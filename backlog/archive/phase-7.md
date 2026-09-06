@@ -3872,3 +3872,131 @@ The reward is what made recruiting ~12 testers for 14 uninterrupted days realist
 network, and Play's production-access gate depended on those testers. The cost at this scale is
 near zero; the liability of *not* honouring it would have been a broken public promise to the
 app's first and most engaged users — the exact people the launch's word of mouth depends on.
+
+---
+
+### T-62 — Web push channel (Flutter Web, and the tombstone it must not touch) — DELIVERED (dark)
+
+| Field | Value |
+|---|---|
+| **Status** | `completed` — **06/09/2026**. The code, the worker, the gates and the runbook ship together; the channel is **armed by console work**, not by a merge (see *What "dark" means* below) |
+| **Priority** | `low` |
+| **Complexity** | `medium` |
+| **Impact** | `low` — unchanged, and for the reason recorded: on iOS web push needs the site on the Home Screen, so the audience is desktop and Android browsers |
+| **Roadmap** | Group 4 (Distribuição). Taken **before T-40** rather than after it: the sequencing argument was about the AUDIENCE this buys, never about a dependency, and nothing in it waits on an iOS build |
+| **Depends on** | **F-09** (29/08/2026) — and the prediction held: the dispatcher, the ten types, the per-recipient render, the token registry, `PushEnrollment`'s four states and the Notificações control needed **no change at all** |
+| **Delivered in** | `2.4.0+61` |
+
+**What the record predicted, and what was actually there**
+
+The record said the client work was "one file". It is one file plus a service worker, a vendored
+SDK and two rewrites of things nobody had looked at — and the difference is worth writing down,
+because every one of the four was invisible from the Dart side.
+
+1. **`firebase_core_web` does not bundle the Firebase JS SDK — it INJECTS it**, at runtime, with
+   a dynamic `import("https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js")`. This
+   channel's CSP is `script-src 'self' …` and `web_channel_test` says in writing that no gstatic
+   host may appear there: CanvasKit is served from our own origin (`--no-web-resources-cdn`)
+   precisely so that executable code never comes from somebody else's. So web push, done the
+   standard way, **collides with a documented decision of the channel**. The way out is the
+   plugin's own: it injects nothing when `window.firebase_core` is already set. The four bundles
+   are vendored under `web/firebasejs/12.18.0/` by `tool/vendor_firebase_js.py`, and the
+   transport sets both globals before `Firebase.initializeApp`. **The CSP gained two
+   `connect-src` hosts and nothing in `script-src`** — which is the whole shape of this item.
+2. **`getToken` opens the permission prompt by itself.** The JS SDK runs
+   `if (Notification.permission === 'default') await Notification.requestPermission()`, and
+   `PushService.start` reads the token on EVERY authenticated session because on the native side
+   that is free. Ported naively, the web channel would have asked every returning visitor for
+   notification permission at page load, with no gesture and no context — spending on a boot the
+   one prompt the product means to spend on a press, and breaking `PushService`'s own documented
+   contract. `token()` reads the permission first; `web_channel_test` pins the guard's position.
+3. **Passing `serviceWorkerScriptPath` would have replaced the app shell.** The FlutterFire layer
+   calls `serviceWorker.register(path)` with no `{scope}`, which takes scope `/` — where
+   Flutter's own worker lives. Passing `null` leaves the JS SDK to register the worker under its
+   own scope, `/firebase-cloud-messaging-push-scope`. That is the answer to the record's "which
+   worker, at which scope": **three workers, three scopes, no contention.** The tombstone is not
+   a participant — nothing registers it but the browser's update check on a device that still
+   carries the Blazor install, and its `activate` unregisters *itself* and touches no other
+   registration. It was never in the way; it only made the standard recipe unusable.
+4. **On the web the tap never reaches Dart.** `onMessageOpenedApp` has no web implementation at
+   all and `getInitialMessage` is hard-coded to `null`: a notification shown by a service worker
+   is clicked against the WORKER. So `firebase-messaging-sw.js` re-states `PushRouting` in
+   JavaScript and opens `/notifications?tab=…&n=…` itself — the same URL `main.dart` builds, read
+   by the same route. It is the **sixth** mirror this product keeps on purpose and the first that
+   is not Dart↔Deno, with a suite of its own; the first run of that suite caught its own
+   leniency, reporting the handler-order rule broken because it had counted a mention in a
+   comment. Order there is load bearing and invisible: the SDK installs its own
+   `notificationclick` listener that calls `stopImmediatePropagation()`, so ours has to be first
+   or the tap closes the notification and goes nowhere.
+
+**The weight, measured rather than argued** (the record asked for exactly this)
+
+| | gzip |
+|---|---|
+| `main.dart.js` before | 1433 KB |
+| `main.dart.js` after | **1443 KB** (+10 KB, +0,7 %) |
+| the SDK the PAGE loads | 32 KB — **only for someone who enables push** |
+| the SDK the WORKER loads | 22 KB — only on that person's first push |
+
+The +10 KB is the Dart interop of `firebase_core`/`firebase_messaging`, which F-09 kept out of
+the web bundle entirely (it was zero occurrences of `firebase` in `main.dart.js`; it is 25 now).
+The 32 KB is not first-load weight at all: `initialize()` answers from `Notification.permission`
+and three global lookups, and the SDK is imported lazily, the first time a token is actually
+needed. **A visitor who never turns push on fetches none of it** — which is what keeps the
+channel acceptance of 23/08/2026 intact rather than re-opened.
+
+**What "dark" means, and why it is the honest shipping state**
+
+The go-live needs a Firebase **Web app** and a VAPID key pair per project — console work, and
+five public values rather than the one the record anticipated (the web has no
+`google-services.json`, so `Firebase.initializeApp` takes explicit options). Until they exist
+`Env.webPush.isConfigured` is false, `PushMessaging.supported` is false, and the control resolves
+to `unsupported` **and says so in words**. Same fail-closed shape as `FCM_SERVICE_ACCOUNT`
+server-side and `billing.store_enabled` client-side, and the same reason: a switch that does
+nothing when pressed is worse than a sentence explaining why there is no switch.
+
+The config lands in **two places** — `Env.prod.webPush` for the page, `FIREBASE_CONFIG` in the
+worker, because a worker is started by the browser with no page to ask — and `web_channel_test`
+compares them string by string, checks that all five values are present (a HALF-filled config
+passes a "not empty" check and then fails at `getToken` complaining about an unrelated field) and
+asserts the worker stays inert while `apiKey` is blank.
+
+**Acceptance is still a human round**, as the record said: `web-e2e` drives a headless Chrome with
+no notification permission and no service-worker lifetime, so it cannot prove a notification. The
+procedure is `supabase/README.md` §11-bis.3, and its one non-obvious step is **close the tab** —
+FCM does not show a notification while a client is visible, it forwards the message to the page.
+
+**The one server-side change**, against a record that said "almost nothing": a `webpush` block in
+`_shared/fcm.ts` carrying `notification.icon`. It is the browser's version of the F-09 Android
+silhouette gotcha — with no icon the notification arrives as a generic bell instead of this
+product. The path is **relative**, because `showNotification` resolves it against the service
+worker's own URL, so one payload names the right origin on every environment and the sender never
+learns a hostname it would then have to keep in sync. No `fcm_options.link`: the destination is a
+product rule and it lives beside the rule it mirrors, and naming a link would hand the tap to the
+SDK's own handler, which stops propagation.
+
+**Files affected**
+- `apps/entrelares_app/lib/services/push_messaging_web.dart` — the stub becomes real
+- `apps/entrelares_app/web/firebase-messaging-sw.js` — new; the worker, its scope reasoning and
+  the `PushRouting` mirror
+- `apps/entrelares_app/web/firebasejs/12.18.0/` — new; the vendored SDK (four bundles)
+- `apps/entrelares_app/tool/vendor_firebase_js.py` — new; the generator, which exits non-zero if
+  any gstatic reference survives its rewrite
+- `apps/entrelares_app/web/_headers` — two `connect-src` hosts, the worker's no-store rule, the
+  pinned SDK's immutable rule
+- `apps/entrelares_app/lib/env.dart` — `WebPushConfig`, per environment
+- `apps/entrelares_app/test/web_channel_test.dart` — seven gates (vendoring, the version pin read
+  out of the plugin itself, the CSP trade, the worker scope, the permission guard, the two-sided
+  config, the cache rules)
+- `packages/entrelares_core/test/mirrors/push_routing_worker_mirror_test.dart` — new; the sixth
+  mirror
+- `supabase/functions/_shared/fcm.ts` — the `webpush` block
+- `supabase/README.md` — new **§11-bis**; `CLAUDE.md` — the Push row, the web-channel row, the
+  mirror inventory and two gotchas
+
+**Justification**
+The web channel is a first-class channel of this product and was the only one that could not tell
+a caregiver something happened while they were not looking. What the item was really blocked on
+was never effort: it was a design decision about service workers on an origin that already had
+two, and — as it turned out — three more traps that a green suite would have shipped without
+noticing. Writing them down is most of the value here; the code is small.

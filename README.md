@@ -20,7 +20,7 @@ consequência ordinária de um cutover que deu certo.
 tool/setup_env.sh             # bootstrap idempotente de ambiente Linux (JDK 17, FVM, Android SDK)
 apps/entrelares_app/tool/     # subset_inter.py — regenera a fonte embarcada (U-27)
 packages/entrelares_core/     # Dart puro: espelhos-cliente das regras do servidor, testáveis com `dart test`
-packages/entrelares_core/test/mirrors/   # T-56: os espelhos Dart↔Deno (i18n.ts, migrations)
+packages/entrelares_core/test/mirrors/   # T-56/F-09/T-62: os seis espelhos (i18n.ts, migrations, service worker)
 packages/entrelares_db_contracts/        # T-56 PR 6: as formas de linha do PostgREST, lidas pelo app E pelo gate
 packages/entrelares_db_gate/  # T-56 PRs 6-16 + F-57 + F-09: o gate de banco (247 testes), Dart puro
 supabase/                     # T-56 PR 3: migrations, Edge Functions e o runbook de deploy
@@ -183,6 +183,13 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   texto por destinatário, em Deno, a partir de `language_effective`. É duplicação
   deliberada do catálogo, e `push_notification_mirror_test.dart` compara os dois lados
   string por string nas duas línguas.
+- **E na WEB o toque também sai do Dart** (T-62): um clique em notificação exibida por
+  service worker é tratado contra o WORKER — `onMessageOpenedApp` não tem implementação
+  web nenhuma —, então `web/firebase-messaging-sw.js` reespelha `PushRouting` e abre
+  `/notifications?tab=…&n=…`, a mesma URL que o `main.dart` monta no Android.
+  `push_routing_worker_mirror_test.dart` é o sexto espelho, e o primeiro que não é
+  Dart↔Deno. O canal web sobe DARK: sem a config do §11-bis do runbook o controle diz
+  `unsupported` por escrito, em vez de oferecer um botão que não funciona.
 - **Gate cobrado no fechamento do lote 6:** `catalog_call_sites_test.dart` prova que toda
   chave declarada ou tem call site, ou está classificada (web-only · o app tem frase própria
   em `k_app` · dívida anotada). As listas falham nos DOIS sentidos — uma chave órfã nova

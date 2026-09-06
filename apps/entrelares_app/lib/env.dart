@@ -19,6 +19,7 @@ class Env {
     required this.analyticsHostname,
     required this.webHostname,
     required this.androidPackage,
+    this.webPush = WebPushConfig.none,
   });
 
   final String name;
@@ -63,6 +64,12 @@ class Env {
   /// its own package so the QA build coexists with the store one).
   final String androidPackage;
 
+  /// T-62: what the WEB build needs to push. Empty means "this environment is
+  /// not armed", and the web transport then reports `unsupported` in words —
+  /// the same fail-closed shape as `FCM_SERVICE_ACCOUNT` server-side and
+  /// `billing.store_enabled` client-side. See [WebPushConfig].
+  final WebPushConfig webPush;
+
   /// Dev/QA — the spike's original target. Still runs the legacy anon JWT
   /// until S-17 (app repo) retires it.
   static const dev = Env._(
@@ -76,6 +83,13 @@ class Env {
     // Synthetic, like its sibling above — see the field's doc.
     webHostname: 'dev.web.entrelares.app',
     androidPackage: 'com.entrelares.flutter',
+    // T-62: deliberately unarmed. Since the Blazor shutdown there is no dev
+    // WEB deployment at all, so the only build that resolves to this
+    // environment on the web is a local `flutter run -d chrome` — arm it here
+    // (§11-bis) only for the session that needs to watch a push arrive, and
+    // never leave prod's values in this slot: a QA run must not be able to
+    // register a token against the production project.
+    webPush: WebPushConfig.none,
   );
 
   /// Production — the exact public values `web.entrelares.app` serves every
@@ -91,6 +105,13 @@ class Env {
     analyticsHostname: 'app.entrelares.app',
     webHostname: 'web.entrelares.app',
     androidPackage: 'com.entrelares.app',
+    // T-62: the web channel's push, DARK until the console work of
+    // `supabase/README.md` §11-bis is done. Filling this is half the go-live;
+    // the other half is the identical object in
+    // `web/firebase-messaging-sw.js`, which the service worker needs because
+    // it starts with no page to ask. `web_channel_test` compares the two
+    // string by string, so they cannot be armed one at a time.
+    webPush: WebPushConfig.none,
   );
 
   /// How the WEB build says "production". `flutter build web` accepts no
@@ -111,5 +132,57 @@ class Env {
   /// Mirrors `pubspec.yaml`'s `version:` — the web's `AppVersion.Display`.
   /// Only the F-17 export reads it, and a stale value there would misdate an
   /// LGPD record, so `env_version_test.dart` fails the build if the two drift.
-  static const String appVersion = '2.3.1+60';
+  static const String appVersion = '2.4.0+61';
+}
+
+/// T-62 — the PUBLIC Firebase Web config of one environment, plus its VAPID
+/// public key.
+///
+/// **Why the web needs five values where Android needs a file.** On Android the
+/// transport reads `google-services.json`, which the Gradle plugin bakes into
+/// the flavor. There is no such file on the web: `Firebase.initializeApp` takes
+/// explicit options, so the same public identifiers have to be written here,
+/// per environment. Nothing in this class is a secret — every one of these
+/// values is served to every browser that loads a Firebase web app, and the
+/// VAPID key is the PUBLIC half of the pair (the private half never leaves the
+/// Firebase console). Rule 1 of `CLAUDE.md` holds unchanged.
+///
+/// **Empty is a state, not an omission.** The item ships with the code, the
+/// worker and the runbook complete and the values blank, because filling them
+/// is Firebase-console work (`supabase/README.md` §11-bis). While they are
+/// blank [isConfigured] is false, `PushMessaging.supported` is false, and the
+/// Notificações control resolves to `unsupported` and SAYS so — never a switch
+/// that does nothing when pressed.
+class WebPushConfig {
+  const WebPushConfig({
+    this.apiKey = '',
+    this.appId = '',
+    this.messagingSenderId = '',
+    this.projectId = '',
+    this.vapidKey = '',
+  });
+
+  /// Firebase Console → Project settings → General → Your apps → Web app.
+  final String apiKey;
+  final String appId;
+  final String messagingSenderId;
+  final String projectId;
+
+  /// Firebase Console → Project settings → Cloud Messaging → Web Push
+  /// certificates → the "Key pair" column. Public by construction.
+  final String vapidKey;
+
+  /// Every value, or none. A HALF-filled config is the worst of the three
+  /// states — it passes a "not empty" check and then fails at `getToken` with
+  /// a message about an unrelated field — so the check is all five.
+  bool get isConfigured =>
+      apiKey.isNotEmpty &&
+      appId.isNotEmpty &&
+      messagingSenderId.isNotEmpty &&
+      projectId.isNotEmpty &&
+      vapidKey.isNotEmpty;
+
+  /// The unarmed environment. Also what every non-web build carries: the
+  /// native transport reads `google-services.json` and never looks here.
+  static const none = WebPushConfig();
 }

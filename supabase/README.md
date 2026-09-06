@@ -1945,6 +1945,83 @@ name every refusal explicitly: `FCM_SERVICE_ACCOUNT not set`, `no registered dev
 
 ---
 
+## 11-bis. The WEB half of the same rail (T-62)
+
+> **Everything in section 11 already covers the web.** The trigger, the function, the service
+> account, the two Vault secrets and the ten types are platform-agnostic, and
+> `push_subscriptions.platform` has accepted `'web'` since the F-09 migration. What is missing
+> on a project armed by §11 is only the CLIENT half: a Firebase **Web app** and a VAPID key
+> pair. Until they exist the web channel reports `unsupported` and says so on the Notificações
+> screen — it never offers a switch that cannot work.
+
+**This is client config, not a secret**, so unlike §11.2 it is COMMITTED. It also lands in two
+places at once, and `web_channel_test` fails the build if only one of them moves.
+
+### 11-bis.1 One Web app per Firebase project
+
+In the SAME project §11.1 created for the environment — not a new one, or the token would be
+minted against a service account that cannot send to it.
+
+1. Firebase Console → the project → ⚙️ **Project settings → General → Your apps → Add app →
+   Web** (`</>`). Nickname is free; **do not** tick "Also set up Firebase Hosting".
+2. The console shows a `firebaseConfig` object. Four of its fields are the ones needed here:
+   `apiKey`, `appId`, `messagingSenderId`, `projectId`. (`authDomain` and `storageBucket` are
+   for products this app does not use.)
+3. Same settings page → **Cloud Messaging** tab → **Web Push certificates** → **Generate key
+   pair**. The string in the "Key pair" column is the VAPID **public** key. The private half
+   never leaves the console.
+
+### 11-bis.2 Writing them down, on both sides
+
+The page and the service worker each need the config, and they get it separately: a worker is
+started by the browser with no page to ask.
+
+1. `apps/entrelares_app/lib/env.dart` → the `webPush:` slot of `Env.prod` (and of `Env.dev`
+   only while a session is watching a push arrive locally — see the comment there).
+2. `apps/entrelares_app/web/firebase-messaging-sw.js` → `FIREBASE_CONFIG`, the same four
+   values minus the VAPID key.
+
+```
+cd apps/entrelares_app && fvm flutter test test/web_channel_test.dart
+```
+
+That suite compares the two objects string by string, checks that all five values are present
+(a HALF-filled config passes a "not empty" check and then fails at `getToken` complaining about
+an unrelated field) and asserts the worker stays inert while `apiKey` is blank.
+
+### 11-bis.3 Verify end to end
+
+`web-e2e` cannot prove this: it drives a headless Chrome with no notification permission and no
+service-worker lifetime. The acceptance is one human round, the same shape F-09's was.
+
+1. Open the channel in a desktop Chrome or an Android browser, sign in, and turn the control on
+   in **Notificações**. Granting the browser prompt is what mints the token.
+2. `select profile_id, platform from public.push_subscriptions;` — a `web` row must be there.
+3. **Close the tab** (this is the point of the test — with a tab visible FCM forwards the
+   message to the page and shows nothing) and have the other caregiver open a swap request.
+4. The notification appears with the product's icon; clicking it opens
+   `/notifications?tab=…&n=…`.
+
+When nothing arrives, read in this order: the browser's DevTools → Application → Service
+Workers (`firebase-messaging-sw.js` must be *activated and running* at scope
+`/firebase-cloud-messaging-push-scope`, alongside the app shell's worker at `/`); then the
+console for a CSP refusal (`connect-src` must cover `firebaseinstallations` and
+`fcmregistrations`, and NOTHING may be blocked in `script-src` — the SDK is vendored under
+`/firebasejs/<version>/` precisely so it is not); then the function's logs as in §11.4.
+
+> **iOS Safari buys almost nothing here, and that is expected.** Web push on iPhone requires
+> the site added to the Home Screen — the installed-PWA scope that died with the cutover. The
+> audience this section serves is desktop and Android browsers.
+
+> **Upgrading the SDK is a re-vendoring, not a `pub upgrade`.** `firebase_core_web` fetches the
+> Firebase JS SDK from `www.gstatic.com` at runtime, which this channel's CSP forbids for
+> executable code. The four bundles under `apps/entrelares_app/web/firebasejs/<version>/` are
+> served from our own origin instead. When the plugin's `supportedFirebaseJsSdkVersion` moves,
+> `web_channel_test` goes red; the fix is `python tool/vendor_firebase_js.py` after bumping its
+> `VERSION`, plus the paths in the worker and in `push_messaging_web.dart`.
+
+---
+
 ## 12. F-53 — the closed-alpha courtesy Premium (who it covers, and how it is granted)
 
 > **Nothing here is new mechanism.** F-58 shipped all of it: `admin_set_comp` writes

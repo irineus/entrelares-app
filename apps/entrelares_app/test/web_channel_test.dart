@@ -26,6 +26,43 @@ String? _csp(String headers) =>
 List<String> _sources(String csp, String directive) =>
     RegExp('$directive ([^;]+)').firstMatch(csp)!.group(1)!.trim().split(' ');
 
+/// T-62 — the Firebase JS SDK version this repo vendors. Named once here and
+/// checked against the four places that spell it out, plus the plugin constant
+/// below, which is the authority.
+const _firebaseSdkVersion = '12.18.0';
+
+/// The Firebase JS SDK version `firebase_core_web` was tested against, read out
+/// of the resolved package rather than repeated here.
+///
+/// Throws rather than skipping when the package cannot be located: a gate that
+/// quietly does nothing reads as coverage on every future review, which is the
+/// vacuous green this file already guards against elsewhere.
+String _pluginSdkVersion() {
+  final config = jsonDecode(File('.dart_tool/package_config.json')
+      .readAsStringSync()) as Map<String, dynamic>;
+  final package = (config['packages'] as List<dynamic>)
+      .cast<Map<String, dynamic>>()
+      .firstWhere((p) => p['name'] == 'firebase_core_web',
+          orElse: () => throw StateError(
+              'firebase_core_web is not in package_config.json — run '
+              '`flutter pub get`'));
+  // `rootUri` is relative to `.dart_tool/` when the package is a path
+  // dependency, absolute (`file:///…`) out of the pub cache.
+  final root = Uri.parse('.dart_tool/')
+      .resolve('${package['rootUri']}/')
+      .resolve('${package['packageUri']}');
+  final source =
+      File.fromUri(root.resolve('src/firebase_sdk_version.dart')).readAsStringSync();
+  final version = RegExp("supportedFirebaseJsSdkVersion = '([^']+)'")
+      .firstMatch(source)
+      ?.group(1);
+  if (version == null) {
+    throw StateError('firebase_core_web no longer declares '
+        'supportedFirebaseJsSdkVersion in the shape this test reads.');
+  }
+  return version;
+}
+
 /// Does one CSP source cover `<scheme>://<host>`? A source matches exactly or
 /// through a single leading `*.` on the host, and `*.example.com` does NOT
 /// cover the bare `example.com` — nothing else in this CSP is dynamic, so a
@@ -173,6 +210,166 @@ void main() {
       // A fetch handler here would make this worker the app's network layer,
       // which is precisely the job it exists to take AWAY from the old one.
       expect(worker, isNot(contains("addEventListener('fetch'")));
+    });
+  });
+
+  // ── T-62 — web push, and the three things about it that fail silently ──────
+  //
+  // The transport itself cannot be unit-tested: `push_messaging_web.dart` is
+  // compiled only for the web, and `flutter test` runs on the VM, where the
+  // conditional export resolves to the native file. So the parts whose failure
+  // is invisible are proven as SOURCES here, the same way the tombstone above
+  // is — a worker at the wrong scope, an SDK reaching for a blocked origin and
+  // a permission prompt on page load are each a thing no green suite would
+  // otherwise notice.
+  group('web push (T-62)', () {
+    late String worker;
+    late String transport;
+
+    setUp(() {
+      worker = _web('firebase-messaging-sw.js').readAsStringSync();
+      transport =
+          File('lib/services/push_messaging_web.dart').readAsStringSync();
+    });
+
+    test('the SDK is vendored, and no copy still points at gstatic', () {
+      // The reason this item touches `web/` at all: `firebase_core_web` does
+      // not bundle the Firebase JS SDK, it injects it with a dynamic
+      // `import("https://www.gstatic.com/firebasejs/…")`. That is executable
+      // third-party code, which the CSP above forbids by decision — so the SDK
+      // is vendored and the plugin is told to inject nothing.
+      final dir = Directory('web/firebasejs/$_firebaseSdkVersion');
+      expect(dir.existsSync(), isTrue,
+          reason: 'run `python tool/vendor_firebase_js.py`');
+
+      for (final name in const [
+        // The ESM pair the PAGE imports.
+        'firebase-app.js',
+        'firebase-messaging.js',
+        // The compat pair the WORKER importScripts — a classic-script loader
+        // cannot take an ES module, and the SDK registers the worker without
+        // `{type: 'module'}`.
+        'firebase-app-compat.js',
+        'firebase-messaging-compat.js',
+      ]) {
+        final file = File('${dir.path}/$name');
+        expect(file.existsSync(), isTrue, reason: '$name is not vendored');
+        // The rewrite the vendoring script exists for: the gstatic ESM bundles
+        // hard-code the absolute URL of their own dependency, so a verbatim
+        // copy would still fetch half the SDK from a blocked origin — and
+        // only at the moment somebody enables push.
+        expect(file.readAsStringSync(), isNot(contains('gstatic.com/firebasejs')),
+            reason: '$name still reaches for gstatic; re-run the vendoring '
+                'script, which fails loudly on exactly this');
+      }
+    });
+
+    test('the vendored version is the one the plugin expects', () {
+      // A `flutter pub upgrade` that moves `firebase_core_web` moves the SDK
+      // version with it, and the plugin only complains in a browser console
+      // nobody reads. Four places name this version — the vendoring script,
+      // the directory, the Dart transport and the worker's importScripts —
+      // and the plugin is the fifth and the authority.
+      expect(_pluginSdkVersion(), _firebaseSdkVersion,
+          reason: 'firebase_core_web now expects a different Firebase JS SDK; '
+              'bump VERSION in tool/vendor_firebase_js.py, re-run it, and '
+              'move the paths in the worker and in push_messaging_web.dart');
+
+      final pinned = 'firebasejs/$_firebaseSdkVersion';
+      expect(File('tool/vendor_firebase_js.py').readAsStringSync(),
+          contains('VERSION = "$_firebaseSdkVersion"'));
+      expect(transport, contains(pinned));
+      expect(worker, contains(pinned));
+    });
+
+    test('the CSP lets the SDK register, without letting it execute', () {
+      final csp = _csp(_web('_headers').readAsStringSync())!;
+      // What the SDK TALKS to: an installation id, then a registration token.
+      // Both are `fetch`, from the page and from the worker alike.
+      for (final host in const [
+        'https://firebaseinstallations.googleapis.com',
+        'https://fcmregistrations.googleapis.com',
+      ]) {
+        expect(_sources(csp, 'connect-src'), contains(host),
+            reason: 'without $host the control turns on and no token is ever '
+                'minted — the browser console is the only witness');
+      }
+      // And the other half of the trade, which is the whole shape of T-62:
+      // two hosts gained in connect-src, NOTHING gained in script-src. The
+      // group above asserts the absence of gstatic there; this asserts that
+      // neither Firebase host was added to it by mistake.
+      final scriptSrc = _sources(csp, 'script-src');
+      expect(scriptSrc.where((s) => s.contains('googleapis')), isEmpty);
+      expect(scriptSrc.where((s) => s.contains('firebase')), isEmpty);
+    });
+
+    test('the worker is never registered over the app shell', () {
+      // The FlutterFire layer registers `serviceWorkerScriptPath` with NO
+      // `{scope}`, which takes scope `/` — where Flutter's own worker lives.
+      // Passing it would replace the app shell's registration with the push
+      // worker. Null leaves the JS SDK to register it under its own scope,
+      // `/firebase-cloud-messaging-push-scope`, beside the shell and beside
+      // the Blazor tombstone.
+      expect(transport, contains('serviceWorkerScriptPath: null'),
+          reason: 'the messaging worker must not claim scope `/`');
+    });
+
+    test('reading the token never opens the permission prompt', () {
+      // THE assertion of this group. The Firebase JS SDK's `getToken` calls
+      // `Notification.requestPermission()` on its own when the permission is
+      // still `default` — and `PushService.start` reads the token on EVERY
+      // authenticated session, whose documented contract is that it never
+      // prompts. Without the guard, the web channel would ask every returning
+      // visitor for notification permission at boot, with no gesture and no
+      // context, spending on page load the one prompt the product means to
+      // spend on a press.
+      final token = transport.substring(
+        transport.indexOf('Future<String?> token()'),
+        transport.indexOf('Future<void> deleteToken()'),
+      );
+      final guard = token.indexOf('_current != PushPermission.granted');
+      final getToken = token.indexOf('getToken(');
+      expect(guard, greaterThan(-1),
+          reason: 'token() must read the permission itself before asking the '
+              'SDK for anything');
+      expect(guard, lessThan(getToken),
+          reason: 'the guard has to come BEFORE getToken, which is what '
+              'raises the prompt');
+    });
+
+    test('the worker and env.dart are armed together or not at all', () {
+      // A service worker starts with no page to ask, so the Firebase config is
+      // written twice: once in `Env.prod.webPush` for the page, once in the
+      // worker. Arming one side only is the failure this pins — the control
+      // would turn on, mint a token, and every push would reach a worker that
+      // cannot read it.
+      String field(String name) =>
+          RegExp("$name: '([^']*)'").firstMatch(worker)?.group(1) ?? '<missing>';
+
+      final config = Env.prod.webPush;
+      expect(field('apiKey'), config.apiKey);
+      expect(field('appId'), config.appId);
+      expect(field('messagingSenderId'), config.messagingSenderId);
+      expect(field('projectId'), config.projectId);
+
+      // And the worker must stay inert while the values are blank: an
+      // `initializeApp({apiKey: ''})` throws on every push event.
+      expect(worker, contains('if (FIREBASE_CONFIG.apiKey)'),
+          reason: 'an unarmed environment must produce an inert worker, not a '
+              'worker that throws');
+    });
+
+    test('the worker is served fresh, and the pinned SDK is not', () {
+      final headers = _web('_headers').readAsStringSync();
+      final sw = RegExp(r'/firebase-messaging-sw\.js\r?\n(.*)')
+          .firstMatch(headers)
+          ?.group(1);
+      expect(sw, contains('no-store'),
+          reason: 'a cached worker pins the routing to an old build');
+      // The opposite rule, and safe only because the version is in the path.
+      final sdk =
+          RegExp(r'/firebasejs/\*\r?\n(.*)').firstMatch(headers)?.group(1);
+      expect(sdk, contains('immutable'));
     });
   });
 
