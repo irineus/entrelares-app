@@ -740,8 +740,8 @@ C prohibition) survives untouched because the pending member simply cannot be a 
 | **Priority** | `low` |
 | **Complexity** | `medium` |
 | **Impact** | `medium` |
-| **Roadmap** | Roadmap group 4 (distribution), immediately after **T-62** — the three push cards run in sequence: iOS (**T-40**) → web (**T-62**) → this one. *(The group is about SEQUENCE, not about this being distribution work: it has to come after both channels exist, or it would be decided on a third of the evidence.)* |
-| **Depends on** | **F-09** (the push rail, delivered 29/08/2026), **F-38** (the e-mail quota this would relieve), **T-40**/**T-62** (a decision taken with only Android data would be re-taken twice) |
+| **Roadmap** | Roadmap group 4 (distribution), last of the three push cards: iOS (**T-40**) → web (**T-62**, delivered 06/09/2026) → this one. *(The group is about SEQUENCE, not about this being distribution work: it has to come after both channels exist, or it would be decided on a third of the evidence.)* |
+| **Depends on** | **F-09** (the push rail, delivered 29/08/2026), **F-38** (the e-mail quota this would relieve), **T-40** and the ARMING of **T-62** (a decision taken with only Android data would be re-taken twice). *(T-62 delivered the web channel's push on 06/09/2026 but ships DARK — the Firebase console work of `supabase/README.md` §11-bis is what starts producing web evidence, so this item waits on that step and not on the item.)* |
 | **Repo** | `flutter` |
 
 **Description**

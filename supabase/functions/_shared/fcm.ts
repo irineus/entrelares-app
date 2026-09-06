@@ -179,6 +179,24 @@ export async function sendToTokens(
 							// and `sound` is what makes it more than a badge.
 							payload: { aps: { sound: "default" } },
 						},
+						webpush: {
+							// T-62 — the browser's equivalent of the Android
+							// silhouette gotcha: with no `icon` the notification
+							// arrives carrying whatever the browser picks, which on
+							// desktop Chrome is a generic bell and not this product.
+							// The path is RELATIVE on purpose — `showNotification`
+							// resolves it against the service worker's own URL, so
+							// the same payload names the right origin on every
+							// environment and this sender never has to learn a
+							// hostname it would then have to keep in sync.
+							//
+							// No `fcm_options.link`: the destination is a product
+							// rule (which tab a type lands on), and it lives beside
+							// the rule it mirrors, in `firebase-messaging-sw.js`.
+							// Naming a link here would ALSO hand the tap to the
+							// SDK's own click handler, which stops propagation.
+							notification: { icon: "/icons/Icon-192.png" },
+						},
 					},
 				}),
 			});

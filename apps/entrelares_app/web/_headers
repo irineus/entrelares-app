@@ -19,13 +19,23 @@
 #     client, declared in the privacy policy. It is fetched with `fetch`, so
 #     `connect-src` is the directive that actually rules; `font-src` is there
 #     for the CSS path.
+#   * T-62 adds TWO connect-src hosts and NOTHING to script-src, which is the
+#     whole shape of that item: `firebase_core_web` fetches the Firebase JS SDK
+#     from gstatic by dynamic `import()`, and this CSP forbids executable code
+#     from anywhere but this origin — so the SDK is VENDORED under
+#     `/firebasejs/<version>/` instead (`tool/vendor_firebase_js.py`) and the
+#     plugin is told to inject nothing. What remains third-party is the API the
+#     SDK TALKS to: `firebaseinstallations` mints the installation id and
+#     `fcmregistrations` exchanges it for the registration token. Both are
+#     `fetch`, from the page AND from the messaging worker (a worker's requests
+#     are judged by the CSP served with the worker script, which is this one).
 /*
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cloud.umami.is https://fonts.gstatic.com; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cloud.umami.is https://fonts.gstatic.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com; frame-ancestors 'none'
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Cache control
@@ -45,6 +55,12 @@
 /flutter_bootstrap.js
   Cache-Control: no-cache, no-store, must-revalidate
 
+# T-62 — the FCM worker. Same rule as the two above and for the same reason:
+# the browser re-fetches a registered worker to check it for updates, and a
+# cached copy pins the push routing (and the Firebase config) to an old build.
+/firebase-messaging-sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
 # The app shell must be fresh so the service worker can always serve the
 # correct version.
 /index.html
@@ -52,6 +68,13 @@
 
 /manifest.json
   Cache-Control: no-cache, no-store, must-revalidate
+
+# T-62 — the vendored Firebase JS SDK. The exact opposite rule of the four
+# above, and safely so: the SDK VERSION is in the path, so a given URL's bytes
+# never change and a new version is a new URL. Cached hard, it costs a returning
+# visitor nothing; the files are only ever fetched by someone who has push on.
+/firebasejs/*
+  Cache-Control: public, max-age=31536000, immutable
 
 # Digital Asset Links — Android re-reads it to verify App Links. Served as
 # JSON, never as a download, and never stale for longer than a day.
