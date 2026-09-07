@@ -51,9 +51,6 @@ cd apps/entrelares_app && fvm flutter test integration_test/swap_workflow_test.d
 # descartável. Exige a service_role do DEV (nunca a de produção); sem ela a suíte
 # aborta com instruções em vez de rodar pela metade.
 cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm dart test
-# Espelho do board no Notion: lê os TRÊS repos (este, entrelares-app e entrelares-site,
-# encontrados por padrão como irmãos deste checkout) e gera o corpo das páginas.
-python tool/notion_mirror.py -o mirror.json
 ```
 
 **Flavors (estágio 3):** todo build Android exige `--flavor dev` ou `--flavor prod` —
