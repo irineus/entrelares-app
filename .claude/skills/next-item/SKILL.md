@@ -1,171 +1,264 @@
 ---
 name: next-item
-description: Start a backlog item end-to-end for Entrelares — pick it from the Notion board (or take the ID passed as argument), read row + page + repo record, run the analysis/gap-question step, implement with tests on a fresh branch, and close out board + backlog in the same delivery. Use at session start when the user wants to develop the next (or a specific) backlog item — "próximo item", "novo item", "vamos desenvolver o F-NN / L-NN". Covers the product app (F-/U-/T-/S- in entrelares-flutter) and the landing (L- in entrelares-site).
+description: Avança o trabalho no board do Entrelares no Notion — database "Backlog" sob "Entrelares — Backlog & Roadmap". Use sempre que o usuário disser "próxima tarefa", "próximo item", "novo item", "o que fazer agora", "vamos desenvolver o F-NN / L-NN", "concluí esse item", "marca como concluído/em andamento", "como está o board", "status do projeto", "cria um card para X", ou qualquer pedido para consultar, atualizar ou expandir o roadmap do Entrelares — mesmo que não mencione o Notion explicitamente. Cobre o app do produto (F-/U-/T-/S- em entrelares-flutter) e a landing (L- em entrelares-site).
 ---
 
-# next-item — develop one backlog item, end to end
+# Próximo item — board do Entrelares
 
-You are starting a development item for **Entrelares**. This skill sequences the working
-rhythm; the `CLAUDE.md` files remain the authority on every convention — on any conflict,
-`CLAUDE.md` wins. Interact with the user in PT-BR.
+Este produto é rastreado no Notion. Os repositórios carregam o código; **o board e as Decisões
+vigentes no Notion são a fonte da verdade** sobre o que fazer e o que já foi decidido.
 
-An argument may have been passed (e.g. `/next-item F-42`): treat it as the item ID.
+> **Desde o T-63 (07/09/2026) o CARD é o registro do item.** Não existe mais espelho em markdown,
+> não existe mais `tool/notion_mirror.py`, e o encerramento não move arquivo nenhum. `backlog/` no
+> repositório é **história congelada** — os registros dos itens concluídos, que continuam valendo
+> como memória e nunca mais são editados.
 
-## 0 · Where things live right now (read this first — it is moving)
+Interagir com o usuário em **PT-BR**. Conteúdo de card, página e documento em **English**, como
+todo o resto do produto (só UI, notificações e e-mails são PT-BR).
 
-The T-53 cutover (23/08/2026) made **both product channels Flutter**, and the archiving of
-`entrelares-app` is under way. Until it finishes, an item is **recorded in one repo and
-delivered in another**:
+## Identificadores
 
-| What | Where, today |
-|---|---|
-| **Code** of a client item (`F-`/`U-`/`T-`/`S-`) | `entrelares-flutter`, branch **`main`** |
-| **Code** of a landing item (`L-`) | `entrelares-site`, branch **`preview`** |
-| Backlog **records** + `archive/phase-*.md` | **here**, in `backlog/` — the mirror reads them from this repo since 24/08/2026 |
-| **Migrations + Edge Functions** | **here**, in `supabase/`. A PR applies them to the **dev** project before the gate runs; a merge to `main` applies them to **production** (job `db-prod`) before the web channel publishes |
-| **The DB gate** (237 tests over RLS/RPCs/triggers) | **here**, in `packages/entrelares_db_gate/` — job `db-gate` of `verify.yml`. Pure Dart since T-56 PR 16 (24/08/2026), and the only copy: the app repo's C# suites went with the emptying |
-| **Play listing + brand masters** | **here**, in `store/` (T-56 PR 4c) — the TWA/Bubblewrap project stayed behind, and retiring that package is **T-52** |
-| The old Blazor client | `entrelares-app`, **shut down and archived** (24/08/2026). It holds the frozen client and its unit suite, nothing else, and nothing is deployed from it. Nothing there needs to be read to work here |
+- Board (data source): `109b1b02-5b6b-48ef-b3b6-990374a3d10f`
+- Database (página): `10744177ada74c6b95baedea8c71a96d`
+- **Decisões vigentes** (página): `3d42f3f4-b9b2-819d-b0d8-c845b7aa1ae5` — ler as **seções 1 a 6**
+- **📜 Decision history** (subpágina da anterior, onde entra a linha nova de cada item):
+  `3d42f3f4-b9b2-817d-9681-d2e3a47f277d`
+- Repositórios: `github.com/irineus/entrelares-flutter` (branch **`main`** = PRODUÇÃO) e
+  `github.com/irineus/entrelares-site` (branch **`preview`**)
+- **O prefixo do ID escolhe o repositório:** `L-*` → `entrelares-site`; todo o resto →
+  `entrelares-flutter`. A coluna `Repo` pode estar com o valor pré-cutover em linha antiga — **o
+  prefixo vence**.
+- NÃO confundir com o board do **Gestão IM360** (`e50abe7f-1688-402a-96b5-c6049b24ce82`) nem com o
+  do **Desmalha** (`d50a2925-fb74-4f67-b0db-af03ef41d1b4`). Projetos diferentes.
 
-**T-56 is CLOSED** — the table above is the settled layout, not a transition. The code closed on
-24/08/2026 and the owner's console work on 25/08: `entrelares-app` is **archived**, and
-`legado.entrelares.app` no longer resolves. Nothing about the product lives outside this repo and
-`entrelares-site`. The plan, the measurements and the PR-by-PR record are in
-[`docs/arquivamento-app.md`](../../../docs/arquivamento-app.md). **If a row above no longer
-matches reality, that doc is the authority and this table is stale: fix it in the same
-delivery.**
+### Propriedades do card
 
-## 1 · Preconditions
+| Propriedade | Tipo | Observação |
+|---|---|---|
+| `Item` | título | **não existe coluna `Nome`nem `Tarefa`** |
+| `ID` | texto | na query é **`"userDefined:ID"`**, nunca `ID`. Chave estável (`F-`/`U-`/`T-`/`S-`/`L-` + número), **nunca reusada** — é a junção com todo o histórico dos repos |
+| `Fase` | select | os 8 grupos do roadmap (`1 · …` a `8 · …`). **Eixo vivo**, e ele SOBREVIVE ao encerramento |
+| `Ordem` | número | aceita decimal — inserção no meio da fila não renumera os demais |
+| `Status` | select | `pending` · `in-progress` · `completed` · `skipped` |
+| `Prioridade` | select | `critical` · `high` · `medium` · `low` |
+| `Notas` | texto | contexto prático: `Origem:`, `Destrava:`, `DECISÃO`, `CONCLUÍDO <data>:` |
+| `Tamanho` | select | `P`/`M`/`G`/`GG` = 1/3/5/8 pontos |
+| `Tipo` | select | `Feature` · `UI/UX` · `Technical` · `Security` · `Landing` |
+| `Conclusão` | data | na query use `date:Conclusão:start` |
+| `Complexidade`, `Impacto` | select | `low`/`medium`/`high` |
+| `Item pai` / `Sub-itens` | relation | hierarquia feature↔story |
 
-- Confirm the **Notion MCP connector** is active. If it is not, STOP and tell the user —
-  never guess an item's status (the markdown carries no status summary).
-- Check the toolchain before planning around it: does `fvm` exist (app: `fvm flutter`,
-  `fvm dart`) / `npm` (landing Worker)? If not, every line is written blind — write against
-  the surrounding patterns, split into smaller deliveries, and treat CI as the first
-  compiler (see `CLAUDE.md` Build & test).
+**CONGELADAS — são história, não se preenchem mais** (T-63): `Esforço gasto (h)`,
+`Esforço estimado (h)`, `Link`, `Fase de entrega (histórico)`, `Início`.
 
-## 2 · Pick the item
+## Pré-requisito
 
-- **With argument:** use that ID.
-- **Without argument:** take the first row of the board's execution queue:
-  ```
-  query_data_sources → mode "sql", data_source_urls
-    ["collection://109b1b02-5b6b-48ef-b3b6-990374a3d10f"]
-  SELECT "userDefined:ID", "Item", "Repo", "Grupo roadmap", "Ordem",
-         "Esforço gasto (h)", url
-  FROM "collection://109b1b02-5b6b-48ef-b3b6-990374a3d10f"
-  WHERE "Status" = 'pending' ORDER BY "Grupo roadmap", "Ordem" LIMIT 5
-  ```
-  The first row is the next item; show the user the top of the queue and confirm the pick.
-  Gotchas (they cost time before): the column is `"userDefined:ID"`, never `ID`; a column
-  alias is NOT usable in `WHERE`; the query is metered — fetch everything needed in ONE call.
-- The ID prefix selects the repo: `L-*` → **`entrelares-site`** (base branch `preview`),
-  everything else → **`entrelares-flutter`** (base branch `main`). The board's `Repo`
-  column may still say the pre-cutover value on old rows — the prefix wins.
-- **Rename the session** to the item being implemented — `<ID> — <item name>` (e.g.
-  `F-50 — Viewer member`) — as soon as the pick is confirmed, so the session list
-  identifies the work at a glance. Right after renaming, **move the session into the
-  "Guarda Compartilhada" session group/project**, so all the project's sessions live
-  together. Use the harness's session-management capability if one is exposed (search the
-  available tools for rename/move); as of Aug 2026 none is — in that case say so ONCE and
-  ask the user to do both in the UI, instead of silently skipping.
+MCP do Notion conectado na sessão. Se não estiver, **parar e avisar** — sem ele não há board nem
+decisões, e adivinhar o status de um item é o defeito que esta regra existe para evitar.
 
-## 3 · Read before writing
+## Passos obrigatórios no início
 
-- Fetch the item's Notion **page body** (the row `url`) and read the **markdown record**
-  (see the table in §0 for where it lives) — the markdown is the source of truth for what
-  the item IS; the row for whether it is still wanted and what was already spent.
-- Staleness check: the record repo may run ahead of what is published. If board and repo
-  disagree, the repo wins. Confirm the item is not already done or superseded before
-  investing in it.
+1. Ler o `CLAUDE.md` do repositório em que se vai trabalhar.
+2. Ler a página **Decisões vigentes**, seções **1 a 6**. **Em conflito com qualquer documento do
+   repositório, a página vence** — ela é escrita no momento da decisão; o arquivo pode estar
+   atrasado. Se a divergência for relevante, avisar o usuário e corrigir o repo na mesma entrega.
+   Se a página não puder ser lida, dizer isso antes de seguir — não improvisar de memória.
+3. **Não ler o log cronológico na partida.** Ele mora na subpágina **📜 Decision history** e se
+   consulta quando a tarefa pedir — rastrear um item, um documento ou um defeito antigo.
+4. **Nem as subpáginas de detalhe.** A §2 e a §3 guardam o **enunciado** de cada regra — o que vale
+   hoje, onde ela mora no código — mais a **armadilha concreta** que aquela regra já custou, com
+   teto de **6 linhas por regra**. O raciocínio, as medições e as contraprovas moram em **seis
+   subpáginas por domínio**:
 
-## 4 · Analysis and gap questions — BEFORE any code
+   | Subpágina | Quando abrir |
+   |---|---|
+   | Database, RLS and RPCs | política, trigger, `SECURITY DEFINER`, migração, comportamento do PostgREST |
+   | Android, web and push | build de canal, service worker, FCM, canal de notificação, SDK vendorizado |
+   | Billing and monetization | trilho Asaas, Play Billing, transição de plano, grace/dunning |
+   | Tests, gates and CI | suíte que concorda com a coisa errada, fila do gate, flake, espelhos |
+   | Design system and UX | tokens, os onze componentes, skeletons, tipografia, dark |
+   | Legal, policy and analytics | versionamento de política, o método do S-15, sanitizador do Umami |
 
-Present a concise analysis: scope, files touched, risks, dependencies (check the item's
-`Depends on`/prerequisites against the board), test plan, and whether the item needs a
-migration/Edge Function. Then ask the gap questions via **AskUserQuestion**. Only start
-implementing after the decisions are locked. If the item is big, propose a split into 2–3
-incremental PRs (each with its docs/backlog closeout inline) and get the user's pick.
+   Abre-se **a do domínio do item**, e só ela.
 
-## 5 · Implement
+   ⚠️ **Ao encerrar item que gere decisão**, o enunciado curto vai para a §2/§3 (respeitando o teto
+   de 6 linhas) e o raciocínio vai para a **subpágina do domínio** — nunca tudo na página-mãe.
 
-- **Fresh branch from the CURRENT base** (`main` for the app, `preview` for the landing) —
-  never reuse a merged branch (squash merges orphan its history). Suggested name:
-  `feature/<item>-<slug>`.
-- Tests ship with the feature in the same item: every **pure rule** gets a mirror in
-  `packages/entrelares_core` with `dart test`; screens get widget tests; **DB rules go to
-  `packages/entrelares_db_gate`** (a suite library under `test/suites/`, wired into the
-  aggregating entrypoint — see §0); two-user flows to the `integration_test` lane.
-- **Run the gate locally before pushing** — the core lane uses `--fatal-infos`, so a single
-  info-level lint (e.g. `unnecessary_brace_in_string_interps` inside a test `reason:`)
-  fails the job, and because it is the FIRST step the app and web lanes never even start:
-  ```
-  cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
-  cd apps/entrelares_app && fvm flutter analyze && fvm flutter test
-  ```
-  If the item touched the database, run the DB gate too (needs the DEV service_role key,
-  never the production one):
-  ```
-  cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm dart test
-  ```
-  That suite also holds the two source gates: `no_literal_snack_test` (catalog strings) and
-  `no_color_literal_test` (U-27 — colours only in `lib/theme/tokens.dart`).
-- Migrations via `supabase migration new` in `supabase/migrations/`; Edge Functions redeploy
-  from `verify.yml` — and a NEW function must be added to `.github/functions.sh`, or the
-  drift guard fails the run rather than letting it be silently never deployed.
-- **Version bump** in the SAME delivery for any functional change: `version:` in
-  `apps/entrelares_app/pubspec.yaml` (`0.2.x+NN` — BOTH halves; the `+NN` is the Android
-  `versionCode` and the Play Console refuses a repeated or lower one). Internal-docs-only
-  work skips it.
-- Commit (PT-BR, conventional style) and push to the session's work branch. Report what
-  was done.
+## Consultar o board
 
-## 6 · Gate: PR and merge
+Uma chamada só — a query é tarifada. Buscar tudo o que a sessão precisa de uma vez:
 
-**PR + squash-merge only with the user's explicit OK — never automatic.** The `Backlog: <ID>`
-trailer lives at the END of the PR body (only if this PR delivers the item; delete the line
-otherwise) — it is what links the commit to the item in the board mirror, and a commit that
-loses it needs a hand-written entry in `tool/notion_mirror.py`.
+```sql
+SELECT "userDefined:ID", "Item", "Status", "Fase", "Ordem", "Prioridade",
+       "Tamanho", "Tipo", "Notas", url
+FROM "collection://109b1b02-5b6b-48ef-b3b6-990374a3d10f"
+WHERE "Status" IN ('pending', 'in-progress')
+ORDER BY CAST(substr("Fase", 1, 2) AS INTEGER), "Ordem"
+```
 
-Unlike the old app repo, **`verify.yml` runs on the PR itself** (`pull_request` trigger), so
-the gate is green before the merge, not after it.
+Armadilhas que já custaram tempo: a coluna é **`"userDefined:ID"`**, nunca `ID`; **um alias não
+serve no `WHERE`**; e `substr("Fase", 1, 2)` funciona porque os grupos são `1 ·` a `8 ·` — se um dia
+passarem de nove, o nome ganha zero à esquerda e essa expressão continua certa. Conferir o
+resultado: se `CAST(...)` der 0 em toda linha, os nomes dos grupos mudaram.
 
-## 7 · Close-out — all in the SAME delivery
+## Escolher o item
 
-1. Entry status updated in the markdown + record moved to `archive/phase-N.md` (`Fase 7`
-   since 03/08/2026 — "Public Availability & Product Depth"; landing records stay in
-   `ROADMAP.md` and never set `Fase`).
-2. The Notion row: `Status`, `Conclusão`, `Esforço gasto (h)`, `Fase`, and clear
-   `Grupo roadmap`/`Ordem`.
-3. Regenerate the item's page body:
+**Com argumento** (`/next-item F-42`): é esse.
+
+**Sem argumento — itens `in-progress` vêm primeiro e o usuário decide.** Antes de propor qualquer
+`pending`:
+
+1. Listar TODOS os `in-progress` na ordenação acima, com as **Notas completas** (elas dizem o que
+   falta e de quem depende).
+2. Perguntar com **AskUserQuestion** em qual seguir — uma opção por item em andamento, mais a opção
+   de ir para o próximo `pending`. **Não escolher sozinho:** item em andamento costuma estar parado
+   por dependência de terceiro (owner, Play Console, jurídico), e só o usuário sabe se destravou.
+3. Sem nenhum `in-progress`, o próximo é o primeiro não concluído na ordenação, respeitando as
+   dependências anotadas nas Notas.
+
+Apresentar o item escolhido **com o corpo do card e as Notas completas** antes de começar — é ali
+que está o registro inteiro e a decisão bloqueante.
+
+## Renomear a sessão
+
+Assim que o item estiver escolhido, renomear a sessão para **`<ID> — <Item>`** (ex.:
+`F-50 — Viewer member`). Sem isso a lista de sessões não diz em que se trabalhou.
+
+`set_session_title` exige o **id real** da sessão — `session_id: "self"` é recusado. O `"self"` só
+vale no `get_session`, que é de onde o id sai:
+
+1. `get_session` **sem** `session_id` → devolve `ccr.id` (`session_...`) desta sessão;
+2. `set_session_title` com esse `session_id` e o título.
+
+Se a ferramenta não estiver exposta, dizer isso **uma vez** e pedir que o usuário renomeie na UI —
+nunca pular em silêncio.
+
+## Analisar antes de escrever — o ritmo do Entrelares
+
+**Análise detalhada + gap questions (AskUserQuestion) ANTES de qualquer código.** Escopo, arquivos
+tocados, riscos, dependências, plano de teste, e se o item precisa de migração ou Edge Function.
+Só implementar depois que as decisões estiverem travadas. Item grande: propor divisão em 2–3 PRs
+incrementais e deixar o usuário escolher.
+
+**Um escopo por sessão.**
+
+## Executar
+
+1. Marcar o card como **`in-progress`** ao começar.
+2. **Branch nova a partir da base ATUAL** (`main` no app, `preview` na landing) — nunca reusar
+   branch já mergeada, que o squash órfã. Nome sugerido: `feature/<id>-<slug>`.
+   Quando a branch designada da sessão for a própria `main`, **não commitar nela**.
+3. Testes vão junto com a feature, no mesmo item: regra pura → espelho em
+   `packages/entrelares_core` com `dart test`; tela → widget test; **regra de banco →
+   `packages/entrelares_db_gate`** (suíte em `test/suites/`, ligada ao entrypoint agregador);
+   fluxo de dois usuários → lane `integration_test`.
+4. **Rodar o gate localmente antes do push** — o lane core usa `--fatal-infos` e é o PRIMEIRO passo,
+   então uma info derruba o job e os lanes de app e web nem começam:
    ```
-   python tool/notion_mirror.py -o mirror.json
+   cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
+   cd apps/entrelares_app && fvm flutter analyze && fvm flutter test
    ```
-   (run from the `entrelares-flutter` checkout; it finds the sibling repos by default)
-   then `update-page` with `command="replace_content"` for the item's page. Never
-   hand-edit the Notion body.
-4. **Documentation sweep — the docs must not wait for a promotion to catch up.**
-   `grep -rn '<ID>'` across the record files, `README.md` and `CLAUDE.md` of the repos the
-   item touched, and fix every hit that still describes the item as pending/future:
-   - the roadmap section of `backlog/README.md`: remove the item's row from its group
-     table; if the group EMPTIED, say so in the group heading/intro; fix status-summary
-     phrases that counted items ("all four gates" → "all five").
-   - `README.md`: feature tables/capability lists gain the delivered feature; test-suite
-     counts and inventories reflect any new test files.
-   - `CLAUDE.md`: the Build & test inventories mention new suites/gates; touch the Overview
-     ONLY for what changed in PRODUCTION.
-   These edits ride the SAME delivery/PR as the close-out (internal docs — no extra version
-   bump beyond the item's own).
+   Item que tocou o banco roda também o DB gate (exige a service_role do **dev**, nunca a de
+   produção):
+   ```
+   cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm dart test
+   ```
+5. **Version bump na MESMA entrega** para qualquer mudança funcional: `version:` em
+   `apps/entrelares_app/pubspec.yaml` (`0.2.x+NN` — as DUAS metades). Trabalho só de documentação
+   interna pula.
+6. Se a nota do card divergir do que faz sentido, **não seguir em silêncio nem inventar escopo**:
+   fazer o que é coerente e registrar a divergência e o motivo nas Notas e na subpágina de
+   resultado.
 
-## 8 · After the merge
+## Encerrar o item
 
-**A merge to `main` publishes to real users.** Since the cutover the `deploy-web` job
-publishes `web.entrelares.app` from every green push to `main` — there is no QA branch in
-between, so the QA that used to happen after the merge now has to happen BEFORE it: on the
-PR's green gate, and on a dev-flavor build when the change needs a real device
-(`workflow_dispatch` → `build-apk`). The Android channel is the exception: it ships only
-when the owner promotes a bundle in the Play Console.
+1. **Resultado extenso** (especificação, medição, relatório, ADR): criar como **subpágina do card**
+   (`parent: {page_id: <card-id>}`), nunca solta na raiz do workspace.
+2. **Corpo do card**: é o registro do item — atualizar o que a entrega mudou no enunciado dele.
+3. **Notas**: `update_properties` **sobrescreve** o campo — ler o valor atual primeiro e reenviar o
+   texto completo, preservando a linha `Origem:`. Prefixar o que foi feito com `CONCLUÍDO <data>:`,
+   com o link do PR.
+4. **Decisões vigentes**, se o item gerou decisão (arquitetura, regra, schema, parâmetro, risco). A
+   decisão se escreve em **três lugares diferentes**:
+   - **o enunciado** vai para a seção da página-mãe, com `update_content` (**nunca**
+     `replace_content`), dentro do teto de 6 linhas;
+   - **o raciocínio, as medições e as contraprovas** vão para a **subpágina do domínio**, com
+     `insert_content`;
+   - **a linha do log** vai para **📜 Decision history**, com `insert_content` e
+     `position: start`, com data e item de origem.
 
-QA feedback lands in a NEW commit/PR — realign the branch onto the current base first. If
-the session watches the CI run, schedule the check-in for the last completed run's duration
-+ 1 minute.
+   Decisão revogada é a única que volta para a página-mãe: vai para a §6 "Superseded decisions",
+   com o motivo. **Não apagar a antiga** — saber o que foi tentado e por que caiu evita refazer a
+   discussão.
+5. **`Status` = `completed`** e **`Conclusão` = a data de hoje**. As duas coisas, sempre. Se o card
+   ainda não tiver `Tamanho` e `Tipo`, preencher também. **`Fase` NÃO se limpa** — ela diz em que
+   grupo o item foi entregue.
+6. **Varredura de documentação, na MESMA entrega.** `grep -rn '<ID>'` nos `README.md` e `CLAUDE.md`
+   dos repos que o item tocou, e corrigir todo acerto que ainda descreva o item como pendente ou
+   futuro: tabelas de capacidade ganham a feature entregue; inventários de suíte refletem arquivos
+   de teste novos; o `CLAUDE.md` só muda no que mudou em PRODUÇÃO. **Nada disso toca `backlog/`**,
+   que é história congelada.
+7. Terminar a sessão com um **bloco de resumo** para o board.
+
+## Ciclo do Git
+
+**`main` é produção.** Não há branch de QA: um merge em `main` publica `web.entrelares.app` pelo job
+`deploy-web`, e a QA que antes acontecia depois do merge tem de acontecer **antes** — no gate verde
+do PR, e num build de flavor dev quando a mudança precisa de aparelho real (`workflow_dispatch` →
+`build-apk`). O canal Android é a exceção: só sai quando o owner promove um bundle no Play Console.
+
+**Por isso o Entrelares NÃO copia o merge automático do Gestão** (lá `develop` é do CI e `main` é do
+dono; aqui só existe `main`, e ela é o dono).
+
+1. Commit em **PT-BR**, conventional-commit (`feat(calendario): …`).
+2. Push: `git push -u origin <branch>`.
+3. **PR + squash-merge só com o OK explícito do usuário — nunca automático.**
+   **Exceção permanente:** gate VERMELHO consertado corrigindo os TESTES (flake, rate-limit,
+   asserção errada — sem mudança de comportamento) pode ser mergeado direto.
+4. `verify.yml` roda no próprio PR (gatilho `pull_request`), então o gate fica verde **antes** do
+   merge.
+5. Em sessão do Claude Code na web o `gh` **não** existe — usar as ferramentas MCP do GitHub.
+6. **Vermelho entra no laço de correção, não para o item.** Parar e não mergear só quando: a falha
+   se repetir pela mesma razão depois de uma tentativa; na terceira tentativa; ou o conserto exigir
+   ação que só o usuário pode fazer (secret, conta externa, decisão de produto). Em qualquer um dos
+   três: dizer qual foi e por quê, com o log.
+7. Se a sessão acabar no meio do ciclo, o resumo tem de dizer **em que ponto parou** — branch
+   empurrada? PR aberto? mergeado? A sessão seguinte começa daí.
+
+### Limpeza de branch depois do merge
+
+**Não decidir por `git branch --merged`**: com squash a ponta da branch deixa de ser ancestral e
+some do `--merged` mesmo com tudo integrado. Usar `git cherry`, que compara por *patch-id*:
+
+```bash
+git fetch origin --quiet
+git cherry main origin/<branch> | grep '^+' | wc -l   # 0 = tudo já está em main
+```
+
+**Em sessão na nuvem, apagar branch remota é impossível — não tentar.** Todo o tráfego de git passa
+por um proxy com *push protection*: apagar a ref de outra branch devolve `HTTP 403` de forma
+determinística, e nenhuma configuração muda isso. Dizer no resumo quais branches estão prontas para
+remoção, com o link `https://github.com/irineus/entrelares-flutter/branches`, e **nunca dar a
+limpeza como feita**.
+
+## Criar cards novos
+
+**Card primeiro, sem registro em markdown.** `notion-create-pages` com
+`parent: {data_source_id: "109b1b02-5b6b-48ef-b3b6-990374a3d10f"}`.
+
+- O **ID** é o próximo número livre da categoria (`F-`/`U-`/`T-`/`S-` no app, `L-` na landing) —
+  IDs são estáveis e **nunca reusados**.
+- Já nascer com `Fase`, `Ordem`, `Tipo` e `Tamanho` — card sem tamanho some da conta de prazo.
+- Nas **Notas** de todo card novo, registrar a **origem** (`Origem: <item ou decisão que gerou
+  este>`) e o que ele destrava. Um card sem contexto de origem é inútil três semanas depois.
+- O **corpo** do card é o registro: o que o item É, por que existe, escopo, aceitação.
+- Pendência registrada nas Decisões vigentes que prometa um card deve virar card de verdade;
+  pendência sem card é pendência esquecida.
+
+## Proibições
+
+- **Nunca deletar cards.**
+- **Nunca tocar em outro database do workspace** (Gestão IM360, Desmalha) a partir deste projeto.
+- **Nunca editar `backlog/`** no repositório: é história congelada desde o T-63.
+- IDs de página em **UUID hifenizado** nas chamadas de atualização.
+- Nunca aplicar SQL manualmente em produção — migração pelo CI.
