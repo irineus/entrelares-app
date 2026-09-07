@@ -648,3 +648,65 @@ the summary e-mail on a real device). If it fails, §9-quater.B.
 URI while real accounts exist — a change of auth host mid-flight is the kind of thing that
 invalidates in-progress sign-ins.
 
+
+### T-63 — Retire the backlog mirror: the Notion card becomes the single record of an item (Gestão IM360 / Desmalha model)
+
+| Field | Value |
+|---|---|
+| **Status** | `pending` |
+| **Priority** | `medium` — process, not product; but every close-out until it lands pays the mirror ceremony |
+| **Complexity** | `medium` (one-time migration of every pending record + a skill rewrite + two `CLAUDE.md`; nothing ships to users) |
+| **Impact** | `medium` (fewer places to keep in sync, one less tool that needs the archived `entrelares-app` checkout to start) |
+| **Depends on / relates** | **T-56** (moved the backlog here and taught the mirror to read every repo), **Fulcrum card 01.4** (its gate asked for `fulcrum` in the mirror's `REPOS`; the owner dropped that line on 07/09/2026 rather than add code this item deletes), the landing's `L-*` records (same generator) |
+
+> **Owner decision, 07/09/2026:** *"estou achando uma replicação desnecessária da forma que
+> está acontecendo hoje"* — the Entrelares board is to work the way the Gestão IM360 and
+> Desmalha boards already do. **This is the LAST item delivered under the mirror scheme:** its
+> own close-out is the final run of `tool/notion_mirror.py`.
+
+**What exists today, and why it is three things.** An item's identity lives in a markdown
+record (`backlog/*.md`, or `ROADMAP.md` for the landing), which `tool/notion_mirror.py`
+renders into the Notion page body, while the board row owns status, order and effort. The
+generator reads four repositories, needs the archived `entrelares-app`
+checkout on disk to even start, credits deliveries by the `Backlog:` trailer plus a
+hand-reviewed table, and derives `Esforço gasto (h)` from a session model this repo's own
+`CLAUDE.md` says not to trust. Each close-out is: edit the record, move it to
+`archive/phase-N.md`, fix the roadmap table, run the mirror, `replace_content` the page.
+
+**What the sibling boards do instead (the target).** Gestão IM360 and Desmalha keep ONE
+record: the card. Properties carry status/order/size/type/dates; `Notas` carries
+`Origem:`/`Destrava:` and the `CONCLUÍDO <date>:` line; extensive results are sub-pages of the
+card; the skill (`proxima-tarefa`) reads and writes that card at pick-up and close-out. No
+generator, no markdown backlog, no trailer reader.
+
+**Scope.**
+1. **One-time migration:** every `pending`/`in-progress` record in `features.md`, `ui-ux.md`,
+   `technical.md`, `security.md` and the landing `ROADMAP.md` lands in its card's body — the
+   mirror's own last run can produce exactly that, which is why this item closes it rather
+   than deleting it first. Completed records stay where they are as history.
+2. **Skill `next-item`:** §3 reads the card body instead of the markdown; §7 close-out becomes
+   properties + `Notas` + sub-page, with no archive move and no regeneration — the shape of
+   `proxima-tarefa` "Encerrar a tarefa". Same for creating items: card first, no record.
+3. **Docs:** `CLAUDE.md` here ("The board, and what effort means", "Language conventions" if
+   the trailer changes, `.claude/skills/next-item/SKILL.md` §0 table) and
+   `entrelares-site/CLAUDE.md` ("Roadmap" section — the generator paragraph and the
+   `entrelares-app` checkout requirement go away). Fulcrum's `CLAUDE.md` "Conventions" bullet
+   that mentions the mirror reading its history.
+4. **Delete** `tool/notion_mirror.py` (with `HAND_REVIEWED`); freeze `backlog/` with a banner
+   saying the records are history and the cards are the source since T-63.
+
+**Gap questions to lock BEFORE any code (owner):**
+- **The `Backlog:` trailer** — its only reader is the mirror. Keep it (costs nothing, keeps
+  `git log --format='%(trailers:key=Backlog)'` greppable, and Fulcrum/console already use it)
+  or drop it with the reader? *Recommendation: keep.*
+- **`Esforço gasto (h)`** — stop computing it (the column freezes at today's values) or replace
+  it with `Tamanho`/`Tipo` like the Gestão board (card 3.13 there)? *Recommendation: freeze;
+  add `Tamanho` only if the estimate is wanted.*
+- **The landing (`L-*`)** rides the same delivery — same generator, same board. Confirm.
+- **`Fase`** stays a property set at close-out; the markdown move to `archive/phase-N.md` is
+  what disappears. Confirm.
+
+**Acceptance.** `tool/notion_mirror.py` is gone and `git grep notion_mirror` hits only history
+docs; `next-item` closes an item without touching any markdown; every pending card's body
+carries its full record (spot-check five, including one `L-*`); both `CLAUDE.md` describe the
+new shape; the last mirror run is linked from this item's card.
