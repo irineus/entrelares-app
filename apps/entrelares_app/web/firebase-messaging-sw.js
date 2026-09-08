@@ -29,14 +29,16 @@ importScripts('/firebasejs/12.18.0/firebase-app-compat.js');
 importScripts('/firebasejs/12.18.0/firebase-messaging-compat.js');
 
 // The PUBLIC Firebase Web config — the mirror of `Env.prod.webPush` (minus the
-// VAPID key, which only the page needs). Empty while the channel ships DARK:
-// filling this and `env.dart` in one delivery is the go-live
-// (`supabase/README.md` §11-bis). Nothing here is a secret.
+// VAPID key, which only the page needs). Armed 08/09/2026 together with
+// `env.dart`, which is the go-live of `supabase/README.md` §11-bis;
+// `web_channel_test` compares the two objects string by string, so neither side
+// can be armed — or later moved — on its own. Nothing here is a secret: every
+// one of these values is served to any browser that opens the app.
 const FIREBASE_CONFIG = {
-  apiKey: '',
-  appId: '',
-  messagingSenderId: '',
-  projectId: '',
+  apiKey: 'AIzaSyCqZbahPltUMUuH_IjWJCPhrH45ob6H6tM',
+  appId: '1:575356979434:web:b193af65d8185c02e72f93',
+  messagingSenderId: '575356979434',
+  projectId: 'entrelares-prod',
 };
 
 // The MIRROR of `PushRouting` (packages/entrelares_core) — the types that leave

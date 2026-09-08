@@ -83,13 +83,21 @@ class Env {
     // Synthetic, like its sibling above — see the field's doc.
     webHostname: 'dev.web.entrelares.app',
     androidPackage: 'com.entrelares.flutter',
-    // T-62: deliberately unarmed. Since the Blazor shutdown there is no dev
-    // WEB deployment at all, so the only build that resolves to this
-    // environment on the web is a local `flutter run -d chrome` — arm it here
-    // (§11-bis) only for the session that needs to watch a push arrive, and
-    // never leave prod's values in this slot: a QA run must not be able to
-    // register a token against the production project.
-    webPush: WebPushConfig.none,
+    // T-62 armed 08/09/2026. There is no dev WEB deployment — since the Blazor
+    // shutdown the only build that resolves to this environment on the web is a
+    // local `flutter run -d chrome`. These values exist so that QA round is
+    // repeatable by anyone, at any time, without a second visit to the console.
+    // They are the DEV project's own: a QA run must never be able to register a
+    // token against the production project, which is the whole reason the two
+    // Firebase projects exist (runbook §11.1).
+    webPush: WebPushConfig(
+      apiKey: 'AIzaSyCveCQiYVaozqLQskx5_UZH8k5mJfUVWJI',
+      appId: '1:51960618124:web:3855d5ada40801021dafa9',
+      messagingSenderId: '51960618124',
+      projectId: 'entrelares-dev',
+      vapidKey:
+          'BKVzlLeJytzADoULGBBLyQWAGd1SHTo-xyojfl10nbqchHrk-Jm_TPM5peu9fIT489ue_xgMJsK1D7Qc4BHHw2g',
+    ),
   );
 
   /// Production — the exact public values `web.entrelares.app` serves every
@@ -105,13 +113,21 @@ class Env {
     analyticsHostname: 'app.entrelares.app',
     webHostname: 'web.entrelares.app',
     androidPackage: 'com.entrelares.app',
-    // T-62: the web channel's push, DARK until the console work of
-    // `supabase/README.md` §11-bis is done. Filling this is half the go-live;
-    // the other half is the identical object in
-    // `web/firebase-messaging-sw.js`, which the service worker needs because
-    // it starts with no page to ask. `web_channel_test` compares the two
-    // string by string, so they cannot be armed one at a time.
-    webPush: WebPushConfig.none,
+    // T-62 armed 08/09/2026 — the web channel's push is LIVE from this line.
+    // Half the go-live is here; the other half is the identical object in
+    // `web/firebase-messaging-sw.js`, which the service worker needs because it
+    // starts with no page to ask. `web_channel_test` compares the two string by
+    // string, so they cannot be armed one at a time — and while these were
+    // blank the control read `unsupported` in words rather than offering a
+    // button that could not work.
+    webPush: WebPushConfig(
+      apiKey: 'AIzaSyCqZbahPltUMUuH_IjWJCPhrH45ob6H6tM',
+      appId: '1:575356979434:web:b193af65d8185c02e72f93',
+      messagingSenderId: '575356979434',
+      projectId: 'entrelares-prod',
+      vapidKey:
+          'BKxwYBh6_lCawyFhugKyh1yoRvm0-O2kAeH88KJxanKdsCEMUHS4ASehFoO6y_VXFHtQ0hrFWdabnvK5f49isNM',
+    ),
   );
 
   /// How the WEB build says "production". `flutter build web` accepts no
@@ -132,7 +148,7 @@ class Env {
   /// Mirrors `pubspec.yaml`'s `version:` — the web's `AppVersion.Display`.
   /// Only the F-17 export reads it, and a stale value there would misdate an
   /// LGPD record, so `env_version_test.dart` fails the build if the two drift.
-  static const String appVersion = '2.4.0+61';
+  static const String appVersion = '2.5.0+62';
 }
 
 /// T-62 — the PUBLIC Firebase Web config of one environment, plus its VAPID
