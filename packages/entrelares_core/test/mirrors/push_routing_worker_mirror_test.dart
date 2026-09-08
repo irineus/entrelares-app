@@ -120,12 +120,20 @@ void main() {
         .where((line) => !line.trimLeft().startsWith('//'))
         .join('\n');
     final ourListener = code.indexOf("addEventListener('notificationclick'");
-    final sdkInit = code.indexOf('firebase.messaging()');
+    final firstImport = code.indexOf('importScripts(');
     expect(ourListener, greaterThan(-1),
         reason: '$_worker must handle the tap itself: without a link in the '
             'payload the SDK\'s own handler opens nothing');
-    expect(sdkInit, greaterThan(-1));
-    expect(ourListener, lessThan(sdkInit),
-        reason: 'the SDK stops propagation, so our listener has to be first');
+    expect(firstImport, greaterThan(-1));
+    // Before the IMPORTS, not merely before `firebase.messaging()`. The SDK
+    // registers its listener when its component is instantiated, and which call
+    // does that is an internal detail an upgrade may move. `addEventListener`
+    // needs nothing from the SDK, so putting it above the imports makes "ours is
+    // first" true by construction rather than by a reading of somebody else's
+    // instantiation mode.
+    expect(ourListener, lessThan(firstImport),
+        reason: 'the SDK stops propagation, so our listener has to be first — '
+            'and the only order that cannot be invalidated by an SDK upgrade '
+            'is being above the imports');
   });
 }

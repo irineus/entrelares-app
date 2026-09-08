@@ -25,52 +25,33 @@
 // string by string, against `Env.prod.webPush` by `web_channel_test`; arming
 // one side without the other is a red gate, not a silent half-push.
 
-importScripts('/firebasejs/12.18.0/firebase-app-compat.js');
-importScripts('/firebasejs/12.18.0/firebase-messaging-compat.js');
-
-// The PUBLIC Firebase Web config — the mirror of `Env.prod.webPush` (minus the
-// VAPID key, which only the page needs). Armed 08/09/2026 together with
-// `env.dart`, which is the go-live of `supabase/README.md` §11-bis;
-// `web_channel_test` compares the two objects string by string, so neither side
-// can be armed — or later moved — on its own. Nothing here is a secret: every
-// one of these values is served to any browser that opens the app.
-const FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyCqZbahPltUMUuH_IjWJCPhrH45ob6H6tM',
-  appId: '1:575356979434:web:b193af65d8185c02e72f93',
-  messagingSenderId: '575356979434',
-  projectId: 'entrelares-prod',
-};
-
-// The MIRROR of `PushRouting` (packages/entrelares_core) — the types that leave
-// the recipient with something to DO, and therefore land on "Para você" instead
-// of "Histórico". It is duplicated here for the same reason `_shared/push.ts`
-// duplicates the copy catalog: a click on a notification is handled by a
-// service worker, which cannot call Dart. `push_routing_worker_mirror_test`
-// reads THIS file and compares it against `PushRouting.landingFor` for every
-// pushable type, so the two cannot drift.
-const ACTIONABLE_TYPES = ['swap_requested', 'revert_requested', 'auto_reminder'];
-
-/// Where a tapped notification lands — the same URL `main.dart` builds for the
-/// Android tap, which is what makes the two channels agree: the Notificações
-/// screen reads `tab` and `n` from the query string either way.
-function landingUrl(data) {
-  const tab = ACTIONABLE_TYPES.includes(data.type) ? 'incoming' : 'history';
-  const id = data.notificationId || '';
-  const query = id ? `?tab=${tab}&n=${encodeURIComponent(id)}` : `?tab=${tab}`;
-  return new URL(`/notifications${query}`, self.location.origin).href;
-}
-
-// Registered BEFORE `firebase.messaging()` on purpose, and the order is load
-// bearing: the SDK installs its own `notificationclick` listener when messaging
-// is initialized, and that listener calls `stopImmediatePropagation()`. Second
-// in line, this handler would never run — the tap would close the notification
-// and go nowhere, because the SDK only opens something when the payload carries
-// `fcm_options.link`, and ours deliberately does not (the destination is a
-// product rule, and it belongs next to the rule it mirrors).
+// Registered BEFORE `importScripts` on purpose, and the order is load bearing:
+// the SDK installs its own `notificationclick` listener, and that listener calls
+// `stopImmediatePropagation()`. Second in line, this handler would never run —
+// the tap would close the notification and go nowhere, because the SDK only
+// opens something when the payload carries `fcm_options.link`, and ours
+// deliberately does not (the destination is a product rule, and it belongs next
+// to the rule it mirrors).
+//
+// It sits ABOVE the imports rather than merely above `firebase.messaging()`
+// because `addEventListener` needs nothing from the SDK, and being first is then
+// true by construction instead of true by a reading of the SDK's instantiation
+// mode — which is a detail an upgrade is free to change under us.
 self.addEventListener('notificationclick', (event) => {
-  const payload = event.notification && event.notification.data
-    ? event.notification.data['FCM_MSG']
-    : null;
+  const data = event.notification ? event.notification.data : null;
+  const payload = data ? data['FCM_MSG'] : null;
+  // One line per tap, on purpose and permanently — the Dart side logs the same
+  // way (`[push] …` in `push_service.dart`). A tap that goes nowhere is
+  // invisible from every other vantage point: nothing throws, the notification
+  // closes either way, and the server has long since reported success. This log
+  // is the only place the difference between "the handler never ran", "the
+  // payload was not what we expect" and "the browser refused the window" is
+  // legible at all.
+  console.log('[push] notificationclick', {
+    hasData: !!data,
+    keys: data ? Object.keys(data) : [],
+    type: payload && payload.data ? payload.data.type : null,
+  });
   // Not one of ours — leave it to whoever put it there.
   if (!payload) return;
   // An action BUTTON, not the notification body. This product ships none, and
@@ -108,6 +89,41 @@ self.addEventListener('notificationclick', (event) => {
         .catch((error) => console.error('[push] openWindow failed', error)),
   );
 });
+
+importScripts('/firebasejs/12.18.0/firebase-app-compat.js');
+importScripts('/firebasejs/12.18.0/firebase-messaging-compat.js');
+
+// The PUBLIC Firebase Web config — the mirror of `Env.prod.webPush` (minus the
+// VAPID key, which only the page needs). Armed 08/09/2026 together with
+// `env.dart`, which is the go-live of `supabase/README.md` §11-bis;
+// `web_channel_test` compares the two objects string by string, so neither side
+// can be armed — or later moved — on its own. Nothing here is a secret: every
+// one of these values is served to any browser that opens the app.
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyCqZbahPltUMUuH_IjWJCPhrH45ob6H6tM',
+  appId: '1:575356979434:web:b193af65d8185c02e72f93',
+  messagingSenderId: '575356979434',
+  projectId: 'entrelares-prod',
+};
+
+// The MIRROR of `PushRouting` (packages/entrelares_core) — the types that leave
+// the recipient with something to DO, and therefore land on "Para você" instead
+// of "Histórico". It is duplicated here for the same reason `_shared/push.ts`
+// duplicates the copy catalog: a click on a notification is handled by a
+// service worker, which cannot call Dart. `push_routing_worker_mirror_test`
+// reads THIS file and compares it against `PushRouting.landingFor` for every
+// pushable type, so the two cannot drift.
+const ACTIONABLE_TYPES = ['swap_requested', 'revert_requested', 'auto_reminder'];
+
+/// Where a tapped notification lands — the same URL `main.dart` builds for the
+/// Android tap, which is what makes the two channels agree: the Notificações
+/// screen reads `tab` and `n` from the query string either way.
+function landingUrl(data) {
+  const tab = ACTIONABLE_TYPES.includes(data.type) ? 'incoming' : 'history';
+  const id = data.notificationId || '';
+  const query = id ? `?tab=${tab}&n=${encodeURIComponent(id)}` : `?tab=${tab}`;
+  return new URL(`/notifications${query}`, self.location.origin).href;
+}
 
 // Fails CLOSED. On an unarmed build the config above is empty, and
 // `initializeApp` would throw on every push event — a worker that logs an
