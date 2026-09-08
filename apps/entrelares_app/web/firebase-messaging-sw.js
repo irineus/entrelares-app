@@ -80,20 +80,33 @@ self.addEventListener('notificationclick', (event) => {
   event.stopImmediatePropagation();
   event.notification.close();
 
-  const target = landingUrl(payload.data || {});
-  event.waitUntil((async () => {
-    // FCM only SHOWS a notification when no tab is visible (it forwards the
-    // message to the page otherwise), so there is usually nothing to reuse.
-    // A hidden tab already sitting on the destination is the one case where
-    // opening a second one would be worse than focusing the first.
-    const clients = await self.clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true,
-    });
-    const existing = clients.find((client) => client.url === target);
-    if (existing) return existing.focus();
-    return self.clients.openWindow(target);
-  })());
+  // `openWindow` is called SYNCHRONOUSLY, and that is the whole shape of this
+  // block. Two things were wrong with the first version (found on the first
+  // real click, 08/09/2026, when the notification arrived correctly and the tap
+  // went nowhere):
+  //
+  //   1. It `await`ed `clients.matchAll()` first. A service worker may only
+  //      open a window while it still holds the transient activation the click
+  //      granted, and awaiting anything first is how that gets spent. The call
+  //      has to be the first thing the handler does with it.
+  //   2. It tried to REUSE an open tab with `focus()`. This worker's scope is
+  //      `/firebase-cloud-messaging-push-scope`, so it controls no page at all
+  //      and `client.navigate()` would throw — `focus()` was the only thing
+  //      left, and it brings a tab forward WITHOUT moving it to the notice that
+  //      was tapped. That is precisely the "nothing happened" the person sees.
+  //      Its match was `client.url === target` too, which a fresh `n=<id>` makes
+  //      almost never true — so the branch was dead except when it was wrong.
+  //
+  // Always opening is therefore both simpler and correct. The cost is a second
+  // tab when one was already open, and FCM only shows a notification when no
+  // client is visible, so that is the uncommon case and the lesser evil.
+  event.waitUntil(
+    self.clients
+        .openWindow(landingUrl(payload.data || {}))
+        // Without this the failure is invisible: a rejected promise inside
+        // `waitUntil` is swallowed, which is exactly how the first version hid.
+        .catch((error) => console.error('[push] openWindow failed', error)),
+  );
 });
 
 // Fails CLOSED. On an unarmed build the config above is empty, and
