@@ -1997,10 +1997,27 @@ service-worker lifetime. The acceptance is one human round, the same shape F-09'
 1. Open the channel in a desktop Chrome or an Android browser, sign in, and turn the control on
    in **Notificações**. Granting the browser prompt is what mints the token.
 2. `select profile_id, platform from public.push_subscriptions;` — a `web` row must be there.
-3. **Close the tab** (this is the point of the test — with a tab visible FCM forwards the
-   message to the page and shows nothing) and have the other caregiver open a swap request.
-4. The notification appears with the product's icon; clicking it opens
-   `/notifications?tab=…&n=…`.
+3. **Make the tab invisible — SWITCH to another tab; do NOT close it.** Hiding it is the point of
+   the test (with a visible client FCM forwards the message to the page and shows nothing), but
+   CLOSING it is a different act, and locally it is fatal: see the box below. Then have the other
+   caregiver open a swap request.
+4. The notification appears with the product's title, body and icon; clicking it opens
+   `/notifications?tab=…&n=…` on the right tab.
+
+> **Testing this LOCALLY has two traps, and both cost a full round on 08/09/2026.**
+>
+> **Fix the port.** `flutter run` picks a random one, and an origin is scheme + host + **port** —
+> so every run is a NEW origin, with its own service worker, its own notification permission and
+> its own token. The control then reads "off" on the new origin and looks like it disarmed itself,
+> while the token in `push_subscriptions` still points at the previous origin. Always
+> `fvm flutter run -d chrome --web-port=8099`.
+>
+> **Never close the tab locally.** The tab and `flutter run` die together, and a service worker
+> whose server is gone cannot start: its `importScripts('/firebasejs/…')` gets connection refused,
+> so the push is dropped **silently**. Every layer upstream still reports success — the dispatcher
+> logs `sent`, because FCM's job ended when it handed the message to the push service. Switch tabs
+> instead. None of this exists on `web.entrelares.app`, where the origin is stable; it is an
+> artefact of the dev server only.
 
 When nothing arrives, read in this order: the browser's DevTools → Application → Service
 Workers (`firebase-messaging-sw.js` must be *activated and running* at scope
