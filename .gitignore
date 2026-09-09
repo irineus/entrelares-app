@@ -38,3 +38,6 @@ packages/*/pubspec.lock
 
 # Python bytecode (store/brand-icons.py is imported by the landing repo generator)
 __pycache__/
+
+# Local secrets for the DB gate (TestEnv reads it upward from cwd) — never committed.
+e2e.local.env

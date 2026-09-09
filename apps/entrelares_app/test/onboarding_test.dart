@@ -436,6 +436,58 @@ void main() {
       expect(find.text(l[K.onbChecklistIntro]), findsNothing);
     });
 
+    testWidgets('the spotlight is measured against the OVERLAY, not the '
+        'window — the web centres the app in a width-capped box (F-56 QA)',
+        (tester) async {
+      // A wide surface with the app in a 360px box in the middle: the overlay
+      // starts 220px from the window's left edge, exactly the web's shape.
+      await tester.binding.setSurfaceSize(const Size(800, 600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final keys = TourKeys();
+      await tester.pumpWidget(AppL10n(
+        l: Localization(AppLanguage.ptBr),
+        setLanguage: (_) async {},
+        child: MaterialApp(
+          builder: (context, child) =>
+              Center(child: SizedBox(width: 360, child: child)),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => Column(
+                children: [
+                  FilledButton(
+                    onPressed: () =>
+                        showGuidedTour(context: context, keys: keys),
+                    child: const Text('go'),
+                  ),
+                  // Stands in for the today card — the first stop's target.
+                  Container(
+                    key: keys.keyFor(TourTarget.todayCard),
+                    height: 80,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('go'));
+      await tester.pumpAndSettle();
+
+      final paint = tester.widget<CustomPaint>(find.byWidgetPredicate((w) =>
+          w is CustomPaint &&
+          w.painter.runtimeType.toString() == '_SpotlightPainter'));
+      final hole = (paint.painter as dynamic).target as Rect;
+      final overlay = tester.getTopLeft(find.byType(Overlay).last);
+      final targetInWindow =
+          tester.getRect(find.byKey(keys.keyFor(TourTarget.todayCard)));
+
+      // Before the fix the hole carried the window's x (220px too far right,
+      // off the app's own box); now it is the target's rect in overlay space.
+      expect(hole.left, closeTo(targetInWindow.left - overlay.dx, 0.5));
+      expect(hole.top, closeTo(targetInWindow.top - overlay.dy, 0.5));
+      expect(hole.width, closeTo(360, 0.5));
+    });
+
     testWidgets('the tour card flips to the top when the target lives at the '
         'bottom — step 4 spotlights the notifications tab (round 3)',
         (tester) async {

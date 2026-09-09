@@ -32,14 +32,22 @@ class TourKeys {
   bool isMounted(TourTarget target) =>
       _keys[target]?.currentContext?.findRenderObject() != null;
 
-  /// The target's rectangle in global coordinates, or null when it is not on
-  /// screen.
-  Rect? rectOf(TourTarget target) {
+  /// The target's rectangle, or null when it is not on screen. Measured
+  /// relative to [ancestor] when given, in global (window) coordinates
+  /// otherwise.
+  ///
+  /// The spotlight passes the OVERLAY that hosts the tour as the ancestor.
+  /// On the web the app sits in a width-capped, centred box (`AppWidthCap`),
+  /// so the overlay's origin is not the window's: a rect measured against the
+  /// window landed one margin to the right of the target, and the first
+  /// stop's hole was cut over empty scrim beside the today card (owner,
+  /// 09/09/2026). Measured against the overlay both spaces agree everywhere.
+  Rect? rectOf(TourTarget target, {RenderObject? ancestor}) {
     final context = _keys[target]?.currentContext;
     if (context == null) return null;
     final box = context.findRenderObject();
     if (box is! RenderBox || !box.hasSize) return null;
-    return box.localToGlobal(Offset.zero) & box.size;
+    return box.localToGlobal(Offset.zero, ancestor: ancestor) & box.size;
   }
 }
 
@@ -110,8 +118,11 @@ Future<OnboardingAction?> showOnboardingChecklist({
       builder: (context) {
         final l = AppL10n.of(context).l;
         final theme = Theme.of(context);
+        // Scrolls like its sibling below: four steps with two-line hints do
+        // not fit a small phone, and a Column that cannot scroll overflowed
+        // by one hint line the day the invite hint grew (F-56 QA).
         return SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -287,7 +298,11 @@ class _GuidedTourState extends State<_GuidedTour> {
       return const SizedBox.shrink();
     }
 
-    final target = widget.keys.rectOf(step.target);
+    // Both the hole and the card are laid out in the overlay's space, so the
+    // target is measured against the overlay too — see [TourKeys.rectOf].
+    final overlayBox =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final target = widget.keys.rectOf(step.target, ancestor: overlayBox);
     final theme = Theme.of(context);
     final isLast = _index == TourSteps.count - 1;
 
@@ -295,7 +310,9 @@ class _GuidedTourState extends State<_GuidedTour> {
     // bottom-pinned card — flip the card to the top for that stop. The
     // overlay ignores the safe area (see [showGuidedTour]), so the status
     // bar inset is added back by hand.
-    final screen = MediaQuery.sizeOf(context);
+    final screen = overlayBox?.hasSize == true
+        ? overlayBox!.size
+        : MediaQuery.sizeOf(context);
     final flipToTop =
         target != null && target.center.dy > screen.height * 0.62;
 
