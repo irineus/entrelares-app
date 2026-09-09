@@ -87,4 +87,27 @@ void main() {
           isFalse);
     });
   });
+
+  group('swapAvailableForScheduled (F-56)', () {
+    const active = MemberView(id: 1, fullName: 'Ana');
+    const pending = MemberView(
+        id: 2, fullName: 'Bia', isActiveMember: false, isPendingMember: true);
+    const gone = MemberView(id: 3, fullName: 'Caio', isActiveMember: false);
+    const members = [active, pending, gone];
+
+    test('a pending planned parent has nobody to approve — no workflow', () {
+      expect(swapAvailableForScheduled(2, members), isFalse);
+    });
+    test('an active planned parent keeps the workflow', () {
+      expect(swapAvailableForScheduled(1, members), isTrue);
+    });
+    test('a departed planned parent is the S-11 ghost, not this rule', () {
+      expect(swapAvailableForScheduled(3, members), isTrue);
+    });
+    test('no planned parent, or an unknown one, never blocks', () {
+      expect(swapAvailableForScheduled(null, members), isTrue);
+      expect(swapAvailableForScheduled(0, members), isTrue);
+      expect(swapAvailableForScheduled(99, members), isTrue);
+    });
+  });
 }

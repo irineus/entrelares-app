@@ -173,6 +173,9 @@ class _DaySheetState extends State<_DaySheet> {
   bool get _willOpenWorkflow {
     final scheduled = _scheduledParentId;
     if (scheduled == null || scheduled == 0 || _saveBlocked) return false;
+    // F-56: no counterpart, no workflow — the actual-parent controls are not
+    // even rendered on that day.
+    if (_swapUnavailableForPending) return false;
     final currentActual = widget.day?.actualParentId;
     final proposed = _actualParentId == 0 ? null : _actualParentId;
     if (shouldRequestRevert(
@@ -445,9 +448,22 @@ class _DaySheetState extends State<_DaySheet> {
   MemberView? _inactiveViewFor(int? profileId) {
     if (profileId == null || profileId <= 0) return null;
     for (final v in widget.memberViews) {
-      if (v.id == profileId && !v.isActiveMember) return v;
+      // F-56: a pending member is NOT a ghost — it is in `members`, with a
+      // colour of its own. Only the S-11 tombstone renders as one.
+      if (v.id == profileId && !v.isAssignable) return v;
     }
     return null;
+  }
+
+  /// F-56: the planned parent of the day being edited has no account yet, so
+  /// the "real responsible" question has no counterpart to answer it. The
+  /// sheet says so instead of offering a swap the database would refuse.
+  bool get _swapUnavailableForPending =>
+      !swapAvailableForScheduled(_scheduledParentId, widget.memberViews);
+
+  String _chipLabel(Member m, Localization l) {
+    final first = m.fullName.split(' ').first;
+    return m.isPendingMember ? '$first ${l[KApp.calMemberPending]}' : first;
   }
 
   Widget _memberChip(int id, String label, {required bool selected,
@@ -653,7 +669,7 @@ class _DaySheetState extends State<_DaySheet> {
                 '${scheduledGhost.fullName.split(' ').first} ${l[K.calMemberLeft]}',
                 selected: true, onSelected: null),
           for (final m in widget.members)
-            _memberChip(m.id, m.fullName.split(' ').first,
+            _memberChip(m.id, _chipLabel(m, l),
                 selected: _scheduledParentId == m.id,
                 onSelected: _scheduledLocked
                     ? null
@@ -668,6 +684,13 @@ class _DaySheetState extends State<_DaySheet> {
       // ── Actual parent — general since lote 3: changing it on today/future
       //    opens a swap request; the direct write survives only where the DB
       //    allows it (admin past-day correction, no-workflow saves) ──
+      // F-56: on a pending member's day there is nobody to approve, so the
+      // question is replaced by the reason (the DB refuses the swap anyway).
+      if (_swapUnavailableForPending)
+        _banner(l.format(KApp.sheetSwapUnavailablePending, [
+          _nameOf(_scheduledParentId),
+        ]))
+      else
       AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

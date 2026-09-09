@@ -542,6 +542,12 @@ class _CalendarScreenState extends State<CalendarScreen>
   List<MemberView> get _memberViews =>
       _members.map((m) => m.toView()).toList(growable: false);
 
+  /// F-56: who a day can be planned for — active members AND pending ones
+  /// (invited, not yet joined). Only the S-11 tombstone is left out. The
+  /// swap workflow is a different question, answered per day by the sheet.
+  List<Member> get _assignableMembers =>
+      _members.where((m) => !m.hasLeft).toList();
+
   void _toggleDaySelection(DateTime date) {
     final d = dateOnly(date);
     setState(() {
@@ -601,7 +607,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       context: context,
       selectedDays: Set.of(_selectedDays),
       daysByIso: _daysByIso,
-      activeMembers: _members.where((m) => m.isActiveMember).toList(),
+      activeMembers: _assignableMembers,
       today: _today,
       dataSource: widget.dataSource,
       adminBypass: _adminBypass,
@@ -674,7 +680,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   Future<void> _openWizard() async {
     final generated = await showWizardSheet(
       context: context,
-      activeMembers: _members.where((m) => m.isActiveMember).toList(),
+      activeMembers: _assignableMembers,
       today: _today,
       dataSource: widget.dataSource,
       // F-39: the wizard clamps to the same horizon as the paging.
@@ -695,7 +701,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       date: date,
       day: _daysByIso[iso],
       previousDay: _daysByIso[previousIso],
-      members: _members.where((m) => m.isActiveMember).toList(),
+      members: _assignableMembers,
       memberViews: _memberViews,
       today: _today,
       dataSource: widget.dataSource,
@@ -778,7 +784,9 @@ class _CalendarScreenState extends State<CalendarScreen>
       showInviteNudge: showInviteNudge(
         isLoading: _loading,
         isAdmin: _ownProfile?.isAdmin ?? false,
-        activeMemberCount: _members.where((m) => m.isActiveMember).length,
+        // F-56: a pending member counts — the nudge is "reach out", and a
+        // caregiver already on the calendar was reached.
+        activeMemberCount: _assignableMembers.length,
       ),
       responsibleRole: _roleLabelFor(
           todayRow?.effectiveParentId, AppL10n.of(context).l.current),
@@ -1218,8 +1226,10 @@ class _Legend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // F-27/S-11: colors are per ACTIVE member (persistent color_slot).
-    final active = members.where((m) => m.isActiveMember).toList()
+    // F-27/S-11: colors are per member still IN the family (persistent
+    // color_slot). F-56: a pending member has a colour and a place in the key,
+    // marked so the legend does not claim someone who has not joined.
+    final active = members.where((m) => !m.hasLeft).toList()
       ..sort((a, b) => (a.colorSlot ?? 9).compareTo(b.colorSlot ?? 9));
     // U-28 QA: it WRAPS, it does not scroll.
     //
@@ -1240,8 +1250,11 @@ class _Legend extends StatelessWidget {
               final slot = context.tokens.slot(profileSlotIndex(m.id, views));
               final role = roleOf(m.id);
               final first = m.fullName.split(' ').first;
-              return _key(context,
-                  slot: slot, label: role == null ? first : '$first ($role)');
+              final base = role == null ? first : '$first ($role)';
+              final label = m.isPendingMember
+                  ? '$base ${AppL10n.of(context).l[KApp.calMemberPending]}'
+                  : base;
+              return _key(context, slot: slot, label: label);
             }),
           if (showSwapKey)
             _key(context,

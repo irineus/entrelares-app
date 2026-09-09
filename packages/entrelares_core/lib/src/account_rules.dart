@@ -125,17 +125,36 @@ abstract final class InviteFormRules {
   /// and contains "@"): `create_invitation` normalises and the address either
   /// receives the message or it does not — a stricter client regex would only
   /// refuse addresses the server accepts.
+  ///
+  /// F-56: the form names the person first — the name is what the placeholder
+  /// is made of — and the e-mail became OPTIONAL: given, the invitation goes
+  /// out now; blank, the admin plans alone and invites later.
   static String? validationErrorKey({
+    required String fullName,
     required String email,
     required String? myEmail,
     required int roleId,
   }) {
+    final name = fullName.trim();
+    if (name.length < 2) return KApp.inviteErrNameRequired;
+    final emailError = emailErrorKey(email: email, myEmail: myEmail);
+    if (emailError != null) return emailError;
+    if (roleId == 0) return KApp.inviteErrRoleRequired;
+    return null;
+  }
+
+  /// The e-mail half alone — what the F-56 "invite this placeholder" sheet
+  /// asks, where name and role are already the member's. A blank address is
+  /// not an error here either; the CALLER decides whether blank is allowed.
+  static String? emailErrorKey({
+    required String email,
+    required String? myEmail,
+  }) {
     final clean = email.trim();
-    if (clean.isEmpty || !clean.contains('@')) return K.famErrInvalidEmail;
+    if (clean.isNotEmpty && !clean.contains('@')) return K.famErrInvalidEmail;
     if (myEmail != null && clean.toLowerCase() == myEmail.trim().toLowerCase()) {
       return K.famErrOwnEmail;
     }
-    if (roleId == 0) return KApp.inviteErrRoleRequired;
     return null;
   }
 

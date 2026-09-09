@@ -36,12 +36,22 @@ class MemberView {
   /// A live, present member holds a family seat (`user_id` set, `left_at` null).
   final bool isActiveMember;
 
+  /// F-56: invited, not yet joined (`user_id` null, `left_at` null). Holds a
+  /// seat and a colour, is assignable to days, but has nobody behind it to
+  /// approve a swap. Never true together with [isActiveMember].
+  final bool isPendingMember;
+
   const MemberView({
     required this.id,
     required this.fullName,
     this.colorSlot,
     this.isActiveMember = true,
+    this.isPendingMember = false,
   });
+
+  /// Still in the family: active or pending. What "assignable to a day"
+  /// means — the S-11 tombstone is the only state that is neither.
+  bool get isAssignable => isActiveMember || isPendingMember;
 }
 
 /// How a calendar day cell paints. Mirrors GetDayCssClass: the color follows
@@ -64,13 +74,15 @@ class DaySlot extends DayPaint {
   const DaySlot(this.slot);
 }
 
-/// F-27/S-11: persistent color slot of an ACTIVE member; 0 for anyone
-/// inactive/unknown — the 4 color themes belong to active members only.
+/// F-27/S-11: persistent color slot of a member still IN the family; 0 for
+/// anyone departed/unknown — the 4 color themes belong to the seats. F-56: a
+/// pending member holds a seat, so it keeps its colour (the grey texture is
+/// the departure's, not the absence of an account).
 /// Mirror of ProfileService.GetProfileSlotIndex.
 int profileSlotIndex(int profileId, List<MemberView> members) {
   for (final m in members) {
     if (m.id == profileId) {
-      if (!m.isActiveMember) return 0;
+      if (!m.isAssignable) return 0;
       final slot = m.colorSlot;
       return (slot != null && slot >= 1 && slot <= 4) ? slot : 0;
     }

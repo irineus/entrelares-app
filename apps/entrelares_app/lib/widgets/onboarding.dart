@@ -177,7 +177,10 @@ class _StepTile extends StatelessWidget {
                   child: Text(l[step.titleKey],
                       style: Theme.of(context).textTheme.titleSmall),
                 ),
-                Text(l[done ? step.doneHintKey : step.hintKey],
+                Text(
+                    l[done
+                        ? OnboardingSteps.doneHintKeyFor(step, signals)
+                        : step.hintKey],
                     style: Theme.of(context).textTheme.bodySmall),
               ],
             ),

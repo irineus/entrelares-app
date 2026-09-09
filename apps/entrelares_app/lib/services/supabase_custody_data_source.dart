@@ -1184,12 +1184,46 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<int> createInvitation(
-      {required String email, required int roleId}) async {
-    final data = await _client.rpc('create_invitation',
-        params: {'p_email': email.trim(), 'p_role_id': roleId});
+  Future<int> createInvitation({
+    required String email,
+    required int roleId,
+    int? profileId,
+  }) async {
+    final data = await _client.rpc('create_invitation', params: {
+      'p_email': email.trim(),
+      'p_role_id': roleId,
+      'p_profile_id': ?profileId,
+    });
     final row = data is List ? (data.isEmpty ? null : data.first) : data;
     return row is Map ? (row['invitation_id'] as int? ?? 0) : 0;
+  }
+
+  @override
+  Future<({int profileId, int? invitationId})> addPendingMember({
+    required String fullName,
+    required int roleId,
+    String? email,
+  }) async {
+    final clean = email?.trim() ?? '';
+    final data = await _client.rpc('add_pending_member', params: {
+      'p_full_name': fullName.trim(),
+      'p_role_id': roleId,
+      if (clean.isNotEmpty) 'p_email': clean,
+    });
+    final row = data is List ? (data.isEmpty ? null : data.first) : data;
+    if (row is! Map) {
+      throw StateError('add_pending_member returned no row: $data');
+    }
+    return (
+      profileId: row['profile_id'] as int,
+      invitationId: row['invitation_id'] as int?,
+    );
+  }
+
+  @override
+  Future<void> removePendingMember(int profileId) async {
+    await _client
+        .rpc('remove_pending_member', params: {'p_profile_id': profileId});
   }
 
   @override

@@ -76,6 +76,11 @@ class OnboardingSignals {
   /// An invitation was sent and is neither accepted nor revoked.
   final bool hasOpenInvitation;
 
+  /// F-56: a pending member (invited, not yet joined — or not even invited
+  /// yet) is on the calendar. Reaching out happened: the other caregiver
+  /// exists in this family's plan, whether or not an e-mail went out.
+  final bool hasPendingMember;
+
   /// The family has at least one row in `care_schedules`, any date.
   final bool hasAnyPlannedDay;
 
@@ -102,6 +107,7 @@ class OnboardingSignals {
   const OnboardingSignals({
     this.hasOtherActiveMember = false,
     this.hasOpenInvitation = false,
+    this.hasPendingMember = false,
     this.hasAnyPlannedDay = false,
     this.hasOpenedSwapExplanation = false,
     this.hasTakenPartInASwap = false,
@@ -115,6 +121,7 @@ class OnboardingSignals {
   OnboardingSignals copyWith({
     bool? hasOtherActiveMember,
     bool? hasOpenInvitation,
+    bool? hasPendingMember,
     bool? hasAnyPlannedDay,
     bool? hasOpenedSwapExplanation,
     bool? hasTakenPartInASwap,
@@ -125,6 +132,7 @@ class OnboardingSignals {
       OnboardingSignals(
         hasOtherActiveMember: hasOtherActiveMember ?? this.hasOtherActiveMember,
         hasOpenInvitation: hasOpenInvitation ?? this.hasOpenInvitation,
+        hasPendingMember: hasPendingMember ?? this.hasPendingMember,
         hasAnyPlannedDay: hasAnyPlannedDay ?? this.hasAnyPlannedDay,
         hasOpenedSwapExplanation:
             hasOpenedSwapExplanation ?? this.hasOpenedSwapExplanation,
@@ -171,14 +179,29 @@ abstract final class OnboardingSteps {
           if (step != OnboardingStep.enablePush || signals.pushSupported) step,
       ];
 
+  /// The line under a DONE step. One step says something different depending
+  /// on HOW it was done: "the other person was invited" is false when the
+  /// admin only added them to the calendar (F-56) — that card says so and
+  /// keeps the invitation as the next thing to do.
+  static String doneHintKeyFor(OnboardingStep step, OnboardingSignals signals) =>
+      step == OnboardingStep.inviteCoCaregiver &&
+              signals.hasPendingMember &&
+              !signals.hasOtherActiveMember &&
+              !signals.hasOpenInvitation
+          ? KApp.onbStepInviteDoneHintPending
+          : step.doneHintKey;
+
   static bool isDone(OnboardingStep step, OnboardingSignals signals) =>
       switch (step) {
         // A sent invitation counts. The step is "reach out to the other
         // parent", and whether they accept today or on Friday is not something
         // this user can act on — leaving it red would make the card nag about
         // someone else's inbox.
-        OnboardingStep.inviteCoCaregiver =>
-          signals.hasOtherActiveMember || signals.hasOpenInvitation,
+        // F-56: a pending member counts too — the other caregiver is on the
+        // calendar, which is the solo parent's whole way of reaching out.
+        OnboardingStep.inviteCoCaregiver => signals.hasOtherActiveMember ||
+            signals.hasOpenInvitation ||
+            signals.hasPendingMember,
 
         // ANY planned day, not "this month": someone who plans August in July
         // has done this step, and a checklist that reset itself on the 1st
