@@ -19,16 +19,5 @@
         "A4:8D:0A:3C:A7:6E:DD:1D:20:D1:EB:E4:86:33:62:00:B4:BF:5D:48:71:5D:ED:E8:91:E8:CD:F4:0E:EE:7A:77"
       ]
     }
-  },
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.guardacompartilhada.app",
-      "sha256_cert_fingerprints": [
-        "6D:8D:AD:B1:B2:68:BD:4E:26:9B:C4:78:C4:A8:33:3E:88:FD:5C:9A:C0:20:06:10:7A:2D:87:84:92:1A:4B:84",
-        "A4:8D:0A:3C:A7:6E:DD:1D:20:D1:EB:E4:86:33:62:00:B4:BF:5D:48:71:5D:ED:E8:91:E8:CD:F4:0E:EE:7A:77"
-      ]
-    }
   }
 ]

@@ -12,8 +12,9 @@ points at them; this directory is about the *presence*, not the pipeline.
 > **Where this came from (T-56, 24/08/2026).** These files spent their whole life in
 > `entrelares-app/store/`, next to the runbook of the **TWA** shell that used to be the Android
 > app: Bubblewrap, `twa-manifest.json`, the keystore ceremony, the version-code rule of a shell
-> that wrapped a website. That half is the **dead package** — it did not travel, and retiring
-> the legacy `com.guardacompartilhada.app` is its own item (**T-52**). What travelled is what is
+> that wrapped a website. That half was the **dead package** — it did not travel, and retiring
+> the legacy `com.guardacompartilhada.app` was its own item (**T-52**, closed 09/09/2026: the
+> Play app was deleted and its `assetlinks.json` statement came out). What travelled is what is
 > still true of a live store listing. Nothing here needs the old repository to be read.
 
 ---
@@ -253,7 +254,9 @@ into the web checkout.
 
 The pairing that keeps the installed app full-screen and lets it own its own URLs lives on the
 **web side**: `apps/entrelares_app/web/.well-known/assetlinks.json`, published with the web
-channel at `web.entrelares.app`. It carries three statements — `com.entrelares.flutter` (the dev
-flavour), `com.entrelares.app` (upload + app-signing fingerprints) and the legacy
-`com.guardacompartilhada.app`, which stays until **T-52** retires that package. If the browser
-bar ever comes back on an installed app, that file in PRODUCTION is the first thing to check.
+channel at `web.entrelares.app`. It carries two statements — `com.entrelares.flutter` (the dev
+flavour) and `com.entrelares.app` (upload + app-signing fingerprints). A third one named the
+legacy `com.guardacompartilhada.app` and came out with **T-52** (09/09/2026), once that Play app
+was deleted; `web_channel_test` now asserts its ABSENCE, so it cannot drift back in. If the
+browser bar ever comes back on an installed app, that file in PRODUCTION is the first thing to
+check.

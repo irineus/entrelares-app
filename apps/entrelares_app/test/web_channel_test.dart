@@ -393,8 +393,20 @@ void main() {
 
       // The dev flavor, so QA can verify its own links (lote 1).
       targetOf('com.entrelares.flutter');
-      // The legacy TWA package, still installed on devices until T-52.
-      targetOf('com.guardacompartilhada.app');
+
+      // And the legacy TWA package is GONE (T-52, 09/09/2026). Its statement
+      // was the bridge that kept a `com.guardacompartilhada.app` install
+      // full-screen; the Play app was deleted, so the bridge came out with it.
+      // Asserted as an ABSENCE on purpose — this guard used to demand the
+      // statement, and the same file is edited whenever a fingerprint moves.
+      expect(
+        statements
+            .cast<Map<String, dynamic>>()
+            .map((s) => (s['target'] as Map<String, dynamic>)['package_name']),
+        isNot(contains('com.guardacompartilhada.app')),
+        reason: 'a statement naming a retired package delegates our URLs to '
+            'something nobody builds any more',
+      );
     });
 
     test('it is served from the host the Android build verifies against', () {
