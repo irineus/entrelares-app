@@ -1,18 +1,25 @@
 /// S-02 in router terms: which screens an unauthenticated visitor may reach,
 /// and where everyone else is sent. Mirror of the web's `MainLayout.EnforceAuth`
-/// allow-list, plus the one rule this stack needs and the web never did.
+/// allow-list.
 ///
-/// **Why a pending location exists.** In the browser the URL survives whatever
-/// the app does while it decides who you are. Here the session gate must answer
-/// BEFORE routing (pilot lesson 1.1), so an App Link that arrives cold is
-/// interrupted by the splash — and its destination would simply be lost. The
-/// recovery link does not notice, because its `passwordRecovery` event routes
-/// explicitly; an INVITATION link carries no event at all, so without this the
-/// visitor lands on the login screen holding a link that appears to do nothing.
+/// **There is no remembered destination any more (T-64, 08/09/2026).** There
+/// used to be: the session gate has to answer BEFORE routing (pilot lesson
+/// 1.1), the app parked the cold entry on `/splash` while it did, and the
+/// destination was held in a `pendingLocation` to be handed back afterwards.
+/// On the web that whole apparatus was a defect factory — go_router runs the
+/// top-level redirect at most once per navigation and reports the parked
+/// `/splash` late, so the memory was spent by the wrong evaluation and the
+/// address bar disagreed with the screen. The app now simply **does not build
+/// a router until the gate has answered** (`main.dart`), so the browser's own
+/// URL is still the URL when routing starts and the first decision made about
+/// it is the right one. Nothing to remember, nothing to lose.
 library;
 
 enum AuthPhase {
-  /// The restored session is still being validated — nothing may render yet.
+  /// The restored session is still being validated. **The router does not
+  /// exist in this phase** — the app shows the splash instead of routing at
+  /// all, which is what leaves the browser's URL untouched. Kept in the enum
+  /// because the app's own phase machine needs the state.
   gate,
 
   /// No live session.
@@ -29,6 +36,12 @@ enum AuthPhase {
 }
 
 abstract final class RouteRules {
+  /// Where the app sits while the gate answers on a platform that hands it no
+  /// URL of its own (Android's cold start). On the web the browser's address is
+  /// the initial location and this is never entered by the app itself — but it
+  /// stays a real route, because an old bookmark or PWA shortcut may still name
+  /// it, and it is in [anonymousOnlyRoutes] so a signed-in visitor who lands
+  /// here gets the calendar.
   static const String splash = '/splash';
   static const String login = '/login';
   static const String register = '/register';
@@ -66,64 +79,26 @@ abstract final class RouteRules {
 
   static bool isPublic(String location) => publicRoutes.contains(location);
 
-  /// Whether a remembered FULL uri (path plus query — the invite token lives in
-  /// the query) may be restored for someone who turned out to have NO session.
-  /// Public only: restoring a guarded screen for an anonymous visitor would be
-  /// handing over exactly what S-02 exists to refuse.
-  static bool isRestorable(String uri) {
-    final path = Uri.tryParse(uri)?.path;
-    return path != null && isPublic(path);
-  }
-
-  /// The same question for someone the gate confirmed as AUTHENTICATED — and
-  /// the answer is almost the opposite: any screen except the ones that make
-  /// no sense with a session (a login form is already answered).
-  ///
-  /// This is what makes F5 restore the screen the reader was on. On Android
-  /// nothing exercised it: there is no reload, and the App Links that arrive
-  /// cold aim at public routes. On the web EVERY reload goes through the gate,
-  /// so without this an authenticated reader who refreshed `/family` was
-  /// silently returned to the calendar — the destination remembered, then
-  /// thrown away one phase later.
-  static bool isRestorableWhenAuthed(String uri) {
-    final path = Uri.tryParse(uri)?.path;
-    return path != null &&
-        path.isNotEmpty &&
-        !anonymousOnlyRoutes.contains(path);
-  }
-
   /// Where the router should send this visitor; null means "stay here".
   ///
-  /// [pendingLocation] is the full URI an App Link — or a browser reload —
-  /// asked for before the gate answered. Who it is honoured for depends on the
-  /// answer the gate gave: for an ANONYMOUS visitor only a public destination
-  /// (restoring a guarded screen would hand over exactly what S-02 refuses),
-  /// and for an AUTHENTICATED one anything that is not an anonymous-only
-  /// screen — that second half is what makes a reload land where the reader
-  /// was.
+  /// Staying is the answer that matters on the web: the location this is asked
+  /// about is the URL the reader typed, pasted, refreshed or tapped in a
+  /// notification, and an authenticated reader keeps it untouched.
   static String? redirect({
     required AuthPhase phase,
     required String location,
-    String? pendingLocation,
   }) =>
       switch (phase) {
-        AuthPhase.gate => location == splash ? null : splash,
-        AuthPhase.anon => isPublic(location)
-            ? null
-            : (pendingLocation != null && isRestorable(pendingLocation)
-                ? pendingLocation
-                : login),
+        // Unreachable in practice — the app renders the splash instead of
+        // routing while the gate decides, precisely so that nothing moves the
+        // URL before the answer. Null keeps that promise if it is ever asked.
+        AuthPhase.gate => null,
+        AuthPhase.anon => isPublic(location) ? null : login,
         // F-57: a profile-less session is confined to the onboarding screen —
         // the S-11 leaving confinement's shape, for the opposite end of the
-        // account's life. A pending destination is deliberately NOT honoured:
-        // there is no profile to show any of it to yet.
-        AuthPhase.onboarding =>
-            location == onboarding ? null : onboarding,
-        AuthPhase.authed => anonymousOnlyRoutes.contains(location)
-            ? (pendingLocation != null &&
-                    isRestorableWhenAuthed(pendingLocation)
-                ? pendingLocation
-                : home)
-            : null,
+        // account's life.
+        AuthPhase.onboarding => location == onboarding ? null : onboarding,
+        AuthPhase.authed =>
+            anonymousOnlyRoutes.contains(location) ? home : null,
       };
 }

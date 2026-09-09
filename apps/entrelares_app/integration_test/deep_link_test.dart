@@ -1,12 +1,12 @@
 // T-64 — the web channel's URLs, driven through the real app in a real
-// browser, because that is the only engine where the defect exists.
+// browser, because that is the only engine where the defect existed.
 //
-// The widget suite (`test/route_gate_test.dart`) proves the gate's rules and
-// the shape of the restore. It cannot prove THIS: in a test binding go_router
-// reports the location it redirected to, so the router never comes back to
-// `/splash` and the broken code passes every scenario. On the web it does come
-// back, and that is the whole defect — `/family` → `/splash` → `/`, with the
-// screen and the address bar disagreeing on the way.
+// The widget suite (`test/route_gate_test.dart`) proves the routing decision.
+// It cannot prove THIS: in a test binding nothing forces the address bar to
+// disagree with the screen, and the address bar was half the defect — the app
+// used to park a cold entry on `/splash`, and go_router reported that park
+// late enough to survive everything done afterwards. `/family` → `/splash` →
+// the calendar, and even when the screen was right the URL was not.
 //
 // A cold boot at a deep route is the same code path a browser reload takes:
 // both hand the URL to the app as the platform's initial route and both go
@@ -75,6 +75,12 @@ void main() {
     tester.binding.platformDispatcher.defaultRouteNameTestValue = route;
     addTearDown(
         tester.binding.platformDispatcher.clearDefaultRouteNameTestValue);
+    // The harness's own precondition, asserted rather than assumed: everything
+    // below is about what the app does with the URL the platform hands it, so
+    // a harness that fails to hand it over would look exactly like a product
+    // defect. It cost a red CI round to learn that the hard way.
+    expect(WidgetsBinding.instance.platformDispatcher.defaultRouteName, route,
+        reason: 'the platform must hand the app the URL under test');
     app.main();
     appBooted = true;
     await tester.pumpAndSettle(const Duration(seconds: 15));
@@ -96,8 +102,9 @@ void main() {
       routerOf(tester).state.uri.toString();
 
   /// What the router has REPORTED — the value the address bar carries and the
-  /// one a reload starts from. This is the half that stayed on `/splash`: the
-  /// screen was right and the URL was not, so the next F5 replayed the defect.
+  /// one a reload starts from. This is the half that used to stay on `/splash`:
+  /// the screen was right and the URL was not, so the next F5 replayed the
+  /// defect.
   String reported(WidgetTester tester) =>
       routerOf(tester).routeInformationProvider.value.uri.toString();
 
@@ -113,8 +120,8 @@ void main() {
     await bootAt(tester, '/family', signedOut: false);
 
     expect(location(tester), '/family',
-        reason: 'T-64: the destination survived the gate instead of being '
-            'traded for the calendar');
+        reason: 'T-64: the URL survived the gate instead of being traded for '
+            'the calendar');
     expect(reported(tester), '/family',
         reason: 'and the address bar agrees — without that a reload replays '
             'the whole defect');

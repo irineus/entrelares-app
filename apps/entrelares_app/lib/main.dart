@@ -169,8 +169,19 @@ class _EntrelaresAppState extends State<EntrelaresApp>
 
   SupabaseClient get _client => Supabase.instance.client;
 
+  /// Built LAZILY, and that laziness is T-64's fix: the first thing a GoRouter
+  /// does is read the platform's initial route, and the first thing it does
+  /// with it is run [_redirect]. While the session gate has not answered there
+  /// is no honest answer to give, and every answer the app used to invent
+  /// (park on `/splash`, remember the destination, hand it back) moved the
+  /// browser's URL away from what the reader asked for. So the router is not
+  /// created — [build] shows the splash instead — and by the time it exists the
+  /// phase is known and the URL is still the reader's own.
+  ///
+  /// `initialLocation` therefore only ever applies where the platform hands the
+  /// app no URL of its own: an Android cold start, where it is the calendar.
   late final GoRouter _router = GoRouter(
-    initialLocation: '/splash',
+    initialLocation: RouteRules.home,
     refreshListenable: _refresh,
     redirect: _redirect,
     // T-64: a URL this app does not serve says so. Without it go_router's own
@@ -406,15 +417,18 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     ],
   );
 
-  /// Where an App Link wanted to go before the session gate had answered, and
-  /// the rest of the routing state the redirect reads. T-64 moved it out of
-  /// this State so a test can drive it — see [AppRouteGate].
+  /// The routing decision, out of this State so a test can drive it (T-64).
   late final AppRouteGate _routeGate = AppRouteGate(
     phase: () => _routePhase,
     isLeaving: () => _isLeaving,
     consentState: () => _consentState,
-    go: (location) => _router.go(location),
   );
+
+  /// Whether [_router] has been built — which only happens once the gate has
+  /// answered. Guards the listener it owns, so `dispose` on a session that
+  /// never got past the splash does not construct a router just to tear it
+  /// down.
+  bool _routerLive = false;
 
   /// S-11: this member asked to leave, so the app is closed to them until they
   /// cancel or sign out (mirror of `MainLayout.EnforceLeaving`).
@@ -431,8 +445,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   late final OnboardingService _onboarding;
   final _tourKeys = TourKeys();
 
-  String? _redirect(BuildContext context, GoRouterState state) => _routeGate
-      .redirect(matchedLocation: state.matchedLocation, uri: state.uri);
+  String? _redirect(BuildContext context, GoRouterState state) =>
+      _routeGate.redirect(state.matchedLocation);
 
   AuthPhase get _routePhase => switch (_phase) {
         _AuthPhase.gate => AuthPhase.gate,
@@ -479,10 +493,6 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       };
       _router.go(Uri(path: '/notifications', queryParameters: query).toString());
     };
-    // T-37: a pageview per navigation, the app's answer to the web's
-    // `OnLocationChanged`. The URL is sanitized by the pure mirror, so no
-    // invite token or profile id can travel with it.
-    _router.routeInformationProvider.addListener(_trackPageView);
     _sudo = SudoService(_dataSource);
     _onboarding = OnboardingService(_dataSource, push: _push);
     _l = Localization(widget.initialLanguage);
@@ -524,7 +534,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _authSub?.cancel();
-    _router.routeInformationProvider.removeListener(_trackPageView);
+    if (_routerLive) {
+      _router.routeInformationProvider.removeListener(_trackPageView);
+    }
     _inactivityTimer?.cancel();
     _adminMode.dispose();
     _storeBilling?.dispose();
@@ -550,7 +562,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
 
   void _setPhase(_AuthPhase phase) {
     if (!mounted) return;
-    _phase = phase;
+    // setState, not a bare assignment: leaving the gate phase swaps the splash
+    // for the router in [build], and that swap is what CREATES the router —
+    // reading the browser's URL for the first time, with the answer already in
+    // hand (T-64).
+    setState(() => _phase = phase);
     // Mirror of the web's logout path: leaving the authenticated phase for
     // ANY reason (sign-out, inactivity, dead session) drops admin mode — and
     // the S-10 elevation window with it.
@@ -575,11 +591,21 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _inactivityTimer?.cancel();
       _inactivityTimer = null;
     }
-    // T-64: a remembered destination is restored by a REAL navigation, not by
-    // the redirect — the redirect's answer never reaches the address bar, and
-    // the next phase ping would re-decide from a `/splash` nobody is on any
-    // more. A `go` re-runs the whole chain, so it IS the ping.
-    if (!_routeGate.restorePendingDestination()) _refresh.ping();
+    if (phase != _AuthPhase.gate) _ensureRouterListeners();
+    _refresh.ping();
+  }
+
+  /// T-37: a pageview per navigation, the app's answer to the web's
+  /// `OnLocationChanged`. The URL is sanitized by the pure mirror, so no invite
+  /// token or profile id can travel with it.
+  ///
+  /// Attached here rather than in `initState` because touching [_router] is
+  /// what builds it, and building it before the gate has answered is the whole
+  /// defect this item removed.
+  void _ensureRouterListeners() {
+    if (_routerLive) return;
+    _routerLive = true;
+    _router.routeInformationProvider.addListener(_trackPageView);
   }
 
   /// F-09 — needs the profile id, which the phase transition does not carry.
@@ -820,6 +846,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           // against the 79 colour literals this delivery removed. Following
           // the system is the whole feature for now; a user-facing switch is
           // U-12's, not this item's.
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.system,
           // T-53 stage 4 — the web channel is a phone-shaped app, and a
           // browser window is not a phone. The Blazor PWA always capped its
           // pages (`.page-container { max-width: 500px; margin: 0 auto }`), so
@@ -828,10 +857,21 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           // decision: the calendar has seven columns and breathes better.
           // Applied through `builder`, so it wraps the Navigator and therefore
           // every route, sheet and dialog — one place, no screen to forget.
-          builder: (context, child) => AppWidthCap(child: child),
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.system,
+          //
+          // T-64 — and `child` is the ROUTER itself (`WidgetsApp.build` hands
+          // the builder its `routing` widget), so not returning it is how the
+          // app spends the gate NOT ROUTING. That is the fix: a router that
+          // mounts before the session gate has answered has to invent an
+          // answer, and every answer it invented moved the URL away from what
+          // the reader asked for — park on `/splash`, then hand the
+          // destination back too late, then disagree with the address bar. It
+          // also costs nothing: no screen builds, so no anon request is fired
+          // for a session that is still being decided. When the phase lands,
+          // the router mounts with the browser's own URL still intact and the
+          // first decision made about it is the right one.
+          builder: (context, child) => _phase == _AuthPhase.gate
+              ? const AppWidthCap(child: AppSplash())
+              : AppWidthCap(child: child),
           routerConfig: _router,
         ),
       ),

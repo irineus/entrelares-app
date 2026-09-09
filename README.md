@@ -205,14 +205,21 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   protegido exceto `/login`, `/reset-password` e `/update-password`. Desde o F-57 há uma
   quarta fase de auth: sessão validada SEM perfil (cadastro Google diferido) fica confinada
   em `/onboarding` até fundar a família ou reivindicar o convite.
-- **URL como interface (T-64, 08/09/2026):** a decisão vive em duas metades. `RouteRules`
-  (core) é a PURA — quem pode ver o quê; `AppRouteGate` (`lib/routing/`) é a de ESTADO —
-  guarda o destino que uma entrada fria pediu enquanto o portão da sessão decide, e o
-  restaura com uma navegação de verdade (`go`) uma vez por fase. Ter que ser navegação, e
-  não devolução pelo redirect, é web: o go_router roda o redirect de topo no máximo uma vez
-  por navegação e não reporta o desvio, então a barra de endereço ficava em `/splash` e o
-  ping de fase seguinte decidia a partir dele — `/family` virava o calendário. Uma URL que
-  o app não serve agora responde 404 (`NotFoundScreen`) em vez de ser engolida.
+- **URL como interface (T-64, 08/09/2026):** **o app não constrói roteador nenhum enquanto o
+  portão da sessão não responde** — o `builder:` do `MaterialApp.router` recebe o próprio
+  `Router` como `child`, então não devolvê-lo é passar a fase `gate` sem rotear, mostrando o
+  splash. É a correção inteira, e ela apagou uma máquina: não existe mais destino lembrado
+  (`pendingLocation`, `isRestorable*`). Antes, um roteador que monta sem saber quem está
+  perguntando tinha de INVENTAR uma resposta — estacionar em `/splash`, guardar o destino,
+  devolvê-lo depois —, e na web isso não fecha: o go_router roda o redirect de topo no máximo
+  uma vez por navegação e reporta aquele `/splash` tarde demais, então o destino era gasto por
+  uma avaliação que não chegava ao leitor e a barra de endereço passava a mentir. Medido num
+  navegador: `/family` → `/splash` → calendário. Agora a URL do navegador continua sendo a URL
+  quando o roteamento começa, e a primeira decisão sobre ela já é a certa. Bônus: nenhuma tela
+  monta durante o portão, então nenhuma requisição anônima é disparada. `RouteRules` (core)
+  segue sendo o espelho puro do S-02; `AppRouteGate` (`lib/routing/`) é ele mais os dois
+  portões que precisam de estado (S-11 saída, S-15 consentimento). Uma URL que o app não serve
+  responde 404 (`NotFoundScreen`) em vez de ser engolida.
 - **Deep links (App Links):** host `web.entrelares.app` (a origem do PWA — o apex é a
   landing), path `/update-password`, `autoVerify`. O `assetlinks.json` de produção já
   listava o prod (`com.entrelares.app`, F-54); o statement do dev
