@@ -285,7 +285,7 @@ async function handleInvitationEmail(
 ): Promise<Response> {
   const { data, error } = await supabase
     .from("family_invitations")
-    .select("id, family_id, email, token, expires_at, accepted_at, revoked_at, families(name), profiles!family_invitations_invited_by_fkey(full_name, language_effective), roles(role, label_pt)")
+    .select("id, family_id, email, token, expires_at, accepted_at, revoked_at, profile_id, families(name), profiles!family_invitations_invited_by_fkey(full_name, language_effective), roles(role, label_pt)")
     .eq("id", invitationId)
     .single();
 
@@ -331,7 +331,9 @@ async function handleInvitationEmail(
   const delivered = await sendEmail(resendKey, fromEmail, fromName, {
     to: data.email,
     subject: t.subjInvitation(inviterName),
-    html: templateInvitation(lang, inviterName, familyName, roleName, link, expiresBr),
+    // F-56: an invitation FOR a pending member states what stays (the admin's
+    // name/role, as family data) and what is purged (the e-mail).
+    html: templateInvitation(lang, inviterName, familyName, roleName, link, expiresBr, data.profile_id != null),
   });
 
   // F-38: admin heads-up when this invitation crossed the 80% / último milestone.
@@ -761,9 +763,10 @@ function templateReminder(lang: Lang, date: string, handoffTime: string | null, 
   );
 }
 
-function templateInvitation(lang: Lang, inviterName: string, familyName: string, roleName: string, link: string, expiresBr: string): string {
+function templateInvitation(lang: Lang, inviterName: string, familyName: string, roleName: string, link: string, expiresBr: string, forPlaceholder = false): string {
   const t = swapText(lang);
   const roleLine = roleName ? `<p ${P}>${t.invitationRole(roleName)}</p>` : "";
+  const privacy = forPlaceholder ? t.invitationPrivacyPlaceholder : t.invitationPrivacy;
   return baseTemplate(lang, t.invitationTitle,
     `<h2 ${h2("#212529")}>${t.invitationHeading}</h2>
      <p ${P}>${t.invitationBody(inviterName, familyName)}</p>
@@ -771,7 +774,7 @@ function templateInvitation(lang: Lang, inviterName: string, familyName: string,
      <p ${P_LAST}>${t.invitationExpiry(expiresBr)}</p>
      <a href="${link}" ${btn("#212529")}>${t.invitationButton}</a>
      <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">${t.invitationLinkFallback}<br/><span style="word-break:break-all;color:#6b7280;">${link}</span></p>
-     <p style="margin:20px 0 0;font-size:12px;color:#6b7280;line-height:1.6;">${t.invitationPrivacy} <a href="https://entrelares.app/privacidade.html" style="color:#6b7280;">${t.invitationPrivacyLink}</a>.</p>`
+     <p style="margin:20px 0 0;font-size:12px;color:#6b7280;line-height:1.6;">${privacy} <a href="https://entrelares.app/privacidade.html" style="color:#6b7280;">${t.invitationPrivacyLink}</a>.</p>`
   );
 }
 

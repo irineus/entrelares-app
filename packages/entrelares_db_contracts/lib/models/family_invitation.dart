@@ -27,6 +27,11 @@ class FamilyInvitation {
   final DateTime? acceptedAt;
   final DateTime? revokedAt;
 
+  /// F-56: the pending member this invitation is for. Accepting it attaches
+  /// the new auth user to THAT profile; a resend is a new row for the same
+  /// profile. Null on a legacy invitation — one that will create a profile.
+  final int? profileId;
+
   const FamilyInvitation({
     required this.id,
     this.familyId,
@@ -37,6 +42,7 @@ class FamilyInvitation {
     required this.expiresAt,
     this.acceptedAt,
     this.revokedAt,
+    this.profileId,
   });
 
   /// Still usable: nobody accepted it, nobody revoked it, and the 7-day window
@@ -60,6 +66,7 @@ class FamilyInvitation {
         expiresAt: DateTime.parse(json['expires_at'] as String).toUtc(),
         acceptedAt: _utc(json['accepted_at'] as String?),
         revokedAt: _utc(json['revoked_at'] as String?),
+        profileId: json['profile_id'] as int?,
       );
 
   static DateTime? _utc(String? wire) =>

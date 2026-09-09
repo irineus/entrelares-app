@@ -247,6 +247,9 @@ export interface SwapStrings {
   invitationButton: string;
   invitationLinkFallback: string;
   invitationPrivacy: string;
+  // F-56: the invitation is for a PENDING member — the admin's name/role stay
+  // as family planning data; only the e-mail is purged with the invitation.
+  invitationPrivacyPlaceholder: string;
   invitationPrivacyLink: string;
 
   cap80Title: string;
@@ -355,6 +358,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     invitationButton: "Criar minha conta",
     invitationLinkFallback: "Se o botão não funcionar, copie e cole este link no navegador:",
     invitationPrivacy: "Seu nome e e-mail foram inseridos sob o legítimo interesse de quem convidou você. Caso este convite não seja aceito, seu registro será permanentemente expurgado de nossos sistemas em até <strong>30 dias</strong>. Saiba mais na",
+    invitationPrivacyPlaceholder: "Seu e-mail foi inserido sob o legítimo interesse de quem convidou você e, caso este convite não seja aceito, será permanentemente expurgado de nossos sistemas em até <strong>30 dias</strong>. O nome e o papel informados por quem convidou fazem parte do planejamento da família dessa pessoa, que pode editá-los ou removê-los a qualquer momento. Saiba mais na",
     invitationPrivacyLink: "Política de Privacidade",
 
     cap80Title: "Vocês estão chegando no limite de e-mails do mês",
@@ -461,6 +465,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     invitationButton: "Create my account",
     invitationLinkFallback: "If the button does not work, copy and paste this link into your browser:",
     invitationPrivacy: "Your name and e-mail were entered under the legitimate interest of whoever invited you. If this invitation is not accepted, your record is permanently purged from our systems within <strong>30 days</strong>. Read more in the",
+    invitationPrivacyPlaceholder: "Your e-mail was entered under the legitimate interest of whoever invited you and, if this invitation is not accepted, it is permanently purged from our systems within <strong>30 days</strong>. The name and role they entered are part of that person's own family planning, which they can edit or remove at any time. Read more in the",
     invitationPrivacyLink: "Privacy Policy",
 
     cap80Title: "You are approaching this month's e-mail limit",
