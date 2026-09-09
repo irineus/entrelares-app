@@ -78,6 +78,8 @@ Future<Uint8List> buildReportPdf(
         pw.SizedBox(height: 14),
         ..._summarySection(report, l),
         pw.SizedBox(height: 14),
+        ..._caregiversSection(report, l),
+        pw.SizedBox(height: 14),
         ..._historySection(report, l),
         pw.SizedBox(height: 16),
         pw.Divider(color: PdfColors.grey400),
@@ -179,8 +181,49 @@ List<pw.Widget> _summarySection(CustodyReport report, Localization l) => [
       ],
     ];
 
-List<pw.Widget> _historySection(CustodyReport report, Localization l) => [
+/// F-61 — section 2: who could see the app, and since when. Printed BEFORE
+/// the history (owner decision) so a reader meets each caregiver's account
+/// date before the lines that depend on it. One dated fact per line; the
+/// section states, it does not conclude.
+List<pw.Widget> _caregiversSection(CustodyReport report, Localization l) => [
       _sectionTitle(l[K.pdfDocSection2]),
+      _paragraph(l[K.pdfDocCaregiversLead], size: 8.5),
+      pw.SizedBox(height: 6),
+      if (report.caregiverTimelines.isEmpty)
+        _paragraph(l[K.pdfDocEmptyCaregivers])
+      else
+        for (final t in report.caregiverTimelines)
+          pw.Container(
+            margin: const pw.EdgeInsets.only(bottom: 8),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  t.role.isEmpty ? t.name : '${t.name} — ${t.role}',
+                  style: pw.TextStyle(
+                      fontSize: 9, fontWeight: pw.FontWeight.bold),
+                ),
+                if (t.entries.isEmpty)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(left: 10, top: 1),
+                    child: pw.Text(l[K.pdfDocEmptyCaregivers],
+                        style: const pw.TextStyle(fontSize: 8.5)),
+                  ),
+                for (final e in t.entries)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(left: 10, top: 1),
+                    child: pw.Text(
+                      '${l.formatDateTime(e.atLocal)} — ${e.text}',
+                      style: const pw.TextStyle(fontSize: 8.5),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+    ];
+
+List<pw.Widget> _historySection(CustodyReport report, Localization l) => [
+      _sectionTitle(l[K.pdfDocSection3]),
       if (report.auditEntries.isEmpty)
         _paragraph(l[K.pdfDocEmptyHistory])
       else

@@ -204,6 +204,194 @@ class ReportAuditEntry {
   });
 }
 
+/// F-61 — the `account_logs` actions the "Responsáveis" section reads. The
+/// app asks the server for exactly these, oldest first, unpaged.
+const List<String> caregiverTimelineActions = [
+  'pending_member_added',
+  'invitation_created',
+  'pending_member_claimed',
+  'pending_member_removed',
+];
+
+/// F-61 — the slice of an `account_logs` row the section needs.
+class AccountEventView {
+  final String action;
+  final int? actorProfileId;
+
+  /// The profile the row is ABOUT (F-56 pending-member rows; invitation rows
+  /// since F-61 PR 2). Null on a legacy invitation row, which carried the
+  /// e-mail alone — see [newValue].
+  final int? targetProfileId;
+
+  /// What the writer stored: the e-mail on the invitation actions, the name
+  /// on the pending-member ones.
+  final String? newValue;
+
+  final DateTime createdAtLocal;
+
+  const AccountEventView({
+    required this.action,
+    required this.createdAtLocal,
+    this.actorProfileId,
+    this.targetProfileId,
+    this.newValue,
+  });
+}
+
+/// F-61 — what the `profiles` row itself says about a caregiver's account.
+class CaregiverAccountView {
+  final int profileId;
+  final String? email;
+
+  /// When the ROW was created: the account's birth for a founder or a legacy
+  /// invitee; the day the admin added them for a placeholder (whose account
+  /// date is the claim log instead).
+  final DateTime? createdAtLocal;
+  final DateTime? leftAtLocal;
+
+  /// F-56: no account yet (`user_id` NULL, `left_at` NULL).
+  final bool isPending;
+
+  const CaregiverAccountView({
+    required this.profileId,
+    this.email,
+    this.createdAtLocal,
+    this.leftAtLocal,
+    this.isPending = false,
+  });
+}
+
+/// One dated line of a caregiver's timeline.
+class CaregiverTimelineEntry {
+  final DateTime atLocal;
+  final String text;
+
+  const CaregiverTimelineEntry(this.atLocal, this.text);
+}
+
+/// F-61 — a caregiver's account timeline as section 2 prints it.
+class CaregiverTimeline {
+  final int profileId;
+  final String name;
+  final String role;
+  final List<CaregiverTimelineEntry> entries;
+
+  const CaregiverTimeline({
+    required this.profileId,
+    required this.name,
+    required this.role,
+    required this.entries,
+  });
+}
+
+/// F-61 — section 2 of the document: for every caregiver the summary table
+/// lists, the dated facts of their access to the app, oldest first.
+///
+///   · added to the calendar by X (`pending_member_added`, target = them);
+///   · invitation sent by X (`invitation_created` with target = them, or a
+///     LEGACY row whose stored e-mail is theirs);
+///   · created the app account — the claim log when there is one, otherwise
+///     the profile row's own creation for an account-bearing member;
+///   · no app account up to the generation of this report, for a pending one
+///     (dated at generation, so the sentence is a fact and not a state);
+///   · removed from the calendar by X (`pending_member_removed`), or left the
+///     family (`left_at`).
+///
+/// Neutral by construction: before a caregiver's account date every day of
+/// theirs is, by construction, the other's authorship — the section makes
+/// that visible without saying it.
+List<CaregiverTimeline> caregiverTimelines({
+  required List<CaregiverStat> caregivers,
+  required List<CaregiverAccountView> accounts,
+  required List<AccountEventView> events,
+  required List<MemberView> members,
+  required DateTime generatedAtLocal,
+  required Localization l,
+}) {
+  String actorName(AccountEventView e) {
+    if (e.actorProfileId != null) {
+      for (final m in members) {
+        if (m.id == e.actorProfileId) return m.fullName;
+      }
+    }
+    return l[K.pdfDocSystem];
+  }
+
+  return [
+    for (final c in caregivers)
+      () {
+        CaregiverAccountView? account;
+        for (final a in accounts) {
+          if (a.profileId == c.profileId) account = a;
+        }
+        if (account == null) {
+          return CaregiverTimeline(
+              profileId: c.profileId,
+              name: c.name,
+              role: c.role,
+              entries: const []);
+        }
+
+        final email = account.email?.trim().toLowerCase();
+        bool isMine(AccountEventView e) =>
+            e.targetProfileId == c.profileId ||
+            (e.targetProfileId == null &&
+                e.action == 'invitation_created' &&
+                email != null &&
+                email.isNotEmpty &&
+                e.newValue?.trim().toLowerCase() == email);
+        final mine = [for (final e in events) if (isMine(e)) e];
+
+        final entries = <CaregiverTimelineEntry>[];
+        AccountEventView? claim;
+        AccountEventView? removed;
+        for (final e in mine) {
+          switch (e.action) {
+            case 'pending_member_added':
+              entries.add(CaregiverTimelineEntry(e.createdAtLocal,
+                  l.format(K.pdfDocTlAdded, [actorName(e)])));
+            case 'invitation_created':
+              entries.add(CaregiverTimelineEntry(e.createdAtLocal,
+                  l.format(K.pdfDocTlInvited, [actorName(e)])));
+            case 'pending_member_claimed':
+              claim ??= e;
+            case 'pending_member_removed':
+              removed ??= e;
+          }
+        }
+
+        if (claim != null) {
+          entries.add(CaregiverTimelineEntry(
+              claim.createdAtLocal, l[K.pdfDocTlAccountCreated]));
+        } else if (account.isPending) {
+          entries.add(CaregiverTimelineEntry(
+              generatedAtLocal, l[K.pdfDocTlNoAccountYet]));
+        } else if (account.createdAtLocal != null &&
+            (removed == null || account.leftAtLocal == null)) {
+          // An account-bearing member (founder, legacy invitee): the row's
+          // birth IS the account's. A removed placeholder never had one.
+          entries.add(CaregiverTimelineEntry(
+              account.createdAtLocal!, l[K.pdfDocTlAccountCreated]));
+        }
+
+        if (removed != null) {
+          entries.add(CaregiverTimelineEntry(removed.createdAtLocal,
+              l.format(K.pdfDocTlRemoved, [actorName(removed)])));
+        } else if (account.leftAtLocal != null) {
+          entries.add(CaregiverTimelineEntry(
+              account.leftAtLocal!, l[K.pdfDocTlLeft]));
+        }
+
+        entries.sort((a, b) => a.atLocal.compareTo(b.atLocal));
+        return CaregiverTimeline(
+            profileId: c.profileId,
+            name: c.name,
+            role: c.role,
+            entries: entries);
+      }(),
+  ];
+}
+
 /// The assembled consolidated history report (F-33). Pure data built by
 /// [buildCustodyReport] from the family's own RLS-scoped reads; the renderer
 /// only lays it out.
@@ -231,6 +419,10 @@ class CustodyReport {
   /// column is printed and every swap count includes accepted future swaps.
   final bool includesFutureSwaps;
 
+  /// F-61: section 2 — one timeline per caregiver of [caregivers]. Empty
+  /// when the account trail was not supplied (the section then says so).
+  final List<CaregiverTimeline> caregiverTimelines;
+
   const CustodyReport({
     required this.familyName,
     required this.childName,
@@ -243,6 +435,7 @@ class CustodyReport {
     required this.totalSwaps,
     required this.auditEntries,
     required this.includesFutureSwaps,
+    this.caregiverTimelines = const [],
   });
 
   int get totalDays =>
@@ -273,6 +466,10 @@ CustodyReport buildCustodyReport({
   // without the lookup (or a log without a request) simply omits the origin.
   Map<int, SwapOrigin> resolutionOrigins = const {},
   bool includeAcceptedFutureSwaps = false,
+  // F-61: the caregivers' account facts and trail. Enrichment like the
+  // origins — absent, section 2 prints its empty line and the rest stands.
+  List<CaregiverAccountView> accounts = const [],
+  List<AccountEventView> accountEvents = const [],
 }) {
   final stats = caregiverStats(
     members: members,
@@ -281,6 +478,8 @@ CustodyReport buildCustodyReport({
     includeFutureSwaps: includeAcceptedFutureSwaps,
     roleLabelOf: roleLabelOf,
   );
+  final visible =
+      reportCaregivers(stats, includeFutureSwaps: includeAcceptedFutureSwaps);
 
   final entries = [...auditLogs]
     ..sort((a, b) => a.createdAtLocal.compareTo(b.createdAtLocal));
@@ -295,8 +494,7 @@ CustodyReport buildCustodyReport({
     generatedAtLocal: generatedAtLocal,
     generatedBy: generatedBy,
     appVersion: appVersion,
-    caregivers:
-        reportCaregivers(stats, includeFutureSwaps: includeAcceptedFutureSwaps),
+    caregivers: visible,
     totalSwaps: totalVisibleSwaps(
       days: days,
       today: today,
@@ -307,6 +505,16 @@ CustodyReport buildCustodyReport({
         _entryFor(log, resolutionOrigins[log.id], members, diffFor, l),
     ],
     includesFutureSwaps: includeAcceptedFutureSwaps,
+    caregiverTimelines: accounts.isEmpty
+        ? const []
+        : caregiverTimelines(
+            caregivers: visible,
+            accounts: accounts,
+            events: accountEvents,
+            members: members,
+            generatedAtLocal: generatedAtLocal,
+            l: l,
+          ),
   );
 }
 

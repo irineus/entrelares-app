@@ -677,6 +677,16 @@ abstract final class K {
   static const String pdfDocActionUpdate = 'pdf.doc.action.update';
   static const String pdfDocSystem = 'pdf.doc.system';
   static const String pdfDocFallbackFamily = 'pdf.doc.fallbackFamily';
+  // F-61: section 2 — each caregiver's dated account timeline.
+  static const String pdfDocSection3 = 'pdf.doc.section3';
+  static const String pdfDocCaregiversLead = 'pdf.doc.caregiversLead';
+  static const String pdfDocEmptyCaregivers = 'pdf.doc.emptyCaregivers';
+  static const String pdfDocTlAdded = 'pdf.doc.tl.added';
+  static const String pdfDocTlInvited = 'pdf.doc.tl.invited';
+  static const String pdfDocTlAccountCreated = 'pdf.doc.tl.accountCreated';
+  static const String pdfDocTlNoAccountYet = 'pdf.doc.tl.noAccountYet';
+  static const String pdfDocTlRemoved = 'pdf.doc.tl.removed';
+  static const String pdfDocTlLeft = 'pdf.doc.tl.left';
 
   // ── LGPD export (F-17) ──
   static const String exportLgpdNote = 'export.lgpdNote';
@@ -1699,6 +1709,15 @@ abstract final class K {
     pdfDocActionUpdate,
     pdfDocSystem,
     pdfDocFallbackFamily,
+    pdfDocSection3,
+    pdfDocCaregiversLead,
+    pdfDocEmptyCaregivers,
+    pdfDocTlAdded,
+    pdfDocTlInvited,
+    pdfDocTlAccountCreated,
+    pdfDocTlNoAccountYet,
+    pdfDocTlRemoved,
+    pdfDocTlLeft,
     exportLgpdNote,
     exportFileNamePrefix,
     notifRenderTitleAutoReminder,

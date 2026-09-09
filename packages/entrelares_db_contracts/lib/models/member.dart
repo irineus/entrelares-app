@@ -67,6 +67,11 @@ class Member {
   final DateTime? onboardingTourSeenAt;
   final DateTime? onboardingDismissedAt;
 
+  /// F-61: when the profile ROW was created. For a founder or a legacy
+  /// invitee that is the account's birth; for a claimed placeholder it is the
+  /// day the admin added them, and the claim log carries the account date.
+  final DateTime? createdAt;
+
   const Member({
     required this.id,
     this.familyId,
@@ -86,6 +91,7 @@ class Member {
     this.onboardingSwapExplainedAt,
     this.onboardingTourSeenAt,
     this.onboardingDismissedAt,
+    this.createdAt,
   });
 
   /// A live, present member holds a family seat (Profile.IsActiveMember).
@@ -125,6 +131,7 @@ class Member {
         onboardingTourSeenAt: _utc(json['onboarding_tour_seen_at'] as String?),
         onboardingDismissedAt:
             _utc(json['onboarding_dismissed_at'] as String?),
+        createdAt: _utc(json['created_at'] as String?),
       );
 
   static DateTime? _utc(String? wire) =>

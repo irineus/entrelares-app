@@ -1538,6 +1538,18 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<List<AccountLog>> fetchAccountLogsByAction(
+      List<String> actions) async {
+    if (actions.isEmpty) return const [];
+    final rows = await _client
+        .from('account_logs')
+        .select()
+        .inFilter('action', actions)
+        .order('created_at', ascending: true);
+    return rows.map(AccountLog.fromJson).toList();
+  }
+
+  @override
   Future<List<AccountLog>> fetchAccountLogs({int offset = 0}) async {
     final rows = await _client
         .from('account_logs')

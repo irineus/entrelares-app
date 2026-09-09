@@ -140,6 +140,25 @@ void main() {
       expect(sharedName, 'entrelares-relatorio-2026-08-01_2026-08-31.pdf');
     });
 
+    testWidgets('F-61: generating reads the caregiver trail, and a failed '
+        'read costs the section and not the document', (tester) async {
+      final ds = source();
+      await pumpPdf(tester, ds);
+      await tester.tap(find.text(l[K.pdfGenerate]));
+      await tester.pumpAndSettle();
+
+      expect(ds.accountActionLookups.single, caregiverTimelineActions);
+      expect(find.text(l[K.pdfDocTitle]), findsOne);
+
+      final failing = source()..throwOnAccountActions = 'trail down';
+      await pumpPdf(tester, failing);
+      await tester.tap(find.text(l[K.pdfGenerate]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[K.pdfDocTitle]), findsOne);
+      expect(find.textContaining('trail down'), findsNothing);
+    });
+
     testWidgets('printing hands over the same bytes', (tester) async {
       Uint8List? printed;
       await pumpPdf(tester, source(), onPrint: (b, _) => printed = b);
@@ -327,6 +346,65 @@ void main() {
       // the no-account sentence and "administradora" to the override one.
       expect(text, contains('ainda'));
       expect(text, contains('administradora'));
+    });
+
+    test('F-61: section 2 prints each caregiver timeline, before the history',
+        () async {
+      CustodyReport withTrail(Localization loc) => buildCustodyReport(
+          familyName: 'Souza',
+          childName: null,
+          start: DateTime(2026, 8, 1),
+          end: DateTime(2026, 8, 31),
+          today: today,
+          days: [
+            ReportDay(
+                scheduleDate: DateTime(2026, 8, 15), scheduledParentId: 1),
+            ReportDay(
+                scheduleDate: DateTime(2026, 8, 16), scheduledParentId: 2),
+          ],
+          members: const [
+            MemberView(id: 1, fullName: 'Ana Souza'),
+            MemberView(
+                id: 2,
+                fullName: 'Bruno Lima',
+                isActiveMember: false,
+                isPendingMember: true),
+          ],
+          auditLogs: const [],
+          roleLabelOf: (id) => id == 1 ? 'Mae' : 'Pai',
+          diffFor: (_) => const [],
+          generatedBy: 'Ana Souza',
+          generatedAtLocal: today,
+          appVersion: '0.2.23+25',
+          l: loc,
+          accounts: [
+            CaregiverAccountView(
+                profileId: 1, createdAtLocal: DateTime(2026, 7, 1)),
+            const CaregiverAccountView(profileId: 2, isPending: true),
+          ],
+          accountEvents: [
+            AccountEventView(
+                action: 'pending_member_added',
+                actorProfileId: 1,
+                targetProfileId: 2,
+                createdAtLocal: DateTime(2026, 8, 10, 9)),
+          ],
+        );
+
+      // Whole ASCII tokens only (WinAnsi faces, words placed one by one).
+      final pt = await render(withTrail(l), l);
+      expect(pt, contains('Adicionado'));
+      expect(pt, contains('Criou'));
+      expect(pt, contains('Sem'));
+
+      // Section 2 precedes the history, which is now section 3 — asserted
+      // in English, whose titles are whole ASCII tokens ("Caregivers",
+      // "Change"); a bare "3." also matches PDF operator coordinates.
+      final en = Localization(AppLanguage.en);
+      final text = await render(withTrail(en), en);
+      expect(text, contains('Added'));
+      expect(text.indexOf('Caregivers'), lessThan(text.indexOf('Change')));
+      expect(text.indexOf('Added'), lessThan(text.indexOf('Change')));
     });
 
     test('F-61: a row without context prints no authorship line', () async {

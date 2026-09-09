@@ -835,6 +835,21 @@ class FakeCustodyDataSource implements CustodyDataSource {
     return accountLogs.skip(offset).take(auditPageSize).toList();
   }
 
+  /// F-61: every action list the document asked the trail for.
+  final List<List<String>> accountActionLookups = [];
+  Object? throwOnAccountActions;
+
+  @override
+  Future<List<AccountLog>> fetchAccountLogsByAction(
+      List<String> actions) async {
+    accountActionLookups.add(actions);
+    if (throwOnAccountActions != null) throw throwOnAccountActions!;
+    return [
+      for (final log in accountLogs)
+        if (actions.contains(log.action)) log
+    ]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  }
+
   @override
   Future<Map<int, SwapOrigin>> fetchResolutionOrigins(List<int> logIds) async {
     originLookups.add(logIds);
