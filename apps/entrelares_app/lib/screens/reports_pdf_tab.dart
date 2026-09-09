@@ -7,6 +7,7 @@ import '../theme/tokens.dart';
 import 'package:printing/printing.dart';
 
 import '../env.dart';
+import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import '../services/custody_data_source.dart';
@@ -148,6 +149,13 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         origins = await widget.dataSource
             .fetchResolutionOrigins([for (final log in logs) log.id]);
       } catch (_) {/* the report stays useful without the origins */}
+      // F-61: the caregivers' account trail for section 2 — the same
+      // contract: a failure costs the section's lines, never the document.
+      var accountEvents = const <AccountLog>[];
+      try {
+        accountEvents = await widget.dataSource
+            .fetchAccountLogsByAction(caregiverTimelineActions);
+      } catch (_) {/* section 2 prints its empty line */}
 
       String roleLabelOf(int profileId) {
         for (final m in members) {
@@ -184,6 +192,28 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         l: l,
         resolutionOrigins: origins,
         includeAcceptedFutureSwaps: _includeFutureSwaps,
+        accounts: [
+          for (final m in members)
+            CaregiverAccountView(
+              profileId: m.id,
+              email: m.email,
+              createdAtLocal: m.createdAt?.toLocal(),
+              leftAtLocal: m.leftAt == null
+                  ? null
+                  : DateTime.tryParse(m.leftAt!)?.toLocal(),
+              isPending: m.isPendingMember,
+            ),
+        ],
+        accountEvents: [
+          for (final e in accountEvents)
+            AccountEventView(
+              action: e.action,
+              actorProfileId: e.actorProfileId,
+              targetProfileId: e.targetProfileId,
+              newValue: e.newValue,
+              createdAtLocal: e.createdAt.toLocal(),
+            ),
+        ],
       );
 
       final bytes = await buildReportPdf(report, l);

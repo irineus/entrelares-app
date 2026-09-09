@@ -190,6 +190,228 @@ void main() {
     });
   });
 
+  // F-61 — section 2 of the document: each caregiver's dated account facts.
+  group('caregiverTimelines', () {
+    final l = Localization(AppLanguage.ptBr);
+    final generatedAt = DateTime(2026, 9, 9, 15, 0);
+
+    const stats = [
+      CaregiverStat(
+          profileId: 1,
+          name: 'Ana Prado',
+          role: 'Mãe',
+          colorSlot: 1,
+          plannedDays: 3,
+          actualDays: 1,
+          projectedDays: 3,
+          swapsGiven: 0,
+          swapsReceived: 0),
+      CaregiverStat(
+          profileId: 2,
+          name: 'Bruno Prado',
+          role: 'Pai',
+          colorSlot: 2,
+          plannedDays: 2,
+          actualDays: 0,
+          projectedDays: 2,
+          swapsGiven: 0,
+          swapsReceived: 0),
+    ];
+
+    AccountEventView event(String action,
+            {int? actor = 1,
+            int? target,
+            String? value,
+            required DateTime at}) =>
+        AccountEventView(
+            action: action,
+            actorProfileId: actor,
+            targetProfileId: target,
+            newValue: value,
+            createdAtLocal: at);
+
+    List<CaregiverTimeline> run({
+      required List<CaregiverAccountView> accounts,
+      List<AccountEventView> events = const [],
+    }) =>
+        caregiverTimelines(
+          caregivers: stats,
+          accounts: accounts,
+          events: events,
+          members: _members,
+          generatedAtLocal: generatedAt,
+          l: l,
+        );
+
+    CaregiverTimeline of(List<CaregiverTimeline> ts, int id) =>
+        ts.firstWhere((t) => t.profileId == id);
+
+    test('a placeholder: added by the admin, then still without an account, '
+        'dated at generation', () {
+      final ts = run(
+        accounts: [
+          CaregiverAccountView(
+              profileId: 1, createdAtLocal: DateTime(2026, 7, 1, 9)),
+          CaregiverAccountView(
+              profileId: 2,
+              createdAtLocal: DateTime(2026, 9, 1, 10),
+              isPending: true),
+        ],
+        events: [
+          event('pending_member_added',
+              target: 2, value: 'Bruno', at: DateTime(2026, 9, 1, 10)),
+        ],
+      );
+
+      final bruno = of(ts, 2);
+      expect(bruno.entries.map((e) => e.text), [
+        'Adicionado ao calendário por Ana Prado.',
+        'Sem conta no aplicativo até a geração deste relatório.',
+      ]);
+      expect(bruno.entries.last.atLocal, generatedAt);
+      // The founder: the row's birth IS the account's.
+      expect(of(ts, 1).entries.map((e) => e.text),
+          ['Criou a conta no aplicativo.']);
+      expect(of(ts, 1).entries.single.atLocal, DateTime(2026, 7, 1, 9));
+    });
+
+    test('a claimed placeholder: added, invited, then the CLAIM date — never '
+        'the row creation', () {
+      final ts = run(
+        accounts: [
+          CaregiverAccountView(
+              profileId: 2,
+              email: 'bruno@example.com',
+              createdAtLocal: DateTime(2026, 9, 1, 10)),
+        ],
+        events: [
+          event('pending_member_added',
+              target: 2, at: DateTime(2026, 9, 1, 10)),
+          event('invitation_created',
+              target: 2,
+              value: 'bruno@example.com',
+              at: DateTime(2026, 9, 2, 8)),
+          event('pending_member_claimed',
+              actor: 2, target: 2, at: DateTime(2026, 9, 20, 19, 30)),
+        ],
+      );
+
+      final bruno = of(ts, 2);
+      expect(bruno.entries.map((e) => e.text), [
+        'Adicionado ao calendário por Ana Prado.',
+        'Convite enviado por Ana Prado.',
+        'Criou a conta no aplicativo.',
+      ]);
+      expect(bruno.entries.last.atLocal, DateTime(2026, 9, 20, 19, 30));
+    });
+
+    test('a LEGACY invitation row (no target) is matched by e-mail, '
+        'case-insensitively; someone else\'s is not', () {
+      final ts = run(
+        accounts: [
+          CaregiverAccountView(
+              profileId: 2,
+              email: 'Bruno@Example.com',
+              createdAtLocal: DateTime(2026, 9, 5)),
+        ],
+        events: [
+          event('invitation_created',
+              value: 'bruno@example.com', at: DateTime(2026, 9, 2)),
+          event('invitation_created',
+              value: 'carla@example.com', at: DateTime(2026, 9, 3)),
+        ],
+      );
+
+      expect(of(ts, 2).entries.map((e) => e.text), [
+        'Convite enviado por Ana Prado.',
+        'Criou a conta no aplicativo.',
+      ]);
+    });
+
+    test('a removed placeholder says by whom; a departed member says it left',
+        () {
+      final ts = run(
+        accounts: [
+          CaregiverAccountView(
+              profileId: 1,
+              createdAtLocal: DateTime(2026, 7, 1),
+              leftAtLocal: DateTime(2026, 9, 8)),
+          CaregiverAccountView(
+              profileId: 2,
+              createdAtLocal: DateTime(2026, 9, 1),
+              leftAtLocal: DateTime(2026, 9, 6)),
+        ],
+        events: [
+          event('pending_member_added', target: 2, at: DateTime(2026, 9, 1)),
+          event('pending_member_removed',
+              target: 2, at: DateTime(2026, 9, 6)),
+        ],
+      );
+
+      expect(of(ts, 2).entries.map((e) => e.text), [
+        'Adicionado ao calendário por Ana Prado.',
+        'Removido do calendário por Ana Prado.',
+      ]);
+      expect(of(ts, 1).entries.map((e) => e.text),
+          ['Criou a conta no aplicativo.', 'Saiu da família.']);
+    });
+
+    test('entries come out oldest first whatever the input order', () {
+      final ts = run(
+        accounts: [
+          CaregiverAccountView(
+              profileId: 2,
+              createdAtLocal: DateTime(2026, 9, 1)),
+        ],
+        events: [
+          event('pending_member_claimed', target: 2, at: DateTime(2026, 9, 9)),
+          event('invitation_created', target: 2, at: DateTime(2026, 9, 2)),
+          event('pending_member_added', target: 2, at: DateTime(2026, 9, 1)),
+        ],
+      );
+      final dates = of(ts, 2).entries.map((e) => e.atLocal).toList();
+      expect(dates, [...dates]..sort());
+      expect(dates.length, 3);
+    });
+
+    test('an unknown actor reads as the system; a caregiver with no account '
+        'row has no entries', () {
+      final ts = run(
+        accounts: [
+          CaregiverAccountView(profileId: 2, isPending: true),
+        ],
+        events: [
+          event('pending_member_added',
+              actor: null, target: 2, at: DateTime(2026, 9, 1)),
+        ],
+      );
+      expect(of(ts, 2).entries.first.text,
+          'Adicionado ao calendário por Sistema.');
+      expect(of(ts, 1).entries, isEmpty);
+    });
+
+    test('no sentence qualifies conduct — both catalogs, pinned', () {
+      const banned = ['sozinh', 'sem consultar', 'alone', 'without consult',
+        'unilateral', 'decidiu', 'decided'];
+      for (final loc in [l, Localization(AppLanguage.en)]) {
+        for (final key in [
+          K.pdfDocCaregiversLead,
+          K.pdfDocTlAdded,
+          K.pdfDocTlInvited,
+          K.pdfDocTlAccountCreated,
+          K.pdfDocTlNoAccountYet,
+          K.pdfDocTlRemoved,
+          K.pdfDocTlLeft,
+        ]) {
+          final text = loc[key].toLowerCase();
+          for (final word in banned) {
+            expect(text, isNot(contains(word)), reason: '$key / $word');
+          }
+        }
+      }
+    });
+  });
+
   group('buildCustodyReport', () {
     final l = Localization(AppLanguage.ptBr);
 
@@ -291,6 +513,36 @@ void main() {
       final swapped = report.auditEntries.last;
       expect(swapped.changes.single.label, l[K.auditFieldActualParent]);
       expect(swapped.changes.single.to, 'Bruno Prado');
+    });
+
+    test('F-61: section 2 is built only when the account trail was given', () {
+      expect(build().caregiverTimelines, isEmpty);
+
+      final report = buildCustodyReport(
+        familyName: 'Família Prado',
+        childName: null,
+        start: DateTime(2026, 8, 15),
+        end: DateTime(2026, 8, 22),
+        today: _today,
+        days: _period(),
+        members: _members,
+        auditLogs: const [],
+        roleLabelOf: (id) => 'Papel',
+        diffFor: (_) => const [],
+        generatedBy: 'Ana Prado',
+        generatedAtLocal: DateTime(2026, 8, 19, 21, 5),
+        appVersion: '0.2.20+22',
+        l: l,
+        accounts: [
+          for (final m in _members)
+            CaregiverAccountView(
+                profileId: m.id, createdAtLocal: DateTime(2026, 7, 1)),
+        ],
+      );
+      // One timeline per VISIBLE caregiver, in the table's order.
+      expect(report.caregiverTimelines.map((t) => t.profileId),
+          report.caregivers.map((c) => c.profileId));
+      expect(report.caregiverTimelines.first.role, 'Papel');
     });
 
     test('F-61: the authorship lines ride the entry; no context, none', () {

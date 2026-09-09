@@ -519,6 +519,12 @@ abstract class CustodyDataSource {
   /// S-10: the newest page of account operations ("Conta" tab).
   Future<List<AccountLog>> fetchAccountLogs({int offset = 0});
 
+  /// F-61: every account operation of the given kinds, OLDEST first and
+  /// unpaged — section 2 of the F-33 document reads a family's whole trail
+  /// of caregiver events (`caregiverTimelineActions`). Enrichment: a failure
+  /// costs the section's lines, never the document.
+  Future<List<AccountLog>> fetchAccountLogsByAction(List<String> actions);
+
   /// F-45: batch reverse lookup — which swap request produced each of these
   /// log rows (keyed by `resolution_log_id`, stamped by the DB on both
   /// resolution paths). Enrichment only: a failure costs the origin line, never

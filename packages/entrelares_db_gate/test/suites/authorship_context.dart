@@ -151,6 +151,37 @@ void authorshipContextTests(GateFixture fx) {
           reason: 'the DELETE still records who the day named');
     });
 
+    test('PR 2: the invitation log names the placeholder it was issued for; '
+        'a legacy one carries only the e-mail', () async {
+      final fam = await fx.createFamily('f61-invlog');
+      final pending = await addPending(fam.admin, 'E2E F61 Invited');
+      final email = fx.testEmail('f61-invlog');
+
+      await fam.admin.rpc<dynamic>('create_invitation', params: {
+        'p_email': email,
+        'p_role_id': fx.roleId('grandmother'),
+        'p_profile_id': pending,
+      });
+      final legacyEmail = fx.testEmail('f61-invlog-legacy');
+      await GateFixture.createInvitation(
+          fam.admin, legacyEmail, fx.roleId('aunt'));
+
+      final rows = [
+        for (final row in await fx.service
+            .from('account_logs')
+            .select()
+            .eq('family_id', fam.familyId)
+            .eq('action', 'invitation_created'))
+          AccountLog.fromJson(row)
+      ];
+      final forPending = rows.singleWhere((r) => r.newValue == email);
+      expect(forPending.targetProfileId, pending);
+      expect(forPending.actorProfileId, fam.adminProfile.id);
+      final legacy = rows.singleWhere((r) => r.newValue == legacyEmail);
+      expect(legacy.targetProfileId, isNull,
+          reason: 'no placeholder behind it — the e-mail is all there is');
+    });
+
     test('an admin applying an approval as the workflow TARGET is not an '
         'override; the auto-approval has no actor at all', () async {
       final fam = await fx.createFamily('f61-target');
