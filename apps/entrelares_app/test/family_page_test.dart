@@ -52,14 +52,36 @@ const departed = Member(
   email: 'carla@example.com',
 );
 
-FamilyInvitation pendingInvite({int id = 10, String email = 'vovo@example.com'}) =>
+/// F-56: no account yet — `user_id` null, `left_at` null. Holds a seat and a
+/// colour; the card says so and offers the admin's two moves.
+const pending = Member(
+  id: 6,
+  fullName: 'Eva Pendente',
+  colorSlot: 3,
+  roleId: 2,
+);
+
+FamilyInvitation pendingInvite({
+  int id = 10,
+  String email = 'vovo@example.com',
+  int? profileId,
+}) =>
     FamilyInvitation(
       id: id,
       email: email,
       roleId: 1,
       token: '11111111-2222-3333-4444-555555555555',
       expiresAt: DateTime.now().toUtc().add(const Duration(days: 5)),
+      profileId: profileId,
     );
+
+/// F-56: the form names the person before anything else.
+Future<void> enterInviteName(WidgetTester tester, Localization l,
+    [String name = 'Vovó Lurdes']) async {
+  await tester.enterText(
+      find.widgetWithText(TextField, l[KApp.famInviteName]), name);
+  await tester.pumpAndSettle();
+}
 
 FamilyInvitation expiredInvite({int id = 11}) => FamilyInvitation(
       id: id,
@@ -218,7 +240,9 @@ void main() {
         (tester) async {
       await pumpFamily(tester, source(plan: 'premium'));
 
-      expect(find.text(l[K.famSendInvite]), findsOne);
+      // F-56: with the address blank the button promises a calendar entry,
+      // not an e-mail — the form is there either way.
+      expect(find.text(l[KApp.famAddWithoutInvite]), findsOne);
       expect(find.text(l[K.famFreeCapNotice]), findsNothing);
     });
 
@@ -235,7 +259,7 @@ void main() {
       await pumpFamily(
           tester, source(members: const [admin, departed], plan: 'premium'));
 
-      expect(find.text(l[K.famSendInvite]), findsOne);
+      expect(find.text(l[KApp.famAddWithoutInvite]), findsOne);
     });
 
     testWidgets('the whole block disappears once every seat is a live member',
@@ -265,6 +289,8 @@ void main() {
       final ds = source(plan: 'premium');
       await pumpFamily(tester, ds);
 
+      // F-56: the placeholder is born with the invitation, in ONE RPC.
+      await enterInviteName(tester, l);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.commonEmail]), 'vovo@example.com');
       await tester.tap(find.byType(DropdownButtonFormField<int>));
@@ -274,9 +300,26 @@ void main() {
       await tester.tap(find.text(l[K.famSendInvite]));
       await tester.pumpAndSettle();
 
-      expect(ds.createdInvitations,
-          [{'email': 'vovo@example.com', 'roleId': 1}]);
+      expect(ds.addedPending, [
+        {'fullName': 'Vovó Lurdes', 'roleId': 1, 'email': 'vovo@example.com'}
+      ]);
+      expect(ds.createdInvitations, isEmpty);
       expect(ds.mailedInvitations, [42]);
+    });
+
+    testWidgets('refuses a missing name before any round-trip',
+        (tester) async {
+      final ds = source(plan: 'premium');
+      await pumpFamily(tester, ds);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.commonEmail]), 'vovo@example.com');
+      await tester.pumpAndSettle(); // the button relabels on the address
+      await tester.tap(find.text(l[K.famSendInvite]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[KApp.inviteErrNameRequired]), findsOne);
+      expect(ds.addedPending, isEmpty);
     });
 
     testWidgets('refuses inviting yourself before any round-trip',
@@ -284,6 +327,7 @@ void main() {
       final ds = source(plan: 'premium');
       await pumpFamily(tester, ds);
 
+      await enterInviteName(tester, l);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.commonEmail]), 'ANA@example.com');
       await tester.tap(find.byType(DropdownButtonFormField<int>));
@@ -294,7 +338,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(l[K.famErrOwnEmail]), findsOne);
-      expect(ds.createdInvitations, isEmpty);
+      expect(ds.addedPending, isEmpty);
     });
 
     testWidgets('refuses a missing role with the catalogued sentence',
@@ -302,13 +346,15 @@ void main() {
       final ds = source(plan: 'premium');
       await pumpFamily(tester, ds);
 
+      await enterInviteName(tester, l);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.commonEmail]), 'vovo@example.com');
+      await tester.pumpAndSettle(); // the button relabels on the address
       await tester.tap(find.text(l[K.famSendInvite]));
       await tester.pumpAndSettle();
 
       expect(find.text(l[KApp.inviteErrRoleRequired]), findsOne);
-      expect(ds.createdInvitations, isEmpty);
+      expect(ds.addedPending, isEmpty);
     });
 
     testWidgets('a pending invitation offers copy, share, resend and revoke',
@@ -354,8 +400,9 @@ void main() {
       await tester.tap(find.text(l[K.famResendInvite]));
       await tester.pumpAndSettle();
 
-      expect(ds.createdInvitations,
-          [{'email': 'antigo@example.com', 'roleId': 1}]);
+      expect(ds.createdInvitations, [
+        {'email': 'antigo@example.com', 'roleId': 1, 'profileId': null}
+      ]);
     });
 
     testWidgets('revoking calls the RPC', (tester) async {
@@ -379,6 +426,7 @@ void main() {
             'responsáveis (contando convites pendentes)."}');
       await pumpFamily(tester, ds);
 
+      await enterInviteName(tester, l);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.commonEmail]), 'vovo@example.com');
       await tester.tap(find.byType(DropdownButtonFormField<int>));
@@ -389,6 +437,114 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('já atingiu o limite de 4'), findsOne);
+    });
+  });
+
+  group('F-56 pending member', () {
+    testWidgets('holds a seat, wears its colour, and the card offers the '
+        'admin\'s two moves', (tester) async {
+      // 1 active + 1 pending = 2 seats = the free cap.
+      await pumpFamily(tester, source(members: const [admin, pending]));
+
+      expect(find.text('Eva Pendente'), findsOne);
+      expect(find.text(l[KApp.famPendingBadge]), findsOne);
+      expect(find.text(l[KApp.famPendingHint]), findsOne);
+      expect(find.text(l[KApp.famPendingInvite]), findsOne);
+      expect(find.text(l[KApp.famPendingRemove]), findsOne);
+      expect(find.text(l[K.famLeftBadge]), findsNothing);
+      expect(find.text(l[K.famFreeCapNotice]), findsOne);
+    });
+
+    testWidgets('a non-admin sees the badge but no moves', (tester) async {
+      final ds = FakeCustodyDataSource(
+          members: const [plain, admin, pending], days: [])
+        ..family = const Family(id: 7, name: 'Souza', plan: 'premium')
+        ..roles = const [roleMother, roleFather];
+      await pumpFamily(tester, ds);
+
+      expect(find.text(l[KApp.famPendingBadge]), findsOne);
+      expect(find.text(l[KApp.famPendingInvite]), findsNothing);
+      expect(find.text(l[KApp.famPendingRemove]), findsNothing);
+    });
+
+    testWidgets('without an e-mail the form adds to the calendar and sends '
+        'nothing', (tester) async {
+      final ds = source(plan: 'premium');
+      await pumpFamily(tester, ds);
+
+      // The button says what will happen while the address is blank.
+      expect(find.text(l[KApp.famAddWithoutInvite]), findsOne);
+      expect(find.text(l[K.famSendInvite]), findsNothing);
+
+      await enterInviteName(tester, l);
+      await tester.tap(find.byType(DropdownButtonFormField<int>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mãe').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[KApp.famAddWithoutInvite]));
+      await tester.pumpAndSettle();
+
+      expect(ds.addedPending, [
+        {'fullName': 'Vovó Lurdes', 'roleId': 1, 'email': null}
+      ]);
+      expect(ds.mailedInvitations, isEmpty);
+    });
+
+    testWidgets('inviting a placeholder later issues the invitation FOR it',
+        (tester) async {
+      final ds = source(members: const [admin, pending], plan: 'premium');
+      await pumpFamily(tester, ds);
+
+      await tester.tap(find.text(l[KApp.famPendingInvite]));
+      await tester.pumpAndSettle();
+      expect(
+          find.text(l.format(KApp.famPendingInviteTitle, ['Eva Pendente'])),
+          findsOne);
+      // The sheet's field is the LAST e-mail field on screen — the invite
+      // form below it has one too.
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.commonEmail]).last,
+          'eva@example.com');
+      await tester.tap(find.text(l[K.famSendInvite]).last);
+      await tester.pumpAndSettle();
+
+      expect(ds.createdInvitations, [
+        {'email': 'eva@example.com', 'roleId': 2, 'profileId': 6}
+      ]);
+      expect(ds.mailedInvitations, [42]);
+    });
+
+    testWidgets('with an invitation out the card stops offering "Convidar" '
+        'and the invitation names the placeholder', (tester) async {
+      await pumpFamily(
+          tester,
+          source(
+              members: const [admin, pending],
+              invitations: [pendingInvite(profileId: 6, email: 'eva@example.com')],
+              plan: 'premium'));
+
+      expect(find.text(l[KApp.famPendingInvite]), findsNothing);
+      expect(find.text('Eva Pendente'), findsNWidgets(2));
+      expect(find.text('eva@example.com'), findsOne);
+      expect(find.text(l[K.famResendInvite]), findsOne);
+    });
+
+    testWidgets('removing asks first, then calls the RPC', (tester) async {
+      final ds = source(members: const [admin, pending], plan: 'premium');
+      await pumpFamily(tester, ds);
+
+      await tester.tap(find.text(l[KApp.famPendingRemove]));
+      await tester.pumpAndSettle();
+      expect(
+          find.text(
+              l.format(KApp.famPendingRemoveConfirm, ['Eva Pendente'])),
+          findsOne);
+      expect(ds.removedPending, isEmpty, reason: 'nothing before the answer');
+
+      await tester.tap(find.text(l[KApp.famPendingRemove]).last);
+      await tester.pumpAndSettle();
+
+      expect(ds.removedPending, [6]);
     });
   });
 

@@ -137,6 +137,29 @@ abstract final class KApp {
   static const String onbStepPushDoneHint = 'app.onbStep.push.doneHint';
   static const String onbStepPushAction = 'app.onbStep.push.action';
 
+  // ── F-56 pending member (invited, not yet joined) ──
+  static const String famPendingBadge = 'app.fam.pendingBadge';
+  static const String famPendingHint = 'app.fam.pendingHint';
+  static const String famInviteName = 'app.fam.inviteName';
+  static const String famInviteNameHint = 'app.fam.inviteNameHint';
+  static const String famInviteEmailOptional = 'app.fam.inviteEmailOptional';
+  static const String famAddWithoutInvite = 'app.fam.addWithoutInvite';
+  static const String famPendingAdded = 'app.fam.pendingAdded';
+  static const String famPendingInvite = 'app.fam.pendingInvite';
+  static const String famPendingInviteTitle = 'app.fam.pendingInviteTitle';
+  static const String famPendingRemove = 'app.fam.pendingRemove';
+  static const String famPendingRemoveConfirm = 'app.fam.pendingRemoveConfirm';
+  static const String famPendingRemoved = 'app.fam.pendingRemoved';
+  static const String inviteErrNameRequired = 'app.invite.errNameRequired';
+  static const String sheetSwapUnavailablePending =
+      'app.sheet.swapUnavailablePending';
+  static const String calMemberPending = 'app.cal.memberPending';
+  static const String onbStepInviteDoneHintPending =
+      'app.onbStep.invite.doneHintPending';
+  static const String auditActionPendingAdded = 'app.audit.pendingAdded';
+  static const String auditActionPendingRemoved = 'app.audit.pendingRemoved';
+  static const String auditActionPendingClaimed = 'app.audit.pendingClaimed';
+
   /// See `K.allKeys`.
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -207,6 +230,25 @@ abstract final class KApp {
     onbStepPushHint,
     onbStepPushDoneHint,
     onbStepPushAction,
+    famPendingBadge,
+    famPendingHint,
+    famInviteName,
+    famInviteNameHint,
+    famInviteEmailOptional,
+    famAddWithoutInvite,
+    famPendingAdded,
+    famPendingInvite,
+    famPendingInviteTitle,
+    famPendingRemove,
+    famPendingRemoveConfirm,
+    famPendingRemoved,
+    inviteErrNameRequired,
+    sheetSwapUnavailablePending,
+    calMemberPending,
+    onbStepInviteDoneHintPending,
+    auditActionPendingAdded,
+    auditActionPendingRemoved,
+    auditActionPendingClaimed,
   ];
 }
 
@@ -312,6 +354,37 @@ abstract final class StringsAppPtBr {
     KApp.onbStepPushDoneHint:
         'Este aparelho avisa você sobre pedidos de troca e prazos.',
     KApp.onbStepPushAction: 'Ativar avisos',
+    KApp.famPendingBadge: 'Ainda não entrou',
+    KApp.famPendingHint:
+        'Sem conta ainda: você planeja os dias dessa pessoa, e as trocas '
+            'ficam disponíveis quando ela entrar.',
+    KApp.famInviteName: 'Nome',
+    KApp.famInviteNameHint: 'Como essa pessoa aparece no calendário',
+    KApp.famInviteEmailOptional:
+        'Opcional: com o e-mail, o convite sai agora. Sem ele, você planeja '
+            'os dias e convida depois.',
+    KApp.famAddWithoutInvite: 'Adicionar ao calendário',
+    KApp.famPendingAdded:
+        '{0} já aparece no calendário. Convide quando fizer sentido.',
+    KApp.famPendingInvite: 'Convidar',
+    KApp.famPendingInviteTitle: 'Convidar {0}',
+    KApp.famPendingRemove: 'Remover',
+    KApp.famPendingRemoveConfirm:
+        'Remover {0} do calendário? Os dias futuros planejados para essa '
+            'pessoa serão liberados; os passados ficam no histórico.',
+    KApp.famPendingRemoved: '{0} foi removido do calendário.',
+    KApp.inviteErrNameRequired:
+        'Informe o nome de quem você está adicionando.',
+    KApp.sheetSwapUnavailablePending:
+        '{0} ainda não entrou no aplicativo. Você pode mudar o responsável '
+            'planejado; a troca fica disponível quando a conta for criada.',
+    KApp.calMemberPending: '(pendente)',
+    KApp.onbStepInviteDoneHintPending:
+        'O outro responsável já está no calendário. Convide quando fizer '
+            'sentido.',
+    KApp.auditActionPendingAdded: 'Responsável adicionado ao calendário',
+    KApp.auditActionPendingRemoved: 'Responsável removido do calendário',
+    KApp.auditActionPendingClaimed: 'Responsável entrou pelo convite',
   };
 }
 
@@ -416,5 +489,35 @@ abstract final class StringsAppEn {
     KApp.onbStepPushDoneHint:
         'This device alerts you about swap requests and deadlines.',
     KApp.onbStepPushAction: 'Turn alerts on',
+    KApp.famPendingBadge: 'Not joined yet',
+    KApp.famPendingHint:
+        'No account yet: you plan this person\'s days, and swaps become '
+            'available once they join.',
+    KApp.famInviteName: 'Name',
+    KApp.famInviteNameHint: 'How this person appears on the calendar',
+    KApp.famInviteEmailOptional:
+        'Optional: with an e-mail the invitation goes out now. Without it, '
+            'you plan the days and invite later.',
+    KApp.famAddWithoutInvite: 'Add to the calendar',
+    KApp.famPendingAdded:
+        '{0} is on the calendar now. Invite them whenever it makes sense.',
+    KApp.famPendingInvite: 'Invite',
+    KApp.famPendingInviteTitle: 'Invite {0}',
+    KApp.famPendingRemove: 'Remove',
+    KApp.famPendingRemoveConfirm:
+        'Remove {0} from the calendar? Future days planned for them are '
+            'freed; past ones stay in the history.',
+    KApp.famPendingRemoved: '{0} was removed from the calendar.',
+    KApp.inviteErrNameRequired: 'Enter the name of the person you are adding.',
+    KApp.sheetSwapUnavailablePending:
+        '{0} has not joined the app yet. You can change the planned parent; '
+            'swaps become available once the account is created.',
+    KApp.calMemberPending: '(pending)',
+    KApp.onbStepInviteDoneHintPending:
+        'The other caregiver is already on the calendar. Invite them '
+            'whenever it makes sense.',
+    KApp.auditActionPendingAdded: 'Caregiver added to the calendar',
+    KApp.auditActionPendingRemoved: 'Caregiver removed from the calendar',
+    KApp.auditActionPendingClaimed: 'Caregiver joined through the invitation',
   };
 }

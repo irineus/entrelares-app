@@ -229,6 +229,25 @@ void main() {
       );
       expect(drafts.where((d) => d.type == 'swap_family_info'), isEmpty);
     });
+
+    test('F-56: the fan-out skips a pending member and a departed one — '
+        'nobody is behind those rows to read it', () {
+      const pending = MemberView(
+          id: 5,
+          fullName: 'Eva Pendente',
+          isActiveMember: false,
+          isPendingMember: true);
+      const gone = MemberView(id: 6, fullName: 'Fábio', isActiveMember: false);
+      final drafts = composeSwapApproved(
+        scheduleDate: _date,
+        requestingProfileId: 1,
+        targetProfileId: 2,
+        proposedActualParentId: 2,
+        allProfiles: [..._members.sublist(0, 2), pending, gone],
+        environmentPrefix: '',
+      );
+      expect(drafts.where((d) => d.type == 'swap_family_info'), isEmpty);
+    });
   });
 
   group('composeSwapRejected', () {

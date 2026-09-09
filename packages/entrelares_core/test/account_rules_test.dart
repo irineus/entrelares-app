@@ -186,19 +186,27 @@ void main() {
 
   group('invite form', () {
     String? check({
+      String fullName = 'Vovó Lurdes',
       String email = 'vovo@example.com',
       String? myEmail = 'ana@example.com',
       int roleId = 3,
     }) =>
         InviteFormRules.validationErrorKey(
-            email: email, myEmail: myEmail, roleId: roleId);
+            fullName: fullName, email: email, myEmail: myEmail, roleId: roleId);
 
     test('a complete form passes', () {
       expect(check(), isNull);
     });
 
-    test('blank and "@"-less addresses are refused', () {
-      expect(check(email: '   '), K.famErrInvalidEmail);
+    test('F-56: the name is what the placeholder is made of — required', () {
+      expect(check(fullName: ''), KApp.inviteErrNameRequired);
+      expect(check(fullName: ' A '), KApp.inviteErrNameRequired);
+      expect(check(fullName: 'Al'), isNull);
+    });
+
+    test('F-56: a blank e-mail is fine (plan now, invite later); an '
+        '"@"-less one is not', () {
+      expect(check(email: '   '), isNull);
       expect(check(email: 'vovo.example.com'), K.famErrInvalidEmail);
     });
 
@@ -211,8 +219,9 @@ void main() {
       expect(check(roleId: 0), KApp.inviteErrRoleRequired);
     });
 
-    test('the e-mail checks come before the role check', () {
-      expect(check(email: '', roleId: 0), K.famErrInvalidEmail);
+    test('the name and e-mail checks come before the role check', () {
+      expect(check(fullName: '', roleId: 0), KApp.inviteErrNameRequired);
+      expect(check(email: 'x', roleId: 0), K.famErrInvalidEmail);
     });
   });
 

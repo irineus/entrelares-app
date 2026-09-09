@@ -113,6 +113,8 @@ class _FamilyScreenState extends State<FamilyScreen> {
 
   // Invite form
   final _inviteEmail = TextEditingController();
+  // F-56: the form names the person first — that name IS the placeholder.
+  final _inviteName = TextEditingController();
   int _inviteRoleId = 0;
   String? _inviteErrorKey;
   bool _sendingInvite = false;
@@ -164,6 +166,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
     _storeSubscription?.cancel();
     _nameDraft.dispose();
     _inviteEmail.dispose();
+    _inviteName.dispose();
     super.dispose();
   }
 
@@ -172,14 +175,32 @@ class _FamilyScreenState extends State<FamilyScreen> {
   int get _activeMemberCount =>
       _members.where((m) => m.isActiveMember).length;
 
+  /// F-56: a seat is held by everyone still IN the family — a pending member
+  /// (invited, not yet joined) as much as a live one. Only the S-11 tombstone
+  /// holds none.
+  int get _seatedMemberCount => _members.where((m) => !m.hasLeft).length;
+
+  /// Open invitations that are NOT a placeholder's: a placeholder's invitation
+  /// is the placeholder's seat, already counted above.
   int get _pendingInvitationCount {
     final now = DateTime.now().toUtc();
-    return _invitations.where((i) => i.isPending(now)).length;
+    return _invitations
+        .where((i) => i.profileId == null && i.isPending(now))
+        .length;
   }
 
   int get _seatsTaken => seatsTaken(
-      activeMembers: _activeMemberCount,
+      activeMembers: _seatedMemberCount,
       pendingInvitations: _pendingInvitationCount);
+
+  /// F-56: the open (pending or expired, never accepted/revoked) invitation a
+  /// placeholder currently has, if any — decides "Convidar" vs the card below.
+  FamilyInvitation? _invitationFor(Member member) {
+    for (final i in _invitations) {
+      if (i.profileId == member.id) return i;
+    }
+    return null;
+  }
 
   bool get _isPremium =>
       Family.isPremiumFamily(_family, DateTime.now().toUtc());
@@ -240,8 +261,11 @@ class _FamilyScreenState extends State<FamilyScreen> {
       // Web parity: the list is only fetched while there is a seat to fill —
       // it also feeds the seat arithmetic, so an empty list at the cap is
       // deliberate, not a bug.
-      final active = members.where((m) => m.isActiveMember).length;
-      final invitations = active < settings.maxCaregivers
+      // F-56: also fetched whenever a placeholder exists, at the cap or not —
+      // its card needs to know whether an invitation is out.
+      final seated = members.where((m) => !m.hasLeft).length;
+      final invitations = seated < settings.maxCaregivers ||
+              members.any((m) => m.isPendingMember)
           ? await widget.dataSource.fetchOpenInvitations()
           : <FamilyInvitation>[];
       final deletion = await widget.dataSource.fetchPendingFamilyDeletion();
@@ -343,8 +367,13 @@ class _FamilyScreenState extends State<FamilyScreen> {
     }
   }
 
+  /// F-56: every addition is a PENDING member first — `add_pending_member`
+  /// creates the placeholder and, when an e-mail was typed, the invitation in
+  /// the same transaction (a refused e-mail leaves no orphan). Without an
+  /// e-mail the admin plans alone and invites later from the member's card.
   Future<void> _sendInvite(Localization l) async {
     final errorKey = InviteFormRules.validationErrorKey(
+      fullName: _inviteName.text,
       email: _inviteEmail.text,
       myEmail: _me?.email,
       roleId: _inviteRoleId,
@@ -357,23 +386,38 @@ class _FamilyScreenState extends State<FamilyScreen> {
       _sendingInvite = true;
       _inviteErrorKey = null;
     });
+    final name = _inviteName.text.trim();
+    final email = _inviteEmail.text.trim();
     try {
-      final id = await widget.dataSource
-          .createInvitation(email: _inviteEmail.text.trim(), roleId: _inviteRoleId);
-      final mailed = await widget.dataSource.sendInvitationEmail(id);
+      final born = await widget.dataSource.addPendingMember(
+        fullName: name,
+        roleId: _inviteRoleId,
+        email: email.isEmpty ? null : email,
+      );
+      final invitationId = born.invitationId;
+      final mailed = invitationId == null
+          ? false
+          : await widget.dataSource.sendInvitationEmail(invitationId);
       if (!mounted) return;
       _inviteEmail.clear();
+      _inviteName.clear();
       setState(() {
         _inviteRoleId = 0;
         _sendingInvite = false;
       });
-      // T-37: viral loop initiated — whether the e-mail went out or the
-      // family will have to share the link themselves.
-      widget.analytics?.trackEvent('invite_sent',
-          props: {'email': mailed ? 'sent' : 'link_only'});
-      showAppSnack(
-          context, l[mailed ? K.famInviteEmailSent : K.famInviteEmailFailed],
-          type: mailed ? AppSnackType.success : AppSnackType.info);
+      if (invitationId == null) {
+        widget.analytics?.trackEvent('invite_sent', props: {'email': 'none'});
+        showAppSnack(context, l.format(KApp.famPendingAdded, [name]),
+            type: AppSnackType.success);
+      } else {
+        // T-37: viral loop initiated — whether the e-mail went out or the
+        // family will have to share the link themselves.
+        widget.analytics?.trackEvent('invite_sent',
+            props: {'email': mailed ? 'sent' : 'link_only'});
+        showAppSnack(
+            context, l[mailed ? K.famInviteEmailSent : K.famInviteEmailFailed],
+            type: mailed ? AppSnackType.success : AppSnackType.info);
+      }
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -389,9 +433,12 @@ class _FamilyScreenState extends State<FamilyScreen> {
     try {
       // Resend semantics live entirely in the RPC: it revokes the previous
       // open invitation for this address before counting seats, so this never
-      // trips its own cap.
-      final id = await widget.dataSource
-          .createInvitation(email: invitation.email, roleId: invitation.roleId);
+      // trips its own cap. F-56: a placeholder's invitation carries the
+      // placeholder along, or the resend would create a placeholder-less one.
+      final id = await widget.dataSource.createInvitation(
+          email: invitation.email,
+          roleId: invitation.roleId,
+          profileId: invitation.profileId);
       final mailed = await widget.dataSource.sendInvitationEmail(id);
       if (!mounted) return;
       showAppSnack(
@@ -437,6 +484,78 @@ class _FamilyScreenState extends State<FamilyScreen> {
     final link =
         InviteFormRules.inviteLink(DeepLinkUrls.webOrigin, invitation.token);
     await Share.shareUri(Uri.parse(link));
+  }
+
+  /// F-56: invite a placeholder that has no open invitation — the one moment
+  /// the invitee's e-mail enters the system, and only for as long as the
+  /// invitation lives.
+  Future<void> _invitePending(Member member, Localization l) async {
+    final email = await showAppSheet<String>(
+      context: context,
+      builder: (context) => _InvitePendingSheet(
+        title: l.format(KApp.famPendingInviteTitle, [member.fullName]),
+        myEmail: _me?.email,
+      ),
+    );
+    if (email == null || !mounted) return;
+    try {
+      final id = await widget.dataSource.createInvitation(
+          email: email, roleId: member.roleId ?? 0, profileId: member.id);
+      final mailed = await widget.dataSource.sendInvitationEmail(id);
+      if (!mounted) return;
+      widget.analytics?.trackEvent('invite_sent',
+          props: {'email': mailed ? 'sent' : 'link_only'});
+      showAppSnack(
+          context, l[mailed ? K.famInviteEmailSent : K.famInviteEmailFailed],
+          type: mailed ? AppSnackType.success : AppSnackType.info);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
+  }
+
+  /// F-56: a typo must not hold one of four seats forever. The RPC deletes a
+  /// never-planned placeholder and freezes one with history (future days
+  /// freed, the name kept on the past) — the confirmation says exactly that.
+  Future<void> _removePending(Member member, Localization l) async {
+    final confirmed = await showAppSheet<bool>(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l.format(KApp.famPendingRemoveConfirm, [member.fullName])),
+          const SizedBox(height: Spacing.md),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(l[K.commonCancel]),
+              ),
+              const SizedBox(width: Spacing.sm),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(l[KApp.famPendingRemove]),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.dataSource.removePendingMember(member.id);
+      if (!mounted) return;
+      showAppSnack(context, l.format(KApp.famPendingRemoved, [member.fullName]));
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
   }
 
   @override
@@ -564,11 +683,13 @@ class _FamilyScreenState extends State<FamilyScreen> {
       child: ListTile(
         onTap: canOpen ? () => widget.onOpenProfile!(member, isOwn) : null,
         subtitleTextStyle: theme.textTheme.bodyMedium,
+        // F-56: a pending member wears its own colour — the grey texture is
+        // the departure's, not the missing account's.
         leading: AppAvatar(
             initials: member.initial,
-            slot: member.isActiveMember
-                ? context.tokens.slot(member.colorSlot)
-                : context.tokens.slot(0)),
+            slot: member.hasLeft
+                ? context.tokens.slot(0)
+                : context.tokens.slot(member.colorSlot)),
         title: Text(
           member.id == _me?.id
               ? '${member.fullName} ${l[K.famYou]}'
@@ -578,17 +699,50 @@ class _FamilyScreenState extends State<FamilyScreen> {
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: Spacing.xs),
-          child: Wrap(
-            spacing: Spacing.xs,
-            runSpacing: Spacing.xs,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (role.isNotEmpty)
-                Text(role, style: theme.textTheme.bodySmall),
-              if (!member.isActiveMember)
-                AppBadge(text: l[K.famLeftBadge], tone: context.tokens.neutral),
-              if (member.isAdmin)
-                AppBadge(text: l[K.famAdminBadge], tone: context.tokens.accent),
+              Wrap(
+                spacing: Spacing.xs,
+                runSpacing: Spacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (role.isNotEmpty)
+                    Text(role, style: theme.textTheme.bodySmall),
+                  if (member.hasLeft)
+                    AppBadge(
+                        text: l[K.famLeftBadge], tone: context.tokens.neutral),
+                  if (member.isPendingMember)
+                    AppBadge(
+                        text: l[KApp.famPendingBadge],
+                        tone: context.tokens.info),
+                  if (member.isAdmin)
+                    AppBadge(
+                        text: l[K.famAdminBadge], tone: context.tokens.accent),
+                ],
+              ),
+              // F-56: what a placeholder is, and the admin's two moves on it.
+              // "Convidar" only while no invitation is out — the invitation
+              // card below carries resend/revoke once one exists.
+              if (member.isPendingMember) ...[
+                const SizedBox(height: Spacing.xs),
+                Text(l[KApp.famPendingHint], style: theme.textTheme.bodySmall),
+                if (_isAdmin)
+                  Wrap(
+                    spacing: Spacing.xs,
+                    children: [
+                      if (_invitationFor(member) == null)
+                        TextButton(
+                          onPressed: () => _invitePending(member, l),
+                          child: Text(l[KApp.famPendingInvite]),
+                        ),
+                      TextButton(
+                        onPressed: () => _removePending(member, l),
+                        child: Text(l[KApp.famPendingRemove]),
+                      ),
+                    ],
+                  ),
+              ],
             ],
           ),
         ),
@@ -666,6 +820,12 @@ class _FamilyScreenState extends State<FamilyScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // F-56: a placeholder's invitation says whose it is.
+            if (_placeholderNameFor(invitation) case final name?)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(name, style: theme.textTheme.titleSmall),
+              ),
             Row(
               children: [
                 Expanded(child: Text(invitation.email)),
@@ -724,6 +884,16 @@ class _FamilyScreenState extends State<FamilyScreen> {
     );
   }
 
+  /// F-56: the name the admin gave a placeholder, for its invitation card.
+  String? _placeholderNameFor(FamilyInvitation invitation) {
+    final id = invitation.profileId;
+    if (id == null) return null;
+    for (final m in _members) {
+      if (m.id == id) return m.fullName;
+    }
+    return null;
+  }
+
   Widget _inviteForm(Localization l) {
     final theme = Theme.of(context);
     return Column(
@@ -732,12 +902,23 @@ class _FamilyScreenState extends State<FamilyScreen> {
         Text(l.format(K.famInviteWhoHelps, [_settings.maxCaregivers]),
             style: theme.textTheme.bodySmall),
         const SizedBox(height: 12),
+        // F-56: the person first. The name is what the calendar shows from
+        // today; the e-mail is optional — with it the invitation goes out
+        // now, without it the admin plans alone and invites later.
+        AppTextField(
+          label: l[KApp.famInviteName],
+          hint: l[KApp.famInviteNameHint],
+          controller: _inviteName,
+        ),
+        const SizedBox(height: 12),
         AppTextField(
           label: l[K.commonEmail],
           hint: l[K.famInviteEmailPlaceholder],
           controller: _inviteEmail,
           keyboardType: TextInputType.emailAddress,
         ),
+        const SizedBox(height: 4),
+        Text(l[KApp.famInviteEmailOptional], style: theme.textTheme.bodySmall),
         const SizedBox(height: 12),
         DropdownButtonFormField<int>(
           initialValue: _inviteRoleId == 0 ? null : _inviteRoleId,
@@ -765,9 +946,18 @@ class _FamilyScreenState extends State<FamilyScreen> {
               style: TextStyle(color: theme.colorScheme.error)),
         ],
         const SizedBox(height: 12),
-        FilledButton(
-          onPressed: _sendingInvite ? null : () => _sendInvite(l),
-          child: Text(_sendingInvite ? l[K.famSending] : l[K.famSendInvite]),
+        // The button says what will happen: an invitation when there is an
+        // address to send it to, a calendar entry otherwise.
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _inviteEmail,
+          builder: (context, value, _) => FilledButton(
+            onPressed: _sendingInvite ? null : () => _sendInvite(l),
+            child: Text(_sendingInvite
+                ? l[K.famSending]
+                : value.text.trim().isEmpty
+                    ? l[KApp.famAddWithoutInvite]
+                    : l[K.famSendInvite]),
+          ),
         ),
         const SizedBox(height: 8),
         Text(l[K.famInviteWhatsapp], style: theme.textTheme.bodySmall),
@@ -1941,6 +2131,79 @@ class _FamilyScreenState extends State<FamilyScreen> {
           )),
         ],
       ),
+    );
+  }
+}
+
+/// F-56: the one question an admin answers to invite a placeholder — the
+/// address. Name and role are already the member's; the sheet hands the
+/// e-mail back and the page issues the invitation FOR that profile.
+class _InvitePendingSheet extends StatefulWidget {
+  final String title;
+  final String? myEmail;
+
+  const _InvitePendingSheet({required this.title, required this.myEmail});
+
+  @override
+  State<_InvitePendingSheet> createState() => _InvitePendingSheetState();
+}
+
+class _InvitePendingSheetState extends State<_InvitePendingSheet> {
+  final _email = TextEditingController();
+  String? _errorKey;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final clean = _email.text.trim();
+    final errorKey = clean.isEmpty
+        ? K.famErrInvalidEmail
+        : InviteFormRules.emailErrorKey(email: clean, myEmail: widget.myEmail);
+    if (errorKey != null) {
+      setState(() => _errorKey = errorKey);
+      return;
+    }
+    Navigator.of(context).pop(clean);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context).l;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(widget.title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: Spacing.md),
+        AppTextField(
+          label: l[K.commonEmail],
+          hint: l[K.famInviteEmailPlaceholder],
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          errorText: _errorKey == null ? null : l[_errorKey!],
+          autofocus: true,
+          onSubmitted: (_) => _submit(),
+        ),
+        const SizedBox(height: Spacing.md),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(l[K.commonCancel]),
+            ),
+            const SizedBox(width: Spacing.sm),
+            FilledButton(
+              onPressed: _submit,
+              child: Text(l[K.famSendInvite]),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -56,6 +56,9 @@ class OnboardingService extends ChangeNotifier {
     }
 
     final hasOther = members.any((m) => m.id != me.id && m.isActiveMember);
+    // F-56: a caregiver on the calendar with no account yet — the solo
+    // parent's way of reaching out, invitation or not.
+    final hasPending = members.any((m) => m.isPendingMember);
     // Only worth asking when nobody holds the second seat yet.
     final hasInvitation =
         hasOther ? false : await _dataSource.hasOpenInvitation();
@@ -71,6 +74,7 @@ class OnboardingService extends ChangeNotifier {
     return OnboardingSignals(
       hasOtherActiveMember: hasOther,
       hasOpenInvitation: hasInvitation,
+      hasPendingMember: hasPending,
       hasAnyPlannedDay: facts.hasAnyPlannedDay,
       hasOpenedSwapExplanation: explained,
       hasTakenPartInASwap: facts.hasTakenPartInASwap,

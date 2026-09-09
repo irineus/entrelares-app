@@ -197,5 +197,16 @@ void main() {
       const noSlot = MemberView(id: 4, fullName: 'Duda');
       expect(profileSlotIndex(4, const [noSlot]), 0);
     });
+    test('F-56: a pending member keeps its slot — the grey texture is the '
+        'departure\'s, not the missing account\'s', () {
+      const pending = MemberView(
+          id: 5,
+          fullName: 'Eva',
+          colorSlot: 3,
+          isActiveMember: false,
+          isPendingMember: true);
+      expect(profileSlotIndex(5, const [ana, bruno, pending]), 3);
+      expect(pending.isAssignable, isTrue);
+    });
   });
 }

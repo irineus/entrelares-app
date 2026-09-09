@@ -140,5 +140,6 @@ class Member {
         fullName: fullName,
         colorSlot: colorSlot,
         isActiveMember: isActiveMember,
+        isPendingMember: isPendingMember,
       );
 }

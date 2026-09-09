@@ -119,6 +119,12 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
         return;
       }
       _invite = info;
+      // F-56: the admin's name for the placeholder fills an EMPTY field only —
+      // the provider's display name, when there is one, is the person's own.
+      final suggested = info.inviteeName?.trim() ?? '';
+      if (_fullName.text.trim().isEmpty && suggested.isNotEmpty) {
+        _fullName.text = suggested;
+      }
     });
   }
 

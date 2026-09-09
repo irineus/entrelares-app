@@ -348,7 +348,31 @@ abstract class CustodyDataSource {
   /// `create_invitation` — which also REVOKES this address's previous open
   /// invitation before counting seats, so a resend never trips its own cap.
   /// That is what makes the call safe to retry. Returns the new row's id.
-  Future<int> createInvitation({required String email, required int roleId});
+  ///
+  /// F-56: with [profileId] the invitation is FOR that pending member — its
+  /// role, its previous open invitation revoked, no seat gate (the placeholder
+  /// already holds the seat). A resend of a placeholder's invitation MUST pass
+  /// it, or the RPC would issue a placeholder-less invitation for the address.
+  Future<int> createInvitation({
+    required String email,
+    required int roleId,
+    int? profileId,
+  });
+
+  /// F-56: `add_pending_member` — the admin describes a caregiver who has no
+  /// account yet (name, role; colour by the system). With [email] the
+  /// invitation goes out in the same transaction. Returns the new profile id
+  /// and, when an e-mail was given, the invitation id.
+  Future<({int profileId, int? invitationId})> addPendingMember({
+    required String fullName,
+    required int roleId,
+    String? email,
+  });
+
+  /// F-56: `remove_pending_member` — deleted outright when nothing references
+  /// the placeholder, otherwise an S-11 tombstone (future days cleared, name
+  /// kept on the past). Admin only, placeholder only; the RPC refuses the rest.
+  Future<void> removePendingMember(int profileId);
 
   Future<void> revokeInvitation(int invitationId);
 
