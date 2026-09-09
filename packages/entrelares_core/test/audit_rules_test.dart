@@ -295,4 +295,191 @@ void main() {
       );
     });
   });
+
+  // F-61 — the dated facts beyond the diff. The trigger stamps them; this is
+  // the ONLY place that turns them into sentences, for the timeline and the
+  // PDF alike.
+  group('F-61 authorship', () {
+    AuditLogView stamped({
+      AuditContext? context,
+      Map<String, dynamic>? newData,
+      Map<String, dynamic>? oldData,
+      String action = 'INSERT',
+      int? performedById = 1,
+    }) =>
+        AuditLogView(
+          id: 7,
+          affectedDate: DateTime(2026, 9, 12),
+          createdAtLocal: DateTime(2026, 9, 9, 10, 0),
+          action: action,
+          oldData: oldData,
+          newData: newData,
+          performedById: performedById,
+          context: context,
+        );
+
+    test('AuditContext.parse reads booleans and treats the rest as unknown',
+        () {
+      final ctx = AuditContext.parse({
+        'scheduled_parent_has_account': false,
+        'actual_parent_has_account': 'yes', // not a boolean → unknown
+        'admin_override': true,
+      })!;
+      expect(ctx.scheduledParentHasAccount, isFalse);
+      expect(ctx.actualParentHasAccount, isNull);
+      expect(ctx.actorIsAdmin, isNull, reason: 'a stripped key is unknown');
+      expect(ctx.adminOverride, isTrue);
+
+      expect(AuditContext.parse(null), isNull);
+      expect(AuditContext.parse('junk'), isNull);
+      expect(AuditContext.parse(const []), isNull);
+    });
+
+    test('a row older than F-61 says nothing — no context, no guessing', () {
+      expect(
+        authorshipLines(
+          log: stamped(newData: const {'scheduled_parent_id': 2}),
+          profiles: _members,
+          l: _pt,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('an assignee without an account is named, in the reader language',
+        () {
+      final log = stamped(
+        context: const AuditContext(
+            scheduledParentHasAccount: false, actorIsAdmin: true,
+            adminOverride: false),
+        newData: const {'scheduled_parent_id': 2},
+      );
+
+      expect(authorshipLines(log: log, profiles: _members, l: _pt),
+          ['Bruno Prado ainda não tinha conta no aplicativo neste momento.']);
+      expect(authorshipLines(log: log, profiles: _members, l: _en),
+          ['Bruno Prado did not yet have an account in the app at this moment.']);
+    });
+
+    test('the same person planned AND real is named once; two people, twice',
+        () {
+      const ctx = AuditContext(
+          scheduledParentHasAccount: false, actualParentHasAccount: false);
+
+      expect(
+        authorshipLines(
+          log: stamped(
+              context: ctx,
+              newData: const {'scheduled_parent_id': 2, 'actual_parent_id': 2}),
+          profiles: _members,
+          l: _pt,
+        ),
+        hasLength(1),
+      );
+      expect(
+        authorshipLines(
+          log: stamped(
+              context: ctx,
+              newData: const {'scheduled_parent_id': 2, 'actual_parent_id': 1}),
+          profiles: _members,
+          l: _pt,
+        ),
+        [
+          'Bruno Prado ainda não tinha conta no aplicativo neste momento.',
+          'Ana Prado ainda não tinha conta no aplicativo neste momento.',
+        ],
+      );
+    });
+
+    test('an assignee WITH an account (or unknown) yields no sentence', () {
+      for (final has in [true, null]) {
+        expect(
+          authorshipLines(
+            log: stamped(
+                context: AuditContext(scheduledParentHasAccount: has),
+                newData: const {'scheduled_parent_id': 2}),
+            profiles: _members,
+            l: _pt,
+          ),
+          isEmpty,
+        );
+      }
+    });
+
+    test('a DELETE reads the assignee from the row that went', () {
+      expect(
+        authorshipLines(
+          log: stamped(
+              action: 'DELETE',
+              context: const AuditContext(
+                  scheduledParentHasAccount: false, adminOverride: true),
+              oldData: const {'scheduled_parent_id': 2}),
+          profiles: _members,
+          l: _pt,
+        ),
+        [
+          'Bruno Prado ainda não tinha conta no aplicativo neste momento.',
+          'Alteração direta pela pessoa administradora (Ana Prado).',
+        ],
+      );
+    });
+
+    test('the admin override names the actor; false and unknown are silent',
+        () {
+      expect(
+        authorshipLines(
+          log: stamped(
+              context: const AuditContext(adminOverride: true),
+              newData: const {'scheduled_parent_id': 1}),
+          profiles: _members,
+          l: _en,
+        ),
+        ['Direct change by the family administrator (Ana Prado).'],
+      );
+      for (final override in [false, null]) {
+        expect(
+          authorshipLines(
+            log: stamped(
+                context: AuditContext(adminOverride: override),
+                newData: const {'scheduled_parent_id': 1}),
+            profiles: _members,
+            l: _pt,
+          ),
+          isEmpty,
+        );
+      }
+    });
+
+    test('an unknown actor id falls back to the generic caregiver', () {
+      expect(
+        authorshipLines(
+          log: stamped(
+              performedById: 99,
+              context: const AuditContext(adminOverride: true),
+              newData: const {'scheduled_parent_id': 1}),
+          profiles: _members,
+          l: _pt,
+        ),
+        ['Alteração direta pela pessoa administradora (um responsável).'],
+      );
+    });
+
+    test('no sentence qualifies conduct — both catalogs, pinned', () {
+      // The owner's rule: a dated fact, never a judgement. The words below
+      // are the ones a qualifier would use; none may enter these entries.
+      const banned = ['sozinh', 'sem consultar', 'alone', 'without consult',
+        'unilateral', 'decidiu', 'decided'];
+      for (final l in [_pt, _en]) {
+        for (final key in [
+          K.auditAuthorshipNoAccount,
+          K.auditAuthorshipAdminOverride,
+        ]) {
+          final text = l[key].toLowerCase();
+          for (final word in banned) {
+            expect(text, isNot(contains(word)), reason: '$key / $word');
+          }
+        }
+      }
+    });
+  });
 }

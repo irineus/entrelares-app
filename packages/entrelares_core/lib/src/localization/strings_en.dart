@@ -563,6 +563,11 @@ abstract final class StringsEn {
     K.auditOriginRevertAuto: 'Change originated from the swap revert requested by {0} and approved automatically after 48h with no reply.',
     K.auditOriginSomeCaregiver: 'a caregiver',
     K.auditOriginOtherCaregiver: 'another caregiver',
+    // F-61: a dated fact, never a qualifier — the reader draws the conclusion.
+    K.auditAuthorshipNoAccount:
+        '{0} did not yet have an account in the app at this moment.',
+    K.auditAuthorshipAdminOverride:
+        'Direct change by the family administrator ({0}).',
     // ── PDF report (F-33) — the screen ──
     K.pdfPageTitle: 'History report as a PDF - Entrelares',
     K.pdfHeading: '📄 History report as a PDF',

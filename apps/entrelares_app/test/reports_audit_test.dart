@@ -193,6 +193,52 @@ void main() {
     });
   });
 
+  group('F-61 — authorship on the line', () {
+    testWidgets('a stamped row says who had no account and the admin change',
+        (tester) async {
+      await pumpAudit(
+        tester,
+        source(logs: [
+          ActivityLog(
+            id: 1,
+            affectedDate: DateTime(2026, 9, 12),
+            createdAt: DateTime.utc(2026, 9, 9, 13),
+            action: 'UPDATE',
+            performedById: 1,
+            oldData: const {'scheduled_parent_id': 1},
+            newData: const {'scheduled_parent_id': 2},
+            context: const AuditContext(
+                scheduledParentHasAccount: false,
+                actorIsAdmin: true,
+                adminOverride: true),
+          ),
+        ]),
+      );
+
+      expect(
+        find.textContaining(
+            l.format(K.auditAuthorshipNoAccount, ['Bruno Lima'])),
+        findsOne,
+      );
+      expect(
+        find.textContaining(
+            l.format(K.auditAuthorshipAdminOverride, ['Ana Souza'])),
+        findsOne,
+      );
+    });
+
+    testWidgets('a row without context (older than F-61) says nothing',
+        (tester) async {
+      await pumpAudit(
+        tester,
+        source(logs: [activity(id: 1, newData: const {'scheduled_parent_id': 2})]),
+      );
+
+      expect(find.textContaining('ainda não tinha conta'), findsNothing);
+      expect(find.textContaining('Alteração direta'), findsNothing);
+    });
+  });
+
   group('Carregar mais', () {
     List<ActivityLog> fullPage() => [
           for (var i = 0; i < auditPageSize; i++)

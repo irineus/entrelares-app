@@ -19,6 +19,12 @@ class ActivityLog {
   /// timeline and the F-33 footer both say so.
   final DateTime createdAt;
 
+  /// F-61: the facts the trigger stamped at write time (whether the assigned
+  /// parents had an account, whether the actor was an admin, whether the
+  /// write was an admin override). Null on rows older than F-61 — unknown,
+  /// and rendered as nothing.
+  final AuditContext? context;
+
   const ActivityLog({
     required this.id,
     required this.affectedDate,
@@ -28,6 +34,7 @@ class ActivityLog {
     this.oldData,
     this.newData,
     this.performedById,
+    this.context,
   });
 
   factory ActivityLog.fromJson(Map<String, dynamic> json) => ActivityLog(
@@ -40,6 +47,7 @@ class ActivityLog {
         performedById: json['performed_by_id'] as int?,
         createdAt:
             DateTime.parse(json['created_at'] as String).toUtc(),
+        context: AuditContext.parse(json['context']),
       );
 
   /// The pure-rule view of this row, with the timestamp already local.
@@ -51,6 +59,7 @@ class ActivityLog {
         oldData: oldData,
         newData: newData,
         performedById: performedById,
+        context: context,
       );
 
   static Map<String, dynamic>? _snapshot(Object? raw) =>

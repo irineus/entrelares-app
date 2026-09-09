@@ -303,6 +303,53 @@ void main() {
       expect(text, contains('originada'));
     });
 
+    test('F-61: the authorship facts reach the page as real text', () async {
+      final text = await render(
+        report(
+          logs: [
+            AuditLogView(
+              id: 6,
+              affectedDate: DateTime(2026, 8, 15),
+              createdAtLocal: DateTime(2026, 8, 10, 9),
+              action: 'UPDATE',
+              performedById: 1,
+              oldData: const {'scheduled_parent_id': 1},
+              newData: const {'scheduled_parent_id': 2},
+              context: const AuditContext(
+                  scheduledParentHasAccount: false, adminOverride: true),
+            ),
+          ],
+        ),
+        l,
+      );
+
+      // Single ASCII tokens, as everywhere in this group: "ainda" belongs to
+      // the no-account sentence and "administradora" to the override one.
+      expect(text, contains('ainda'));
+      expect(text, contains('administradora'));
+    });
+
+    test('F-61: a row without context prints no authorship line', () async {
+      final text = await render(
+        report(
+          logs: [
+            AuditLogView(
+              id: 6,
+              affectedDate: DateTime(2026, 8, 15),
+              createdAtLocal: DateTime(2026, 8, 10, 9),
+              action: 'INSERT',
+              performedById: 1,
+              newData: const {'scheduled_parent_id': 2},
+            ),
+          ],
+        ),
+        l,
+      );
+
+      expect(text, isNot(contains('ainda')));
+      expect(text, isNot(contains('administradora')));
+    });
+
     test('the U-20 criterion line is printed only with the projection on',
         () async {
       // Only whole ASCII tokens are safe to assert: the page text is WinAnsi

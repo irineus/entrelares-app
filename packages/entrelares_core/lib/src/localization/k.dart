@@ -614,6 +614,10 @@ abstract final class K {
   static const String auditOriginRevertAuto = 'audit.origin.revertAuto';
   static const String auditOriginSomeCaregiver = 'audit.origin.someCaregiver';
   static const String auditOriginOtherCaregiver = 'audit.origin.otherCaregiver';
+  // F-61: the dated facts beyond the diff — shared by the timeline and the PDF.
+  static const String auditAuthorshipNoAccount = 'audit.authorship.noAccount';
+  static const String auditAuthorshipAdminOverride =
+      'audit.authorship.adminOverride';
 
   // ── PDF report (F-33) — the page AND the printed document ──
   static const String pdfPageTitle = 'pdf.pageTitle';
@@ -1636,6 +1640,8 @@ abstract final class K {
     auditOriginRevertAuto,
     auditOriginSomeCaregiver,
     auditOriginOtherCaregiver,
+    auditAuthorshipNoAccount,
+    auditAuthorshipAdminOverride,
     pdfPageTitle,
     pdfHeading,
     pdfSubtitle,

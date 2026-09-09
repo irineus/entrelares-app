@@ -9,6 +9,7 @@ import 'suites/admin_override_tier.dart';
 import 'suites/admin_rpc.dart';
 import 'suites/adversarial.dart';
 import 'suites/app_settings.dart';
+import 'suites/authorship_context.dart';
 import 'suites/auto_approval.dart';
 import 'suites/billing_avulso.dart';
 import 'suites/billing_checkout.dart';
@@ -107,6 +108,7 @@ void main() {
   oauthOnboardingTests(fx);
   claimInvitationTests(fx);
   pendingMemberTests(fx);
+  authorshipContextTests(fx);
   adminRpcTests(fx);
   adminOverrideTierTests(fx);
   platformOperatorTests(fx);

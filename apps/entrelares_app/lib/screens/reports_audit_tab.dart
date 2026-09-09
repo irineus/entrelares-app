@@ -345,6 +345,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
     final actor = _nameOf(log.performedById, l[K.auditSystemTrigger]);
     final changes = computeAuditDiff(log: view, profiles: _views, l: l);
     final origin = _origins[log.id];
+    final authorship = authorshipLines(log: view, profiles: _views, l: l);
     final badge = scheduleActionBadge(log.action);
 
     return _item(
@@ -360,12 +361,38 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
         RichLabel.of(l, K.auditScheduleChange,
             args: [actor, scheduleActionLabel(log.action, l)]),
         if (origin != null) _originBlock(origin, l),
+        if (authorship.isNotEmpty) _authorshipBlock(authorship),
         for (final change in changes)
           _diffRow(change.label, change.from, change.to),
       ],
       timestamp: l.formatDateTime(view.createdAtLocal),
     );
   }
+
+  /// F-61: the dated facts beyond the diff — an assignee who had no account
+  /// at that instant, the admin's direct change. Same block shape as the
+  /// origin, in the NEUTRAL tone on purpose: the record states, it does not
+  /// warn.
+  Widget _authorshipBlock(List<String> lines) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: context.tokens.neutral.container,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final line in lines)
+              Text('👤 $line',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
 
   /// F-45: where the change came from, and the two F-44 texts that carry the
   /// motivation — the part that makes the paid report genuinely richer.
