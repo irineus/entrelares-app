@@ -98,7 +98,9 @@ cd apps/entrelares_app && fvm flutter build web --release --no-web-resources-cdn
 # ela a suíte aborta com instruções em vez de rodar pela metade.
 cd packages/entrelares_db_gate && fvm dart analyze --fatal-infos
 cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm dart test
-# Gate de fluxo na web: os MESMOS arquivos integration_test/ num Chrome headless.
+# Gate de fluxo na web: os mesmos arquivos integration_test/ num Chrome headless,
+# MAIS deep_link_test — o único web por construção (T-64: uma entrada fria numa
+# URL interna só se comporta mal onde o navegador entrega o endereço ao app).
 # Exige chromedriver no PATH (`chromedriver --port=4444 &` antes).
 cd apps/entrelares_app && fvm flutter drive --driver=test_driver/integration_test.dart   --target=integration_test/swap_workflow_test.dart -d web-server --browser-name=chrome --headless   --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev>
 ```

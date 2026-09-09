@@ -77,6 +77,9 @@ da suíte web (`E2E-<runId>`, e-mails `@resend.dev`, teardown sempre via
 (06:10 UTC diário)** e sob demanda pelo `workflow_dispatch` (`run-e2e`, com
 `e2e-pack` = `p0` de fumaça ou `full`). A `service_role` do dev chega só pelo secret
 `SUPABASE_SERVICE_ROLE_DEV` → `--dart-define`; nunca entra no repositório.
+O job `web-e2e` (esse SIM no gate) roda os mesmos arquivos num Chrome headless, mais
+`deep_link_test` — o único que é web por construção: uma entrada fria numa URL interna
+só se comporta mal onde o navegador entrega o próprio endereço ao app (T-64).
 
 ## Gate de banco (`packages/entrelares_db_gate/`)
 
@@ -202,6 +205,14 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   protegido exceto `/login`, `/reset-password` e `/update-password`. Desde o F-57 há uma
   quarta fase de auth: sessão validada SEM perfil (cadastro Google diferido) fica confinada
   em `/onboarding` até fundar a família ou reivindicar o convite.
+- **URL como interface (T-64, 08/09/2026):** a decisão vive em duas metades. `RouteRules`
+  (core) é a PURA — quem pode ver o quê; `AppRouteGate` (`lib/routing/`) é a de ESTADO —
+  guarda o destino que uma entrada fria pediu enquanto o portão da sessão decide, e o
+  restaura com uma navegação de verdade (`go`) uma vez por fase. Ter que ser navegação, e
+  não devolução pelo redirect, é web: o go_router roda o redirect de topo no máximo uma vez
+  por navegação e não reporta o desvio, então a barra de endereço ficava em `/splash` e o
+  ping de fase seguinte decidia a partir dele — `/family` virava o calendário. Uma URL que
+  o app não serve agora responde 404 (`NotFoundScreen`) em vez de ser engolida.
 - **Deep links (App Links):** host `web.entrelares.app` (a origem do PWA — o apex é a
   landing), path `/update-password`, `autoVerify`. O `assetlinks.json` de produção já
   listava o prod (`com.entrelares.app`, F-54); o statement do dev
