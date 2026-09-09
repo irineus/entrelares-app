@@ -36,6 +36,7 @@ import 'suites/multi_caregiver.dart';
 import 'suites/notification_params.dart';
 import 'suites/oauth_onboarding.dart';
 import 'suites/optimistic_concurrency.dart';
+import 'suites/pending_member.dart';
 import 'suites/planning_horizon_gate.dart';
 import 'suites/platform_operator.dart';
 import 'suites/premium_entitlement.dart';
@@ -105,6 +106,7 @@ void main() {
   registerInviteeTests(fx);
   oauthOnboardingTests(fx);
   claimInvitationTests(fx);
+  pendingMemberTests(fx);
   adminRpcTests(fx);
   adminOverrideTierTests(fx);
   platformOperatorTests(fx);

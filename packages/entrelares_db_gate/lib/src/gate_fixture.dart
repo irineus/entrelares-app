@@ -292,6 +292,24 @@ class GateFixture {
     return email;
   }
 
+  /// F-56: a user created the way `register-invitee` creates one — pre-confirmed
+  /// and carrying the invite token, the typed name and the policy version — so
+  /// `handle_new_user`'s invitee branch runs for real against [token]. Returns
+  /// the auth uid; tracked so teardown removes it.
+  Future<String> createInvitedUser(
+    String email,
+    String token, {
+    required String fullName,
+  }) async {
+    final uid = await _admin.createConfirmedUser(email, password, {
+      'full_name': fullName,
+      'invite_token': token,
+      'policy_version': PolicyVersions.current,
+    });
+    _userIds.add(uid);
+    return uid;
+  }
+
   /// F-57: a user with NO metadata at all — the shape a password sign-up
   /// straight at the GoTrue API (never our forms) produces. Since the
   /// deferred branch keys on the metadata's absence, this defers exactly like

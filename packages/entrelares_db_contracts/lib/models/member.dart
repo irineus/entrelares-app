@@ -91,6 +91,17 @@ class Member {
   /// A live, present member holds a family seat (Profile.IsActiveMember).
   bool get isActiveMember => (userId ?? '').isNotEmpty && leftAt == null;
 
+  /// F-56: invited, not yet joined — a profile with NO auth user that has not
+  /// departed. Assignable to days and holding a seat and a colour, but never a
+  /// swap counterpart (nothing to approve with) and never an admin. The pair
+  /// (`user_id`, `left_at`) is the member state: this is the mirror image of
+  /// the S-11 tombstone, which is `user_id` NULL *with* `left_at` set.
+  bool get isPendingMember => (userId ?? '').isEmpty && leftAt == null;
+
+  /// S-11: departed — or a removed placeholder (F-56). Frozen, no seat, no
+  /// colour; the name stays on the history.
+  bool get hasLeft => leftAt != null;
+
   factory Member.fromJson(Map<String, dynamic> json) => Member(
         id: json['id'] as int,
         familyId: json['family_id'] as int?,
