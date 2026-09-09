@@ -333,7 +333,7 @@ class E2eFamily {
   Future<List<Map<String, dynamic>>> openInvitations() async {
     final rows = await _get('/rest/v1/family_invitations'
         '?family_id=eq.$familyId&accepted_at=is.null&revoked_at=is.null'
-        '&select=id,email,role_id,token,expires_at');
+        '&select=id,email,role_id,token,expires_at,profile_id');
     return rows.cast<Map<String, dynamic>>();
   }
 

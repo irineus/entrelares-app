@@ -551,11 +551,37 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Future<List<FamilyInvitation>> fetchOpenInvitations() async => invitations;
 
   @override
-  Future<int> createInvitation(
-      {required String email, required int roleId}) async {
+  Future<int> createInvitation({
+    required String email,
+    required int roleId,
+    int? profileId,
+  }) async {
     if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
-    createdInvitations.add({'email': email, 'roleId': roleId});
+    createdInvitations
+        .add({'email': email, 'roleId': roleId, 'profileId': profileId});
     return 42;
+  }
+
+  /// F-56: what the page asked `add_pending_member` for, in order.
+  final List<Map<String, Object?>> addedPending = [];
+  final List<int> removedPending = [];
+
+  @override
+  Future<({int profileId, int? invitationId})> addPendingMember({
+    required String fullName,
+    required int roleId,
+    String? email,
+  }) async {
+    if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
+    addedPending.add({'fullName': fullName, 'roleId': roleId, 'email': email});
+    final clean = email?.trim() ?? '';
+    return (profileId: 500 + addedPending.length, invitationId: clean.isEmpty ? null : 42);
+  }
+
+  @override
+  Future<void> removePendingMember(int profileId) async {
+    if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
+    removedPending.add(profileId);
   }
 
   @override

@@ -114,6 +114,30 @@ void main() {
               OnboardingStep.inviteCoCaregiver, const OnboardingSignals()),
           isFalse);
     });
+
+    test('F-56: done when a pending member is on the calendar, and the done '
+        'line says the invitation is still to come', () {
+      const solo = OnboardingSignals(hasPendingMember: true);
+      expect(
+          OnboardingSteps.isDone(OnboardingStep.inviteCoCaregiver, solo),
+          isTrue);
+      expect(
+          OnboardingSteps.doneHintKeyFor(
+              OnboardingStep.inviteCoCaregiver, solo),
+          KApp.onbStepInviteDoneHintPending);
+
+      // Once an invitation exists the ordinary line is the true one again.
+      const invited = OnboardingSignals(
+          hasPendingMember: true, hasOpenInvitation: true);
+      expect(
+          OnboardingSteps.doneHintKeyFor(
+              OnboardingStep.inviteCoCaregiver, invited),
+          K.onbStepInviteDoneHint);
+      // Other steps never branch.
+      expect(
+          OnboardingSteps.doneHintKeyFor(OnboardingStep.planTheDays, solo),
+          OnboardingStep.planTheDays.doneHintKey);
+    });
   });
 
   group('planTheDays', () {

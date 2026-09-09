@@ -11,6 +11,7 @@ library;
 
 import 'calendar_rules.dart' show MemberView;
 import 'localization/k.dart';
+import 'localization/k_app.dart';
 import 'localization/localization.dart';
 
 /// Page size of the incremental timeline ("Carregar mais"), mirroring
@@ -267,6 +268,10 @@ String accountActionLabel(String action, Localization l) {
     'password_changed' => K.auditActionPasswordChanged,
     'email_change_requested' => K.auditActionEmailChangeRequested,
     'data_exported' => K.auditActionDataExported,
+    // F-56: the pending member's three moments.
+    'pending_member_added' => KApp.auditActionPendingAdded,
+    'pending_member_removed' => KApp.auditActionPendingRemoved,
+    'pending_member_claimed' => KApp.auditActionPendingClaimed,
     _ => null,
   };
   return key == null ? action : l[key];
@@ -275,8 +280,13 @@ String accountActionLabel(String action, Localization l) {
 /// The icon the account timeline puts on a row — mirror of the badge switch
 /// in `ReportsAudit.razor`.
 (AuditBadge, String) accountActionBadge(String action) => switch (action) {
-      'invitation_created' => (AuditBadge.created, '＋'),
-      'invitation_revoked' => (AuditBadge.deleted, '✕'),
+      'invitation_created' ||
+      'pending_member_added' ||
+      'pending_member_claimed' =>
+        (AuditBadge.created, '＋'),
+      'invitation_revoked' ||
+      'pending_member_removed' =>
+        (AuditBadge.deleted, '✕'),
       'admin_granted' || 'admin_revoked' => (AuditBadge.updated, '🛡️'),
       'password_changed' ||
       'email_change_requested' =>

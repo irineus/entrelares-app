@@ -131,6 +131,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _invite = info;
       // The invitation names the address; the trigger refuses any other.
       _email.text = info.invitedEmail;
+      // F-56: the name the admin gave the placeholder is a suggestion — the
+      // person's own typing wins, at sign-up and forever after.
+      final suggested = info.inviteeName?.trim() ?? '';
+      if (_fullName.text.trim().isEmpty && suggested.isNotEmpty) {
+        _fullName.text = suggested;
+      }
     });
   }
 

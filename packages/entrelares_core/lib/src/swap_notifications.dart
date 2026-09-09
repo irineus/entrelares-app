@@ -426,8 +426,13 @@ List<NotificationDraft> _familyInfo({
   required Map<String, String> params,
 }) =>
     [
+      // F-56: only caregivers with an account — a pending member has no
+      // session to read it in, and a departed one is out. Same predicate the
+      // database's own fan-out (auto_approve_expired) applies.
       for (final member in allProfiles)
-        if (member.id != requestingProfileId && member.id != targetProfileId)
+        if (member.isActiveMember &&
+            member.id != requestingProfileId &&
+            member.id != targetProfileId)
           NotificationDraft(
             recipientProfileId: member.id,
             type: 'swap_family_info',

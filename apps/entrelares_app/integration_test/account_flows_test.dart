@@ -121,6 +121,11 @@ void main() {
     await openFamilyTab(tester);
 
     // ── Send ──
+    // F-56: the form names the person first — that name is the placeholder
+    // the invitation is issued for.
+    await tester.enterText(
+        find.widgetWithText(TextField, l[KApp.famInviteName]), 'Vovó E2E');
+    await tester.pumpAndSettle();
     await tester.enterText(
         find.widgetWithText(TextField, l[K.commonEmail]), invitee);
     await tester.pumpAndSettle();
@@ -135,6 +140,8 @@ void main() {
         reason: 'create_invitation wrote the row the UI asked for');
     expect(created.single['role_id'],
         await family.roleIdOf('grandmother'));
+    expect(created.single['profile_id'], isNotNull,
+        reason: 'F-56: the invitation is FOR the placeholder the form created');
 
     // ── Revoke ──
     await tapVisible(tester, find.text(l[K.famRevoke]).first);

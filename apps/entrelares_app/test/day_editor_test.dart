@@ -227,4 +227,31 @@ void main() {
     expect(adminMode.isActive, isTrue);
     expect(find.byIcon(Icons.shield), findsOneWidget);
   });
+
+  testWidgets('F-56: a pending planned parent hides the real-responsible '
+      'question and says why — and keeps its own colour on the chip',
+      (tester) async {
+    final future = futureDay;
+    if (future == null) return;
+    // Eva has no account yet (user_id null, left_at null): assignable, never
+    // a swap counterpart.
+    const eva =
+        Member(id: 5, fullName: 'Eva Pendente', colorSlot: 3, roleId: 2);
+    final ds = FakeCustodyDataSource(
+        members: [ana, bruno, eva], days: [row(7, dayOfMonth(future), 5)]);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    await openDay(tester, future);
+    expect(
+        find.textContaining(
+            pt.format(KApp.sheetSwapUnavailablePending, ['Eva Pendente'])),
+        findsOneWidget);
+    expect(find.text(pt[K.editorActualParent]), findsNothing);
+    expect(find.text(pt[K.editorSameAsPlanned]), findsNothing);
+    // Not the departed ghost: the chip carries the pending mark, not "(saiu)".
+    expect(find.widgetWithText(ChoiceChip, 'Eva ${pt[KApp.calMemberPending]}'),
+        findsOneWidget);
+    expect(find.textContaining(pt[K.calMemberLeft]), findsNothing);
+  });
 }
