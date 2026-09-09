@@ -277,12 +277,19 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   `account_logs` do S-10), diff campo-a-campo, "carregar mais" incremental e a entrada
   sintética de fim de trial (F-58 QA 2). **F-45** entra aqui: a alteração vinda de um
   workflow nomeia a origem e carrega as duas mensagens F-44; a busca é enriquecimento e
-  nunca derruba a timeline.
+  nunca derruba a timeline. **F-61** (09/09/2026): cada linha diz também, em bloco neutro,
+  se o responsável atribuído **ainda não tinha conta** naquele instante e se foi
+  **alteração direta pela pessoa administradora** — fatos carimbados pelo trigger em
+  `activity_logs.context` (`authorshipLines` em core); linha anterior ao F-61 não diz nada.
 - **Relatório em PDF (F-33) — o redesign:** o `print()` do navegador não existe, então o
   documento é montado no aparelho (`pdf`) e entregue pelo sistema (`printing`: share sheet
   ou impressão nativa). Gate F-32 com falha fechada e **upsell neutro** (T-38).
   **Roboto embarcado**: a Helvetica embutida do dart_pdf não tem Unicode e derruba os
-  acentos.
+  acentos. **F-61**: as mesmas frases de autoria em cada linha do histórico, e a seção
+  **2 · Responsáveis e acesso ao aplicativo** antes do histórico — por responsável, uma
+  linha datada por fato (`caregiverTimelines`: adicionado ao calendário por quem, convite
+  enviado, criou a conta, sem conta até a geração, saiu). Nenhuma frase qualifica conduta;
+  o teste de neutralidade dos catálogos garante.
 - **Analytics T-37:** POST direto na Events API do Umami (`text/plain`, sem preflight),
   desligado enquanto não houver website id — o flavor **dev vem vazio de propósito**. O
   contrato no-PII é espelho puro (`sanitizeAnalyticsPath`): query e fragmento caem sempre,
