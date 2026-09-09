@@ -261,7 +261,7 @@ Quatro passos de console, nenhum deles código, todos feitos e conferidos **de f
 | `https://entrelares.app/` | **200** — landing intacta |
 | zona `entrelares.app` | 13 registros, nenhum `legado`, nenhum `qa`, nenhum pendurado |
 | Workers & Pages | `entrelares-web`, `entrelares-site`, `entrelares-site-preview`, `desmalha` — o `entrelares-app` não existe mais |
-| allow-list do Auth, prod | `web.entrelares.app/**` e `app.guardacompartilhada.com/**` (este ainda responde 301, então não está pendurado — é resíduo do F-54 e sai com o T-52) |
+| allow-list do Auth, prod | `web.entrelares.app/**` e `app.guardacompartilhada.com/**` (este ainda responde 301, então não está pendurado — é resíduo do F-54 e sai com o T-52). **T-52, 09/09/2026:** a segunda entrada sai do dashboard nesta entrega — passo de console do owner, ao lado da remoção da declaração do pacote legado no `assetlinks.json` |
 | allow-list do Auth, dev | uma entrada só: `web.entrelares.app/**`; Site URL corrigido |
 | `irineus/entrelares-app` | **archived: true**, somente-leitura desde 25/08/2026 |
 
