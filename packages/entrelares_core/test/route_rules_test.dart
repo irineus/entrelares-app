@@ -1,9 +1,12 @@
-/// The router's S-02 allow-list and the deep-link destination it has to
-/// remember across the session gate.
+/// The router's S-02 allow-list.
 ///
-/// The invitation case is the one worth the file: an App Link arriving cold is
-/// interrupted by the splash, and without the pending destination the visitor
-/// ends on the login screen holding a link that appears to do nothing.
+/// It used to be more than that: the rule also carried a `pendingLocation`, the
+/// deep-link destination the app had to remember while the session gate parked
+/// it on the splash. **T-64 deleted that half** (08/09/2026) — the app no
+/// longer routes at all until the gate has answered, so the browser's URL is
+/// still the URL when the first decision is made about it, and there is nothing
+/// to remember. What is left is the question this file was always about: who
+/// may see what.
 library;
 
 import 'package:entrelares_core/entrelares_core.dart';
@@ -12,18 +15,16 @@ import 'package:test/test.dart';
 void main() {
   const inviteLink = '/register?invite=11111111-2222-3333-4444-555555555555';
 
-  group('gate phase — nothing renders before we know who you are', () {
-    test('the splash stays', () {
-      expect(
-          RouteRules.redirect(phase: AuthPhase.gate, location: '/splash'),
-          isNull);
-    });
-
-    test('everything else waits at the splash', () {
+  group('gate phase — the router does not exist yet', () {
+    test('nothing is redirected, because nothing is routed', () {
       for (final location in ['/', '/register', '/family', '/login']) {
         expect(
-            RouteRules.redirect(phase: AuthPhase.gate, location: location),
-            '/splash');
+          RouteRules.redirect(phase: AuthPhase.gate, location: location),
+          isNull,
+          reason: 'the app shows the splash INSTEAD of routing while the gate '
+              'decides — a redirect here would move the URL, which is the '
+              'whole thing T-64 stopped doing',
+        );
       }
     });
   });
@@ -31,220 +32,106 @@ void main() {
   group('anonymous phase', () {
     test('the four public screens are reachable', () {
       for (final location in RouteRules.publicRoutes) {
-        expect(
-            RouteRules.redirect(phase: AuthPhase.anon, location: location),
+        expect(RouteRules.redirect(phase: AuthPhase.anon, location: location),
             isNull);
       }
     });
 
     test('anything guarded goes to login', () {
       for (final location in ['/', '/family', '/notifications', '/reports']) {
-        expect(
-            RouteRules.redirect(phase: AuthPhase.anon, location: location),
-            '/login');
+        expect(RouteRules.redirect(phase: AuthPhase.anon, location: location),
+            RouteRules.login);
       }
     });
 
-    test('a remembered invitation link is restored, query and all', () {
+    test('an invitation link opens where it points', () {
+      // The case that used to need the remembered destination and now needs
+      // nothing, because the URL is never taken away from the visitor. The
+      // router asks with `matchedLocation`, so the token rides in the query
+      // and only the PATH is judged — `route_gate_test` drives the real thing
+      // with the token attached.
       expect(
-        RouteRules.redirect(
-            phase: AuthPhase.anon,
-            location: '/splash',
-            pendingLocation: inviteLink),
-        inviteLink,
-      );
-    });
-
-    test('a remembered GUARDED destination is NOT restored — it still has to '
-        'pass through login', () {
-      expect(
-        RouteRules.redirect(
-            phase: AuthPhase.anon,
-            location: '/splash',
-            pendingLocation: '/family'),
-        '/login',
-      );
-    });
-
-    test('an unparseable pending location falls back to login', () {
-      expect(
-        RouteRules.redirect(
-            phase: AuthPhase.anon,
-            location: '/splash',
-            pendingLocation: '::not a uri::'),
-        '/login',
-      );
+          RouteRules.redirect(
+              phase: AuthPhase.anon, location: Uri.parse(inviteLink).path),
+          isNull);
     });
   });
 
   group('authenticated phase', () {
-    test('the anonymous-only screens hand back to the calendar', () {
-      for (final location in RouteRules.anonymousOnlyRoutes) {
-        expect(
-            RouteRules.redirect(phase: AuthPhase.authed, location: location),
-            '/');
+    test('a real screen is left alone — the URL is the reader\'s', () {
+      for (final location in [
+        '/',
+        '/family',
+        '/family/profile',
+        '/notifications',
+        '/reports',
+        '/premium/retorno',
+      ]) {
+        expect(RouteRules.redirect(phase: AuthPhase.authed, location: location),
+            isNull,
+            reason: 'a cold entry, a paste, an F5 and a push tap all arrive '
+                'here, and all of them must stay put');
       }
     });
 
-    test('a signed-in visitor opening an invitation link lands on the calendar',
-        () {
-      expect(
-          RouteRules.redirect(
-              phase: AuthPhase.authed, location: '/register'),
-          '/');
+    test('the anonymous-only screens fall back to the calendar', () {
+      for (final location in RouteRules.anonymousOnlyRoutes) {
+        expect(RouteRules.redirect(phase: AuthPhase.authed, location: location),
+            RouteRules.home,
+            reason: '$location is already answered for a signed-in reader');
+      }
     });
 
-    test('/update-password stays reachable — the recovery visitor is signed in',
-        () {
+    test('/update-password is NOT anonymous-only: the recovery flow lands '
+        'there with a session', () {
       expect(
           RouteRules.redirect(
-              phase: AuthPhase.authed, location: '/update-password'),
+              phase: AuthPhase.authed, location: RouteRules.updatePassword),
           isNull);
     });
-
-    test('the app proper stays put', () {
-      for (final location in ['/', '/family', '/notifications']) {
-        expect(
-            RouteRules.redirect(phase: AuthPhase.authed, location: location),
-            isNull);
-      }
-    });
   });
 
-  group('isRestorable', () {
-    test('accepts a public path with a query', () {
-      expect(RouteRules.isRestorable(inviteLink), isTrue);
-    });
-
-    test('refuses a guarded path', () {
-      expect(RouteRules.isRestorable('/family'), isFalse);
-    });
-  });
-
-  group('a reload, once the gate answers', () {
-    // The web QA finding: with a session, the remembered destination was
-    // computed and then thrown away, so every F5 landed on the calendar.
-    // Android never exercised it — there is no reload there, and the App
-    // Links that arrive cold aim at public routes.
-    test('an authenticated reader lands back where they were', () {
-      expect(
-        RouteRules.redirect(
-          phase: AuthPhase.authed,
-          location: RouteRules.splash,
-          pendingLocation: '/family',
-        ),
-        '/family',
-      );
-    });
-
-    test('the query survives with it', () {
-      expect(
-        RouteRules.redirect(
-          phase: AuthPhase.authed,
-          location: RouteRules.splash,
-          pendingLocation: '/reports?tab=audit',
-        ),
-        '/reports?tab=audit',
-      );
-    });
-
-    test('a screen that makes no sense with a session is never restored', () {
-      for (final anonOnly in ['/login', '/register', '/reset-password']) {
-        expect(
-          RouteRules.redirect(
-            phase: AuthPhase.authed,
-            location: RouteRules.splash,
-            pendingLocation: anonOnly,
-          ),
-          RouteRules.home,
-          reason: '$anonOnly is already answered for whoever has a session',
-        );
-      }
-    });
-
-    test('with nothing remembered, home — as before', () {
-      expect(
-        RouteRules.redirect(
-            phase: AuthPhase.authed, location: RouteRules.splash),
-        RouteRules.home,
-      );
-    });
-
-    test('a reader already on a real screen is left alone', () {
-      expect(
-        RouteRules.redirect(
-          phase: AuthPhase.authed,
-          location: '/family',
-          pendingLocation: '/reports',
-        ),
-        isNull,
-      );
-    });
-
-    // F-57 — the onboarding confinement: a validated session with no profile
-    // lives on /onboarding and nowhere else, the way the S-11 leaving
-    // confinement closes the app at the other end of the account's life.
-    test('the onboarding phase confines to /onboarding', () {
+  group('onboarding phase (F-57)', () {
+    test('confines to /onboarding, wherever the visitor came from', () {
       for (final location in ['/', '/family', RouteRules.login, '/reports']) {
         expect(
-          RouteRules.redirect(
-              phase: AuthPhase.onboarding, location: location),
+          RouteRules.redirect(phase: AuthPhase.onboarding, location: location),
           RouteRules.onboarding,
           reason: 'a profile-less session has nothing to see at $location',
         );
       }
       expect(
-        RouteRules.redirect(
-            phase: AuthPhase.onboarding, location: RouteRules.onboarding),
-        isNull,
-      );
-    });
-
-    test('a pending destination is NOT honoured while onboarding', () {
-      expect(
-        RouteRules.redirect(
-          phase: AuthPhase.onboarding,
-          location: '/',
-          pendingLocation: '/family',
-        ),
-        RouteRules.onboarding,
-        reason: 'there is no profile to show the remembered screen to yet',
-      );
+          RouteRules.redirect(
+              phase: AuthPhase.onboarding, location: RouteRules.onboarding),
+          isNull);
     });
 
     test('an ONBOARDED visitor has no business on /onboarding', () {
       expect(
-        RouteRules.redirect(
-            phase: AuthPhase.authed, location: RouteRules.onboarding),
-        RouteRules.home,
-      );
+          RouteRules.redirect(
+              phase: AuthPhase.authed, location: RouteRules.onboarding),
+          RouteRules.home);
       expect(
-        RouteRules.redirect(
-            phase: AuthPhase.anon, location: RouteRules.onboarding),
-        RouteRules.login,
-        reason: 'not public: an anonymous visitor cannot onboard',
-      );
+          RouteRules.redirect(
+              phase: AuthPhase.anon, location: RouteRules.onboarding),
+          RouteRules.login,
+          reason: 'not public: an anonymous visitor cannot onboard');
+    });
+  });
+
+  group('the allow-list itself', () {
+    test('isPublic is the four screens and nothing else', () {
+      for (final location in RouteRules.publicRoutes) {
+        expect(RouteRules.isPublic(location), isTrue);
+      }
+      for (final location in ['/', '/family', RouteRules.splash]) {
+        expect(RouteRules.isPublic(location), isFalse);
+      }
     });
 
-    test('the ANONYMOUS half is untouched: still public destinations only', () {
-      // The guard that keeps a deep link from handing a guarded screen to a
-      // visitor with no session (S-02).
-      expect(
-        RouteRules.redirect(
-          phase: AuthPhase.anon,
-          location: '/family',
-          pendingLocation: '/family',
-        ),
-        RouteRules.login,
-      );
-      expect(
-        RouteRules.redirect(
-          phase: AuthPhase.anon,
-          location: '/family',
-          pendingLocation: '/register?invite=abc',
-        ),
-        '/register?invite=abc',
-      );
+    test('the splash is anonymous-only, never public', () {
+      expect(RouteRules.anonymousOnlyRoutes, contains(RouteRules.splash));
+      expect(RouteRules.isPublic(RouteRules.splash), isFalse);
     });
   });
 }

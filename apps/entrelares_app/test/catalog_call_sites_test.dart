@@ -31,10 +31,16 @@ const _catalogFiles = {
 
 /// Web-only by construction, or replaced by a native affordance: document
 /// <title> (an app has app bars), the PWA install banner and shell chrome (the
-/// map DROPS them), the 404 route, ARIA strings the app expresses through
-/// Semantics differently, the month buttons that became a swipe, the "Filtrar"
-/// button that became reload-on-change, and the browser print hint the F-33
-/// redesign replaced with the share sheet.
+/// map DROPS them), ARIA strings the app expresses through Semantics
+/// differently, the month buttons that became a swipe, the "Filtrar" button
+/// that became reload-on-change, and the browser print hint the F-33 redesign
+/// replaced with the share sheet.
+///
+/// The 404 route left this list in T-64 (08/09/2026): it was classified here
+/// while this stack had no error route at all, and an unknown path was
+/// swallowed by the router — the reader landed on the calendar with no hint
+/// that the link was wrong. On a channel whose URLs ARE its interface that is
+/// not a web-only concern, so `NotFoundScreen` says it now.
 const _webOnly = <String>{
   'K.auditPageTitle',
   'K.bulkAriaLabel',
@@ -67,9 +73,6 @@ const _webOnly = <String>{
   'K.loginDismissNotice',
   'K.loginPageTitle',
   'K.navAdmin',
-  'K.notFoundBack',
-  'K.notFoundBody',
-  'K.notFoundTitle',
   'K.notifFilterAria',
   'K.onbChecklistDismiss',
   'K.onbLauncherOpenAria',
