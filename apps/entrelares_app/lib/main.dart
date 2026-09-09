@@ -21,6 +21,8 @@ import 'screens/family_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/leaving_screen.dart';
 import 'screens/login_screen.dart';
+import 'routing/app_route_gate.dart';
+import 'screens/not_found_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/oauth_onboarding_screen.dart';
 import 'screens/policy_update_screen.dart';
@@ -171,6 +173,14 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     initialLocation: '/splash',
     refreshListenable: _refresh,
     redirect: _redirect,
+    // T-64: a URL this app does not serve says so. Without it go_router's own
+    // error page would be the answer, and before the restore was fixed an
+    // unknown path did not even get that far — it was swallowed and the reader
+    // landed on the calendar.
+    errorBuilder: (_, state) => NotFoundScreen(
+      location: state.uri.toString(),
+      onBackToStart: () => _router.go('/'),
+    ),
     routes: [
       GoRoute(
         path: '/splash',
@@ -396,10 +406,15 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     ],
   );
 
-  /// Where an App Link wanted to go before the session gate had answered — the
-  /// state half of [RouteRules.redirect] (the decision itself is a pure mirror
-  /// with its own tests).
-  String? _pendingLocation;
+  /// Where an App Link wanted to go before the session gate had answered, and
+  /// the rest of the routing state the redirect reads. T-64 moved it out of
+  /// this State so a test can drive it — see [AppRouteGate].
+  late final AppRouteGate _routeGate = AppRouteGate(
+    phase: () => _routePhase,
+    isLeaving: () => _isLeaving,
+    consentState: () => _consentState,
+    go: (location) => _router.go(location),
+  );
 
   /// S-11: this member asked to leave, so the app is closed to them until they
   /// cancel or sign out (mirror of `MainLayout.EnforceLeaving`).
@@ -416,47 +431,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   late final OnboardingService _onboarding;
   final _tourKeys = TourKeys();
 
-  String? _redirect(BuildContext context, GoRouterState state) {
-    final location = state.matchedLocation;
-
-    if (_phase == _AuthPhase.gate) {
-      // Remember the destination WITH its query — the invite token lives there
-      // — for as long as the gate is still deciding.
-      if (location != RouteRules.splash) _pendingLocation = state.uri.toString();
-      return RouteRules.redirect(phase: AuthPhase.gate, location: location);
-    }
-
-    // The web's order, and it matters: authentication first, then the exit
-    // confinement, then the consent gate. A member on their way out never
-    // meets the re-consent screen — asking someone to accept new terms on the
-    // way to deleting their account would be absurd.
-    if (_phase == _AuthPhase.authed) {
-      if (FamilyLifecycleRules.mustStayOnLeavingScreen(
-          isLeaving: _isLeaving, location: location)) {
-        return FamilyLifecycleRules.leavingRoute;
-      }
-      if (!_isLeaving &&
-          _consentState == ConsentGateState.blocked &&
-          location != FamilyLifecycleRules.policyUpdateRoute &&
-          location != RouteRules.login) {
-        return FamilyLifecycleRules.policyUpdateRoute;
-      }
-    }
-
-    final pending = _pendingLocation;
-    final decision = RouteRules.redirect(
-      phase: _routePhase,
-      location: location,
-      pendingLocation: pending,
-    );
-    // Hand a remembered destination back exactly once (otherwise leaving that
-    // screen would bounce straight into it again), and drop it entirely once
-    // there is a session — by then it has either been used or was never usable.
-    if (decision == pending || _phase == _AuthPhase.authed) {
-      _pendingLocation = null;
-    }
-    return decision;
-  }
+  String? _redirect(BuildContext context, GoRouterState state) => _routeGate
+      .redirect(matchedLocation: state.matchedLocation, uri: state.uri);
 
   AuthPhase get _routePhase => switch (_phase) {
         _AuthPhase.gate => AuthPhase.gate,
@@ -599,7 +575,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _inactivityTimer?.cancel();
       _inactivityTimer = null;
     }
-    _refresh.ping();
+    // T-64: a remembered destination is restored by a REAL navigation, not by
+    // the redirect — the redirect's answer never reaches the address bar, and
+    // the next phase ping would re-decide from a `/splash` nobody is on any
+    // more. A `go` re-runs the whole chain, so it IS the ping.
+    if (!_routeGate.restorePendingDestination()) _refresh.ping();
   }
 
   /// F-09 — needs the profile id, which the phase transition does not carry.

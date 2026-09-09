@@ -435,9 +435,12 @@ jobs:
           for i in $(seq 1 20); do curl -sf http://localhost:4444/status >/dev/null && break; sleep 1; done
           echo "### Gate de fluxo (web)" >> "$GITHUB_STEP_SUMMARY"
           # One invocation per target: `flutter drive` takes a single target and
-          # each one pays its own ~40 s compile. Both files are the SAME ones the
-          # emulator lane runs — nothing web-specific was written for this gate.
-          for target in swap_workflow_test account_flows_test; do
+          # each one pays its own ~40 s compile. The first two files are the SAME
+          # ones the emulator lane runs; `deep_link_test` is the exception T-64
+          # bought — a cold entry into an inner URL only misbehaves where the
+          # browser hands the app its own address, so that one is web-only by
+          # construction and the emulator lane does not run it.
+          for target in swap_workflow_test account_flows_test deep_link_test; do
             start=$(date +%s)
             flutter drive \
               --driver=test_driver/integration_test.dart \
