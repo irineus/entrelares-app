@@ -150,6 +150,11 @@ abstract final class KApp {
   static const String famPendingRemove = 'app.fam.pendingRemove';
   static const String famPendingRemoveConfirm = 'app.fam.pendingRemoveConfirm';
   static const String famPendingRemoved = 'app.fam.pendingRemoved';
+  // ── F-62 legacy invitation → placeholder ("Adicionar ao calendário") ──
+  static const String famAttachInvite = 'app.fam.attachInvite';
+  static const String famAttachTitle = 'app.fam.attachTitle';
+  static const String famAttachHint = 'app.fam.attachHint';
+  static const String famAttached = 'app.fam.attached';
   static const String inviteErrNameRequired = 'app.invite.errNameRequired';
   static const String sheetSwapUnavailablePending =
       'app.sheet.swapUnavailablePending';
@@ -242,6 +247,10 @@ abstract final class KApp {
     famPendingRemove,
     famPendingRemoveConfirm,
     famPendingRemoved,
+    famAttachInvite,
+    famAttachTitle,
+    famAttachHint,
+    famAttached,
     inviteErrNameRequired,
     sheetSwapUnavailablePending,
     calMemberPending,
@@ -373,6 +382,13 @@ abstract final class StringsAppPtBr {
         'Remover {0} do calendário? Os dias futuros planejados para essa '
             'pessoa serão liberados; os passados ficam no histórico.',
     KApp.famPendingRemoved: '{0} foi removido do calendário.',
+    KApp.famAttachInvite: 'Adicionar ao calendário',
+    KApp.famAttachTitle: 'Adicionar {0} ao calendário',
+    KApp.famAttachHint:
+        'Você já pode planejar os dias dessa pessoa. O convite enviado '
+            'continua valendo — é o mesmo link.',
+    KApp.famAttached:
+        '{0} já aparece no calendário. O convite enviado continua valendo.',
     KApp.inviteErrNameRequired:
         'Informe o nome de quem você está adicionando.',
     KApp.sheetSwapUnavailablePending:
@@ -508,6 +524,13 @@ abstract final class StringsAppEn {
         'Remove {0} from the calendar? Future days planned for them are '
             'freed; past ones stay in the history.',
     KApp.famPendingRemoved: '{0} was removed from the calendar.',
+    KApp.famAttachInvite: 'Add to the calendar',
+    KApp.famAttachTitle: 'Add {0} to the calendar',
+    KApp.famAttachHint:
+        'You can plan this person\'s days right away. The invitation already '
+            'sent still stands — same link.',
+    KApp.famAttached:
+        '{0} is on the calendar now. The invitation already sent still stands.',
     KApp.inviteErrNameRequired: 'Enter the name of the person you are adding.',
     KApp.sheetSwapUnavailablePending:
         '{0} has not joined the app yet. You can change the planned parent; '

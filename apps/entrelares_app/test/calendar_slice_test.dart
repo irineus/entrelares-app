@@ -584,6 +584,19 @@ class FakeCustodyDataSource implements CustodyDataSource {
     removedPending.add(profileId);
   }
 
+  /// F-62: what the page asked `attach_pending_member` for, in order.
+  final List<Map<String, Object?>> attachedPending = [];
+
+  @override
+  Future<int> attachPendingMember({
+    required int invitationId,
+    required String fullName,
+  }) async {
+    if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
+    attachedPending.add({'invitationId': invitationId, 'fullName': fullName});
+    return 600 + attachedPending.length;
+  }
+
   @override
   Future<void> revokeInvitation(int invitationId) async {
     if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;

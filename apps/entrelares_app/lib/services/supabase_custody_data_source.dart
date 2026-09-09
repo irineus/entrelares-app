@@ -1227,6 +1227,21 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<int> attachPendingMember({
+    required int invitationId,
+    required String fullName,
+  }) async {
+    final data = await _client.rpc('attach_pending_member', params: {
+      'p_invitation_id': invitationId,
+      'p_full_name': fullName.trim(),
+    });
+    if (data is! num) {
+      throw StateError('attach_pending_member returned no id: $data');
+    }
+    return data.toInt();
+  }
+
+  @override
   Future<void> revokeInvitation(int invitationId) async {
     await _client
         .rpc('revoke_invitation', params: {'p_invitation_id': invitationId});

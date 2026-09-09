@@ -22,7 +22,7 @@ apps/entrelares_app/tool/     # subset_inter.py — regenera a fonte embarcada (
 packages/entrelares_core/     # Dart puro: espelhos-cliente das regras do servidor, testáveis com `dart test`
 packages/entrelares_core/test/mirrors/   # T-56/F-09/T-62: os seis espelhos (i18n.ts, migrations, service worker)
 packages/entrelares_db_contracts/        # T-56 PR 6: as formas de linha do PostgREST, lidas pelo app E pelo gate
-packages/entrelares_db_gate/  # T-56 PRs 6-16 + F-57 + F-09 + F-56: o gate de banco (256 testes), Dart puro
+packages/entrelares_db_gate/  # T-56 PRs 6-16 + F-57 + F-09 + F-56 + F-62: o gate de banco (256 testes), Dart puro
 supabase/                     # T-56 PR 3: migrations, Edge Functions e o runbook de deploy
 backlog/                      # T-56 PR 4a: a memória escrita do produto (registros + archive/)
 store/                        # T-56 PR 4c: listagens da Play, masters de marca e seus geradores

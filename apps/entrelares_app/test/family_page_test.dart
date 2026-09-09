@@ -548,6 +548,97 @@ void main() {
     });
   });
 
+  group('F-62 legacy invitation gets its placeholder', () {
+    // The card's button reads "Adicionar ao calendário" — the same words the
+    // invite form's button uses with a blank address, on purpose: both put a
+    // person on the calendar. The icon is what tells the card's apart.
+    final attachButton = find.byIcon(Icons.person_add_alt_1_outlined);
+
+    testWidgets('a legacy invitation offers "Adicionar ao calendário"; a '
+        'placeholder\'s does not', (tester) async {
+      // At the free cap on purpose: the attach never trips the gate for a
+      // valid invitation, so the button is there even without a form.
+      await pumpFamily(
+          tester,
+          source(members: const [admin], invitations: [pendingInvite()]));
+      expect(attachButton, findsOne);
+      expect(find.byType(TextField), findsNothing,
+          reason: 'no form at the cap — the button is the card\'s');
+      expect(find.text(l[KApp.famAttachInvite]), findsOne);
+    });
+
+    testWidgets('a placeholder\'s invitation does not offer it', (tester) async {
+      await pumpFamily(
+          tester,
+          source(
+              members: const [admin, pending],
+              invitations: [pendingInvite(profileId: 6)],
+              plan: 'premium'));
+      expect(attachButton, findsNothing);
+      expect(find.text(l[K.famResendInvite]), findsOne,
+          reason: 'the card is there — only the attach is not');
+    });
+
+    testWidgets('an EXPIRED legacy invitation offers it too', (tester) async {
+      await pumpFamily(
+          tester,
+          source(
+              members: const [admin],
+              invitations: [expiredInvite()],
+              plan: 'premium'));
+      expect(attachButton, findsOne);
+    });
+
+    testWidgets('the sheet asks the name and attaches to THAT invitation',
+        (tester) async {
+      final ds = source(members: const [admin], invitations: [pendingInvite()]);
+      await pumpFamily(tester, ds);
+
+      await tester.tap(find.text(l[KApp.famAttachInvite]));
+      await tester.pumpAndSettle();
+      expect(
+          find.text(l.format(KApp.famAttachTitle, ['vovo@example.com'])),
+          findsOne);
+      expect(find.text(l[KApp.famAttachHint]), findsOne);
+
+      // Empty name: refused before any round-trip.
+      await tester.tap(find.text(l[KApp.famAttachInvite]).last);
+      await tester.pumpAndSettle();
+      expect(find.text(l[KApp.inviteErrNameRequired]), findsOne);
+      expect(ds.attachedPending, isEmpty);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, l[KApp.famInviteName]),
+          '  Vovó Lurdes ');
+      await tester.tap(find.text(l[KApp.famAttachInvite]).last);
+      await tester.pumpAndSettle();
+
+      expect(ds.attachedPending, [
+        {'invitationId': 10, 'fullName': 'Vovó Lurdes'}
+      ]);
+      expect(ds.createdInvitations, isEmpty,
+          reason: 'no resend — the token the person holds stays alive');
+      expect(find.text(l.format(KApp.famAttached, ['Vovó Lurdes'])), findsOne);
+    });
+
+    testWidgets('the server\'s refusal is shown verbatim', (tester) async {
+      final ds = source(members: const [admin], invitations: [pendingInvite()])
+        ..throwOnFamilyWrite = Exception(
+            '{"code":"23514","message":"Este convite já foi aceito — a pessoa '
+            'já está na família."}');
+      await pumpFamily(tester, ds);
+
+      await tester.tap(find.text(l[KApp.famAttachInvite]));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.widgetWithText(TextField, l[KApp.famInviteName]), 'Vovó');
+      await tester.tap(find.text(l[KApp.famAttachInvite]).last);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('já foi aceito'), findsOne);
+    });
+  });
+
   group('admin mode section', () {
     testWidgets('an admin can turn it on, and the tier copy explains F-40',
         (tester) async {
