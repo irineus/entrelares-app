@@ -81,6 +81,16 @@ void main() {
     // defect. It cost a red CI round to learn that the hard way.
     expect(WidgetsBinding.instance.platformDispatcher.defaultRouteName, route,
         reason: 'the platform must hand the app the URL under test');
+    // Unmount before booting again, and this is not tidiness. `runApp` with a
+    // widget of the same runtimeType and no key UPDATES the element tree
+    // instead of replacing it, so `createState` never runs and the second boot
+    // inherits the first one's State — including its router, which read the
+    // platform's URL back when it was something else. That is a cold boot in
+    // name only, and it cost two red CI rounds that looked exactly like a
+    // product defect: the platform handed over `/family` (asserted above) and
+    // the app still opened the calendar.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
     app.main();
     appBooted = true;
     await tester.pumpAndSettle(const Duration(seconds: 15));
