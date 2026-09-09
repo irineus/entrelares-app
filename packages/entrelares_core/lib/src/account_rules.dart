@@ -135,13 +135,20 @@ abstract final class InviteFormRules {
     required String? myEmail,
     required int roleId,
   }) {
-    final name = fullName.trim();
-    if (name.length < 2) return KApp.inviteErrNameRequired;
+    final nameError = nameErrorKey(fullName);
+    if (nameError != null) return nameError;
     final emailError = emailErrorKey(email: email, myEmail: myEmail);
     if (emailError != null) return emailError;
     if (roleId == 0) return KApp.inviteErrRoleRequired;
     return null;
   }
+
+  /// The name half alone — what the F-62 "add to the calendar" sheet asks of
+  /// a legacy invitation, where e-mail and role are already the invitation's.
+  /// Mirrors the RPCs' own floor (`length(trim(name)) >= 2`); the 80 ceiling
+  /// is the field's `maxLength` ([RegisterRules.maxNameLength]), not a refusal.
+  static String? nameErrorKey(String fullName) =>
+      fullName.trim().length < 2 ? KApp.inviteErrNameRequired : null;
 
   /// The e-mail half alone — what the F-56 "invite this placeholder" sheet
   /// asks, where name and role are already the member's. A blank address is

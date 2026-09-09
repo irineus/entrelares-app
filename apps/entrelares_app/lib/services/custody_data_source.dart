@@ -374,6 +374,16 @@ abstract class CustodyDataSource {
   /// kept on the past). Admin only, placeholder only; the RPC refuses the rest.
   Future<void> removePendingMember(int profileId);
 
+  /// F-62: `attach_pending_member` — gives a LEGACY open invitation (one with
+  /// no placeholder behind it) its pending member: the invitation's role, a
+  /// colour by the system, and the SAME token, so the link already sent keeps
+  /// working. Admin only; the RPC refuses accepted, revoked and already
+  /// attached invitations. Returns the new profile id.
+  Future<int> attachPendingMember({
+    required int invitationId,
+    required String fullName,
+  });
+
   Future<void> revokeInvitation(int invitationId);
 
   /// Best-effort: the invitation exists either way, and the copyable link is

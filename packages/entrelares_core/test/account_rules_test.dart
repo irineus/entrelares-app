@@ -223,6 +223,12 @@ void main() {
       expect(check(fullName: '', roleId: 0), KApp.inviteErrNameRequired);
       expect(check(email: 'x', roleId: 0), K.famErrInvalidEmail);
     });
+
+    test('F-62: the name half alone — what the attach sheet asks', () {
+      expect(InviteFormRules.nameErrorKey(''), KApp.inviteErrNameRequired);
+      expect(InviteFormRules.nameErrorKey(' A '), KApp.inviteErrNameRequired);
+      expect(InviteFormRules.nameErrorKey(' Al '), isNull);
+    });
   });
 
   group('invite link', () {

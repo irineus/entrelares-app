@@ -473,5 +473,183 @@ void pendingMemberTests(GateFixture fx) {
           isNotEmpty,
           reason: 'the involved parties still get theirs');
     });
+
+    // ── F-62: a LEGACY invitation gets its placeholder ─────────────────────
+
+    /// The F-37 arithmetic as the RPCs compute it: seats held by everyone
+    /// still in the family, plus open placeholder-less invitations that have
+    /// not expired. The attach must never move this number for a valid
+    /// invitation — that is the "aritmética honesta" the owner chose.
+    Future<int> seatsTakenOf(int familyId) async {
+      final seated = await fx.service
+          .from('profiles')
+          .select('id')
+          .eq('family_id', familyId)
+          .isFilter('left_at', null);
+      final legacy = await fx.service
+          .from('family_invitations')
+          .select('id')
+          .eq('family_id', familyId)
+          .isFilter('profile_id', null)
+          .isFilter('accepted_at', null)
+          .isFilter('revoked_at', null)
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String());
+      return seated.length + legacy.length;
+    }
+
+    Future<int> attach(SupabaseClient who, int invitationId, String name) async =>
+        (await who.rpc<dynamic>('attach_pending_member', params: {
+          'p_invitation_id': invitationId,
+          'p_full_name': name,
+        }) as num)
+            .toInt();
+
+    /// The two-argument call every pre-F-56 client still makes.
+    Future<FamilyInvitation> legacyInvitation(
+            ThrowawayFamily fam, String email) async =>
+        invitationByToken(await GateFixture.createInvitation(
+            fam.admin, email, fx.roleId('aunt')));
+
+    test('F-62: a legacy invitation gets its placeholder — same token, name '
+        'shown, assignable, the claim lands on that profile', () async {
+      final fam = await fx.createFamily('f62-attach');
+      final email = fx.testEmail('f62-attach');
+
+      final legacy = await legacyInvitation(fam, email);
+      expect(legacy.profileId, isNull, reason: 'the pre-F-56 shape');
+      expect((await inviteInfo(legacy.token)).single.inviteeName, isNull);
+      final seatsBefore = await seatsTakenOf(fam.familyId);
+
+      final id = await attach(fam.admin, legacy.id, 'E2E Attached');
+
+      // The SAME row now names a placeholder; the token never changed.
+      final after = await invitationByToken(legacy.token);
+      expect(after.id, legacy.id);
+      expect(after.profileId, id);
+      expect(after.revokedAt, isNull);
+      final info = await inviteInfo(legacy.token);
+      expect(info.single.inviteeName, 'E2E Attached');
+      expect(info.single.roleName, 'aunt');
+
+      // The placeholder is one add_pending_member would have made.
+      final placeholder = await profileById(id);
+      expect(placeholder.isPendingMember, isTrue);
+      expect(placeholder.roleId, fx.roleId('aunt'),
+          reason: 'the invitation\'s role');
+      expect(placeholder.email, isNull,
+          reason: 'the e-mail stays on the invitation (LGPD, F-56)');
+      expect(placeholder.colorSlot, isNotNull);
+      expect(placeholder.joinedViaInvite, isTrue);
+
+      // The seat moved from the invitation to the placeholder: no double count.
+      expect(await seatsTakenOf(fam.familyId), seatsBefore);
+
+      // Once is enough.
+      await expectRejected(
+        () => attach(fam.admin, legacy.id, 'E2E Twice'),
+        contains: 'já está ligado',
+      );
+
+      // The whole point: a day planned for them before they exist …
+      final day = fx.nextFutureDate();
+      await fam.admin.from('care_schedules').insert({
+        'schedule_date': isoDate(day),
+        'scheduled_parent_id': id,
+      });
+
+      // … and the link they already hold attaches the account to THAT row.
+      final uid = await fx.createInvitedUser(email, legacy.token,
+          fullName: 'E2E Attached Claimed');
+      final claimed = await profileById(id);
+      expect(claimed.userId, uid);
+      expect(claimed.fullName, 'E2E Attached Claimed');
+      expect(claimed.colorSlot, placeholder.colorSlot);
+      expect((await readDay(fam.admin, day)).scheduledParentId, id);
+      expect((await invitationByToken(legacy.token)).acceptedAt, isNotNull);
+      expect(await seatsTakenOf(fam.familyId), seatsBefore);
+    });
+
+    test('F-62: the refusals — non-admin, accepted, revoked, another '
+        'family\'s, a bad name', () async {
+      final fam = await fx.createFamily('f62-refuse');
+
+      final legacy = await legacyInvitation(fam, fx.testEmail('f62-refuse'));
+      await expectRejected(
+        () => attach(fam.member, legacy.id, 'E2E Not Admin'),
+        contains: 'administradores',
+      );
+      await expectRejected(
+        () => attach(fam.admin, legacy.id, 'X'),
+        contains: 'entre 2 e 80',
+      );
+      // Family B's founder is an admin — of the wrong family.
+      await expectRejected(
+        () => attach(fx.founderB, legacy.id, 'E2E Wrong Family'),
+        contains: 'não encontrado',
+      );
+
+      // The member's own invitation was accepted when the family was built.
+      final accepted = FamilyInvitation.fromJson((await fx.service
+              .from('family_invitations')
+              .select()
+              .eq('family_id', fam.familyId)
+              .not('accepted_at', 'is', null))
+          .first);
+      await expectRejected(
+        () => attach(fam.admin, accepted.id, 'E2E Accepted'),
+        contains: 'já foi aceito',
+      );
+
+      await fam.admin.rpc<dynamic>('revoke_invitation',
+          params: {'p_invitation_id': legacy.id});
+      await expectRejected(
+        () => attach(fam.admin, legacy.id, 'E2E Revoked'),
+        contains: 'revogado',
+      );
+
+      // Nothing was created by any of them.
+      expect(
+          (await profilesOf(fam.admin)).where((m) => m.isPendingMember), isEmpty);
+    });
+
+    test('F-62: a VALID invitation attaches with no gate even after a '
+        'downgrade; an EXPIRED one is a new seat and goes through it',
+        () async {
+      final fam = await fx.createFamily('f62-seat');
+
+      // Two legacy invitations issued on Premium: seats 3 and 4.
+      await setPlan(fam.familyId, 'premium');
+      final valid = await legacyInvitation(fam, fx.testEmail('f62-seat-v'));
+      final expired = await legacyInvitation(fam, fx.testEmail('f62-seat-x'));
+      await fx.service.from('family_invitations').update({
+        'expires_at': DateTime.now()
+            .toUtc()
+            .subtract(const Duration(days: 1))
+            .toIso8601String(),
+      }).eq('id', expired.id);
+      expect(await seatsTakenOf(fam.familyId), 3,
+          reason: 'the expired one holds no seat');
+
+      // Back on free: the valid invitation's seat is already the family's,
+      // so attaching it changes nothing and is never refused.
+      await setPlan(fam.familyId, 'free');
+      await attach(fam.admin, valid.id, 'E2E Seat Valid');
+      expect(await seatsTakenOf(fam.familyId), 3);
+
+      // The expired one would be a NEW seat: the F-37 gate speaks.
+      await expectRejected(
+        () => attach(fam.admin, expired.id, 'E2E Seat Expired'),
+        contains: 'Premium',
+      );
+      expect((await invitationByToken(expired.token)).profileId, isNull);
+
+      // With room for it, it attaches — and outlives its dead token.
+      await setPlan(fam.familyId, 'premium');
+      final id = await attach(fam.admin, expired.id, 'E2E Seat Expired');
+      expect((await invitationByToken(expired.token)).profileId, id);
+      expect(await seatsTakenOf(fam.familyId), 4);
+      expect(await inviteInfo(expired.token), isEmpty,
+          reason: 'expired stays expired — a resend renews the link');
+    });
   });
 }

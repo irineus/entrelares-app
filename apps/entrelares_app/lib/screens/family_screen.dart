@@ -516,6 +516,35 @@ class _FamilyScreenState extends State<FamilyScreen> {
     }
   }
 
+  /// F-62: a LEGACY invitation — issued before F-56, or by an Android build
+  /// not yet promoted — has an e-mail and a role but nobody to plan days for.
+  /// The sheet asks the one thing missing, the name, and the RPC attaches a
+  /// placeholder to THAT invitation: same row, same token. Resending instead
+  /// would revoke the link the person already holds, which is the whole
+  /// reason this is not `_resendInvite`.
+  Future<void> _attachPending(FamilyInvitation invitation, Localization l) async {
+    final name = await showAppSheet<String>(
+      context: context,
+      builder: (context) => _AttachPendingSheet(
+        title: l.format(KApp.famAttachTitle, [invitation.email]),
+      ),
+    );
+    if (name == null || !mounted) return;
+    try {
+      await widget.dataSource.attachPendingMember(
+          invitationId: invitation.id, fullName: name);
+      if (!mounted) return;
+      showAppSnack(context, l.format(KApp.famAttached, [name]),
+          type: AppSnackType.success);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      // The RPC's own sentence: which refusal (accepted, revoked, cap) it was.
+      showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
+  }
+
   /// F-56: a typo must not hold one of four seats forever. The RPC deletes a
   /// never-planned placeholder and freezes one with history (future days
   /// freed, the name kept on the past) — the confirmation says exactly that.
@@ -856,6 +885,15 @@ class _FamilyScreenState extends State<FamilyScreen> {
             Wrap(
               spacing: 8,
               children: [
+                // F-62: no placeholder behind this invitation — offer one
+                // without touching the token. Expired or not: the placeholder
+                // outlives the link, and a resend afterwards carries it.
+                if (invitation.profileId == null)
+                  FilledButton.tonalIcon(
+                    icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
+                    label: Text(l[KApp.famAttachInvite]),
+                    onPressed: () => _attachPending(invitation, l),
+                  ),
                 if (!expired) ...[
                   OutlinedButton.icon(
                     icon: const Icon(Icons.copy, size: 18),
@@ -2131,6 +2169,79 @@ class _FamilyScreenState extends State<FamilyScreen> {
           )),
         ],
       ),
+    );
+  }
+}
+
+/// F-62: the one question an admin answers to give a legacy invitation its
+/// placeholder — the name. E-mail and role are already the invitation's; the
+/// sheet hands the name back and the page attaches the placeholder to THAT
+/// invitation, token untouched.
+class _AttachPendingSheet extends StatefulWidget {
+  final String title;
+
+  const _AttachPendingSheet({required this.title});
+
+  @override
+  State<_AttachPendingSheet> createState() => _AttachPendingSheetState();
+}
+
+class _AttachPendingSheetState extends State<_AttachPendingSheet> {
+  final _name = TextEditingController();
+  String? _errorKey;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final errorKey = InviteFormRules.nameErrorKey(_name.text);
+    if (errorKey != null) {
+      setState(() => _errorKey = errorKey);
+      return;
+    }
+    Navigator.of(context).pop(_name.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context).l;
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(widget.title, style: theme.textTheme.titleMedium),
+        const SizedBox(height: Spacing.xs),
+        Text(l[KApp.famAttachHint], style: theme.textTheme.bodySmall),
+        const SizedBox(height: Spacing.md),
+        AppTextField(
+          label: l[KApp.famInviteName],
+          hint: l[KApp.famInviteNameHint],
+          controller: _name,
+          maxLength: RegisterRules.maxNameLength,
+          errorText: _errorKey == null ? null : l[_errorKey!],
+          autofocus: true,
+          onSubmitted: (_) => _submit(),
+        ),
+        const SizedBox(height: Spacing.md),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(l[K.commonCancel]),
+            ),
+            const SizedBox(width: Spacing.sm),
+            FilledButton(
+              onPressed: _submit,
+              child: Text(l[KApp.famAttachInvite]),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
