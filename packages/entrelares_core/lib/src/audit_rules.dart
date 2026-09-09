@@ -40,6 +40,9 @@ class AuditLogView {
 
   final int? performedById;
 
+  /// F-61: the facts stamped at write time. Null before F-61 — unknown.
+  final AuditContext? context;
+
   const AuditLogView({
     required this.id,
     required this.affectedDate,
@@ -48,7 +51,93 @@ class AuditLogView {
     this.oldData,
     this.newData,
     this.performedById,
+    this.context,
   });
+}
+
+/// F-61 — what `audit_care_schedule_changes` stamps in `activity_logs.context`
+/// at the instant of the write. Every field is a recorded FACT, never an
+/// inference made here: whether the assigned parents had an account, whether
+/// the actor was an admin, and whether the write went through only on the
+/// admin's authority (a DELETE, or a planned/real-parent UPDATE, by an admin
+/// who was not the target of a pending request on that day).
+///
+/// A missing key is `null` — the trigger strips unknowns (a system write has
+/// no actor), and rows older than F-61 have no context at all. The renderer
+/// says nothing for `null`: "unknown" and "no" are different answers on a
+/// record.
+class AuditContext {
+  final bool? scheduledParentHasAccount;
+  final bool? actualParentHasAccount;
+  final bool? actorIsAdmin;
+  final bool? adminOverride;
+
+  const AuditContext({
+    this.scheduledParentHasAccount,
+    this.actualParentHasAccount,
+    this.actorIsAdmin,
+    this.adminOverride,
+  });
+
+  /// [raw] as PostgREST hands it over — a decoded JSON object, or null.
+  /// Anything that is not an object (or a boolean inside it) reads as unknown.
+  static AuditContext? parse(Object? raw) {
+    if (raw is! Map) return null;
+    bool? flag(String key) {
+      final value = raw[key];
+      return value is bool ? value : null;
+    }
+
+    return AuditContext(
+      scheduledParentHasAccount: flag('scheduled_parent_has_account'),
+      actualParentHasAccount: flag('actual_parent_has_account'),
+      actorIsAdmin: flag('actor_is_admin'),
+      adminOverride: flag('admin_override'),
+    );
+  }
+}
+
+/// F-61 — the dated facts a trail line carries beyond its diff, in the
+/// reader's language, one sentence each:
+///
+///   · a parent the day names who had NO account at that instant (the planned
+///     one, the real one, or both — the same person is named once);
+///   · the write being the admin's direct change (S-09 / F-14 / a clear).
+///
+/// Neutral by construction: each sentence names a person and a state with the
+/// row's own timestamp next to it; none qualifies anyone's conduct. Shared by
+/// the Histórico timeline and the F-33 document so the two cannot drift.
+/// A log without context (older than F-61) yields nothing.
+List<String> authorshipLines({
+  required AuditLogView log,
+  required List<MemberView> profiles,
+  required Localization l,
+}) {
+  final ctx = log.context;
+  if (ctx == null) return const [];
+
+  // The day as recorded: the new row, or — for a DELETE — the one that went.
+  final row = log.newData ?? log.oldData;
+  final withoutAccount = <String>[];
+  void nameIf(bool? hasAccount, String key) {
+    if (hasAccount != false) return;
+    final idText = _snapshotString(row, key);
+    if (idText == null) return;
+    final name = _resolveParent(idText, profiles);
+    if (!withoutAccount.contains(name)) withoutAccount.add(name);
+  }
+
+  nameIf(ctx.scheduledParentHasAccount, 'scheduled_parent_id');
+  nameIf(ctx.actualParentHasAccount, 'actual_parent_id');
+
+  return [
+    for (final name in withoutAccount)
+      l.format(K.auditAuthorshipNoAccount, [name]),
+    if (ctx.adminOverride == true)
+      l.format(K.auditAuthorshipAdminOverride, [
+        _nameOf(profiles, log.performedById) ?? l[K.auditOriginSomeCaregiver],
+      ]),
+  ];
 }
 
 /// The slice of a `swap_requests` row the F-45 origin sentence needs. Kept

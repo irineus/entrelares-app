@@ -214,6 +214,16 @@ List<pw.Widget> _historySection(CustodyReport report, Localization l) => [
                       ],
                     ),
                   ),
+                // F-61: the dated facts beyond the diff — set in bold so a
+                // reader skimming the history finds them without reading
+                // every line; the wording itself stays a plain fact.
+                for (final line in e.authorshipLines)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(left: 10, top: 2),
+                    child: pw.Text(line,
+                        style: pw.TextStyle(
+                            fontSize: 8.5, fontWeight: pw.FontWeight.bold)),
+                  ),
                 for (final change in e.changes)
                   pw.Padding(
                     padding: const pw.EdgeInsets.only(left: 10, top: 1),

@@ -186,6 +186,11 @@ class ReportAuditEntry {
   final String? originMessage;
   final String? originNote;
 
+  /// F-61: the dated facts beyond the diff — an assignee without an account
+  /// at that instant, the admin's direct change. Empty for rows older than
+  /// F-61, whose context is unknown.
+  final List<String> authorshipLines;
+
   const ReportAuditEntry({
     required this.affectedDate,
     required this.timestampLocal,
@@ -195,6 +200,7 @@ class ReportAuditEntry {
     this.originText,
     this.originMessage,
     this.originNote,
+    this.authorshipLines = const [],
   });
 }
 
@@ -328,5 +334,6 @@ ReportAuditEntry _entryFor(
         origin == null ? null : resolutionOriginText(origin, members, l),
     originMessage: origin?.requestMessage,
     originNote: origin?.approvalNote,
+    authorshipLines: authorshipLines(log: log, profiles: members, l: l),
   );
 }

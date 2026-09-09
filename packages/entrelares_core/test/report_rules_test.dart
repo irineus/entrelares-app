@@ -293,6 +293,44 @@ void main() {
       expect(swapped.changes.single.to, 'Bruno Prado');
     });
 
+    test('F-61: the authorship lines ride the entry; no context, none', () {
+      final report = buildCustodyReport(
+        familyName: 'Família Prado',
+        childName: null,
+        start: DateTime(2026, 8, 15),
+        end: DateTime(2026, 8, 22),
+        today: _today,
+        days: _period(),
+        members: _members,
+        auditLogs: [
+          ...logs,
+          AuditLogView(
+            id: 12,
+            affectedDate: DateTime(2026, 8, 21),
+            createdAtLocal: DateTime(2026, 8, 17, 8, 0),
+            action: 'INSERT',
+            performedById: 1,
+            newData: const {'scheduled_parent_id': 2},
+            context: const AuditContext(
+                scheduledParentHasAccount: false, actorIsAdmin: true),
+          ),
+        ],
+        roleLabelOf: (id) => id == 1 ? 'Mãe' : 'Pai',
+        diffFor: (log) => computeAuditDiff(log: log, profiles: _members, l: l),
+        generatedBy: 'Ana Prado',
+        generatedAtLocal: DateTime(2026, 8, 19, 21, 5),
+        appVersion: '0.2.20+22',
+        l: l,
+      );
+
+      final stamped = report.auditEntries.last;
+      expect(stamped.authorshipLines,
+          ['Bruno Prado ainda não tinha conta no aplicativo neste momento.']);
+      for (final older in report.auditEntries.take(2)) {
+        expect(older.authorshipLines, isEmpty);
+      }
+    });
+
     test('the projection reaches the document numbers', () {
       final report = build(future: true);
       expect(report.includesFutureSwaps, isTrue);

@@ -563,6 +563,11 @@ abstract final class StringsPtBr {
     K.auditOriginRevertAuto: 'Alteração originada da reversão de troca solicitada por {0} e aprovada automaticamente após 48h sem resposta.',
     K.auditOriginSomeCaregiver: 'um responsável',
     K.auditOriginOtherCaregiver: 'outro responsável',
+    // F-61: fato datado, nunca qualificador — o leitor tira a conclusão.
+    K.auditAuthorshipNoAccount:
+        '{0} ainda não tinha conta no aplicativo neste momento.',
+    K.auditAuthorshipAdminOverride:
+        'Alteração direta pela pessoa administradora ({0}).',
     // ── Relatório em PDF (F-33) — a tela ──
     K.pdfPageTitle: 'Relatório do histórico em PDF - Entrelares',
     K.pdfHeading: '📄 Relatório do histórico em PDF',
