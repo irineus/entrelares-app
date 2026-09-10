@@ -12,7 +12,28 @@
           "package_name": "com.entrelares.flutter"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "51960618124-5t52fs7oeuj98bvf2r3l0i8gnak64nuq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.entrelares.flutter",
+            "certificate_hash": "205f2c8ca5273f4f152abd9c3f3f8a6538643499"
+          }
+        },
+        {
+          "client_id": "51960618124-oq91jqqqm33u5h49bcenneq2obhbv649.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.entrelares.flutter",
+            "certificate_hash": "95070f010472213b9935de84b31a7b52d1a24eb7"
+          }
+        },
+        {
+          "client_id": "51960618124-vfauicf9qbt4hhvv3ct49abiivllq3p7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDdOF_mrYdpuDw6Z1hpcuLC9_TwbzNQ_8g"
@@ -20,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "51960618124-vfauicf9qbt4hhvv3ct49abiivllq3p7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

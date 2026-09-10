@@ -12,7 +12,28 @@
           "package_name": "com.entrelares.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "575356979434-5ldojjcp3gvnmipe8t7ori8m34j9q6j4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.entrelares.app",
+            "certificate_hash": "eb526a33de11308c54ec4d991c122384ae649261"
+          }
+        },
+        {
+          "client_id": "575356979434-5m9mv9vghbq2l5r92bpg5gcd6upe6cap.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.entrelares.app",
+            "certificate_hash": "090aba459233a338ac1293ad21633e0131ad4578"
+          }
+        },
+        {
+          "client_id": "575356979434-8fnls1hls3kb9nj1afcvf1cdu4m9hrhi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBLQ708zi5lp5Z5H5FlmhYeEB7Kpj5xLTY"
@@ -20,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "575356979434-8fnls1hls3kb9nj1afcvf1cdu4m9hrhi.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
