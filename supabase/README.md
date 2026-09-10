@@ -1380,7 +1380,8 @@ disabling only closes the door for NEW sign-ins.
 that host is the project ref. Measured on a real device during the F-57 go-live: the consent
 screen reads *"Fazer login no serviço `jptqbwfziyzlhlmoekzu.supabase.co`"*, and Google's summary
 e-mail arrives titled *"You shared some Google Account data with
-jptqbwfziyzlhlmoekzu.supabase.co"*. Full reasoning in the T-61 record (`backlog/technical.md`).
+jptqbwfziyzlhlmoekzu.supabase.co"*. Full reasoning in the T-61 card, which is the record of the
+item since T-63 retired the markdown backlog (07/09/2026).
 
 **The decision (owner, 28/08/2026): A now, B if A fails.** Both are free. The two host changes
 stay documented below because they are what a rollback or a change of mind returns to — they are
@@ -1413,10 +1414,16 @@ NOT the plan.
 
 Supabase's own Google guide is explicit that Branding **and Verification** *"show a logo and name
 instead of the Supabase project ID in the consent screen"*. That is the lever the first analysis
-missed: §9-ter.0 configured Branding and PUBLISHED the Audience, but published ≠ **verified** —
-verification is a separate submission with human review. "Branding set, screen still showing the
-ref" is the expected state of a published, unverified app, so the device measurement and this
-path do not contradict each other.
+missed: §9-ter.0 configured Branding, but Branding alone changes nothing on screen — **verified**
+is a separate submission with human review, and publishing the Audience (step 0 below) is only
+its prerequisite. "Branding set, screen still showing the ref" is the expected state of an
+unverified app, so the device measurement and this path do not contradict each other.
+
+> **The exact values to submit** — app name, logo path, the three landing URLs, the scopes, and
+> the two-place re-measurement protocol — are in the card's sub-page **"T-61 — Brand verification
+> submission dossier"**, each one verified against this repository and the live hosts on
+> 10/09/2026. This section stays the procedure and the ordering; that page is what to paste, and
+> afterwards the record of what was submitted.
 
 0. **Publish the app first.** *Google Auth Platform → **Audience*** must read **In
    production**, not Testing — Google neither requires nor accepts verification for an app in
@@ -1874,7 +1881,12 @@ prevent.
    carries no secret) and are committed in the app PR under
    `apps/entrelares_app/android/app/src/dev/` and `.../src/prod/`.
 4. **SHA-1 fingerprints are not needed for messaging** — they are a Google-sign-in concern,
-   and F-57 already handles that through Supabase, not Firebase.
+   and F-57 handles sign-in through Supabase, not Firebase. Both files nonetheless CARRY
+   fingerprints since 10/09/2026: the Fulcrum tenant registered six OAuth clients in these very
+   projects (one Web + one Android per signing certificate, per project), so `oauth_client` is no
+   longer empty. **Nothing in `lib/` reads them** — the app still signs in by redirect. They are
+   inert here and are the standing prerequisite of T-61 path B (§9-quater.B), which is why they
+   are committed rather than stripped.
 
 ### 11.2 The service account, per project
 
