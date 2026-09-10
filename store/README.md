@@ -122,6 +122,43 @@ The landing repo's favicon and OG art are still on the clay masters, behind thei
 this script (`entrelares-site/assets-src/brand-icons.py`). Moving them is T-57's landing half,
 and it happens in that repo.
 
+### The one mark in this app that is NOT ours (U-45, 10/09/2026)
+
+`apps/entrelares_app/assets/brand/google-g.png` (+ `2.0x/`, `3.0x/`) is Google's "G", used under
+the *Sign in with Google* [branding guidelines](https://developers.google.com/identity/branding-guidelines).
+It is **Google's trademark, not ours**: it may not be recoloured, redrawn, rotated or distorted,
+which is exactly why it ships as an IMAGE and never as an icon font or a painter — and why its
+colours are the one palette in the app that does not answer to `tokens.dart`. The rest of the
+button's spec (surface, stroke, ink, 40 dp, 4 dp corners, 12/10/12 padding) lives in
+`GoogleBrand`, inside `tokens.dart`, because that file is the only place a colour may be spelled
+out and `no_color_literal_test` keeps it that way.
+
+Provenance, so a future refresh of the mark is a re-run and not an archaeology dig:
+
+```
+master:  https://developers.google.com/identity/images/g-logo.png   (200×204, RGBA)
+checked: against the official pack, https://developers.google.com/static/identity/images/signin-assets.zip
+         → "Android + Web/PNG @4x/Light/…Show text=Yes, Shape=Square…" — the G there measures
+           79×80 px at @4x (19.75×20 dp), 12 dp from the left edge, in a 40 dp button. That
+           button is also where the height, the 4 dp corner and the paddings were MEASURED: the
+           guidelines page states the colours and the paddings, not the geometry.
+derived: scaled to fit a 20 dp square, centred, at 1×/2×/3× (20/40/60 px, ~9 KB total)
+```
+
+```python
+from PIL import Image                      # run from apps/entrelares_app/assets/brand/
+m = Image.open('g-logo.png').convert('RGBA')
+for scale, out in ((1, 'google-g.png'), (2, '2.0x/google-g.png'), (3, '3.0x/google-g.png')):
+    side = 20 * scale
+    g = m.resize((round(m.width * side / m.height), side), Image.LANCZOS)
+    box = Image.new('RGBA', (side, side), (0, 0, 0, 0))
+    box.paste(g, ((side - g.width) // 2, 0), g)   # fit by HEIGHT, never squashed
+    box.save(out, optimize=True)
+```
+
+The pack's own pre-rendered buttons are deliberately NOT used: they carry the sentence baked in,
+in English only, and this product writes it in the reader's language (`KApp.authGoogle`).
+
 ## 3 · Feature graphic (1024×500, required)
 
 **Both languages have a generator since T-57 (28/08/2026), and both are on the new mark.**

@@ -564,3 +564,53 @@ abstract final class TypeScale {
 /// breathes better with the extra hundred. On a phone the constraint never
 /// binds, so this changes nothing on the store channel.
 const double maxAppWidth = 600;
+
+/// U-45 — the "Sign in with Google" button's own spec.
+///
+/// This is a THIRD PARTY's design, not part of this design system: the values
+/// below are Google's *Sign in with Google* branding guidelines, measured
+/// against the official `signin-assets.zip` (the 40 dp "Square" button, @4x),
+/// and they are the one thing on screen that must NOT follow our tokens. They
+/// never lerp with the theme, they are not tinted, and the light/dark pair is
+/// chosen by [Brightness] alone — the guideline names those two surfaces and
+/// no other. They live in this file for one reason: it is the only place a
+/// colour may be spelled out, and `no_color_literal_test` is what keeps that
+/// true. The mark itself ships as an IMAGE (`logoAsset`) because it may not be
+/// recoloured or redrawn.
+///
+/// The one deliberate divergence is the typeface: the guideline asks for
+/// Google Sans Medium, and the app renders the sentence in **Inter** at the
+/// same 14/20 medium — registering a second font family for one button costs
+/// more than it buys, and the sentence is ours (it is written in the reader's
+/// language, which the pre-rendered official buttons cannot be).
+abstract final class GoogleBrand {
+  /// The G, 20 dp square, at 1x/2x/3x. Declared file-by-file in `pubspec.yaml`
+  /// so the launcher-icon masters next to it stay out of the bundle.
+  static const String logoAsset = 'assets/brand/google-g.png';
+
+  static const Color lightSurface = Color(0xFFFFFFFF);
+  static const Color lightStroke = Color(0xFF747775);
+  static const Color lightText = Color(0xFF1F1F1F);
+
+  static const Color darkSurface = Color(0xFF131314);
+  static const Color darkStroke = Color(0xFF8E918F);
+  static const Color darkText = Color(0xFFE3E3E3);
+
+  static const double height = 40;
+  static const double logoSize = 20;
+
+  /// 12 dp before the logo and after the sentence, 10 dp between them.
+  static const double padding = 12;
+  static const double logoGap = 10;
+
+  static const double strokeWidth = 1;
+
+  /// The guideline's "Square" shape. It happens to be [Radii.sm] exactly —
+  /// written as the token so the coincidence is visible rather than a second
+  /// unexplained 4.
+  static const double radius = Radii.sm;
+
+  /// 14/20, medium.
+  static const double fontSize = 14;
+  static const double lineHeight = 20;
+}
