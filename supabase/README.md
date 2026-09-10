@@ -1194,13 +1194,15 @@ verification.
 > **PARTIALLY DONE, and the gap was invisible for a month — read 9-ter.0 step 2 first.** The
 > code merged on 27/08/2026 (PRs #92/#93, `2.1.0+55`) and both projects answer
 > `external.google: true`, but on 28/08/2026 the console showed the Google Auth Platform app
-> still in **Testing**: step 2 of 9-ter.0 was never executed. **Re-measured 10/09/2026 and still
-> Testing**, with one detail that makes it worse than "capped to a list": the *Test users* table
-> reads **No rows to display**. An empty list does not mean everyone — it means **only principals
-> holding an IAM role on the Cloud project can complete Google sign-in at all**. The owner can,
-> because the account owns the project; every alpha tester who pressed the button since the
-> go-live hit a wall, and no signal on our side could show it. Those who do get in are also
-> **silently signed out after 7 days**, when Testing expires the refresh token.
+> still in **Testing**: step 2 of 9-ter.0 was never executed. **FIXED 10/09/2026 — the app is now
+> `In production`.** It stayed broken for two weeks, and the shape of the break is worth keeping:
+> the *Test users* table was **empty**, which is worse than "capped to a list". An empty list does
+> not mean everyone — it means **only principals holding an IAM role on the Cloud project could
+> complete Google sign-in at all**. The owner could, because the account owns the project; every
+> alpha tester who pressed the button since the go-live hit a wall, and no signal on our side
+> could show it. Those who did get in were also **silently signed out after 7 days**, when Testing
+> expires the refresh token — so expect one last such sign-out from sessions created before the
+> fix.
 >
 > **Which project's Audience is the one that matters.** Both Supabase projects hand the browser
 > the SAME OAuth client — `97600663120-8jnqm3cq…apps.googleusercontent.com`, so `97600663120` is
@@ -1432,7 +1434,7 @@ NOT the plan.
 > matter. Read that before "fixing" the web gap: the repo shows two channels built to the same
 > standard and says nothing about their rank, so the rank has to be written down.
 
-**9-quater.A — Brand verification. Free, no code, a few business days.**
+**9-quater.A — Brand verification. Free, no code, and — measured 10/09/2026 — no wait either.**
 
 Supabase's own Google guide is explicit that Branding **and Verification** *"show a logo and name
 instead of the Supabase project ID in the consent screen"*. That is the lever the first analysis
@@ -1461,17 +1463,32 @@ unverified app, so the device measurement and this path do not contradict each o
 
    > **Measured on 28/08/2026:** the *Authorized domains* list already carries both Supabase
    > project hosts, added by the console because the OAuth client's redirect URIs live there.
-   > **Do not remove them** — that breaks the client. This is also precisely where path A may be
-   > refused, since Google wants proven ownership of authorized domains and `supabase.co` is not
-   > ours. The submission is the only way to find out; a refusal on that ground is the
-   > definition of "A failed" and the trigger for B.
+   > **Do not remove them** — that breaks the client.
+   >
+   > This was also, from 28/08 to 10/09/2026, the documented way path A could fail: Google wants
+   > proven ownership of authorized domains and `supabase.co` is not ours. **It never came up.**
+   > There is no submission for non-sensitive scopes (step 3), so nothing ever asked us to prove
+   > a domain. The risk was real on paper and moot in practice.
+   >
+   > The support e-mail is a **dropdown**, not a free field: it offers the signed-in account and
+   > Google Groups you administer. `suporte@entrelares.app` is not among them, so the configured
+   > value is the owner's own address.
 2. *Google Auth Platform → **Data Access (Scopes)***: confirm only `openid`,
    `.../auth/userinfo.email` and `.../auth/userinfo.profile`. The app passes **no** `scopes` to
    `signInWithOAuth` (`main.dart`), so these are the defaults — all non-sensitive, which is the
    light review path, with no security assessment.
-3. *Google Auth Platform → **Verification*** → submit. Expect a few business days.
+3. *Google Auth Platform → **Verification Center***. **There is nothing to submit, and no wait
+   — measured 10/09/2026.** The page answers *"Verification is not required since your app is not
+   requesting any sensitive or restricted scopes"*, and Branding status reads *"Your branding has
+   been verified and is being shown to users"*. **Publishing (step 0) is what makes Branding take
+   effect**; the human review this section spent two weeks planning around applies to sensitive
+   and restricted scopes, which we do not request. If this page ever DOES ask for a submission,
+   something added a scope — go read step 2 before answering it.
 4. **Re-measure both places on a real device**, the way the finding was made: the consent screen
    line AND the subject of Google's summary e-mail, hours later. Only both together close T-61.
+   **The console is not the measurement.** "Being shown to users" is Google's claim about its own
+   state, and the whole of T-61 exists because Branding was configured on 28/08 and the device
+   still read the project ref — configured never meant displayed. Trust the handset.
 
 > **The open risk, and what "A failed" means.** Google requires authorized domains to be domains
 > you can prove you own, and it infers domains from the redirect URIs. If `supabase.co` is pulled
