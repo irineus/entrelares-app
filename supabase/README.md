@@ -1194,9 +1194,28 @@ verification.
 > **PARTIALLY DONE, and the gap was invisible for a month — read 9-ter.0 step 2 first.** The
 > code merged on 27/08/2026 (PRs #92/#93, `2.1.0+55`) and both projects answer
 > `external.google: true`, but on 28/08/2026 the console showed the Google Auth Platform app
-> still in **Testing**: step 2 of 9-ter.0 was never executed. Consequences, live since the
-> go-live: **only accounts on the test-user list can sign in with Google** — every other alpha
-> tester hits a wall — and those who do sign in are **silently signed out after 7 days**.
+> still in **Testing**: step 2 of 9-ter.0 was never executed. **Re-measured 10/09/2026 and still
+> Testing**, with one detail that makes it worse than "capped to a list": the *Test users* table
+> reads **No rows to display**. An empty list does not mean everyone — it means **only principals
+> holding an IAM role on the Cloud project can complete Google sign-in at all**. The owner can,
+> because the account owns the project; every alpha tester who pressed the button since the
+> go-live hit a wall, and no signal on our side could show it. Those who do get in are also
+> **silently signed out after 7 days**, when Testing expires the refresh token.
+>
+> **Which project's Audience is the one that matters.** Both Supabase projects hand the browser
+> the SAME OAuth client — `97600663120-8jnqm3cq…apps.googleusercontent.com`, so `97600663120` is
+> the Cloud project whose consent screen users actually see. It is neither Firebase project
+> (`entrelares-dev` is `51960618124`, `entrelares-prod` is `575356979434`; §11.1). Confirm the
+> Web client is listed under *Google Auth Platform → Clients* in that project before publishing
+> or submitting anything — every Cloud project has its own consent screen, and configuring the
+> wrong one changes nothing on the device. Read it without the console:
+>
+> ```
+> curl -s -o /dev/null -w "%{redirect_url}
+" >   https://<ref>.supabase.co/auth/v1/authorize?provider=google
+> ```
+>
+> The `client_id` in that redirect is public — it is in the URL every user's browser follows.
 >
 > **Why nobody caught it, which is the lesson worth more than the fix.** This banner told you to
 > verify in one command and to prefer that over reading the console. That advice is right about
