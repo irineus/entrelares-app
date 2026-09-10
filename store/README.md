@@ -210,8 +210,15 @@ say which one is blocking: sweep the whole list.
   | Financial info | **No** | — | See the caveat below |
   | Location, contacts, photos, device ids | No | — | Not requested |
   - Data is **encrypted in transit** (HTTPS only): Yes.
-  - **Deletion**: users can request account/data deletion in-app and via
-    `privacidade@entrelares.app` (LGPD) — answer "Yes, deletion path available".
+  - **Deletion**: answer "Yes, deletion path available", and give the public page
+    **`https://entrelares.app/exclusao-de-conta.html`** (S-19) as the account-deletion URL —
+    the field asks for a link a person who UNINSTALLED the app can still follow, which an
+    e-mail address alone does not satisfy. The page is bilingual and single (the reviewer
+    reads English, the user reads PT-BR), and it teaches the real path: `web.entrelares.app`
+    is the same client with the same danger zone, so nobody needs the app to delete their
+    account. `privacidade@entrelares.app` stays as the channel for whoever cannot sign in —
+    including, today, anyone who signs in with Google: deletion is sudo-gated (S-10) and an
+    OAuth session has no password to confirm.
   - The consent log stores the accepting IP (disclosed in the policy) — server-side
     security/audit data tied to the account; declare it under Personal info only if the form's
     current wording requires IP disclosure (re-read the help text at fill time).
@@ -252,7 +259,9 @@ calendar time, so recruit testers early rather than when a build is ready.
 
 > **The closed test ended on 01/09/2026.** What follows it — production access, the listing
 > going public, and the checkboxes that come with it — is tracked as **T-59** in
-> [`backlog/technical.md`](../backlog/technical.md), not here.
+> the **T-59** card ([board](https://app.notion.com/3c82f3f4b9b2810aaff5e49014f748ef)), not here —
+> `backlog/` stopped being the record on 07/09/2026 (T-63). The account-deletion URL of §4 is one
+> of its checkboxes, tracked as **S-19**.
 
 ## 6 · Publishing a new Android build
 

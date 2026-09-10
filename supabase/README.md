@@ -1878,7 +1878,9 @@ Só depois de 10.1–10.5 verdes. Página **JWT Keys** → aba **"JWT Signing Ke
 > Este passo **não** é um resto de tarefa: ele espera por construção (tokens
 > assinados com HS256 valem por 1 h, e a plataforma recusa revogar o segredo
 > enquanto as chaves que derivam dele estiverem ativas), então virou item próprio.
-> Registro e critérios de verificação em [`backlog/security.md`](../backlog/security.md).
+> Registro e critérios de verificação no card **S-17**
+> ([board](https://app.notion.com/3b12f3f4b9b28111a8d7e7d4bce53122)) — o card é o registro desde
+> 07/09/2026 (T-63), e `backlog/` é história congelada.
 
 Página **API Keys** → aba **"Legacy API keys"** → use os indicadores de *last used*
 para confirmar que `anon` e `service_role` não são mais chamadas → **Disable**.
