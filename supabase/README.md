@@ -1205,10 +1205,13 @@ verification.
 > **Which project's Audience is the one that matters.** Both Supabase projects hand the browser
 > the SAME OAuth client — `97600663120-8jnqm3cq…apps.googleusercontent.com`, so `97600663120` is
 > the Cloud project whose consent screen users actually see. It is neither Firebase project
-> (`entrelares-dev` is `51960618124`, `entrelares-prod` is `575356979434`; §11.1). Confirm the
-> Web client is listed under *Google Auth Platform → Clients* in that project before publishing
-> or submitting anything — every Cloud project has its own consent screen, and configuring the
-> wrong one changes nothing on the device. Read it without the console:
+> (`entrelares-dev` is `51960618124`, `entrelares-prod` is `575356979434`; §11.1). **Confirmed
+> 10/09/2026:** *Google Auth Platform → Clients* in `entrelares-506400` lists exactly one client,
+> *"Entrelares — Supabase GoTrue"*, Web application, created 27/08/2026 — so that project's
+> Branding, Audience and Verification are the ones that reach a user. Re-confirm it before
+> publishing or submitting if anything about the client changes: every Cloud project has its own
+> consent screen, and configuring the wrong one changes nothing on the device. Read it without
+> the console:
 >
 > ```
 > curl -s -o /dev/null -w "%{redirect_url}
