@@ -16,9 +16,12 @@ import 'app_l10n.dart';
 /// `OutlinedButton.icon` carrying `Icons.account_circle_outlined`: a generic
 /// "account" glyph exactly where a person looks for the G. Every number and
 /// colour below comes from [GoogleBrand], which is the *Sign in with Google*
-/// guideline written down — the T-61 brand verification is a HUMAN review of
-/// this product's OAuth surfaces, and an off-spec button is the cheapest thing
-/// on that checklist to get wrong.
+/// guideline written down. The reason given here used to be that T-61's brand
+/// verification was a human review of this product's OAuth surfaces; T-61
+/// closed on 10/09/2026 and there was no such review — for non-sensitive
+/// scopes Google requires no submission at all. The spec still binds: it is
+/// Google's published guideline for this button, and it is the surface a
+/// person meets one screen before handing over their identity.
 class GoogleSignInButton extends StatelessWidget {
   final Future<bool> enabled;
   final Future<void> Function() onPressed;
