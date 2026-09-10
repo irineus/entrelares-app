@@ -386,6 +386,19 @@ jobs:
   #     10-15 min of the emulator lane. Most of that difference is booting an
   #     emulator and installing an APK, neither of which the browser needs.
   #
+  # THAT MEASUREMENT DOES NOT COVER THE CASE THAT ACTUALLY HAPPENED (T-58,
+  # discovered 25/08/2026 — the day AFTER this gate was trusted). Every bullet
+  # above exercised a suite whose tests RAN: the probe proved the harness reports
+  # a FAILING test, not that any test existed. `flutter drive` on web prints
+  # "All tests passed." and exits 0 with ZERO tests too, so a `setUpAll` that
+  # throws is indistinguishable from a green run and `set -euo pipefail` sees
+  # nothing. This gate was born five days AFTER the bug that broke its
+  # `setUpAll`: the green that justified letting it block production was empty
+  # from the first run. Hypothesis 2 (the calendar) was confirmed and fixed in
+  # #109; the guard that makes a ZERO-test run RED is still open, and is T-58's
+  # first half. Until it lands, a green here means "nothing reported a failure",
+  # never "the flows passed" — do not add a bullet above that reads like proof.
+  #
   # It does NOT replace the emulator lane: what needs a device — Play Billing,
   # the share sheet, the native print dialog — only runs there.
   #
