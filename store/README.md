@@ -210,13 +210,14 @@ say which one is blocking: sweep the whole list.
   | Financial info | **No** | — | See the caveat below |
   | Location, contacts, photos, device ids | No | — | Not requested |
   - Data is **encrypted in transit** (HTTPS only): Yes.
-  - **Account creation** — the form asks HOW an account is created, and the answer must list
-    **`Username, password, and other authentication`** *and* **`OAuth`**. The declaration of
-    25/08/2026 ticked only the first, two days before Google sign-in (**F-57**) shipped —
-    re-answer it. This is the S-15 rule biting in the Console instead of in the policy.
-  - **Deletion — TWO URL fields, both measured as wrong on 10/09/2026 (S-19).** Both held
-    `https://web.entrelares.app/profile`, and that address is not a route this app serves:
-    the real one is `/family/profile`, nested under `/family` (`main.dart`), so an unknown
+  - **Account creation** — the form asks HOW an account is created, and the answer lists
+    **`Username, password, and other authentication`** *and* **`OAuth`**, ticked on 10/09/2026.
+    The declaration of 25/08 had only the first, two days before Google sign-in (**F-57**)
+    shipped: true when written, false the week after. This is the S-15 rule biting in the
+    Console instead of in the policy — a declaration ages the moment the code moves.
+  - **Deletion — TWO URL fields, both answered on 10/09/2026 with the public page (S-19).**
+    They had held `https://web.entrelares.app/profile`, and that address is not a route this
+    app serves: the real one is `/family/profile`, nested under `/family` (`main.dart`), so an unknown
     path lands on the T-64 `NotFoundScreen`; and without a session it lands on the login,
     which forgets where it was going — the T-64 gate keeps NO remembered destination, on
     purpose. Give both fields the public page **`https://entrelares.app/exclusao-de-conta`** —
