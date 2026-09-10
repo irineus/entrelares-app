@@ -219,10 +219,13 @@ say which one is blocking: sweep the whole list.
     the real one is `/family/profile`, nested under `/family` (`main.dart`), so an unknown
     path lands on the T-64 `NotFoundScreen`; and without a session it lands on the login,
     which forgets where it was going — the T-64 gate keeps NO remembered destination, on
-    purpose. Give both fields the public page **`https://entrelares.app/exclusao-de-conta.html`**
-    (`entrelares-site`), which is what the three bullets beside the field actually ask for:
-    name the app, **show the steps**, and **say what is deleted, what is kept and for how
-    long**. A screen behind a login does none of the three.
+    purpose. Give both fields the public page **`https://entrelares.app/exclusao-de-conta`** —
+    **no `.html`**, which is the address that answers 200: Cloudflare's static assets redirect
+    the extension away (measured on the preview right after the deploy), which is also why the
+    app links `/privacidade` without it. Declaring the bouncing form hands the reviewer a
+    redirect for nothing. The page lives in `entrelares-site`, and it is what the three bullets
+    beside the field actually ask for: name the app, **show the steps**, and **say what is
+    deleted, what is kept and for how long**. A screen behind a login does none of the three.
     - *Delete account URL* — the page's first half: sign in at `web.entrelares.app` (the same
       client, with the same danger zone, so nobody needs the app installed) → **Perfil** →
       **Sair da família…** / **Excluir família…**.
