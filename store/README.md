@@ -210,15 +210,29 @@ say which one is blocking: sweep the whole list.
   | Financial info | **No** | — | See the caveat below |
   | Location, contacts, photos, device ids | No | — | Not requested |
   - Data is **encrypted in transit** (HTTPS only): Yes.
-  - **Deletion**: answer "Yes, deletion path available", and give the public page
-    **`https://entrelares.app/exclusao-de-conta.html`** (S-19) as the account-deletion URL —
-    the field asks for a link a person who UNINSTALLED the app can still follow, which an
-    e-mail address alone does not satisfy. The page is bilingual and single (the reviewer
-    reads English, the user reads PT-BR), and it teaches the real path: `web.entrelares.app`
-    is the same client with the same danger zone, so nobody needs the app to delete their
-    account. `privacidade@entrelares.app` stays as the channel for whoever cannot sign in —
-    including, today, anyone who signs in with Google: deletion is sudo-gated (S-10) and an
-    OAuth session has no password to confirm.
+  - **Account creation** — the form asks HOW an account is created, and the answer must list
+    **`Username, password, and other authentication`** *and* **`OAuth`**. The declaration of
+    25/08/2026 ticked only the first, two days before Google sign-in (**F-57**) shipped —
+    re-answer it. This is the S-15 rule biting in the Console instead of in the policy.
+  - **Deletion — TWO URL fields, both measured as wrong on 10/09/2026 (S-19).** Both held
+    `https://web.entrelares.app/profile`, and that address is not a route this app serves:
+    the real one is `/family/profile`, nested under `/family` (`main.dart`), so an unknown
+    path lands on the T-64 `NotFoundScreen`; and without a session it lands on the login,
+    which forgets where it was going — the T-64 gate keeps NO remembered destination, on
+    purpose. Give both fields the public page **`https://entrelares.app/exclusao-de-conta.html`**
+    (`entrelares-site`), which is what the three bullets beside the field actually ask for:
+    name the app, **show the steps**, and **say what is deleted, what is kept and for how
+    long**. A screen behind a login does none of the three.
+    - *Delete account URL* — the page's first half: sign in at `web.entrelares.app` (the same
+      client, with the same danger zone, so nobody needs the app installed) → **Perfil** →
+      **Sair da família…** / **Excluir família…**.
+    - *Delete data URL* (the optional "delete some data without deleting the account" — answered
+      **Yes**) — the page's *"Apagar dados sem excluir a conta"* section: the LGPD art. 18
+      rights exercised through `privacidade@entrelares.app`, including the by-annotation
+      correction the immutable history requires.
+    - `privacidade@entrelares.app` stays as the channel for whoever cannot sign in — including,
+      today, anyone who signs in with Google: deletion is sudo-gated (S-10) and an OAuth session
+      has no password to confirm (**S-21**).
   - The consent log stores the accepting IP (disclosed in the policy) — server-side
     security/audit data tied to the account; declare it under Personal info only if the form's
     current wording requires IP disclosure (re-read the help text at fill time).
