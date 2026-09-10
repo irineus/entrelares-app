@@ -1248,10 +1248,10 @@ verification.
 > Google's summary e-mail both naming `<ref>.supabase.co` instead of Entrelares) is a blocker
 > for the PUBLIC rollout (T-59), and the product is still in closed alpha — so this puts the
 > flow in front of exactly the testers whose feedback created F-57, while the branding fix
-> lands before it reaches strangers. When T-61 is done, the auth host changes and the redirect
-> URI moves with it: existing identities are untouched (they live in `auth.identities`), but
-> sign-ins IN FLIGHT during the switch will fail, so do it in a quiet window. **§9-quater is
-> the procedure** — and read it before assuming the host has to move at all: the decided path
+> lands before it reaches strangers. **Closed 10/09/2026, and the host never moved** — path A
+> brands the consent screen in place, so the migration this paragraph used to warn about did not
+> happen and its warning survives only under §9-quater.C/D, for the day a host change is chosen.
+> **§9-quater is the procedure** — and read it before assuming the host has to move at all: the
 > (A, Google brand verification) changes no host and no code, and only its failure sends us to
 > a path that does.
 
@@ -1398,7 +1398,14 @@ disabling only closes the door for NEW sign-ins.
 
 ## 9-quater. T-61 — making the Google screens say Entrelares
 
-> **NOT DONE.** Written before execution so the ordering is decided in the calm.
+> **DONE 10/09/2026, by path A, at zero cost and with no application code changed.** Both
+> measurements passed: the consent flow names **Entrelares** on four surfaces (account chooser,
+> consent title, permission sentence, policy links) with the U-29 logo, and Google's summary
+> e-mail arrived titled *"You shared some Google Account data with Entrelares"*. Kept in full
+> because two of its premises were **false**, and the corrections below are the part worth
+> reading: there is **no verification submission** for non-sensitive scopes (step 3), and the
+> documented reason path A could fail **could never have fired**. C and D stay for a rollback or
+> a change of mind; **B has no live trigger left**.
 
 **The problem.** Google identifies the relying party by the HOST of the redirect URI, and today
 that host is the project ref. Measured on a real device during the F-57 go-live: the consent
@@ -1413,8 +1420,8 @@ NOT the plan.
 
 | | Path | Cost | Fixes Android | Fixes web |
 |---|---|---|---|---|
-| **A** | **Google brand verification** — decided first move | zero | yes | yes |
-| **B** | **Native sign-in** (`signInWithIdToken`) — decided fallback | zero | yes | **no** |
+| **A** | **Google brand verification** — **DONE 10/09/2026** | zero | yes | yes |
+| **B** | **Native sign-in** (`signInWithIdToken`) — fallback, **no live trigger** | zero | yes | **no** |
 | C | Vanity subdomain (`entrelares.supabase.co`) | zero | partial | partial |
 | D | Custom domain (`auth.entrelares.app`) | ~US$10/mo | yes | yes |
 
@@ -1485,18 +1492,39 @@ unverified app, so the device measurement and this path do not contradict each o
    and restricted scopes, which we do not request. If this page ever DOES ask for a submission,
    something added a scope — go read step 2 before answering it.
 4. **Re-measure both places on a real device**, the way the finding was made: the consent screen
-   line AND the subject of Google's summary e-mail, hours later. Only both together close T-61.
+   line AND the subject of Google's summary e-mail. Only both together close T-61.
    **The console is not the measurement.** "Being shown to users" is Google's claim about its own
    state, and the whole of T-61 exists because Branding was configured on 28/08 and the device
    still read the project ref — configured never meant displayed. Trust the handset.
 
-> **The open risk, and what "A failed" means.** Google requires authorized domains to be domains
+   > **Revoke the grant first, or you measure nothing.** Google shows the consent screen — and
+   > sends the summary e-mail — only on an account's FIRST authorization. A returning account
+   > skips both, and "I did not see the ref" is then evidence of nothing. `myaccount.google.com/
+   > connections` → the entry → *Remove access*. It does not touch the Supabase account: GoTrue
+   > keys the identity on the Google `sub`, which survives the revoke.
+
+   **Measured 10/09/2026, both PASSED.** The flow names Entrelares on four surfaces with the
+   logo — including the **account chooser**, which the original finding never checked and which
+   carried the ref too. The e-mail arrived **one minute** later, not hours, titled *"You shared
+   some Google Account data with Entrelares"*. Both screens render in GOOGLE's UI language, not
+   the product's, so English there is not a U-13/U-24 regression.
+
+> **The open risk that could never fire — kept because reasoning this well and still being wrong
+> is the lesson.** Google requires authorized domains to be domains
 > you can prove you own, and it infers domains from the redirect URIs. If `supabase.co` is pulled
-> into that list, the submission may be refused over a domain we cannot verify. That refusal — or
+> into that list, the submission may be refused over a domain we cannot verify. **It never came
+> up: there is no submission on this path**, so nothing ever asked us to prove a domain. The risk
+> was about a mechanism that does not run here — and it was the ONLY trigger for path B, which
+> therefore sat armed for two weeks against something that could not happen. That refusal — or
 > a review that comes back with the screen still naming the ref — is the trigger for B. Nothing
 > else is.
 
 **9-quater.B — Native sign-in. Free, ~1 session, Android (and iOS with T-40).**
+
+> **NOT pending work since 10/09/2026.** A closed and its only trigger turned out to be
+> unreachable, so this stays as the answer to a future regression — Google un-verifying the app,
+> or a scope change dragging us into real review. Its console half is already paid: the Fulcrum
+> tenant's six OAuth clients (§11.1 item 4) are exactly what it orders.
 
 Google issues an ID token to the app and `signInWithIdToken` exchanges it for a Supabase session.
 GoTrue's redirect never happens, so **no host is displayed at all** — it is the native account
