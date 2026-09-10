@@ -412,7 +412,7 @@ aqui, então não há janela descoberta.
   regerar o próprio ícone de launcher e que a arte estava "no outro repositório". **Resolvido no
   PR 4c (24/08/2026)**: vieram as listagens, os dois masters, o `brand-icons.py` reapontado, o
   gráfico de destaque e um `README.md` triado. O projeto TWA (Bubblewrap, `twa-manifest.json`) é
-  o pacote morto e fica para trás com o **T-52**, que segue item próprio. **A lição de método:**
+  o pacote morto e ficou para trás com o **T-52**, item próprio **concluído em 09/09/2026**. **A lição de método:**
   uma lista de "o que vem" escrita antes da execução não é conferência — o que confere é olhar o
   repositório de origem inteiro no fim, que é o que o PR F faz.
 - ~~**O esvaziamento abriu uma lacuna, e ela é do port.**~~ **Fechada em 24/08/2026, no mesmo

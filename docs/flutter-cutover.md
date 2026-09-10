@@ -164,6 +164,8 @@ Blazor, o SW do Flutter é substituído pelo caminho simétrico.
    loja primeiro: ela é a decisão mais difícil de desfazer, e vale tomá-la enquanto o canal
    web ainda está inteiro como rota de saída.
 4. T-52 (aposentar `com.guardacompartilhada.app`) segue item próprio, independente disto.
+   *CONCLUÍDO em 09/09/2026: o pacote foi deletado no Play Console e a declaração dele saiu do
+   `assetlinks.json` (PR #132).*
 5. **A faixa de teste interno FICA** — é a pista rápida de QA, e é dela que se promove.
    Mas guarde a regra que ela impõe: a Play tem **precedência entre faixas**, e *interno
    vence fechado*. Quem está nas duas listas — o owner está — recebe sempre o build da

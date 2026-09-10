@@ -164,8 +164,9 @@ incrementais e deixar o usuário escolher.
    cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm dart test
    ```
 5. **Version bump na MESMA entrega** para qualquer mudança funcional: `version:` em
-   `apps/entrelares_app/pubspec.yaml` (`0.2.x+NN` — as DUAS metades). Trabalho só de documentação
-   interna pula.
+   `apps/entrelares_app/pubspec.yaml` (`2.6.x+NN` — as DUAS metades) **e `Env.appVersion` em
+   `apps/entrelares_app/lib/env.dart`**, que o `env_version_test` prende ao pubspec: bumpar só um
+   deixa a suíte do app vermelha (T-52, 09/09/2026). Trabalho só de documentação interna pula.
 6. Se a nota do card divergir do que faz sentido, **não seguir em silêncio nem inventar escopo**:
    fazer o que é coerente e registrar a divergência e o motivo nas Notas e na subpágina de
    resultado.
