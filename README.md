@@ -240,7 +240,12 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   via Edge Function `claim-invitation`, com a migração S-11 preservando a sessão). No
   Android o retorno é por scheme próprio por flavor (`<applicationId>://login-callback`);
   runbook do owner em `supabase/README.md` §9-ter. Sessão sem senha vê o método de login
-  no perfil no lugar do cartão de senha.
+  no perfil no lugar do cartão de senha. **Desde a U-45 (10/09/2026) o botão segue as
+  diretrizes de marca do *Sign in with Google*:** o "G" oficial como imagem em
+  `assets/brand/google-g.png` (1×/2×/3×), superfície/borda/tinta da spec em `GoogleBrand`
+  (dentro do `tokens.dart`, o único lugar onde uma cor se escreve), 40 dp de altura, e a
+  frase continua sendo nossa — em PT-BR ou inglês, conforme o leitor. Provenência e
+  licença do asset em `store/README.md` §2. Coberto por `google_sign_in_button_test`.
 - **S-04 inatividade:** espelho `InactivityPolicy` (30 min, poll de 30 s) — pointer-down
   em qualquer lugar reseta; o resume do lifecycle reavalia na hora (tempo em background
   conta, como a aba escondida no web). Expirou → signOut local + banner no login.
