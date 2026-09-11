@@ -15,7 +15,7 @@
 /// Ported from `entrelares-app` `Entrelares.Tests/AuthMailMirrorTests.cs`
 /// (T-56, 24/08/2026). One deliberate strengthening over the original, which
 /// pinned a single named method: this reads EVERY `resetPasswordForEmail` call
-/// site under `apps/entrelares_app/lib/` and requires each to go through
+/// site under `app/lib/` and requires each to go through
 /// `DeepLinkUrls.updatePasswordFor`. The app has two of them — the anonymous
 /// "I forgot mine" route and the profile screen's admin-assisted reset — and
 /// the original's shape would have watched only one.
@@ -47,7 +47,7 @@ String _readTsConstant(String name) {
 /// `services\custody.dart` and miss every assertion written against the paths
 /// Linux CI produces.
 Map<String, String> _appSources() {
-  final root = '${repoRoot().path}/apps/entrelares_app/lib';
+  final root = '${repoRoot().path}/app/lib';
   final dir = Directory(root);
   expect(dir.existsSync(), isTrue, reason: 'App sources not found at $root.');
 

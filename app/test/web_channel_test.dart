@@ -14,7 +14,7 @@ import 'package:entrelares_app/env.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 File _web(String name) => File('web/$name');
-File _workflow() => File('../../.github/workflows/verify.yml');
+File _workflow() => File('../.github/workflows/verify.yml');
 File _androidManifest() =>
     File('android/app/src/main/AndroidManifest.xml');
 
@@ -554,8 +554,8 @@ void main() {
       // `paths-ignore` to exclude the file being read.
       final roots = [
         Directory('test'),
-        Directory('../../packages/entrelares_core/test'),
-        Directory('../../packages/entrelares_db_gate/test'),
+        Directory('../packages/entrelares_core/test'),
+        Directory('../packages/entrelares_db_gate/test'),
         Directory('integration_test'),
       ];
       final offenders = <String>[];

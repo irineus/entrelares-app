@@ -43,7 +43,7 @@ jobs:
       - name: Ping no PostgREST do DEV
         env:
           # PUBLIC, not a secret: this is the same dev project URL that is
-          # hardcoded in `apps/entrelares_app/lib/env.dart` (the anon/public
+          # hardcoded in `app/lib/env.dart` (the anon/public
           # config has zero privilege by construction — T-44). Keeping it as a
           # secret would have made this workflow need one more piece of the
           # handover than it actually does.

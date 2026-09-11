@@ -39,7 +39,7 @@ structure exists to prevent.
 | 📜 Decision history | Notion page `3d42f3f4-b9b2-817d-9681-d2e3a47f277d` |
 | Product app + backlog + migrations + DB gate + Play listing | this repo, branch **`main`** (= production) |
 | Landing (`L-*` items) | `entrelares-site`, branch **`preview`** |
-| The old Blazor client | `entrelares-app`, **archived** since 25/08/2026. Nothing there needs to be read |
+| The old Blazor client | `entrelares-app-legacy`, **archived** since 25/08/2026. Nothing there needs to be read |
 
 Do not confuse this board with **Gestão IM360** (`e50abe7f-1688-402a-96b5-c6049b24ce82`) or
 **Desmalha** (`d50a2925-fb74-4f67-b0db-af03ef41d1b4`). Never touch them from this repository.
@@ -55,10 +55,10 @@ URL with the ids already in it, never `https://<console>` with a placeholder.
 |---|---|---|
 | Supabase **prod** | https://supabase.com/dashboard/project/jptqbwfziyzlhlmoekzu | ref `jptqbwfziyzlhlmoekzu`. **A merge reaches real users from here** |
 | Supabase **dev/QA** | https://supabase.com/dashboard/project/buroanotfjcgvbfmacuh | ref `buroanotfjcgvbfmacuh`. The DB gate and the E2E lane run against THIS one |
-| GitHub secrets (app) | https://github.com/irineus/entrelares-flutter/settings/secrets/actions | `SUPABASE_SERVICE_ROLE_DEV`, `CLOUDFLARE_API_TOKEN`, … |
-| GitHub variables (app) | https://github.com/irineus/entrelares-flutter/settings/variables/actions | public config (`UMAMI_APP_WEBSITE_ID` and friends) |
-| GitHub Actions (app) | https://github.com/irineus/entrelares-flutter/actions | `workflow_dispatch`: `run-e2e`, `build-apk`, full run on a docs-only branch |
-| GitHub branches (app) | https://github.com/irineus/entrelares-flutter/branches | branch deletion — the cloud session CANNOT do it (403 by design) |
+| GitHub secrets (app) | https://github.com/irineus/entrelares-app/settings/secrets/actions | `SUPABASE_SERVICE_ROLE_DEV`, `CLOUDFLARE_API_TOKEN`, … |
+| GitHub variables (app) | https://github.com/irineus/entrelares-app/settings/variables/actions | public config (`UMAMI_APP_WEBSITE_ID` and friends) |
+| GitHub Actions (app) | https://github.com/irineus/entrelares-app/actions | `workflow_dispatch`: `run-e2e`, `build-apk`, full run on a docs-only branch |
+| GitHub branches (app) | https://github.com/irineus/entrelares-app/branches | branch deletion — the cloud session CANNOT do it (403 by design) |
 | Landing repo | https://github.com/irineus/entrelares-site | `L-*` items, branch `preview` |
 | Cloudflare Pages | https://dash.cloudflare.com/?to=/:account/pages/view/entrelares-web | project `entrelares-web` serves `web.entrelares.app`; the `?to=/:account/…` form resolves the account itself |
 | Play Console — the app | https://play.google.com/console/u/0/developers/5188946194088545235/app/4976020657794164634/app-dashboard | package `com.entrelares.app`. Bundle promotion is the owner's, always. Developer `5188946194088545235`, app `4976020657794164634` — keep these, they are the only way to deep-link a Play screen |
@@ -75,12 +75,19 @@ once instead of guessing a URL that 404s.
 
 ## Repository layout
 
-Monorepo: `apps/entrelares_app` (Flutter) + three pure-Dart packages — `packages/entrelares_core`
-(the client mirrors of the server rules), `packages/entrelares_db_contracts` (the PostgREST row
+Monorepo: `app` (Flutter) + three pure-Dart packages — `packages/entrelares_core` (the
+client mirrors of the server rules), `packages/entrelares_db_contracts` (the PostgREST row
 shapes) and `packages/entrelares_db_gate` (the database gate). **Nothing under `packages/` may
 import Flutter:** the gate has to run under plain `dart test`, and the contracts have to be
 importable by both sides. Migrations and Edge Functions in `supabase/`; Play listing and brand
 masters in `store/`.
+
+**The names inside `docs/` and `backlog/` are the names of their own time (T-69, 11/09/2026).**
+This repo was `entrelares-flutter` and the app lived in `apps/entrelares_app`; the archived Blazor
+client was `entrelares-app`. Those documents are frozen history and were deliberately NOT rewritten
+— inside them `entrelares-app` still means the Blazor repo, today `entrelares-app-legacy`, and a
+line like *"`entrelares-flutter` #51 + `entrelares-app` #303"* names two different repositories.
+Live pointers — workflows, scripts, this file — carry today's names; dated prose carries its own.
 
 `backlog/` is **frozen history** since T-63: `archive/` holds the records of completed items and
 the four category files are tombstones. **The card is the record now** — see
@@ -118,7 +125,7 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # sétimo uma Edge Function, pela mesma razão em outras linguagens. Um espelho que
 # ninguém confere apodrece calado, e é o lane mais barato do run.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
-cd apps/entrelares_app && fvm flutter analyze && fvm flutter test
+cd app && fvm flutter analyze && fvm flutter test
 # The three source gates live in that suite: no_literal_snack_test (catalog strings),
 # no_color_literal_test (U-27 — colours only in lib/theme/tokens.dart) e o
 # web_channel_test, que prova como FONTE o que só se manifestaria SERVIDO — a CSP,
@@ -126,10 +133,10 @@ cd apps/entrelares_app && fvm flutter analyze && fvm flutter test
 # Sentry dentro de connect-src (sem ele o navegador bloqueia o POST e o canal web
 # reporta NADA, em silêncio, porque o reporter engole a própria falha por contrato)
 # mais o espelho do watcher pré-Flutter do index.html.
-cd apps/entrelares_app && fvm flutter build apk --debug --flavor dev --split-per-abi
+cd app && fvm flutter build apk --debug --flavor dev --split-per-abi
 # Canal web: os dois flags NÃO são opcionais — sem o define o build aponta para o
 # banco de QA, e sem o --no-web-resources-cdn o CanvasKit vem do gstatic.
-cd apps/entrelares_app && fvm flutter build web --release --no-web-resources-cdn --dart-define=APP_ENV=prod
+cd app && fvm flutter build web --release --no-web-resources-cdn --dart-define=APP_ENV=prod
 # O DEPLOY faz três coisas a mais que este comando local (T-66, runbook §13.6):
 # compila com --source-maps, sobe os mapas para o Sentry numa release nomeada
 # `entrelares-app@<versão do pubspec>` — a mesma string que o cliente manda, senão
@@ -144,7 +151,7 @@ cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm 
 # MAIS deep_link_test — o único web por construção (T-64: uma entrada fria numa
 # URL interna só se comporta mal onde o navegador entrega o endereço ao app).
 # Exige chromedriver no PATH (`chromedriver --port=4444 &` antes).
-cd apps/entrelares_app && fvm flutter drive --driver=test_driver/integration_test.dart   --target=integration_test/swap_workflow_test.dart -d web-server --browser-name=chrome --headless   --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev>
+cd app && fvm flutter drive --driver=test_driver/integration_test.dart   --target=integration_test/swap_workflow_test.dart -d web-server --browser-name=chrome --headless   --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev>
 ```
 ⚠️ **Uma mudança só de markdown NÃO roda CI nenhum** (`paths-ignore: ['**/*.md']`,
 29/08/2026). A economia não são os três minutos do `verify`: são o `db-gate`, que segura
@@ -154,7 +161,7 @@ projeto dev compartilhado para não provar nada sobre um parágrafo. Duas premis
 sustentam isso e as duas são GUARDADAS em `web_channel_test.dart`: nenhuma suíte lê um
 `.md` (se alguma passar a ler, o filtro a transformaria num teste que para de rodar
 justamente para as mudanças que ela vigia — o verde vazio do T-58), e nada sob
-`apps/entrelares_app/web/` é markdown (tudo ali é copiado verbatim para o build). Para
+`app/web/` é markdown (tudo ali é copiado verbatim para o build). Para
 forçar um run completo num branch só de docs: `workflow_dispatch`, que não tem filtro.
 
 ⚠️ O lane core do `verify.yml` roda **`dart analyze --fatal-infos`**, não `dart analyze`:
@@ -167,7 +174,7 @@ comando acima antes do push é o que separa um push verde de um `main` vermelho 
 e o `verify.yml` compila o web em todo push, imprimindo o peso gzip do first-load no
 summary do run. O aceite do CANAL — medição real em Android mediano/4G contra o PWA —
 foi **concedido pelo owner em 23/08/2026**.
-Lane E2E (aberta no lote 3): `apps/entrelares_app/integration_test/` — app real em
+Lane E2E (aberta no lote 3): `app/integration_test/` — app real em
 emulador contra o projeto dev, família descartável (`E2E-<runId>`, `@resend.dev`,
 `purge_e2e_family` no teardown). Fora do gate por custo de minutos: agendada
 (06:10 UTC) + `workflow_dispatch` (`run-e2e`, `e2e-pack` p0/full). A service_role do

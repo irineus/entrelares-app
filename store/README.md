@@ -10,7 +10,7 @@ Build and upload mechanics therefore live where the build does — [§6](#6--pub
 points at them; this directory is about the *presence*, not the pipeline.
 
 > **Where this came from (T-56, 24/08/2026).** These files spent their whole life in
-> `entrelares-app/store/`, next to the runbook of the **TWA** shell that used to be the Android
+> `entrelares-app-legacy/store/`, next to the runbook of the **TWA** shell that used to be the Android
 > app: Bubblewrap, `twa-manifest.json`, the keystore ceremony, the version-code rule of a shell
 > that wrapped a website. That half was the **dead package** — it did not travel, and retiring
 > the legacy `com.guardacompartilhada.app` was its own item (**T-52**, closed 09/09/2026: the
@@ -63,7 +63,7 @@ calendar card whose **day cells draw the two interlocked houses** — the blue h
 house wear the calendar's own day colours, the cells where they interlace are the rose
 `#E11D48`, each house keeps a card-coloured "door" (an empty day), and the today ring sits on a
 shared day. Launcher background: the brand indigo `#4F46E5`. Every colour is a token from
-`apps/entrelares_app/lib/theme/tokens.dart` — the icon is the calendar screen, abstracted.
+`app/lib/theme/tokens.dart` — the icon is the calendar screen, abstracted.
 
 The **script is the source**: the geometry lives as data in
 [`brand-icons.py`](brand-icons.py) (pure Pillow — `python3 store/brand-icons.py`), which also
@@ -88,14 +88,14 @@ until its own half of T-57 retires it.**
 `brand-icons.py` writes, and these are the ONLY places the mark is vendored:
 
 ```
-apps/entrelares_app/web/favicon.png                     (96, squircle)
-apps/entrelares_app/web/icons/Icon-{192,512}.png        (full-bleed)
-apps/entrelares_app/web/icons/Icon-maskable-{192,512}.png
-apps/entrelares_app/assets/brand/emblema.png            (512, indigo squircle —
+app/web/favicon.png                     (96, squircle)
+app/web/icons/Icon-{192,512}.png        (full-bleed)
+app/web/icons/Icon-maskable-{192,512}.png
+app/assets/brand/emblema.png            (512, indigo squircle —
     legacy launchers AND the native splash bitmap)
-apps/entrelares_app/assets/brand/emblema-maskable.png   (512, adaptive
+app/assets/brand/emblema-maskable.png   (512, adaptive
     FOREGROUND: transparent, mark inside the 66% safe zone)
-apps/entrelares_app/assets/brand/emblema-monochrome.png (512, the Android 13
+app/assets/brand/emblema-monochrome.png (512, the Android 13
     themed-icon glyph)
 store/brand-calendario.svg
 store/store_icon.png                                    (512, the Play LISTING
@@ -103,7 +103,7 @@ store/store_icon.png                                    (512, the Play LISTING
 ```
 
 The three `assets/brand/` files are what `flutter_launcher_icons` reads (config block in
-`apps/entrelares_app/pubspec.yaml`: indigo adaptive background, zero foreground inset because
+`app/pubspec.yaml`: indigo adaptive background, zero foreground inset because
 the script already composes the safe zone, plus the monochrome layer). After running the script:
 `fvm dart run flutter_launcher_icons` refreshes the mipmaps and the adaptive XML.
 
@@ -124,7 +124,7 @@ and it happens in that repo.
 
 ### The one mark in this app that is NOT ours (U-45, 10/09/2026)
 
-`apps/entrelares_app/assets/brand/google-g.png` (+ `2.0x/`, `3.0x/`) is Google's "G", used under
+`app/assets/brand/google-g.png` (+ `2.0x/`, `3.0x/`) is Google's "G", used under
 the *Sign in with Google* [branding guidelines](https://developers.google.com/identity/branding-guidelines).
 It is **Google's trademark, not ours**: it may not be recoloured, redrawn, rotated or distorted,
 which is exactly why it ships as an IMAGE and never as an icon font or a painter — and why its
@@ -146,7 +146,7 @@ derived: scaled to fit a 20 dp square, centred, at 1×/2×/3× (20/40/60 px, ~9 
 ```
 
 ```python
-from PIL import Image                      # run from apps/entrelares_app/assets/brand/
+from PIL import Image                      # run from app/assets/brand/
 m = Image.open('g-logo.png').convert('RGBA')
 for scale, out in ((1, 'google-g.png'), (2, '2.0x/google-g.png'), (3, '3.0x/google-g.png')):
     side = 20 * scale
@@ -288,13 +288,13 @@ calendar time, so recruit testers early rather than when a build is ready.
 ## 6 · Publishing a new Android build
 
 ```
-cd apps/entrelares_app && fvm flutter build appbundle --flavor prod --release
+cd app && fvm flutter build appbundle --flavor prod --release
 ```
 
 - `--flavor prod` is not optional: it is what selects the production Supabase project **and** the
   `com.entrelares.app` application id. A flavour-less build resolves to dev by construction
   (`CLAUDE.md` → *Locked decisions*).
-- **Release signing** comes from the git-ignored `apps/entrelares_app/android/key.properties`
+- **Release signing** comes from the git-ignored `app/android/key.properties`
   (T-55): `prod.*` must be the PRODUCT's upload keystore. Without the file a release build fails
   fast, on purpose.
 - **Version**: `version:` in `pubspec.yaml` feeds both halves — the name (`2.0.0`) and the build
@@ -321,7 +321,7 @@ into the web checkout.
 ## 8 · App Links (`assetlinks.json`)
 
 The pairing that keeps the installed app full-screen and lets it own its own URLs lives on the
-**web side**: `apps/entrelares_app/web/.well-known/assetlinks.json`, published with the web
+**web side**: `app/web/.well-known/assetlinks.json`, published with the web
 channel at `web.entrelares.app`. It carries two statements — `com.entrelares.flutter` (the dev
 flavour) and `com.entrelares.app` (upload + app-signing fingerprints). A third one named the
 legacy `com.guardacompartilhada.app` and came out with **T-52** (09/09/2026), once that Play app

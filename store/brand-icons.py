@@ -18,18 +18,18 @@ pure geometry, so THIS SCRIPT is the source — it also writes
 `store/brand-calendario.svg` as the vector artifact.
 
 Usage (needs Pillow):  python3 store/brand-icons.py
-Then:                  cd apps/entrelares_app && fvm dart run flutter_launcher_icons
+Then:                  cd app && fvm dart run flutter_launcher_icons
 
-Outputs:  apps/entrelares_app/web/favicon.png                    (96, squircle)
-          apps/entrelares_app/web/icons/Icon-{192,512}.png       (full-bleed)
-          apps/entrelares_app/web/icons/Icon-maskable-{192,512}.png
-          apps/entrelares_app/assets/brand/emblema.png           (512, squircle
+Outputs:  app/web/favicon.png                    (96, squircle)
+          app/web/icons/Icon-{192,512}.png       (full-bleed)
+          app/web/icons/Icon-maskable-{192,512}.png
+          app/assets/brand/emblema.png           (512, squircle
               on transparency — legacy launcher AND the native splash bitmap)
-          apps/entrelares_app/assets/brand/emblema-maskable.png  (512, adaptive
+          app/assets/brand/emblema-maskable.png  (512, adaptive
               FOREGROUND: transparent, mark inside the 66% safe zone)
-          apps/entrelares_app/assets/brand/emblema-monochrome.png (512, the
+          app/assets/brand/emblema-monochrome.png (512, the
               Android 13 themed-icon glyph: white alpha shape)
-          apps/entrelares_app/android/.../res/drawable-*/ic_stat_entrelares.png
+          app/android/.../res/drawable-*/ic_stat_entrelares.png
               (F-09: the Android status-bar icon, 5 densities — white glyph on
               transparency, because Android silhouettes the small icon)
           store/brand-calendario.svg                             (vector source)
@@ -54,7 +54,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
-APP = ROOT / "apps" / "entrelares_app"
+APP = ROOT / "app"
 WEB = APP / "web"
 BRAND = APP / "assets" / "brand"
 

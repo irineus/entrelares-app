@@ -2,7 +2,7 @@
 /// two RPC payloads that are not tables), in pure Dart.
 ///
 /// **Why they live outside the app.** They were written for the Flutter client
-/// and stayed under `apps/entrelares_app/lib/models/` while it was their only
+/// and stayed under `app/lib/models/` while it was their only
 /// reader. T-56's port of the database gate to Dart gave them a SECOND reader
 /// that must not depend on Flutter, and the shape of the answer was already on
 /// record: in C# the same suite was unblocked by lifting `Entrelares.Models`

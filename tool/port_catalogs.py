@@ -15,9 +15,9 @@ import sys
 from pathlib import Path
 
 FLUTTER_ROOT = Path(__file__).resolve().parent.parent
-# Default assumes the sibling checkout layout (…/repos/entrelares-flutter and
-# …/repos/entrelares-app); pass the path explicitly from a worktree.
-APP_REPO = Path(sys.argv[1]) if len(sys.argv) > 1 else FLUTTER_ROOT.parent / "entrelares-app"
+# Default assumes the sibling checkout layout (…/repos/entrelares-app and
+# …/repos/entrelares-app-legacy); pass the path explicitly from a worktree.
+APP_REPO = Path(sys.argv[1]) if len(sys.argv) > 1 else FLUTTER_ROOT.parent / "entrelares-app-legacy"
 SRC = APP_REPO / "Entrelares" / "Localization"
 OUT = FLUTTER_ROOT / "packages" / "entrelares_core" / "lib" / "src" / "localization"
 

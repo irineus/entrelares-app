@@ -1022,7 +1022,7 @@ The Flutter build carries the permission with no manifest edit of ours:
 declares it, and the merge does the rest.
 
 ```
-cd apps/entrelares_app && fvm flutter build appbundle --flavor prod --release
+cd app && fvm flutter build appbundle --flavor prod --release
 ```
 
 Upload it to the **internal-test** track (see the warning under 9-bis.6 — never
@@ -1463,7 +1463,7 @@ unverified app, so the device measurement and this path do not contradict each o
 1. *Google Auth Platform → **Branding***: app name **Entrelares**, logo, support e-mail,
    authorized domain `entrelares.app`, and the home page / privacy policy / terms links — the
    landing already serves `entrelares.app/privacidade` and `/termos` (lote 4). **Use
-   `apps/entrelares_app/assets/brand/emblema.png`** (the indigo squircle, U-29) — or
+   `app/assets/brand/emblema.png`** (the indigo squircle, U-29) — or
    `store/store_icon.png`, which since **T-57** (28/08/2026) is the same U-29 mark rather than
    the retired F-54 clay emblem; the two differ only in framing (the store icon is full-bleed at
    60 %, cut for Play's own rounding).
@@ -1634,12 +1634,12 @@ are the app's RETURN addresses — `com.entrelares.app://login-callback`,
 
 **9-quater.D5 — The client flip, in the same window.** One PR, three lines and a version bump:
 
-1. `apps/entrelares_app/lib/env.dart` — `Env.prod.supabaseUrl` → `https://auth.entrelares.app`.
-2. `apps/entrelares_app/web/_headers` — `connect-src` gains
+1. `app/lib/env.dart` — `Env.prod.supabaseUrl` → `https://auth.entrelares.app`.
+2. `app/web/_headers` — `connect-src` gains
    `https://auth.entrelares.app wss://auth.entrelares.app`. **Keep the `*.supabase.co` pair**:
    dev still lives there. Miss this and the web channel does not degrade — it reaches NO API at
    all, REST and Realtime included, with only the browser console to say why.
-3. `apps/entrelares_app/pubspec.yaml` — `version:`, both halves.
+3. `app/pubspec.yaml` — `version:`, both halves.
 
 Step 2 cannot be forgotten: `web_channel_test` asserts that `connect-src` covers the host
 `Env.prod.supabaseUrl` names, so step 1 without step 2 is a red gate (T-61). Merging to `main`
@@ -1948,7 +1948,7 @@ prevent.
    - prod project → `com.entrelares.app`
 3. Download each `google-services.json`. They are **public client config** (rule 1: the file
    carries no secret) and are committed in the app PR under
-   `apps/entrelares_app/android/app/src/dev/` and `.../src/prod/`.
+   `app/android/app/src/dev/` and `.../src/prod/`.
 4. **SHA-1 fingerprints are not needed for messaging** — they are a Google-sign-in concern,
    and F-57 handles sign-in through Supabase, not Firebase. Both files nonetheless CARRY
    fingerprints since 10/09/2026: the Fulcrum tenant registered six OAuth clients in these very
@@ -2057,13 +2057,13 @@ minted against a service account that cannot send to it.
 The page and the service worker each need the config, and they get it separately: a worker is
 started by the browser with no page to ask.
 
-1. `apps/entrelares_app/lib/env.dart` → the `webPush:` slot of `Env.prod` (and of `Env.dev`
+1. `app/lib/env.dart` → the `webPush:` slot of `Env.prod` (and of `Env.dev`
    only while a session is watching a push arrive locally — see the comment there).
-2. `apps/entrelares_app/web/firebase-messaging-sw.js` → `FIREBASE_CONFIG`, the same four
+2. `app/web/firebase-messaging-sw.js` → `FIREBASE_CONFIG`, the same four
    values minus the VAPID key.
 
 ```
-cd apps/entrelares_app && fvm flutter test test/web_channel_test.dart
+cd app && fvm flutter test test/web_channel_test.dart
 ```
 
 That suite compares the two objects string by string, checks that all five values are present
@@ -2113,7 +2113,7 @@ console for a CSP refusal (`connect-src` must cover `firebaseinstallations` and
 
 > **Upgrading the SDK is a re-vendoring, not a `pub upgrade`.** `firebase_core_web` fetches the
 > Firebase JS SDK from `www.gstatic.com` at runtime, which this channel's CSP forbids for
-> executable code. The four bundles under `apps/entrelares_app/web/firebasejs/<version>/` are
+> executable code. The four bundles under `app/web/firebasejs/<version>/` are
 > served from our own origin instead. When the plugin's `supportedFirebaseJsSdkVersion` moves,
 > `web_channel_test` goes red; the fix is `python tool/vendor_firebase_js.py` after bumping its
 > `VERSION`, plus the paths in the worker and in `push_messaging_web.dart`.
@@ -2243,7 +2243,7 @@ treated as a mistake until proven otherwise.
 **One project per environment, not one project with an `environment` tag.** The reasoning is the
 one the two Firebase projects already follow (§11.1): a QA run must never be able to write into
 the stream someone reads to decide whether production is on fire. The DSNs live in
-`apps/entrelares_app/lib/env.dart`, one per `Env`, as PUBLIC config — a Sentry DSN is shipped to
+`app/lib/env.dart`, one per `Env`, as PUBLIC config — a Sentry DSN is shipped to
 every browser that loads an instrumented page and can only WRITE events, so rule 1 of
 `CLAUDE.md` holds unchanged. **An empty DSN is a state**: `CrashReporter.isEnabled` goes false
 and the app is silent, never half-configured.
@@ -2393,7 +2393,7 @@ still publishes and the run summary says the stacks will read minified.
 To arm it (or to rotate it): Sentry → Settings → **Organization Tokens** → Create New
 Organization Token (https://irineu-pinheiro.sentry.io/settings/auth-tokens/new-token/), then add
 the value as the repository secret `SENTRY_AUTH_TOKEN`
-(https://github.com/irineus/entrelares-flutter/settings/secrets/actions).
+(https://github.com/irineus/entrelares-app/settings/secrets/actions).
 
 **An organization token's scope is not chosen — it is fixed at `org:ci`**, which the screen spells
 out as *Source Map Upload, Release Creation, Code Mappings*. That is exactly what the three

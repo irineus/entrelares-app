@@ -1,6 +1,6 @@
 ---
 name: next-item
-description: Avança o trabalho no board do Entrelares no Notion — database "Backlog" sob "Entrelares — Backlog & Roadmap". Use sempre que o usuário disser "próxima tarefa", "próximo item", "novo item", "o que fazer agora", "vamos desenvolver o F-NN / L-NN", "concluí esse item", "marca como concluído/em andamento", "como está o board", "status do projeto", "cria um card para X", ou qualquer pedido para consultar, atualizar ou expandir o roadmap do Entrelares — mesmo que não mencione o Notion explicitamente. Cobre o app do produto (F-/U-/T-/S- em entrelares-flutter) e a landing (L- em entrelares-site).
+description: Avança o trabalho no board do Entrelares no Notion — database "Backlog" sob "Entrelares — Backlog & Roadmap". Use sempre que o usuário disser "próxima tarefa", "próximo item", "novo item", "o que fazer agora", "vamos desenvolver o F-NN / L-NN", "concluí esse item", "marca como concluído/em andamento", "como está o board", "status do projeto", "cria um card para X", ou qualquer pedido para consultar, atualizar ou expandir o roadmap do Entrelares — mesmo que não mencione o Notion explicitamente. Cobre o app do produto (F-/U-/T-/S- em entrelares-app) e a landing (L- em entrelares-site).
 ---
 
 # Próximo item — board do Entrelares
@@ -23,10 +23,10 @@ todo o resto do produto (só UI, notificações e e-mails são PT-BR).
 - **Decisões vigentes** (página): `3d42f3f4-b9b2-819d-b0d8-c845b7aa1ae5` — ler as **seções 1 a 6**
 - **📜 Decision history** (subpágina da anterior, onde entra a linha nova de cada item):
   `3d42f3f4-b9b2-817d-9681-d2e3a47f277d`
-- Repositórios: `github.com/irineus/entrelares-flutter` (branch **`main`** = PRODUÇÃO) e
+- Repositórios: `github.com/irineus/entrelares-app` (branch **`main`** = PRODUÇÃO) e
   `github.com/irineus/entrelares-site` (branch **`preview`**)
 - **O prefixo do ID escolhe o repositório:** `L-*` → `entrelares-site`; todo o resto →
-  `entrelares-flutter`. A coluna `Repo` pode estar com o valor pré-cutover em linha antiga — **o
+  `entrelares-app`. A coluna `Repo` pode estar com o valor pré-cutover em linha antiga — **o
   prefixo vence**.
 - NÃO confundir com o board do **Gestão IM360** (`e50abe7f-1688-402a-96b5-c6049b24ce82`) nem com o
   do **Desmalha** (`d50a2925-fb74-4f67-b0db-af03ef41d1b4`). Projetos diferentes.
@@ -156,7 +156,7 @@ incrementais e deixar o usuário escolher.
    então uma info derruba o job e os lanes de app e web nem começam:
    ```
    cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
-   cd apps/entrelares_app && fvm flutter analyze && fvm flutter test
+   cd app && fvm flutter analyze && fvm flutter test
    ```
    Item que tocou o banco roda também o DB gate (exige a service_role do **dev**, nunca a de
    produção):
@@ -164,8 +164,8 @@ incrementais e deixar o usuário escolher.
    cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm dart test
    ```
 5. **Version bump na MESMA entrega** para qualquer mudança funcional: `version:` em
-   `apps/entrelares_app/pubspec.yaml` (`2.6.x+NN` — as DUAS metades) **e `Env.appVersion` em
-   `apps/entrelares_app/lib/env.dart`**, que o `env_version_test` prende ao pubspec: bumpar só um
+   `app/pubspec.yaml` (`2.6.x+NN` — as DUAS metades) **e `Env.appVersion` em
+   `app/lib/env.dart`**, que o `env_version_test` prende ao pubspec: bumpar só um
    deixa a suíte do app vermelha (T-52, 09/09/2026). Trabalho só de documentação interna pula.
 6. Se a nota do card divergir do que faz sentido, **não seguir em silêncio nem inventar escopo**:
    fazer o que é coerente e registrar a divergência e o motivo nas Notas e na subpágina de
@@ -284,7 +284,7 @@ gh pr view <N> --json number,state,mergeCommit,headRefName
 **Em sessão na nuvem, apagar branch remota é impossível — não tentar.** Todo o tráfego de git passa
 por um proxy com *push protection*: apagar a ref de outra branch devolve `HTTP 403` de forma
 determinística, e nenhuma configuração muda isso. Dizer no resumo quais branches estão prontas para
-remoção, com o link `https://github.com/irineus/entrelares-flutter/branches`, e **nunca dar a
+remoção, com o link `https://github.com/irineus/entrelares-app/branches`, e **nunca dar a
 limpeza como feita**.
 
 ## Criar cards novos

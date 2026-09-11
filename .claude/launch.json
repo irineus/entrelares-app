@@ -5,7 +5,7 @@
       "name": "entrelares-web-dev",
       "runtimeExecutable": "fvm",
       "runtimeArgs": ["flutter", "run", "-d", "web-server", "--web-port", "8080", "--web-hostname", "127.0.0.1"],
-      "cwd": "apps/entrelares_app",
+      "cwd": "app",
       "port": 8080
     },
     {
