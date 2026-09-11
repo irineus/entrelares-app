@@ -20,16 +20,19 @@ void main() {
     });
 
     test('masks a JWT, whatever it is doing in the message', () {
+      // Shaped like a JWT, signed by nobody. A fixture must never be a COPY of
+      // a live key — the value is public either way, but a scanner cannot tell
+      // a test from a leak, and neither can the next reader.
       const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
-          '.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIn0'
-          '.hRU5jhn1pJQeUVpvnAp4IGBJ5Is_pCwlIfR5hdK9Mi0';
+          '.eyJpc3MiOiJmaXh0dXJlIiwicm9sZSI6ImFub24ifQ'
+          '.nOtArEaLsIgNaTuReJuStAfIxTuReFoRtEsTsXxXxXx';
       expect(scrubCrashMessage('apikey $jwt rejected'), contains('[token]'));
       expect(scrubCrashMessage('apikey $jwt rejected'), isNot(contains('eyJ')));
     });
 
     test('masks both S-16 key shapes', () {
       expect(
-        scrubCrashMessage('sb_publishable_uKr0ES-10F3gpcd0j0osYw_HxqP_RMZ'),
+        scrubCrashMessage('sb_publishable_FiXtUrEoNlY0000NotARealKey0'),
         '[token]',
       );
       expect(scrubCrashMessage('sb_secret_abc123XYZ_deadbeef'), '[token]');
@@ -203,7 +206,7 @@ void main() {
         '(joana.pereira@gmail.com) already exists in family '
         '3d42f3f4-b9b2-819d-b0d8-c845b7aa1ae5, hint: null, code: 23505) while '
         'POSTing https://jptqbwfziyzlhlmoekzu.supabase.co/rest/v1/'
-        'family_invitations?select=*&apikey=sb_publishable_uKr0ES-10F3gpcd0j0';
+        'family_invitations?select=*&apikey=sb_publishable_FiXtUrEoNlY00';
 
     const dirtyStack = '''
 #0      SupabaseCustodyDataSource.createInvitation (package:entrelares_app/services/supabase_custody_data_source.dart:412:7)
