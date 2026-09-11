@@ -36,6 +36,7 @@ import 'services/account_identity.dart';
 import 'services/admin_mode.dart';
 import 'services/analytics_service.dart';
 import 'services/auth_providers.dart';
+import 'services/crash_reporter.dart';
 import 'services/custody_data_source.dart';
 import 'services/notification_badge.dart';
 import 'services/onboarding_service.dart';
@@ -55,6 +56,14 @@ bool _urlStrategyApplied = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // T-66: the two error hooks, before anything that can fail. Until this line
+  // existed a crash on a real device reached nobody, on either channel — the
+  // only defect reports the product ever had came from a tester with a
+  // screenshot. Installed FIRST on purpose: a failure inside `Supabase
+  // .initialize` or in the language resolution below is exactly the kind that
+  // used to be invisible. It is additive (the console still prints, the red
+  // screen still paints) and a no-op where the DSN is blank.
+  CrashReporter().install();
   // The web channel serves REAL paths (`/family`), not `/#/family`. Three
   // things ride on it: F5 restores the screen the reader was on, the URLs
   // match the ones the Blazor app has always published (so a bookmark survives

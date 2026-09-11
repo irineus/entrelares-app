@@ -178,6 +178,28 @@ void main() {
       }
     });
 
+    // T-66 — the same mirror, for the crash sink. It is worth its own test for
+    // a reason the Supabase one does not have: a Supabase host the CSP misses
+    // is a dead app, which somebody notices in a minute. A SENTRY host the CSP
+    // misses is an app that works perfectly and reports nothing — the browser
+    // blocks the POST, the reporter swallows the failure by contract, and the
+    // channel goes quiet with no symptom at all. That is the exact silence
+    // T-66 exists to end, so it gets a red gate instead of trust.
+    test('connect-src covers the Sentry host BOTH DSNs name', () {
+      final sources = _sources(_csp(headers)!, 'connect-src');
+
+      for (final dsn in [Env.dev.sentryDsn, Env.prod.sentryDsn]) {
+        final host = Uri.parse(dsn).host;
+        expect(
+          sources.any((s) => _covers(s, 'https', host)),
+          isTrue,
+          reason: 'the CSP must allow https://$host — a DSN the CSP does not '
+              'cover makes the web channel silent, not broken. Move the '
+              'project and `_headers` moves with it.',
+        );
+      }
+    });
+
     test('the files whose staleness breaks a deploy are uncacheable', () {
       for (final path in const [
         '/service-worker.js',
