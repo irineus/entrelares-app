@@ -171,6 +171,38 @@ incrementais e deixar o usuário escolher.
    fazer o que é coerente e registrar a divergência e o motivo nas Notas e na subpágina de
    resultado.
 
+## Ação que só o owner pode fazer — handoff OBRIGATÓRIO
+
+Quase todo item deste produto encosta numa tela que só o owner abre: secret do GitHub, secret de
+Edge Function, webhook no Asaas, promoção de bundle na Play, variável no Cloudflare, flip de
+`app_settings` em produção, domínio, chave de provedor. **Nunca encerrar — nem pausar — com
+instrução genérica** ("configure o webhook", "adicione o secret").
+
+Escrever um **bloco de handoff** por ação, no formato completo definido em `~/.claude/CLAUDE.md`
+(seção *Handoff de ação manual*): **o quê** (e o que quebra sem isso) · **onde** (URL clicável direta
++ caminho na UI como plano B) · **quando** (e o que falha fora de ordem) · **como** (valores
+literais, copiáveis, campo por campo) · **como conferir** (a evidência visível) · **o que eu faço
+depois**.
+
+As URLs reais dos consoles deste produto, com os ids já preenchidos, estão na tabela
+**"Consoles — where an OWNER-ONLY action actually happens"** do `CLAUDE.md` do repositório. **Montar
+a URL a partir dela, não de memória** — e se o link exato exigir um id interno que o repo não tem
+(id numérico do app na Play, account id do Cloudflare), dizer isso e **pedir o link colado uma vez**,
+em vez de inventar uma URL que dá 404.
+
+Além do bloco no chat, **registrar nas `Notas` do card** a linha
+
+```
+AÇÃO DO OWNER PENDENTE: <o que falta, em uma linha> — <console>
+```
+
+Um item que fica `in-progress` esperando clique de terceiro é exatamente o que a seção *Escolher o
+item* manda listar no começo da sessão seguinte — e sem essa linha nas Notas, a sessão seguinte não
+tem como saber o que era.
+
+Enquanto a ação não acontecer: **entregar tudo o que NÃO depende dela** e dizer, com essas palavras,
+o que ficou parado — nunca declarar o item completo.
+
 ## Encerrar o item
 
 1. **Resultado extenso** (especificação, medição, relatório, ADR): criar como **subpágina do card**
@@ -199,7 +231,9 @@ incrementais e deixar o usuário escolher.
    futuro: tabelas de capacidade ganham a feature entregue; inventários de suíte refletem arquivos
    de teste novos; o `CLAUDE.md` só muda no que mudou em PRODUÇÃO. **Nada disso toca `backlog/`**,
    que é história congelada.
-7. Terminar a sessão com um **bloco de resumo** para o board.
+7. Terminar a sessão com um **bloco de resumo** para o board. Se sobrou ação do owner, o resumo
+   **abre** com a lista numerada dessas ações (só os títulos — os blocos completos já estão acima),
+   antes de qualquer outra coisa: o que vem depois de um resumo longo não é lido.
 
 ## Ciclo do Git
 
@@ -222,7 +256,8 @@ dono; aqui só existe `main`, e ela é o dono).
 6. **Vermelho entra no laço de correção, não para o item.** Parar e não mergear só quando: a falha
    se repetir pela mesma razão depois de uma tentativa; na terceira tentativa; ou o conserto exigir
    ação que só o usuário pode fazer (secret, conta externa, decisão de produto). Em qualquer um dos
-   três: dizer qual foi e por quê, com o log.
+   três: dizer qual foi e por quê, com o log. No terceiro caso, o log **não basta** — vai com o
+   bloco de handoff completo (ver *Ação que só o owner pode fazer*).
 7. Se a sessão acabar no meio do ciclo, o resumo tem de dizer **em que ponto parou** — branch
    empurrada? PR aberto? mergeado? A sessão seguinte começa daí.
 
