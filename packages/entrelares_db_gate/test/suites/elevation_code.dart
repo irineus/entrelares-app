@@ -181,13 +181,17 @@ void elevationCodeTests(GateFixture fx) {
       final userId = fx.founderProfile.userId!;
       await plantCode(userId, '868686');
 
-      // No SELECT policy: the digest of one's own pending code is not something
-      // to look up. A read with no policy matches nothing rather than throwing,
-      // so the assertion is on the ROWS (the trap the RLS detail page names).
-      final visible =
-          await fx.founder.from('auth_elevation_codes').select();
-      expect(visible, isEmpty,
-          reason: 'the code table must be invisible to every end user');
+      // The usual RLS trap — a read with no policy matches nothing instead of
+      // throwing — does NOT apply here, and the difference is the point: the
+      // table GRANTS nothing to `authenticated`, so PostgREST refuses with
+      // 42501 before any policy is consulted. That is the stronger refusal of
+      // the two, and asserting `isEmpty` would have passed for a table that
+      // merely had no rows yet.
+      await expectRejected(
+        () => fx.founder.from('auth_elevation_codes').select(),
+        contains: 'permission denied',
+        caseInsensitive: true,
+      );
 
       await expectRejected(
         () => fx.founder.rpc<dynamic>('request_elevation_code', params: {
@@ -211,7 +215,11 @@ void elevationCodeTests(GateFixture fx) {
 
     test('a password-less account cannot elevate with a password, but can with '
         'a code — and the gated RPC then accepts it', () async {
-      final who = await fx.createPasswordlessMember('s21',
+      // A throwaway family, never family A: a third caregiver in the shared
+      // family changes the fan-out other suites count on. The first run of this
+      // suite killed `NotificationParamsTests` from three files away.
+      final family = await fx.createFamily('s21');
+      final who = await fx.createPasswordlessMember(family, 's21m',
           fullName: 'E2E Sem Senha');
 
       // 1. The defect itself: there is no credential to confirm, so the only
@@ -224,14 +232,17 @@ void elevationCodeTests(GateFixture fx) {
       // 2. And the gated RPC is unreachable while that is the only proof.
       //    (The account was promoted first, so what refuses below is the
       //    ELEVATION, not the admin check.)
-      await fx.elevate(fx.founderProfile);
-      await fx.founder.rpc<dynamic>('set_member_admin',
+      await fx.elevate(family.adminProfile);
+      await family.admin.rpc<dynamic>('set_member_admin',
           params: {'p_profile_id': who.profile.id, 'p_is_admin': true});
-      await fx.clearElevation(fx.founderProfile);
+      await fx.clearElevation(family.adminProfile);
 
       await expectRejected(
         () => who.client.rpc<dynamic>('set_member_admin',
-            params: {'p_profile_id': fx.memberProfile.id, 'p_is_admin': true}),
+            params: {
+              'p_profile_id': family.memberProfile.id,
+              'p_is_admin': true
+            }),
         contains: 'ELEVATION_REQUIRED',
       );
 
@@ -248,13 +259,13 @@ void elevationCodeTests(GateFixture fx) {
       // 4. And the window it opened is the SAME window the password opens —
       //    `is_elevated()` cannot tell which proof was given, by design.
       await who.client.rpc<dynamic>('set_member_admin',
-          params: {'p_profile_id': fx.memberProfile.id, 'p_is_admin': true});
+          params: {
+            'p_profile_id': family.memberProfile.id,
+            'p_is_admin': true
+          });
 
-      // Put the fixture back the way the rest of the run expects it.
-      await fx.elevate(fx.founderProfile);
-      await fx.founder.rpc<dynamic>('set_member_admin',
-          params: {'p_profile_id': fx.memberProfile.id, 'p_is_admin': false});
-      await fx.clearElevation(fx.founderProfile);
+      // No clean-up: the family is thrown away at teardown, which is the other
+      // half of why it is not family A.
     });
 
     test('a wrong code is refused with the code sentence, not the password one',

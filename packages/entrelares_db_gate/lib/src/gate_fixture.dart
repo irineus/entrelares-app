@@ -319,14 +319,22 @@ class GateFixture {
     _userIds.add(await _admin.createConfirmedUser(email, password, const {}));
   }
 
-  /// S-21: a member of family A whose account has **no password at all** — the
+  /// S-21: a member of [family] whose account has **no password at all** — the
   /// condition a Google sign-in leaves behind, and the one that shut the whole
   /// sudo surface before the elevation code existed.
   ///
-  /// It is built through the REAL invitation branch of `handle_new_user`, not
-  /// bolted on afterwards, so the profile this returns is an ordinary member in
-  /// every respect except the missing credential. The access token comes from a
-  /// generated magic link: a password-less account has no other way in, which is
+  /// It takes a THROWAWAY family rather than using family A, and that is not
+  /// tidiness: the shared family's member count is load-bearing for other
+  /// suites. A third caregiver added here made `auto-approval writes render
+  /// params on every notification it makes` fan out to two rows and die on
+  /// `.single` — a suite that had nothing to do with this one, failing for a
+  /// reason nothing in its own file explains. (`ensureThirdMember` exists for
+  /// the tests that WANT that, and shares one.)
+  ///
+  /// The account is built through the REAL invitation branch of
+  /// `handle_new_user`, so the profile is an ordinary member in every respect
+  /// except the missing credential. The access token comes from a generated
+  /// magic link: a password-less account has no other way in, which is
   /// precisely the point being tested.
   Future<
       ({
@@ -335,10 +343,14 @@ class GateFixture {
         String accessToken,
         Member profile,
         SupabaseClient client
-      })> createPasswordlessMember(String tag,
-          {required String fullName}) async {
+      })> createPasswordlessMember(
+    ThrowawayFamily family,
+    String tag, {
+    required String fullName,
+  }) async {
     final email = testEmail(tag);
-    final token = await createInvitation(founder, email, roleId('grandmother'));
+    final token =
+        await createInvitation(family.admin, email, roleId('grandmother'));
     final uid = await _admin.createPasswordlessUser(email, {
       'full_name': fullName,
       'invite_token': token,
@@ -346,8 +358,9 @@ class GateFixture {
     });
     _userIds.add(uid);
 
-    final profile = (await _profilesOf(founder))
+    final profile = (await _profilesOf(family.admin))
         .firstWhere((p) => p.email?.toLowerCase() == email.toLowerCase());
+    await _markOnboarded([profile.id]);
 
     // The token goes on the client as a HEADER rather than through
     // `auth.setSession`: this account has no password, so there is no sign-in to
