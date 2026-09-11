@@ -319,6 +319,56 @@ class GateFixture {
     _userIds.add(await _admin.createConfirmedUser(email, password, const {}));
   }
 
+  /// S-21: a member of family A whose account has **no password at all** — the
+  /// condition a Google sign-in leaves behind, and the one that shut the whole
+  /// sudo surface before the elevation code existed.
+  ///
+  /// It is built through the REAL invitation branch of `handle_new_user`, not
+  /// bolted on afterwards, so the profile this returns is an ordinary member in
+  /// every respect except the missing credential. The access token comes from a
+  /// generated magic link: a password-less account has no other way in, which is
+  /// precisely the point being tested.
+  Future<
+      ({
+        String email,
+        String userId,
+        String accessToken,
+        Member profile,
+        SupabaseClient client
+      })> createPasswordlessMember(String tag,
+          {required String fullName}) async {
+    final email = testEmail(tag);
+    final token = await createInvitation(founder, email, roleId('grandmother'));
+    final uid = await _admin.createPasswordlessUser(email, {
+      'full_name': fullName,
+      'invite_token': token,
+      'policy_version': PolicyVersions.current,
+    });
+    _userIds.add(uid);
+
+    final profile = (await _profilesOf(founder))
+        .firstWhere((p) => p.email?.toLowerCase() == email.toLowerCase());
+
+    // The token goes on the client as a HEADER rather than through
+    // `auth.setSession`: this account has no password, so there is no sign-in to
+    // restore a session from, and PostgREST only ever reads the bearer anyway.
+    final accessToken = await _admin.passwordlessAccessToken(email);
+    final client = _track(SupabaseClient(
+      TestEnv.supabaseUrl,
+      TestEnv.anonKey,
+      headers: {'Authorization': 'Bearer $accessToken'},
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+    ));
+
+    return (
+      email: email,
+      userId: uid,
+      accessToken: accessToken,
+      profile: profile,
+      client: client,
+    );
+  }
+
   /// F-57: registers a family created OUTSIDE [createFamily] (e.g. by
   /// `complete_oauth_onboarding`) for the run's teardown purge.
   void trackFamily(int familyId) => _extraFamilyIds.add(familyId);

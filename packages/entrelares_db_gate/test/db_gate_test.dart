@@ -26,6 +26,7 @@ import 'suites/custom_role.dart';
 import 'suites/day_protection.dart';
 import 'suites/e2e_date_allocator.dart';
 import 'suites/edge_function_auth.dart';
+import 'suites/elevation_code.dart';
 import 'suites/email_quota_gate.dart';
 import 'suites/family_deletion.dart';
 import 'suites/family_isolation.dart';
@@ -113,6 +114,7 @@ void main() {
   adminOverrideTierTests(fx);
   platformOperatorTests(fx);
   sudoElevationTests(fx);
+  elevationCodeTests(fx);
   customRoleTests(fx);
   appSettingsTests(fx);
   edgeFunctionAuthTests(fx);

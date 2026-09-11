@@ -17,6 +17,11 @@ dependencies:
   # The GoTrue admin calls and the Edge Function probes are hand-built requests:
   # they must control their own header shape (see `KeyHeaders` in test_env.dart).
   http: ^1.6.0
+  # S-21: the elevation code's digest. The gate plants a code whose PLAINTEXT it
+  # knows and then redeems it through the deployed function — which is only a
+  # proof if both sides compute the same SHA-256, so the hash has to be real
+  # here too.
+  crypto: ^3.0.6
   entrelares_db_contracts:
     path: ../entrelares_db_contracts
   entrelares_core:

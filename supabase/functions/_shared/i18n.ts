@@ -555,6 +555,16 @@ export interface AccountStrings {
   fdCompletedHeading: string;
   fdCompletedBody: (family: string) => string;
   fdCompletedClosing: string;
+
+  // S-21 — the sudo gate's second proof, for a session that has no password to
+  // confirm. The copy never names the action being confirmed: `elevate` is
+  // called before the action runs and does not know which one it is, and
+  // guessing in an e-mail about leaving or deleting would be worse than silence.
+  subjElevationCode: string;
+  elevationHeading: string;
+  elevationIntro: string;
+  elevationExpiry: (minutes: string) => string;
+  elevationIgnore: string;
 }
 
 const ACCOUNT: Record<Lang, AccountStrings> = {
@@ -625,6 +635,12 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
     fdCompletedHeading: "Família excluída",
     fdCompletedBody: (f) => `A família <strong>${f}</strong> foi <strong>excluída definitivamente</strong>, conforme a solicitação aprovada por todos os responsáveis (nenhuma recusa dentro do prazo de 30 dias).`,
     fdCompletedClosing: "Todos os dados — calendário, histórico, auditoria e contas — foram apagados, e este e-mail não permite mais acesso ao aplicativo. Se isso for uma surpresa para você, responda a esta mensagem.",
+
+    subjElevationCode: "Seu código de confirmação",
+    elevationHeading: "Seu código de confirmação",
+    elevationIntro: "Você pediu para confirmar que é você antes de concluir uma ação sensível na sua conta. Use o código abaixo no aplicativo:",
+    elevationExpiry: (m) => `O código vale por <strong>${m} minutos</strong> e só pode ser usado uma vez.`,
+    elevationIgnore: "Se não foi você que pediu, ignore esta mensagem — nada foi alterado. Vale a pena conferir quem tem acesso à sua conta.",
   },
   en: {
     fallbackThirtyDays: "30 days",
@@ -693,6 +709,12 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
     fdCompletedHeading: "Family deleted",
     fdCompletedBody: (f) => `The family <strong>${f}</strong> was <strong>permanently deleted</strong>, following the request approved by every caregiver (no refusal within the 30-day window).`,
     fdCompletedClosing: "All the data — calendar, history, audit trail and accounts — was erased, and this e-mail no longer grants access to the app. If this comes as a surprise to you, reply to this message.",
+
+    subjElevationCode: "Your confirmation code",
+    elevationHeading: "Your confirmation code",
+    elevationIntro: "You asked to confirm it is you before completing a sensitive action on your account. Use the code below in the app:",
+    elevationExpiry: (m) => `The code is valid for <strong>${m} minutes</strong> and can only be used once.`,
+    elevationIgnore: "If this was not you, ignore this message — nothing was changed. It is worth checking who has access to your account.",
   },
 };
 
