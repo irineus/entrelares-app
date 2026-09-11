@@ -2333,6 +2333,9 @@ leave production's alone:
 
 **T-68 shares this destination.** A failed publish is the same defect one floor up, and three
 channels of ops signal is the same as none.
-3. **Web stack traces read minified** until the source-map upload lands (T-66, PR 3). Events
-   group and count correctly today; the frames name `main.dart.js` positions rather than Dart
-   symbols. Android is unobfuscated, so its frames are already readable.
+### 13.6 Known limitation — the web reads minified, for now
+
+**Web stack traces name `main.dart.js` positions, not Dart symbols**, until the source-map upload
+lands (T-66, PR 3). Events from the web channel group and count correctly today; they are just
+harder to read. Android release builds carry no obfuscation (`--obfuscate` is not in any workflow),
+so their frames are already readable.
