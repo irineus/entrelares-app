@@ -7,7 +7,7 @@
 > [`arquivamento-app.md`](arquivamento-app.md)).
 >
 > O app Flutter tem versionamento **próprio e independente** (`0.2.x+NN` em
-> `apps/entrelares_app/pubspec.yaml`, onde o `+NN` é o `versionCode` do Android) e não
+> `app/pubspec.yaml`, onde o `+NN` é o `versionCode` do Android) e não
 > continua esta numeração. Nada aqui descreve o produto atual: descreve como ele foi feito.
 
 ---

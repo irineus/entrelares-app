@@ -90,13 +90,13 @@ dependencies:
   in_app_purchase: ^3.2.3
   # Pure client mirrors of the server rules, tested with `dart test`.
   entrelares_core:
-    path: ../../packages/entrelares_core
+    path: ../packages/entrelares_core
   # The PostgREST row contracts. They used to live in `lib/models/` and moved
   # out in T-56 (PR 6), when the database gate — ported to Dart, and pure Dart
   # by construction — became their second reader. Same move `Entrelares.Models`
   # → `Entrelares.DbContracts` made in C#, for the same reason.
   entrelares_db_contracts:
-    path: ../../packages/entrelares_db_contracts
+    path: ../packages/entrelares_db_contracts
   http: ^1.6.0
   firebase_core: ^4.14.0
   firebase_messaging: ^16.6.0

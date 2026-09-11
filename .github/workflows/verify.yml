@@ -24,7 +24,7 @@ name: verify
 #   1. NO suite reads a `.md`. The moment one does, this filter would make it a
 #      test that silently stops running — the vacuous green T-58 exists about.
 #      A test asserts that no suite reads one.
-#   2. NOTHING under `apps/entrelares_app/web/` is markdown. Everything there is
+#   2. NOTHING under `app/web/` is markdown. Everything there is
 #      copied verbatim into the published build, so a `.md` in that directory
 #      WOULD be user-facing and must not skip the deploy.
 #
@@ -129,7 +129,7 @@ jobs:
           dart analyze --fatal-infos
 
       - name: App — analyze + flutter test
-        working-directory: apps/entrelares_app
+        working-directory: app
         run: |
           flutter pub get
           flutter analyze
@@ -140,7 +140,7 @@ jobs:
       # for Android would let the web channel rot silently. It is a compile, not
       # an emulator: ~1,5 min, cheap enough for every push.
       - name: Web — release build + first-load weight
-        working-directory: apps/entrelares_app
+        working-directory: app
         run: |
           flutter build web --release --no-web-resources-cdn
           echo "### Web first-load weight (gzip)" >> "$GITHUB_STEP_SUMMARY"
@@ -307,7 +307,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          working-directory: apps/entrelares_app
+          working-directory: app
           script: >-
             flutter test integration_test/swap_workflow_test.dart
             --flavor dev
@@ -325,7 +325,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          working-directory: apps/entrelares_app
+          working-directory: app
           script: >-
             flutter test integration_test/account_flows_test.dart
             --flavor dev
@@ -359,14 +359,14 @@ jobs:
       # local-by-construction — a release task here would fail fast on the
       # missing file.
       - name: Build debug APK (dev flavor, arm64)
-        working-directory: apps/entrelares_app
+        working-directory: app
         run: flutter build apk --debug --flavor dev --split-per-abi --target-platform android-arm64
       # 1-day retention: the 500 MB artifact quota is account-wide (T-50).
       # Glob: the flavor changes the APK filename (only one file matches).
       - uses: actions/upload-artifact@v4
         with:
           name: app-dev-arm64-v8a-debug
-          path: apps/entrelares_app/build/app/outputs/flutter-apk/app-*-debug.apk
+          path: app/build/app/outputs/flutter-apk/app-*-debug.apk
           retention-days: 1
 
   # ── The flow gate (T-56, PR 5) ───────────────────────────────────────────
@@ -438,7 +438,7 @@ jobs:
           command -v chromedriver >/dev/null || { echo "::error::chromedriver não está no PATH do runner"; exit 1; }
 
       - name: Drive integration_test in a headless Chrome
-        working-directory: apps/entrelares_app
+        working-directory: app
         env:
           E2E_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
         run: |
@@ -579,7 +579,7 @@ jobs:
       # where it happened. The maps are uploaded to Sentry below and then
       # DELETED before publishing — see that step for why.
       - name: Build web (production config)
-        working-directory: apps/entrelares_app
+        working-directory: app
         run: |
           flutter pub get
           flutter build web --release --no-web-resources-cdn --source-maps --dart-define=APP_ENV=prod
@@ -590,7 +590,7 @@ jobs:
       - name: Name the release, exactly as the app does
         id: release
         run: |
-          version=$(grep -m1 '^version:' apps/entrelares_app/pubspec.yaml | awk '{print $2}')
+          version=$(grep -m1 '^version:' app/pubspec.yaml | awk '{print $2}')
           echo "name=entrelares-app@$version" >> "$GITHUB_OUTPUT"
       # Self-DISARMING, the same shape as the publish step below: with no token
       # the deploy proceeds and says the stacks will read minified, instead of
@@ -602,7 +602,7 @@ jobs:
       # above have to agree.
       - name: Upload source maps to Sentry
         if: env.SENTRY_AUTH_TOKEN != ''
-        working-directory: apps/entrelares_app
+        working-directory: app
         run: |
           npm install -g @sentry/cli
           sentry-cli releases new "${{ steps.release.outputs.name }}"
@@ -618,7 +618,7 @@ jobs:
       # asks for it. Sentry already has its copy — the maps have no reason to
       # exist on the CDN, and the browser never needs them.
       - name: Strip source maps before publishing
-        working-directory: apps/entrelares_app
+        working-directory: app
         run: |
           count=$(find build/web -name '*.map' | wc -l)
           find build/web -name '*.map' -delete
@@ -642,7 +642,7 @@ jobs:
       # (`secrets` is not readable from a job-level `if`; `env` is, from a
       # step-level one.)
       - name: Publish to Cloudflare Pages
-        working-directory: apps/entrelares_app
+        working-directory: app
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: wrangler pages deploy build/web --project-name=entrelares-web --branch=main --commit-dirty=true
       - name: Say why nothing was published

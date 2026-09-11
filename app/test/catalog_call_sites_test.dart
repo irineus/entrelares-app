@@ -172,7 +172,7 @@ Set<String> _declaredKeys() {
   final keys = <String>{};
   for (final entry in {'K': 'k.dart', 'KApp': 'k_app.dart'}.entries) {
     final source = File(
-            '../../packages/entrelares_core/lib/src/localization/${entry.value}')
+            '../packages/entrelares_core/lib/src/localization/${entry.value}')
         .readAsStringSync();
     for (final match
         in RegExp(r'static const String (\w+)\s*=').allMatches(source)) {
@@ -187,7 +187,7 @@ Set<String> _usedKeys() {
   final pattern = RegExp(r'\b(K|KApp)\.(\w+)');
   for (final dir in [
     Directory('lib'),
-    Directory('../../packages/entrelares_core/lib/src'),
+    Directory('../packages/entrelares_core/lib/src'),
   ]) {
     for (final file in dir.listSync(recursive: true).whereType<File>()) {
       if (!file.path.endsWith('.dart')) continue;

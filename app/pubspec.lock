@@ -180,14 +180,14 @@ packages:
   entrelares_core:
     dependency: "direct main"
     description:
-      path: "../../packages/entrelares_core"
+      path: "../packages/entrelares_core"
       relative: true
     source: path
     version: "0.1.0"
   entrelares_db_contracts:
     dependency: "direct main"
     description:
-      path: "../../packages/entrelares_db_contracts"
+      path: "../packages/entrelares_db_contracts"
       relative: true
     source: path
     version: "0.1.0"

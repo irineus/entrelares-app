@@ -29,7 +29,7 @@ import 'package:test/test.dart';
 
 import 'repo_files.dart';
 
-const _worker = 'apps/entrelares_app/web/firebase-messaging-sw.js';
+const _worker = 'app/web/firebase-messaging-sw.js';
 const _sender = 'supabase/functions/_shared/push.ts';
 
 /// The quoted strings of an array literal, found by the declaration that opens

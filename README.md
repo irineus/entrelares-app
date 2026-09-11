@@ -8,17 +8,34 @@ Nasceu como spike do estágio 1 (GO do owner em 19/08/2026) e foi construído lo
 mapa de paridade ([`docs/flutter-paridade.md`](docs/flutter-paridade.md)) atrás do plano de
 cutover ([`docs/flutter-cutover.md`](docs/flutter-cutover.md)). O cliente Blazor que ele
 substituiu ficou publicado em `legado.entrelares.app` como rota de rollback até **24/08/2026**,
-quando o owner declarou a rota desnecessária; o cliente foi desligado e o `entrelares-app` está
+quando o owner declarou a rota desnecessária; o cliente foi desligado e o `entrelares-app-legacy` está
 **arquivado** desde 25/08/2026, somente-leitura
 (T-56, [`docs/arquivamento-app.md`](docs/arquivamento-app.md)). **Não há mais volta**, que é a
 consequência ordinária de um cutover que deu certo.
+
+## Os nomes antigos, e o que eles querem dizer (T-69, 11/09/2026)
+
+Este repositório se chamou **`entrelares-flutter`** e o app morou em **`apps/entrelares_app`** —
+os dois eram nomes do cutover C#→Flutter (T-53/T-56), um momento que acabou. Hoje o repositório é
+`entrelares-app` e o app é `app/`.
+
+**`docs/` e `backlog/` NÃO foram reescritos**: são história congelada, e lá dentro os nomes valem
+para a data que descrevem. Em particular, **`entrelares-app` naqueles documentos é o cliente
+Blazor** — que hoje é [`entrelares-app-legacy`](https://github.com/irineus/entrelares-app-legacy),
+arquivado. Linhas como *"`entrelares-flutter` #51 + `entrelares-app` #303"* falam de dois
+repositórios diferentes, e é por isso que trocar o nome nelas as tornaria mentira.
+
+Ponteiro vivo — workflow, script, comando, este arquivo — carrega o nome de hoje. Prosa datada
+carrega o nome do dia.
 
 ## Estrutura (molde `irineus/desmalha`)
 
 ```
 .fvmrc                        # pin do Flutter (3.44.7) — só o .fvmrc é versionado, .fvm/ não
 tool/setup_env.sh             # bootstrap idempotente de ambiente Linux (JDK 17, FVM, Android SDK)
-apps/entrelares_app/tool/     # subset_inter.py — regenera a fonte embarcada (U-27)
+app/                          # o app Flutter (só orquestra e apresenta)
+app/lib/theme/                # U-27: tokens.dart (a única fonte de cor) + app_theme.dart
+app/tool/                     # subset_inter.py — regenera a fonte embarcada (U-27)
 packages/entrelares_core/     # Dart puro: espelhos-cliente das regras do servidor, testáveis com `dart test`
 packages/entrelares_core/test/mirrors/   # T-56/F-09/T-62: os seis espelhos (i18n.ts, migrations, service worker)
 packages/entrelares_db_contracts/        # T-56 PR 6: as formas de linha do PostgREST, lidas pelo app E pelo gate
@@ -26,8 +43,6 @@ packages/entrelares_db_gate/  # T-56 PRs 6-16 + F-57 + F-09 + F-56 + F-62: o gat
 supabase/                     # T-56 PR 3: migrations, Edge Functions e o runbook de deploy
 backlog/                      # T-56 PR 4a: a memória escrita do produto (registros + archive/)
 store/                        # T-56 PR 4c: listagens da Play, masters de marca e seus geradores
-apps/entrelares_app/          # o app Flutter (só orquestra e apresenta)
-apps/entrelares_app/lib/theme/  # U-27: tokens.dart (a única fonte de cor) + app_theme.dart
 ```
 
 > Nenhum pacote sob `packages/` pode importar Flutter: o gate tem de rodar sob `dart test` puro,
@@ -38,14 +53,14 @@ apps/entrelares_app/lib/theme/  # U-27: tokens.dart (a única fonte de cor) + ap
 ```
 fvm flutter --version                                  # 3.44.7 (pinado)
 cd packages/entrelares_core && fvm dart test           # regras puras, sem emulador
-cd apps/entrelares_app && fvm flutter analyze && fvm flutter test
-cd apps/entrelares_app && fvm flutter build apk --debug --flavor dev --split-per-abi
+cd app && fvm flutter analyze && fvm flutter test
+cd app && fvm flutter build apk --debug --flavor dev --split-per-abi
 # Preview do alvo web em 127.0.0.1:8080 — é o caminho mais rápido para conferir a
 # camada visual (U-27), inclusive o tema escuro pelo prefers-color-scheme do
 # navegador. Mesmo comando que `.claude/launch.json` roda.
-cd apps/entrelares_app && fvm flutter run -d web-server --web-port 8080
+cd app && fvm flutter run -d web-server --web-port 8080
 # E2E (lote 3): app real em emulador contra o projeto dev — exige a service_role key
-cd apps/entrelares_app && fvm flutter test integration_test/swap_workflow_test.dart \
+cd app && fvm flutter test integration_test/swap_workflow_test.dart \
   --flavor dev --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev>
 # Gate de banco: 256 testes de RLS/RPC/trigger contra o projeto dev, com família
 # descartável. Exige a service_role do DEV (nunca a de produção); sem ela a suíte
@@ -85,7 +100,7 @@ só se comporta mal onde o navegador entrega o próprio endereço ao app (T-64).
 
 **256 testes** sobre RLS, RPCs `SECURITY DEFINER`, triggers e o ledger de cobrança,
 rodando contra o projeto **dev** real com família descartável. É a camada que prova o
-invariante do produto — *o cliente ESPELHA, o banco IMPÕE* — e veio do `entrelares-app`,
+invariante do produto — *o cliente ESPELHA, o banco IMPÕE* — e veio do `entrelares-app-legacy`,
 que está sendo arquivado (ver [`docs/arquivamento-app.md`](docs/arquivamento-app.md)).
 
 Chegou em **C#** e é **Dart puro desde 24/08/2026** (T-56, PRs 6 a 16): cada PR da travessia
@@ -105,7 +120,7 @@ famílias são únicas por execução, mas as seeds de billing do T-39 usam ids 
 
 ## Assinatura (release) — T-55
 
-Builds **release** exigem `apps/entrelares_app/android/key.properties` (git-ignorado);
+Builds **release** exigem `app/android/key.properties` (git-ignorado);
 sem ele o build **falha com erro claro** — nunca sai APK release assinado com as chaves
 de debug desta máquina (lição 2.2 do piloto: keystore de debug é por máquina, e um
 aparelho que instalou um build debug-signed precisa DESINSTALAR — perdendo dados locais —
@@ -118,8 +133,8 @@ sessão cloud (regra permanente 1). O `key.properties` tem entradas **por flavor
 # dev — keystore dedicado de sideload (T-55), gerado em 19/08/2026. Para
 # recriar do zero (PowerShell — a pasta primeiro, o keytool não a cria):
 #   New-Item -ItemType Directory -Force "$env:USERPROFILE\keystores"
-#   keytool -genkey -v -keystore "$env:USERPROFILE\keystores\entrelares-flutter.jks" -keyalg RSA -keysize 2048 -validity 10000 -alias entrelares
-dev.storeFile=C:/Users/irineu/keystores/entrelares-flutter.jks
+#   keytool -genkey -v -keystore "$env:USERPROFILE\keystores\entrelares-app.jks" -keyalg RSA -keysize 2048 -validity 10000 -alias entrelares
+dev.storeFile=C:/Users/irineu/keystores/entrelares-app.jks
 dev.storePassword=...
 dev.keyAlias=entrelares
 dev.keyPassword=...
@@ -127,7 +142,7 @@ dev.keyPassword=...
 # prod — o keystore de UPLOAD do produto (F-54). O pacote da Play
 # (com.entrelares.app) só aceita essa assinatura de upload (achado do estágio 0) —
 # nunca aponte prod.* para outro keystore. Ele nasceu em
-# `entrelares-app/store/android.keystore` e SAIU DE LÁ em 25/08/2026: aquele
+# `entrelares-app-legacy/store/android.keystore` e SAIU DE LÁ em 25/08/2026: aquele
 # repositório está arquivado (T-56), e uma chave de publicação não pode morar num
 # clone que ninguém tem mais motivo para manter no disco. A cópia é byte a byte, e
 # a impressão SHA-256 é a mesma que o assetlinks.json declara como upload.
@@ -149,11 +164,11 @@ a pedido. Mas a redefinição custa dias de fila num canal que publica produçã
 no gerenciador. Para conferir que o Gradle enxerga os dois — sem abrir nenhuma senha:
 
 ```
-cd apps/entrelares_app/android && ./gradlew :app:signingReport
+cd app/android && ./gradlew :app:signingReport
 ```
 
 O `Variant: prodRelease` tem que imprimir a impressão SHA-256 que o
-`apps/entrelares_app/web/.well-known/assetlinks.json` declara para `com.entrelares.app`.
+`app/web/.well-known/assetlinks.json` declara para `com.entrelares.app`.
 Se divergir, o build sai assinado com a chave errada e a Play recusa o upload.
 
 ## i18n (U-13/U-24 — lote 1)
@@ -162,8 +177,8 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
 
 - **Catálogos gerados, nunca editados à mão:** `packages/entrelares_core/lib/src/localization/`
   (`k.dart` + `strings_pt_br.dart` + `strings_en.dart`, 961 chaves) são espelhos mecânicos
-  dos `K.cs`/`StringsPtBr.cs`/`StringsEn.cs` do repo `entrelares-app`, regenerados por
-  `python tool/port_catalogs.py <caminho-do-entrelares-app>`. Strings que só existem
+  dos `K.cs`/`StringsPtBr.cs`/`StringsEn.cs` do repo `entrelares-app-legacy`, regenerados por
+  `python tool/port_catalogs.py <caminho-do-entrelares-app-legacy>`. Strings que só existem
   neste cliente vivem em `k_app.dart` (prefixo `app.`), à mão.
 - **Resolução** (`LanguageResolver`): escolha local > `profiles.language` > locale do
   aparelho > PT-BR. Idioma fixo no boot; a troca (picker no login e no calendário)
@@ -224,7 +239,7 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   landing), path `/update-password`, `autoVerify`. O `assetlinks.json` de produção já
   listava o prod (`com.entrelares.app`, F-54); o statement do dev
   (`com.entrelares.flutter`, certificado de sideload T-55) entra por PR pareado no
-  `entrelares-app`. Build DEBUG nunca verifica (certificado por máquina) — QA de deep
+  `entrelares-app-legacy`. Build DEBUG nunca verifica (certificado por máquina) — QA de deep
   link usa o release dev.
 - **Recovery:** "Esqueci minha senha" → `resetPasswordForEmail` com `redirectTo` para o
   deep link; o `supabase_flutter` consome os tokens do link e emite `passwordRecovery`,
@@ -337,7 +352,7 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
 - **Funil T-37 completo** com a dimensão `channel` derivada do mesmo fato de build que
   escolhe o trilho — é ela que separa a coorte da loja da coorte web no Umami.
 - **Falta configuração de console (do owner)** para o trilho da loja vender:
-  `entrelares-app/supabase/README.md` §9-bis.
+  `entrelares-app-legacy/supabase/README.md` §9-bis.
 
 ## Fundação visual (U-27)
 
@@ -383,7 +398,7 @@ regras e ~0% do visual — por um sistema de tokens. O que ela estabelece:
 
 | Componente | Versão atual |
 |---|---|
-| `apps/entrelares_app` | `0.2.31+33` (U-27 PR3 — skeletons e movimento; **U-27 fechado**) |
+| `app` | `0.2.31+33` (U-27 PR3 — skeletons e movimento; **U-27 fechado**) |
 
 Trilha do estágio 3: `0.2.0+2` abertura de flavors → `0.2.1+3` T-55 → `0.2.2+4`…`0.2.4+6`
 lote 1 → `0.2.5+7`…`0.2.8+10` lote 2 → `0.2.9+11`…`0.2.13+15` lote 3 →

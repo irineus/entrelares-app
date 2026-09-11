@@ -26,7 +26,7 @@ fail the CSP at exactly the moment someone enables push. The rewrite below
 points it at its sibling. It is asserted from the other side too:
 `web_channel_test` fails if any vendored file still names gstatic.
 
-Usage (from `apps/entrelares_app`):
+Usage (from `app`):
 
     python tool/vendor_firebase_js.py
 
