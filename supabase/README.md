@@ -2294,7 +2294,13 @@ client code:
 2. **Sentry processes data for us now**, exactly as allowing `fonts.gstatic.com` made Google an
    operator for the web client (see the `_headers` commentary). The privacy policy on the landing
    names who does that, and a processor the policy does not name is the S-15 failure mode in its
-   purest form: a claim about the system that the system contradicts. Tracked as **L-24**.
+   purest form: a claim about the system that the system contradicts. **L-24, delivered
+   11/09/2026:** §7 of `entrelares-site/public/privacidade.html` now names Sentry — what it
+   receives, what it never receives, and the city that survives — and §3 names the crash report
+   among the technical data. It was **disclosure, not a material change**: version 1.7 stood, so
+   no `PolicyVersions` bump, no `enforceFrom`, no `app_settings` migration and no blocking
+   re-consent. The call was settled by a measured precedent — commit `b77188e` (23/08/2026) put
+   Google in that same §7 and left the version untouched.
 
 **What the switch does NOT remove, measured after turning it on:** the event came back with no
 `user` and `Users Impacted: 0`, but still carrying **`user.geo: BR, Porto Alegre`**. Sentry derives
