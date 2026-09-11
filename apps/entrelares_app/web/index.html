@@ -34,6 +34,105 @@
 </head>
 <body>
   <!--
+    T-66 — the ONLY watcher for a failure that happens before Dart exists.
+
+    Armed here, above the loader, on purpose: if `flutter_bootstrap.js` or
+    `main.dart.js` 404s after a bad deploy, or a chunk is refused, or CanvasKit
+    is blocked, then no Dart runs at all — the two error hooks in `main.dart`
+    are never installed, and the reader sees a blank page while nobody is told.
+    That is the one hole the Dart side cannot cover by construction.
+
+    It stands down the moment Dart is alive (`window.entrelaresBooted`, set by
+    `services/boot_handoff_web.dart`), so a normal Dart crash is reported ONCE,
+    by the side that has a Dart stack. `web_channel_test` pins the flag name,
+    both DSNs and the production hostname against `env.dart` — this file is a
+    deliberate duplication in another language, like `firebase-messaging-sw.js`,
+    and an unmirrored duplication rots silently.
+
+    No release is attached: index.html has no way to read `pubspec.yaml`, and
+    bumping a version in a third place every delivery is friction that would be
+    forgotten within a month. A pre-boot failure is about the DEPLOY anyway, and
+    `logger: web-boot` plus the timestamp identify it.
+  -->
+  <script>
+    (function () {
+      var PROD_HOST = 'web.entrelares.app';
+      var DSN_PROD = 'https://207fdf4ae55dd391583ecaa369b3319b@o4511910022217728.ingest.us.sentry.io/4512066983231488';
+      var DSN_DEV = 'https://745aa4d38b3b07ac90ce48a267ea4181@o4511910022217728.ingest.us.sentry.io/4512066983559168';
+
+      var isProd = window.location.hostname === PROD_HOST;
+      var parts = /^https:\/\/([^@]+)@([^/]+)\/(.+)$/.exec(isProd ? DSN_PROD : DSN_DEV);
+      var sent = false;
+
+      function scrub(text) {
+        return String(text == null ? '' : text)
+          .slice(0, 1000)
+          .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[email]')
+          .replace(/((?:[a-z][a-z0-9+.-]*):\/\/[^\s"']*?)[?#][^\s"']*/g, '$1?[redacted]');
+      }
+
+      function eventId() {
+        var id = '';
+        for (var i = 0; i < 32; i++) {
+          id += '0123456789abcdef'.charAt(Math.floor(Math.random() * 16));
+        }
+        return id;
+      }
+
+      function report(type, message, source, line) {
+        // One event, and never after Dart took over. A boot failure repeats as
+        // fast as the browser retries, and the reader is staring at a blank
+        // page either way.
+        if (sent || parts === null || window.entrelaresBooted === true) return;
+        sent = true;
+        try {
+          var now = new Date().toISOString();
+          var id = eventId();
+          var event = {
+            event_id: id,
+            timestamp: now,
+            platform: 'javascript',
+            level: 'fatal',
+            logger: 'web-boot',
+            environment: isProd ? 'production' : 'dev',
+            tags: { channel: 'web', context: 'pre-flutter-boot' },
+            exception: { values: [{ type: type, value: scrub(message) }] },
+            extra: { source: scrub(source), line: line || 0 }
+          };
+          var body =
+            JSON.stringify({ event_id: id, sent_at: now }) + '\n' +
+            JSON.stringify({ type: 'event', content_type: 'application/json' }) + '\n' +
+            JSON.stringify(event) + '\n';
+          // Auth in the query and a text/plain body: a CORS-simple request with
+          // no preflight, exactly like the Dart transport. `keepalive` is what
+          // lets it survive the page the reader is about to give up on.
+          fetch(
+            'https://' + parts[2] + '/api/' + parts[3] + '/envelope/' +
+              '?sentry_key=' + parts[1] + '&sentry_version=7' +
+              '&sentry_client=entrelares.envelope.web-boot',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+              body: body,
+              keepalive: true
+            }
+          );
+        } catch (ignored) {
+          // Same contract as the Dart side: a reporter may never be the reason
+          // a page fails.
+        }
+      }
+
+      window.addEventListener('error', function (e) {
+        report('BootError', e.message, e.filename, e.lineno);
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        report('BootRejection', e.reason, window.location.pathname, 0);
+      });
+    })();
+  </script>
+
+  <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
     or to give the user feedback during the initialization process.

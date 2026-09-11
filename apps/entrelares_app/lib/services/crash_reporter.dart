@@ -170,6 +170,28 @@ class CrashReporter {
     }
   }
 
+  /// T-66 — the handled half: an error the app CAUGHT and could not explain.
+  ///
+  /// Wired to `saveErrorObserver` at boot, so it fires from the one place where
+  /// a caught exception becomes a user-facing sentence, and only on the
+  /// fallback path. See that seam's doc for why a recognized refusal is
+  /// deliberately silent.
+  ///
+  /// **The stack is the CATCH site, not the throw site** — the seam receives a
+  /// string, not an exception, so there is nothing else to take. It still names
+  /// the screen and the action, which is what makes the event actionable; the
+  /// server's own message carries the rest.
+  void reportUnexplainedSaveError(String raw, String fallback) {
+    unawaited(report(
+      UnexplainedSaveError(raw),
+      StackTrace.current,
+      // A stable slug, never the localized sentence: a tag whose value is a
+      // translated paragraph fragments the same event into two.
+      context: 'unexplained-save-error',
+      fatal: false,
+    ));
+  }
+
   /// Undo the install guard. Only the suite needs this: a test that proves the
   /// hooks chain has to install them more than once in one process.
   @visibleForTesting
@@ -181,4 +203,16 @@ class CrashReporter {
     const hex = '0123456789abcdef';
     return List.generate(32, (_) => hex[_random.nextInt(16)]).join();
   }
+}
+
+/// What the sink calls a save error this client could not explain. A type of
+/// its own so the events group together in Sentry instead of scattering across
+/// whatever the server happened to say.
+class UnexplainedSaveError implements Exception {
+  const UnexplainedSaveError(this.raw);
+
+  final String raw;
+
+  @override
+  String toString() => raw;
 }

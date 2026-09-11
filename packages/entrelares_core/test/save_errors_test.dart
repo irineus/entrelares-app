@@ -186,6 +186,67 @@ void main() {
     });
   });
 
+  // T-66 — the seam that turns "the app could not explain this" into a signal.
+  group('saveErrorObserver', () {
+    late List<({String raw, String fallback})> seen;
+
+    setUp(() {
+      seen = [];
+      saveErrorObserver = (raw, fallback) =>
+          seen.add((raw: raw, fallback: fallback));
+    });
+
+    tearDown(() => saveErrorObserver = null);
+
+    String postgrest(String message, String code) =>
+        'PostgrestException(message: $message, code: $code, details: Bad '
+        'Request, hint: null)';
+
+    test('fires when the fallback is what the reader will see', () {
+      final raw = postgrest('some internal detail', 'P0001');
+
+      expect(translateSaveError(raw, _fallback, _pt), _fallback);
+      expect(seen, hasLength(1));
+      expect(seen.single.raw, raw);
+      expect(seen.single.fallback, _fallback);
+    });
+
+    test('fires on an error of a shape this client cannot parse at all', () {
+      expect(translateSaveError('total garbage', _fallback, _pt), _fallback);
+      expect(seen, hasLength(1));
+    });
+
+    test('stays QUIET on a recognized refusal — that is the product working',
+        () {
+      // A day collision, a rule the trigger explained in PT-BR, and a seat cap.
+      translateSaveError(
+          postgrest('care_schedules_family_schedule_date_key', '23505'),
+          _fallback,
+          _pt);
+      translateSaveError(
+          postgrest('Esta família já atingiu o limite de 4 responsáveis.',
+              '23514'),
+          _fallback,
+          _pt);
+
+      expect(seen, isEmpty,
+          reason: 'reporting a refusal the product explained correctly would '
+              'bury the signal under correct behaviour');
+    });
+
+    test('an observer that throws never costs the reader their message', () {
+      saveErrorObserver = (_, _) => throw StateError('sink is down');
+
+      expect(translateSaveError('total garbage', _fallback, _pt), _fallback);
+    });
+
+    test('no observer is the default — core carries no transport', () {
+      saveErrorObserver = null;
+
+      expect(translateSaveError('total garbage', _fallback, _pt), _fallback);
+    });
+  });
+
   group('sessionExpiredMessage', () {
     test('follows the reader language', () {
       expect(sessionExpiredMessage(_pt),

@@ -585,4 +585,62 @@ void main() {
       expect(job, contains('wrangler pages deploy build/web'));
     });
   });
+
+  // T-66 (PR 2) — the EIGHTH mirror. `index.html` carries a boot watcher
+  // written in JavaScript because nothing else is running yet, which makes it
+  // the same kind of deliberate duplication as `firebase-messaging-sw.js`: the
+  // values live in `env.dart` for Dart and are spelled again, by hand, for the
+  // browser. Nothing at build time compares them — a wrong DSN here reports a
+  // production boot failure into the QA project, and a renamed flag leaves the
+  // script armed forever, doubling every Dart crash. Both fail with no error.
+  group('the pre-Flutter boot watcher (T-66)', () {
+    late String html;
+
+    setUp(() => html = _web('index.html').readAsStringSync());
+
+    test('carries BOTH DSNs, character for character with env.dart', () {
+      expect(html, contains(Env.prod.sentryDsn),
+          reason: 'the production DSN must be the one `Env.prod` names');
+      expect(html, contains(Env.dev.sentryDsn),
+          reason: 'anything that is not the production host reports to dev');
+    });
+
+    test('names the production host exactly as Env.prod does', () {
+      expect(html, contains("var PROD_HOST = '${Env.prod.webHostname}';"),
+          reason: 'this string is the ONLY thing deciding which project a boot '
+              'failure lands in; drift sends production events to QA');
+    });
+
+    test('reads the same flag Dart writes', () {
+      final dart = File('lib/services/boot_handoff_web.dart').readAsStringSync();
+      final flag = RegExp(r"_bootedFlag = '([^']+)'").firstMatch(dart)?.group(1);
+      expect(flag, isNotNull,
+          reason: 'boot_handoff_web.dart no longer declares the flag in the '
+              'shape this mirror reads');
+      expect(html, contains('window.$flag === true'),
+          reason: 'a renamed flag never stands the boot script down: every '
+              'Dart crash would then be reported twice, in two shapes');
+    });
+
+    test('is armed ABOVE the loader it is there to watch', () {
+      final watcher = html.indexOf('pre-flutter-boot');
+      // The TAG, not the word: the comment above the watcher names the
+      // loader too, and matching that would compare the watcher with its own
+      // documentation.
+      final loader = html.indexOf('<script src="flutter_bootstrap.js"');
+      expect(watcher, greaterThan(-1));
+      expect(watcher, lessThan(loader),
+          reason: 'a watcher installed after the loader cannot see the loader '
+              'fail, which is the only failure it exists for');
+    });
+
+    test('posts the same CORS-simple shape as the Dart transport', () {
+      expect(html, contains('sentry_key='));
+      expect(html, contains("'Content-Type': 'text/plain;charset=UTF-8'"));
+      expect(html, isNot(contains('X-Sentry-Auth')),
+          reason: 'a custom header turns the POST into a preflighted request, '
+              'which is how this channel would go quiet without failing');
+    });
+  });
+
 }
