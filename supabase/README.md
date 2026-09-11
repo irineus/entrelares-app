@@ -2310,12 +2310,29 @@ channel's POST a CORS-simple request with no preflight, the same trap the Umami 
 avoids (T-37). Moving either one into a custom header is how the web channel would go quiet
 without failing.
 
-### 13.5 What still needs the owner
+### 13.5 Alerting — what Sentry already does, and the one thing to turn OFF
 
-1. **An alert rule**, per project — Sentry does not notify anyone by default. Production wants
-   at least "a new issue, first seen" by e-mail; dev wants none.
-2. **T-68 shares this destination.** A failed publish is the same defect one floor up, and three
-   channels of ops signal is the same as none.
+**Creating a project creates an enabled alert rule with it**, measured 11/09/2026: *"Send a
+notification for high priority issues"*, e-mailing the issue owners with fallthrough to active
+members. So production alerts correctly **without anyone configuring anything** — which is the
+good half of the surprise.
+
+The bad half is that **dev got the same rule**, and it fired on the very first probe event. A QA
+crash must not put a message in the same inbox that says production is on fire; that is the whole
+reason the environments are two projects. **Disable (or delete) the dev project's rule**, and
+leave production's alone:
+
+| Project | Rule | What it should be |
+|---|---|---|
+| `entrelares-app` | https://irineu-pinheiro.sentry.io/monitors/alerts/3978315/ | **enabled** — this is the signal |
+| `entrelares-app-dev` | https://irineu-pinheiro.sentry.io/monitors/alerts/3978316/ | **disabled** — dev proves the path, it does not wake anyone |
+
+> **Where the UI keeps alerts.** Not under a top-level "Alerts" item — in this layout they live
+> under **Monitors**. The direct rule URLs above come from the API and are the reliable way in;
+> hunting for the word "Alerts" in the sidebar is how this was nearly declared impossible.
+
+**T-68 shares this destination.** A failed publish is the same defect one floor up, and three
+channels of ops signal is the same as none.
 3. **Web stack traces read minified** until the source-map upload lands (T-66, PR 3). Events
    group and count correctly today; the frames name `main.dart.js` positions rather than Dart
    symbols. Android is unobfuscated, so its frames are already readable.
