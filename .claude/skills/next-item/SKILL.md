@@ -200,19 +200,43 @@ Um item que fica `in-progress` esperando clique de terceiro é exatamente o que 
 item* manda listar no começo da sessão seguinte — e sem essa linha nas Notas, a sessão seguinte não
 tem como saber o que era.
 
+Essa linha vai na **mesma `update_properties`** de qualquer outra propriedade que esteja mudando
+naquele momento (um `PARCIAL`, um `Status`), nunca numa chamada só para ela — cada escrita no Notion
+é uma aprovação do owner (ver *Encerrar o item*).
+
 Enquanto a ação não acontecer: **entregar tudo o que NÃO depende dela** e dizer, com essas palavras,
 o que ficou parado — nunca declarar o item completo.
 
 ## Encerrar o item
 
+**Cada escrita no Notion é uma aprovação do owner, e nenhuma configuração a cala.** As ferramentas
+de escrita do conector do Notion vêm marcadas pelo próprio servidor como exigindo aprovação a cada
+chamada (`requiresUserInteraction`, verificado em 11/09/2026): regra de `allow`, modo `auto` e até
+`bypassPermissions` não pulam o prompt, e ele nunca oferece "não perguntar de novo". Leitura
+(`fetch`, `search`, `query`) não pergunta. Por isso o encerramento se desenha pelo número de
+**escritas**: `notion-update-page` aceita **um `command` por chamada** (corpo e propriedades não
+se juntam), então a regra é **uma chamada por página** e **todas as propriedades do card numa única
+`update_properties`**. E as escritas saem em **bloco contíguo, no fim** — uma agora e outra dali a
+dez minutos é o que transforma aprovação em interrupção. **Antes de abrir o bloco, dizer ao usuário
+quantas aprovações virão:** até **3** sem decisão (2 se não houver resultado extenso), até **6**
+com. Medido em 11/09/2026: eram 4 e 7, porque `Notas` e `Status`/`Conclusão` iam em duas chamadas.
+
 1. **Resultado extenso** (especificação, medição, relatório, ADR): criar como **subpágina do card**
-   (`parent: {page_id: <card-id>}`), nunca solta na raiz do workspace.
-2. **Corpo do card**: é o registro do item — atualizar o que a entrega mudou no enunciado dele.
-3. **Notas**: `update_properties` **sobrescreve** o campo — ler o valor atual primeiro e reenviar o
-   texto completo, preservando a linha `Origem:`. Prefixar o que foi feito com `CONCLUÍDO <data>:`,
-   com o link do PR.
+   (`parent: {page_id: <card-id>}`), nunca solta na raiz do workspace. *1 escrita.*
+2. **Corpo do card**: é o registro do item — atualizar o que a entrega mudou no enunciado dele
+   (`update_content`). *1 escrita.*
+3. **Propriedades do card, TODAS numa única `update_properties`.** *1 escrita:*
+   - **`Notas`**: o campo é **sobrescrito** — ler o valor atual primeiro (`fetch`, não pergunta) e
+     reenviar o texto completo, preservando a linha `Origem:`. Prefixar o que foi feito com
+     `CONCLUÍDO <data>:`, com o link do PR;
+   - **`Status` = `completed`** e **`Conclusão` = a data de hoje**. As duas coisas, sempre;
+   - **`Tamanho`** e **`Tipo`**, se o card ainda não tiver;
+   - **`Fase` NÃO se limpa** — ela diz em que grupo o item foi entregue.
+
+   Partir isso em duas chamadas é uma aprovação a mais por item e nenhum benefício.
 4. **Decisões vigentes**, se o item gerou decisão (arquitetura, regra, schema, parâmetro, risco). A
-   decisão se escreve em **três lugares diferentes**:
+   decisão se escreve em **três lugares diferentes** — são três páginas, logo *3 escritas*, e não
+   há como fundir sem mudar a estrutura do T-63:
    - **o enunciado** vai para a seção da página-mãe, com `update_content` (**nunca**
      `replace_content`), dentro do teto de 6 linhas;
    - **o raciocínio, as medições e as contraprovas** vão para a **subpágina do domínio**, com
@@ -223,15 +247,12 @@ o que ficou parado — nunca declarar o item completo.
    Decisão revogada é a única que volta para a página-mãe: vai para a §6 "Superseded decisions",
    com o motivo. **Não apagar a antiga** — saber o que foi tentado e por que caiu evita refazer a
    discussão.
-5. **`Status` = `completed`** e **`Conclusão` = a data de hoje**. As duas coisas, sempre. Se o card
-   ainda não tiver `Tamanho` e `Tipo`, preencher também. **`Fase` NÃO se limpa** — ela diz em que
-   grupo o item foi entregue.
-6. **Varredura de documentação, na MESMA entrega.** `grep -rn '<ID>'` nos `README.md` e `CLAUDE.md`
+5. **Varredura de documentação, na MESMA entrega.** `grep -rn '<ID>'` nos `README.md` e `CLAUDE.md`
    dos repos que o item tocou, e corrigir todo acerto que ainda descreva o item como pendente ou
    futuro: tabelas de capacidade ganham a feature entregue; inventários de suíte refletem arquivos
    de teste novos; o `CLAUDE.md` só muda no que mudou em PRODUÇÃO. **Nada disso toca `backlog/`**,
    que é história congelada.
-7. Terminar a sessão com um **bloco de resumo** para o board. Se sobrou ação do owner, o resumo
+6. Terminar a sessão com um **bloco de resumo** para o board. Se sobrou ação do owner, o resumo
    **abre** com a lista numerada dessas ações (só os títulos — os blocos completos já estão acima),
    antes de qualquer outra coisa: o que vem depois de um resumo longo não é lido.
 
