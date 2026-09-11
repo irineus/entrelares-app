@@ -488,6 +488,48 @@ void main() {
       expect(workflow, contains('--no-web-resources-cdn'));
     });
 
+    // ── T-66 (PR 3): source maps ─────────────────────────────────────────────
+    //
+    // Two failures live here and neither announces itself. Without the flag the
+    // web channel reports crashes nobody can read. With the flag but WITHOUT
+    // the strip, every `.map` is published from our own origin, which hands the
+    // whole Dart source to anyone who asks — a deploy that looks perfect.
+
+    test('the published build generates source maps', () {
+      expect(workflow, contains('--source-maps'),
+          reason: 'a dart2js stack without maps names `main.dart.js` offsets; '
+              'the issue still groups, it just says nothing');
+    });
+
+    test('the maps are STRIPPED before the bundle is published', () {
+      final strip = workflow.indexOf("find build/web -name '*.map' -delete");
+      final publish = workflow.indexOf('wrangler pages deploy');
+      expect(strip, greaterThan(-1),
+          reason: 'Sentry has its copy; the CDN must not');
+      expect(strip, lessThan(publish),
+          reason: 'stripping AFTER the publish would publish the sources and '
+              'then tidy the runner, which is the worst of both');
+    });
+
+    test('the release the CI names is the one the client sends', () {
+      // `CrashReporter.release` builds `entrelares-app@<pubspec version>`. A
+      // release that does not match is an upload nobody ever asks for — the
+      // maps are there, the events are there, and they never meet.
+      expect(workflow, contains(r'entrelares-app@$version'),
+          reason: 'the workflow must name the release off the pubspec, the '
+              'same way the client does');
+      expect(workflow, contains("--url-prefix '~/'"),
+          reason: 'the frames carry absolute URLs; `~/` is what makes an '
+              'artifact match one');
+    });
+
+    test('the upload disarms itself when the token is absent', () {
+      expect(workflow, contains("if: env.SENTRY_AUTH_TOKEN != ''"),
+          reason: 'an absent secret must skip the step, never paint main red '
+              'for ops that has not happened yet — the same shape the '
+              'Cloudflare publish uses');
+    });
+
     // ── The docs-only skip, and the two assumptions holding it up ────────────
     //
     // Since 29/08/2026 a change touching ONLY markdown runs no jobs at all

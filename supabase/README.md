@@ -2359,9 +2359,48 @@ leave production's alone:
 
 **T-68 shares this destination.** A failed publish is the same defect one floor up, and three
 channels of ops signal is the same as none.
-### 13.6 Known limitation — the web reads minified, for now
+### 13.6 Source maps — making a web stack readable
 
-**Web stack traces name `main.dart.js` positions, not Dart symbols**, until the source-map upload
-lands (T-66, PR 3). Events from the web channel group and count correctly today; they are just
-harder to read. Android release builds carry no obfuscation (`--obfuscate` is not in any workflow),
-so their frames are already readable.
+Android release builds carry no obfuscation (`--obfuscate` is in no workflow), so their frames are
+readable as they land. The web is the opposite: dart2js minifies, and a frame names a
+`main.dart.js` offset. The issue still groups and counts correctly — it just says nothing about
+where it happened. The first real proof of this was an accident: a local browser run reported
+`Unable to load asset: "AssetManifest.bin.json"` as `minified:wB` in `Object.h`.
+
+`deploy-web` closes that gap, in four steps that only make sense together:
+
+1. the build gains **`--source-maps`**;
+2. the release is named off the pubspec as **`entrelares-app@<version>`** — the exact string
+   `CrashReporter.release` puts in every event. A release that does not match is an upload nobody
+   ever asks for: the maps are there, the events are there, and they never meet;
+3. `sentry-cli sourcemaps upload … --url-prefix '~/'` sends the maps (the frames carry absolute
+   URLs, and `~/` is what makes an artifact match one);
+4. **every `.map` is deleted before the publish** — always, token or not. Sentry has its copy; a
+   map served from our own origin hands the whole Dart source to anyone who asks. The
+   `//# sourceMappingURL=` line goes with it, so a devtools session does not fetch a 404 and read
+   the deploy as broken.
+
+`web_channel_test` pins all four, including the ORDER of (4) against the publish.
+
+**No `sourcemaps inject`.** It stamps debug ids into the bundle and expects the events to carry
+them back, which a hand-written client does not send. Matching here is by release + URL, which is
+exactly why step 2 is worth a test.
+
+**The secret this needs — armed 11/09/2026.** The upload step disarms itself while
+`SENTRY_AUTH_TOKEN` is absent (the same shape as the Cloudflare publish beside it): the deploy
+still publishes and the run summary says the stacks will read minified.
+
+To arm it (or to rotate it): Sentry → Settings → **Organization Tokens** → Create New
+Organization Token (https://irineu-pinheiro.sentry.io/settings/auth-tokens/new-token/), then add
+the value as the repository secret `SENTRY_AUTH_TOKEN`
+(https://github.com/irineus/entrelares-flutter/settings/secrets/actions).
+
+**An organization token's scope is not chosen — it is fixed at `org:ci`**, which the screen spells
+out as *Source Map Upload, Release Creation, Code Mappings*. That is exactly what the three
+`sentry-cli` calls above use and nothing more, so there is no narrower option to pick and no
+broader one to avoid. (A per-user token with `project:releases` would work too and is what most
+docs describe; it is the worse choice here, because it dies with the person rather than with the
+project.)
+
+Verify on the next merge to `main`: the run summary stops carrying the "upload PULADO" line, and
+the release appears under Sentry → Releases with its artifacts.
