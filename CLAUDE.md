@@ -44,6 +44,35 @@ structure exists to prevent.
 Do not confuse this board with **Gestão IM360** (`e50abe7f-1688-402a-96b5-c6049b24ce82`) or
 **Desmalha** (`d50a2925-fb74-4f67-b0db-af03ef41d1b4`). Never touch them from this repository.
 
+### Consoles — where an OWNER-ONLY action actually happens
+
+Any delivery that needs a click the owner alone can make gets a **handoff block** written as
+`~/.claude/CLAUDE.md` ("Handoff de ação manual") prescribes — what, where (clickable URL), when, the
+literal values, how to verify, and what happens next. This table exists so the "where" is a **real**
+URL with the ids already in it, never `https://<console>` with a placeholder.
+
+| Console | Direct URL | Note |
+|---|---|---|
+| Supabase **prod** | https://supabase.com/dashboard/project/jptqbwfziyzlhlmoekzu | ref `jptqbwfziyzlhlmoekzu`. **A merge reaches real users from here** |
+| Supabase **dev/QA** | https://supabase.com/dashboard/project/buroanotfjcgvbfmacuh | ref `buroanotfjcgvbfmacuh`. The DB gate and the E2E lane run against THIS one |
+| GitHub secrets (app) | https://github.com/irineus/entrelares-flutter/settings/secrets/actions | `SUPABASE_SERVICE_ROLE_DEV`, `CLOUDFLARE_API_TOKEN`, … |
+| GitHub variables (app) | https://github.com/irineus/entrelares-flutter/settings/variables/actions | public config (`UMAMI_APP_WEBSITE_ID` and friends) |
+| GitHub Actions (app) | https://github.com/irineus/entrelares-flutter/actions | `workflow_dispatch`: `run-e2e`, `build-apk`, full run on a docs-only branch |
+| GitHub branches (app) | https://github.com/irineus/entrelares-flutter/branches | branch deletion — the cloud session CANNOT do it (403 by design) |
+| Landing repo | https://github.com/irineus/entrelares-site | `L-*` items, branch `preview` |
+| Cloudflare Pages | https://dash.cloudflare.com/?to=/:account/pages/view/entrelares-web | project `entrelares-web` serves `web.entrelares.app`; the `?to=/:account/…` form resolves the account itself |
+| Play Console — the app | https://play.google.com/console/u/0/developers/5188946194088545235/app/4976020657794164634/app-dashboard | package `com.entrelares.app`. Bundle promotion is the owner's, always. Developer `5188946194088545235`, app `4976020657794164634` — keep these, they are the only way to deep-link a Play screen |
+| Firebase **prod** | https://console.firebase.google.com/project/entrelares-prod | FCM / web push. Sender `575356979434` |
+| Firebase **dev** | https://console.firebase.google.com/project/entrelares-dev | Sender `51960618124` |
+| Asaas (prod / sandbox) | https://www.asaas.com · https://sandbox.asaas.com | billing rail. Prod must OPT IN via `ASAAS_API_URL` |
+| Umami | https://cloud.umami.is | prod site `6fdd6c5a-4bce-449f-8188-3b7399a859d8` |
+
+⚠️ The **sub-paths inside** these consoles (which tab holds Edge Function secrets, which screen
+registers a webhook) move between product redesigns. So a handoff block always pairs the URL with
+the **in-UI navigation path** as plan B — and when an exact deep link needs an internal numeric id
+this repo does not hold (the Cloudflare account id is the one still missing), say so and ask for it
+once instead of guessing a URL that 404s.
+
 ## Repository layout
 
 Monorepo: `apps/entrelares_app` (Flutter) + three pure-Dart packages — `packages/entrelares_core`
