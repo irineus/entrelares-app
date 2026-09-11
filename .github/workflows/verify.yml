@@ -557,6 +557,12 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # T-66 (PR 3): the sourcemap upload, self-disarming like the publish
+      # below. Org and project are NOT secrets — the DSN in `env.dart` already
+      # names the same account in public.
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: irineu-pinheiro
+      SENTRY_PROJECT: entrelares-app
     steps:
       - uses: actions/checkout@v4
       - name: Read Flutter version from .fvmrc
@@ -567,11 +573,62 @@ jobs:
           flutter-version: ${{ steps.fvm.outputs.version }}
           channel: stable
           cache: true
+      # `--source-maps` (T-66, PR 3) is what makes a web crash READABLE. Without
+      # it dart2js frames name `main.dart.js` offsets and a Sentry issue from
+      # this channel groups and counts correctly while saying nothing about
+      # where it happened. The maps are uploaded to Sentry below and then
+      # DELETED before publishing — see that step for why.
       - name: Build web (production config)
         working-directory: apps/entrelares_app
         run: |
           flutter pub get
-          flutter build web --release --no-web-resources-cdn --dart-define=APP_ENV=prod
+          flutter build web --release --no-web-resources-cdn --source-maps --dart-define=APP_ENV=prod
+      # The release name MUST be the string the client puts in its events
+      # (`CrashReporter.release`), or Sentry has artifacts nobody asks for.
+      # Read from the pubspec rather than repeated here, for the same reason
+      # `env_version_test` exists.
+      - name: Name the release, exactly as the app does
+        id: release
+        run: |
+          version=$(grep -m1 '^version:' apps/entrelares_app/pubspec.yaml | awk '{print $2}')
+          echo "name=entrelares-app@$version" >> "$GITHUB_OUTPUT"
+      # Self-DISARMING, the same shape as the publish step below: with no token
+      # the deploy proceeds and says the stacks will read minified, instead of
+      # painting `main` red for ops that has not happened yet.
+      #
+      # No `sourcemaps inject`: it stamps debug ids into the bundle AND expects
+      # the events to carry them back, which a hand-written client does not
+      # send. Matching here is by RELEASE + url, which is why the two strings
+      # above have to agree.
+      - name: Upload source maps to Sentry
+        if: env.SENTRY_AUTH_TOKEN != ''
+        working-directory: apps/entrelares_app
+        run: |
+          npm install -g @sentry/cli
+          sentry-cli releases new "${{ steps.release.outputs.name }}"
+          sentry-cli sourcemaps upload build/web --release "${{ steps.release.outputs.name }}" --url-prefix '~/' --validate
+          sentry-cli releases finalize "${{ steps.release.outputs.name }}"
+      - name: Say why the web stacks will read minified
+        if: env.SENTRY_AUTH_TOKEN == ''
+        run: |
+          echo "### Source maps: upload PULADO" >> "$GITHUB_STEP_SUMMARY"
+          echo "Falta o secret \`SENTRY_AUTH_TOKEN\` neste repo. O canal web segue reportando crash; as stacks é que saem minificadas (runbook §13.6)." >> "$GITHUB_STEP_SUMMARY"
+      # ALWAYS, token or no token, and always BEFORE the publish: a `.map` file
+      # served from our own origin hands the whole Dart source to anyone who
+      # asks for it. Sentry already has its copy — the maps have no reason to
+      # exist on the CDN, and the browser never needs them.
+      - name: Strip source maps before publishing
+        working-directory: apps/entrelares_app
+        run: |
+          count=$(find build/web -name '*.map' | wc -l)
+          find build/web -name '*.map' -delete
+          # dart2js also leaves a `//# sourceMappingURL=` line pointing at the
+          # file just deleted. Harmless, but it makes every devtools session
+          # fetch a 404 and read like a broken deploy. Removed here, AFTER the
+          # upload, and it is the last line of the bundle — nothing above it
+          # moves, so the maps Sentry holds still line up.
+          find build/web -name '*.js' -exec sed -i '/^\/\/# sourceMappingURL=/d' {} +
+          echo "Source maps stripped from the published bundle: $count" >> "$GITHUB_STEP_SUMMARY"
       # Wrangler, as in the app repo. The Pages project name is IMMUTABLE once
       # created (a lesson the F-54 rebrand paid for), so it is pinned here and
       # created by the owner before the first run.
