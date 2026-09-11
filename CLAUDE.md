@@ -71,7 +71,7 @@ chores that are not backlog items.
 ## Build & test
 ```
 cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
-# Nesse lane moram os seis ESPELHOS (test/mirrors/, T-56 + F-09 + T-62): rótulos
+# Nesse lane moram os sete ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21): rótulos
 # de papel em inglês, formato de data dos e-mails, a chave `lang` do redirect de reset,
 # a cobertura de `params` de todo writer de notificação, o catálogo de push
 # (F-09: o texto do push é montado no servidor, então `_shared/push.ts` duplica de
@@ -80,11 +80,14 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # e o roteamento do toque na web (T-62: o clique numa notificação é tratado pelo SERVICE
 # WORKER, que não chama Dart, então `firebase-messaging-sw.js` reespelha `PushRouting` —
 # o espelho compara os dois lados para TODO tipo pushável, porque errar aqui abre a aba
-# errada sem erro nenhum). Cinco leem
+# errada sem erro nenhum), e os números do gate de sudo (S-21: 6 dígitos, 10 min, 60 s
+# entre pedidos e a própria janela de elevação moram em `elevate/index.ts`, e o espelho
+# lê ESSE arquivo — errar aqui recusa no cliente o código que o e-mail mandou, com os
+# dois lados compilando, e quem não passa é justamente quem não tem senha). Cinco leem
 # supabase/functions/_shared/i18n.ts e supabase/migrations — as duplicações que
-# existem de propósito porque Deno não chama Dart; o sexto lê um service worker, pela
-# mesma razão em outra linguagem. Um espelho que ninguém confere
-# apodrece calado, e é o lane mais barato do run.
+# existem de propósito porque Deno não chama Dart; o sexto lê um service worker e o
+# sétimo uma Edge Function, pela mesma razão em outras linguagens. Um espelho que
+# ninguém confere apodrece calado, e é o lane mais barato do run.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
 cd apps/entrelares_app && fvm flutter analyze && fvm flutter test
 # The two source gates live in that suite: no_literal_snack_test (catalog strings)
@@ -93,7 +96,7 @@ cd apps/entrelares_app && fvm flutter build apk --debug --flavor dev --split-per
 # Canal web: os dois flags NÃO são opcionais — sem o define o build aponta para o
 # banco de QA, e sem o --no-web-resources-cdn o CanvasKit vem do gstatic.
 cd apps/entrelares_app && fvm flutter build web --release --no-web-resources-cdn --dart-define=APP_ENV=prod
-# Gate de banco (256 testes de RLS/RPC/trigger contra o projeto dev), Dart puro
+# Gate de banco (279 testes de RLS/RPC/trigger contra o projeto dev), Dart puro
 # desde o PR 16 do T-56. Exige a service_role do DEV — nunca a de produção. Sem
 # ela a suíte aborta com instruções em vez de rodar pela metade.
 cd packages/entrelares_db_gate && fvm dart analyze --fatal-infos

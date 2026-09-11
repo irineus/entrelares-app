@@ -240,7 +240,9 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   via Edge Function `claim-invitation`, com a migração S-11 preservando a sessão). No
   Android o retorno é por scheme próprio por flavor (`<applicationId>://login-callback`);
   runbook do owner em `supabase/README.md` §9-ter. Sessão sem senha vê o método de login
-  no perfil no lugar do cartão de senha. **Desde a U-45 (10/09/2026) o botão segue as
+  no perfil no lugar do cartão de senha — e, **desde o S-21 (10/09/2026), passa pelo gate
+  de sudo com um código enviado por e-mail**, que é o que lhe devolveu sair da família,
+  promover admin e apagar a própria conta. **Desde a U-45 (10/09/2026) o botão segue as
   diretrizes de marca do *Sign in with Google*:** o "G" oficial como imagem em
   `assets/brand/google-g.png` (1×/2×/3×), superfície/borda/tinta da spec em `GoogleBrand`
   (dentro do `tokens.dart`, o único lugar onde uma cor se escreve), 40 dp de altura, e a
