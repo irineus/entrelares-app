@@ -263,12 +263,22 @@ dono; aqui só existe `main`, e ela é o dono).
 
 ### Limpeza de branch depois do merge
 
-**Não decidir por `git branch --merged`**: com squash a ponta da branch deixa de ser ancestral e
-some do `--merged` mesmo com tudo integrado. Usar `git cherry`, que compara por *patch-id*:
+**Não decidir por git, decidir pelo GitHub.** Com squash a ponta da branch deixa de ser ancestral,
+e TODA heurística local erra a partir daí — inclusive as duas que já foram recomendadas aqui:
+
+- `git branch --merged` não lista a branch, mesmo com tudo integrado;
+- `git cherry`, que compara por *patch-id*, **só acerta em branch de UM commit**. Um squash
+  transforma N commits em um só, cujo patch é a união deles: nenhum dos N patch-ids casa. Medido
+  em 11/09/2026 (T-66): uma branch de 5 commits, squashed e mergeada, acusou `5` "pendentes",
+  enquanto as três de um commit cada acusaram `0`;
+- `git diff main...origin/<branch>` engana pelo mesmo motivo — o commit do squash não é ancestral,
+  então a base de comparação é antiga e o diff mostra o trabalho da branch como se fosse novidade.
+
+Quem sabe é o GitHub, e ele responde direto:
 
 ```bash
-git fetch origin --quiet
-git cherry main origin/<branch> | grep '^+' | wc -l   # 0 = tudo já está em main
+gh pr view <N> --json number,state,mergeCommit,headRefName
+# MERGED + o sha do merge = integrado, pode remover
 ```
 
 **Em sessão na nuvem, apagar branch remota é impossível — não tentar.** Todo o tráfego de git passa
