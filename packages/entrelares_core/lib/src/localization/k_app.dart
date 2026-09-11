@@ -177,6 +177,12 @@ abstract final class KApp {
   static const String auditActionPendingRemoved = 'app.audit.pendingRemoved';
   static const String auditActionPendingClaimed = 'app.audit.pendingClaimed';
 
+  // ── T-65 web→app handoff. Shown ONLY on the web channel, and only when the
+  //    browser confirms the Play app is on this device. ──
+  static const String handoffBanner = 'app.handoff.banner';
+  static const String handoffOpen = 'app.handoff.open';
+  static const String handoffDismiss = 'app.handoff.dismiss';
+
   /// See `K.allKeys`.
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -277,6 +283,9 @@ abstract final class KApp {
     auditActionPendingAdded,
     auditActionPendingRemoved,
     auditActionPendingClaimed,
+    handoffBanner,
+    handoffOpen,
+    handoffDismiss,
   ];
 }
 
@@ -429,6 +438,9 @@ abstract final class StringsAppPtBr {
     KApp.auditActionPendingAdded: 'Responsável adicionado ao calendário',
     KApp.auditActionPendingRemoved: 'Responsável removido do calendário',
     KApp.auditActionPendingClaimed: 'Responsável entrou pelo convite',
+    KApp.handoffBanner: 'Você já tem o app neste aparelho.',
+    KApp.handoffOpen: 'Abrir no app',
+    KApp.handoffDismiss: 'Agora não',
   };
 }
 
@@ -577,5 +589,8 @@ abstract final class StringsAppEn {
     KApp.auditActionPendingAdded: 'Caregiver added to the calendar',
     KApp.auditActionPendingRemoved: 'Caregiver removed from the calendar',
     KApp.auditActionPendingClaimed: 'Caregiver joined through the invitation',
+    KApp.handoffBanner: 'You already have the app on this device.',
+    KApp.handoffOpen: 'Open in the app',
+    KApp.handoffDismiss: 'Not now',
   };
 }

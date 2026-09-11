@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  T-65 — the app→site half of the Digital Asset Links pair.
+
+  `web/.well-known/assetlinks.json` is the site→app half, and it has named this
+  package since F-54; it is what Android reads to VERIFY App Links. This file is
+  the opposite direction, and it exists for a different reader: Chrome's
+  `navigator.getInstalledRelatedApps()`, which the web channel calls to find out
+  whether this app is already on the device before offering to hand the reader
+  over to it.
+
+  BOTH halves must be present, plus `related_applications` in
+  `web/manifest.json`. With any of the three missing the API resolves to an
+  EMPTY LIST — indistinguishable from "not installed" — so the handoff banner
+  would simply never appear, with no error anywhere. `web_channel_test` reads
+  all three and fails the build if they drift.
+
+  The site is the PRODUCT's web origin, not a per-flavor value: the web channel
+  is served from exactly one hostname, and a dev build running on a random
+  `flutter run` port is a different origin that this API could not match anyway.
+-->
+<resources>
+    <string name="asset_statements" translatable="false">
+        [{
+          \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+          \"target\": {
+            \"namespace\": \"web\",
+            \"site\": \"https://web.entrelares.app\"
+          }
+        }]
+    </string>
+</resources>

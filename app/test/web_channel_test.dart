@@ -9,6 +9,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:entrelares_core/entrelares_core.dart';
+
 import 'package:entrelares_app/deep_link_urls.dart';
 import 'package:entrelares_app/env.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +19,17 @@ File _web(String name) => File('web/$name');
 File _workflow() => File('../.github/workflows/verify.yml');
 File _androidManifest() =>
     File('android/app/src/main/AndroidManifest.xml');
+File _androidStrings() => File('android/app/src/main/res/values/strings.xml');
+
+/// Every `autoVerify` filter in the manifest, as raw blocks. These are the
+/// filters that claim an https ADDRESS — the ones with the power to take a URL
+/// away from the web channel.
+List<String> _appLinkFilters(String manifest) =>
+    RegExp(r'<intent-filter android:autoVerify="true">(.*?)</intent-filter>',
+            dotAll: true)
+        .allMatches(manifest)
+        .map((m) => m.group(1)!)
+        .toList();
 
 /// The one CSP the web channel ships, as written in `_headers`.
 String? _csp(String headers) =>
@@ -471,6 +484,94 @@ void main() {
         related.cast<Map<String, dynamic>>().map((a) => a['id']),
         contains(Env.prod.androidPackage),
       );
+    });
+  });
+
+  group('the web\u2192app handoff (T-65)', () {
+    test('the app answers the host the web channel links to', () {
+      // Two languages, one host. A rename on either side leaves the banner
+      // pointing at a URI no activity answers — which Chrome renders as a
+      // dead page and reports nowhere.
+      final manifest = _androidManifest().readAsStringSync();
+      expect(manifest,
+          contains('android:host="${ChannelHandoffRules.host}"'));
+      // And it is the app's OWN scheme, per flavor, never a literal package:
+      // the two flavors coexist on the owner's device, and a shared scheme
+      // would open a chooser or wake the wrong environment. Matched over the
+      // `<data>` element rather than on exact indentation, so reformatting the
+      // manifest cannot fail this for the wrong reason.
+      final handoffData = RegExp(
+              r'<data android:scheme="\$\{applicationId\}"\s+'
+              'android:host="${ChannelHandoffRules.host}"\\s*/>')
+          .hasMatch(manifest);
+      expect(handoffData, isTrue,
+          reason: 'the handoff filter must pair the applicationId placeholder '
+              'with the host ${ChannelHandoffRules.host}');
+    });
+
+    test('all THREE sources getInstalledRelatedApps needs are present', () {
+      // The API resolves to an EMPTY LIST when any of them is missing, which
+      // is indistinguishable from "the app is not installed": the banner
+      // simply never appears and nothing anywhere says why. This is the only
+      // place that can notice.
+      final manifest = _androidManifest().readAsStringSync();
+      final strings = _androidStrings().readAsStringSync();
+      final webManifest =
+          jsonDecode(_web('manifest.json').readAsStringSync())
+              as Map<String, dynamic>;
+
+      // 1. app -> site, named by the manifest and declared in strings.xml.
+      expect(manifest, contains('android:name="asset_statements"'));
+      expect(manifest, contains('android:resource="@string/asset_statements"'));
+      expect(strings, contains('name="asset_statements"'));
+      expect(strings, contains('https://${Env.prod.webHostname}'));
+
+      // 2. site -> app, the file Android also verifies App Links against.
+      final statements = jsonDecode(
+        _web('.well-known/assetlinks.json').readAsStringSync(),
+      ) as List<dynamic>;
+      expect(
+        statements
+            .cast<Map<String, dynamic>>()
+            .map((s) => (s['target'] as Map<String, dynamic>)['package_name']),
+        contains(Env.prod.androidPackage),
+      );
+
+      // 3. the web manifest's own pointer at the store app.
+      expect(
+        (webManifest['related_applications'] as List<dynamic>)
+            .cast<Map<String, dynamic>>()
+            .map((a) => a['id']),
+        contains(Env.prod.androidPackage),
+      );
+    });
+
+    test('no App Link claims the site itself', () {
+      // THE invariant of this item, asserted as an absence. Covering `/` (or
+      // prefixing it) does not repair the web channel, it ENDS it: every visit
+      // to web.entrelares.app would open the app instead. The handoff is a
+      // custom scheme precisely so no https address changes owner.
+      for (final filter in _appLinkFilters(_androidManifest().readAsStringSync())) {
+        expect(filter, isNot(contains('android:pathPrefix="/"')));
+        expect(filter, isNot(contains('android:pathPattern=".*"')));
+        expect(
+          RegExp(r'android:path="/"').hasMatch(filter),
+          isFalse,
+          reason: 'an App Link on `/` hands the whole web channel to the app',
+        );
+      }
+    });
+
+    test('the App Links that DO exist are still the two that always did', () {
+      // The list is short on purpose and each entry is a URL the app took
+      // over from the browser. A new one is a product decision, not a detail.
+      final filters =
+          _appLinkFilters(_androidManifest().readAsStringSync()).join();
+      final paths = RegExp(r'android:path="([^"]+)"')
+          .allMatches(filters)
+          .map((m) => m.group(1))
+          .toSet();
+      expect(paths, {'/update-password', '/register'});
     });
   });
 

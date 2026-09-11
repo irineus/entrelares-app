@@ -79,7 +79,48 @@
                 <data android:scheme="${applicationId}"
                       android:host="login-callback"/>
             </intent-filter>
+            <!-- T-65: the way ACROSS from the web channel. A reader on
+                 web.entrelares.app in Chrome who also has this app had no way
+                 back into it; the banner there links to
+                 `${applicationId}://open/<location>` and this filter is what
+                 answers.
+
+                 A SEPARATE filter from the F-57 one above, though the scheme is
+                 the same and Android would match either way: the two hosts
+                 answer to different callers (GoTrue's redirect, our own page)
+                 and reading one comment must never require untangling the
+                 other.
+
+                 It is deliberately NOT an https App Link. Covering `/` would
+                 end the web channel — every visit to the site would open the
+                 app — and path-scoped App Links for internal routes carry the
+                 same defect in miniature: the same URL, pasted or e-mailed,
+                 would start opening the app for everyone who has it. A scheme
+                 the app already owns changes the ownership of no address.
+
+                 The location rides in the PATH because the embedding builds the
+                 initial route out of the intent's getPath() + query + fragment,
+                 so go_router receives the location itself and needs no listener
+                 of ours. `ChannelHandoffRules` builds the same value from
+                 Env.current.androidPackage, and web_channel_test reads the host
+                 out of this file. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="${applicationId}"
+                      android:host="open"/>
+            </intent-filter>
         </activity>
+        <!-- T-65 — the app→site Digital Asset Links statement, which is what
+             lets Chrome's getInstalledRelatedApps() answer the web channel's
+             "is this app already here?". The site→app half lives in
+             web/.well-known/assetlinks.json. With either half missing the API
+             returns an EMPTY LIST, which reads exactly like "not installed":
+             the banner never shows and nothing reports a thing. -->
+        <meta-data
+            android:name="asset_statements"
+            android:resource="@string/asset_statements" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <!-- F-09 — the status-bar icon, and it is NOT a nicety. Android renders a

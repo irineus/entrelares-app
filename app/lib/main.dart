@@ -11,6 +11,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'deep_link_urls.dart';
 import 'env.dart';
@@ -39,6 +40,7 @@ import 'services/boot_handoff.dart';
 import 'services/auth_providers.dart';
 import 'services/crash_reporter.dart';
 import 'services/custody_data_source.dart';
+import 'services/installed_app.dart';
 import 'services/notification_badge.dart';
 import 'services/onboarding_service.dart';
 import 'services/push_service.dart';
@@ -334,6 +336,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
             onSignOut: _signOut,
             onOpenProfile: () => _router.go('/family/profile'),
             deletionBanner: _deletionBanner,
+            appHandoff: _appHandoff,
             tourKeys: _tourKeys),
         branches: [
           StatefulShellBranch(routes: [
@@ -460,6 +463,16 @@ class _EntrelaresAppState extends State<EntrelaresApp>
 
   /// S-11: what the shell's persistent deletion banner shows, or null.
   FamilyDeletionBanner? _deletionBanner;
+
+  /// T-65: the web→app offer, or null — which is the answer on every native
+  /// build and on every browser that did not confirm the app is on this device.
+  AppHandoffBanner? _appHandoff;
+
+  /// Where a dismissal of that offer is remembered. Under the `app.` prefix
+  /// the whole client uses, and read through `prefs` rather than
+  /// `localStorage` directly so the web and the VM tell the same story in a
+  /// test.
+  static const String _handoffDismissedKey = 'app.handoff.dismissed';
 
   /// U-23 — the checklist/tour state and the shared registry of tour targets
   /// (they live in two different subtrees: the tab bar and the calendar).
@@ -606,6 +619,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       // who already said yes. Never prompts — the dialog is spent by a gesture
       // on the Notificações screen, not by opening the app.
       unawaited(_startPush());
+      // T-65: asks the BROWSER whether this reader already has the app. Here
+      // rather than at boot because the banner lives in the authenticated
+      // shell, and because a question nobody will act on is not worth asking.
+      unawaited(_resolveAppHandoff());
     } else {
       _badge.stop();
       unawaited(_push.stop());
@@ -627,6 +644,46 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     if (_routerLive) return;
     _routerLive = true;
     _router.routeInformationProvider.addListener(_trackPageView);
+  }
+
+  /// T-65 — whether to offer the crossing into the installed app.
+  ///
+  /// Asked once per authenticated session and never again after a dismissal:
+  /// the offer is a convenience, and a convenience that keeps coming back is
+  /// an interruption. The dismissal is per BROWSER (`prefs` is `localStorage`
+  /// on this channel), which is the right grain — it is that browser that has
+  /// the app beside it.
+  ///
+  /// Every failure inside [isStoreAppInstalled] answers "no", so the whole
+  /// path is silent by construction: nothing here may cost the reader a
+  /// screen.
+  Future<void> _resolveAppHandoff() async {
+    if (!kIsWeb || _appHandoff != null) return;
+    if (widget.prefs.getBool(_handoffDismissedKey) ?? false) return;
+    if (!await isStoreAppInstalled(Env.current.androidPackage)) return;
+    if (!mounted || _phase != _AuthPhase.authed) return;
+    setState(() => _appHandoff = AppHandoffBanner(
+          onOpen: _openInApp,
+          onDismiss: _dismissAppHandoff,
+        ));
+  }
+
+  /// T-65 — hands the reader's CURRENT location to the app.
+  ///
+  /// `_self` is not decoration: without a window name the web plugin opens a
+  /// new tab to fire the intent and leaves a blank one behind — the same
+  /// stray-tab artefact the original bug report was misread as.
+  void _openInApp() {
+    final uri = ChannelHandoffRules.handoffUri(
+      androidPackage: Env.current.androidPackage,
+      location: _router.routeInformationProvider.value.uri.toString(),
+    );
+    unawaited(launchUrl(uri, webOnlyWindowName: '_self'));
+  }
+
+  void _dismissAppHandoff() {
+    setState(() => _appHandoff = null);
+    unawaited(widget.prefs.setBool(_handoffDismissedKey, true));
   }
 
   /// F-09 — needs the profile id, which the phase transition does not carry.
