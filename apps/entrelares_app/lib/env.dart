@@ -20,6 +20,7 @@ class Env {
     required this.webHostname,
     required this.androidPackage,
     this.webPush = WebPushConfig.none,
+    this.sentryDsn = '',
   });
 
   final String name;
@@ -70,6 +71,19 @@ class Env {
   /// `billing.store_enabled` client-side. See [WebPushConfig].
   final WebPushConfig webPush;
 
+  /// T-66 — where a crash goes. PUBLIC config, like everything else in this
+  /// file: a Sentry DSN is shipped to every browser that loads an
+  /// instrumented page and can only WRITE events, so rule 1 of `CLAUDE.md`
+  /// (T-44) holds unchanged. It is worth saying out loud because a long
+  /// opaque string in a config file reads like a secret even when it is not.
+  ///
+  /// **One project per environment**, on the same reasoning as the two
+  /// Firebase projects above: a QA run must never be able to write into the
+  /// stream someone reads to decide whether production is on fire. Empty is a
+  /// STATE — `CrashReporter.isEnabled` goes false and the app is silent,
+  /// never half-configured.
+  final String sentryDsn;
+
   /// Dev/QA — the spike's original target. Still runs the legacy anon JWT
   /// until S-17 (app repo) retires it.
   static const dev = Env._(
@@ -98,6 +112,12 @@ class Env {
       vapidKey:
           'BKVzlLeJytzADoULGBBLyQWAGd1SHTo-xyojfl10nbqchHrk-Jm_TPM5peu9fIT489ue_xgMJsK1D7Qc4BHHw2g',
     ),
+    // T-66: the `entrelares-app-dev` project. Dev REPORTS, unlike analytics,
+    // which is dark here on purpose — a crash path proves nothing until an
+    // event of ours has actually landed, and the first place to prove it is
+    // the environment nobody's family lives in.
+    sentryDsn: 'https://745aa4d38b3b07ac90ce48a267ea4181'
+        '@o4511910022217728.ingest.us.sentry.io/4512066983559168',
   );
 
   /// Production — the exact public values `web.entrelares.app` serves every
@@ -128,6 +148,10 @@ class Env {
       vapidKey:
           'BKxwYBh6_lCawyFhugKyh1yoRvm0-O2kAeH88KJxanKdsCEMUHS4ASehFoO6y_VXFHtQ0hrFWdabnvK5f49isNM',
     ),
+    // T-66: the `entrelares-app` project — the stream that says whether the
+    // product is breaking for real families, on either channel.
+    sentryDsn: 'https://207fdf4ae55dd391583ecaa369b3319b'
+        '@o4511910022217728.ingest.us.sentry.io/4512066983231488',
   );
 
   /// How the WEB build says "production". `flutter build web` accepts no
@@ -148,7 +172,7 @@ class Env {
   /// Mirrors `pubspec.yaml`'s `version:` — the web's `AppVersion.Display`.
   /// Only the F-17 export reads it, and a stale value there would misdate an
   /// LGPD record, so `env_version_test.dart` fails the build if the two drift.
-  static const String appVersion = '2.6.8+72';
+  static const String appVersion = '2.6.9+73';
 }
 
 /// T-62 — the PUBLIC Firebase Web config of one environment, plus its VAPID

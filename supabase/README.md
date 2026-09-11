@@ -2225,3 +2225,97 @@ the family is now premium for a reason that does not expire.
 pair as *motivo da cortesia → motivo da revogação* (F-58 QA 4). **There is no legitimate reason
 to revoke an F-53 comp** — the promise was permanent — so a revoke on this cohort should be
 treated as a mistake until proven otherwise.
+## 13. T-66 — crash reporting (Sentry), per project
+
+> **Why this is in the runbook and not only in the code.** The client half ships with the app
+> and needs no deploy step; what needs a human is the *other* end — the projects, the alert
+> rule and the quota. Until 11/09/2026 a crash on a real device reached nobody on either
+> channel, and every defect the product ever heard about came from a person who happened to say
+> something.
+
+### 13.1 The two projects
+
+| Environment | Sentry project | Written by |
+|---|---|---|
+| Production | `irineu-pinheiro/entrelares-app` | the Play build and `web.entrelares.app` |
+| Dev/QA | `irineu-pinheiro/entrelares-app-dev` | a `dev`-flavour build and a local `flutter run` |
+
+**One project per environment, not one project with an `environment` tag.** The reasoning is the
+one the two Firebase projects already follow (§11.1): a QA run must never be able to write into
+the stream someone reads to decide whether production is on fire. The DSNs live in
+`apps/entrelares_app/lib/env.dart`, one per `Env`, as PUBLIC config — a Sentry DSN is shipped to
+every browser that loads an instrumented page and can only WRITE events, so rule 1 of
+`CLAUDE.md` holds unchanged. **An empty DSN is a state**: `CrashReporter.isEnabled` goes false
+and the app is silent, never half-configured.
+
+Unlike analytics (T-37), **dev is NOT dark**. Umami is silent in dev so QA cannot pollute
+product statistics; a crash path, by contrast, proves nothing until an event of ours has
+actually landed somewhere, and the place to prove it is the environment no family lives in.
+
+### 13.2 What leaves the device, and what deliberately does not
+
+There is **no SDK**. The event is a hand-written envelope POST (`lib/services/crash_reporter.dart`),
+and the payload itself is built and scrubbed in `packages/entrelares_core/lib/src/crash_rules.dart`,
+under `dart test`. That is the whole reason for the shape: an SDK's defaults collect breadcrumbs,
+user context and request data, and the S-13 invariant would then depend on switching each of them
+off — where a new default in a future version reopens the leak in silence. Here nothing enters the
+payload that we did not write.
+
+**Sent:** exception type, scrubbed message, parsed stack frames (with `in_app` for our own),
+release, environment, channel (`web`/`store`), platform.
+**Never sent:** user id, e-mail or session; breadcrumbs; device or server name; request and
+response bodies; route arguments; screenshots.
+
+The scrubber masks the known shapes before anything is encoded — e-mail addresses, JWTs, both
+S-16 key shapes, `Bearer`/`apikey` pairs, **the entire query and fragment of any URL** (that is
+where an invitation token and a recovery hash live), UUIDs, and runs of six digits or more (the
+S-21 elevation code is exactly six). A five-digit SQLSTATE survives on purpose: it is a
+diagnosis, not a credential.
+
+**What it cannot promise, stated plainly:** a first name has no shape a regular expression can
+catch. A server message that interpolates one would carry it. That is why the message is capped
+at 1 000 characters and why the app never attaches a response body — the unknown-shaped data is
+kept out by not sending the places it lives, not by matching it.
+
+### 13.3 Rate limiting, on both ends
+
+The client sends **one event per distinct fingerprint per process**, with a ceiling of **20 per
+process**. A failure inside `build()` throws on every frame, and without the ceiling one bad
+release spends the month's quota — and the reader's battery — in seconds.
+
+The free plan covers 5 000 errors/month, which is far above this product's volume. If a release
+ever floods anyway, cap it at the DSN: Sentry → project → **Client Keys (DSN)** → rate limit.
+
+### 13.4 Verifying a project by hand
+
+One `curl` proves the whole chain — auth in the query, `text/plain` body, envelope shape:
+
+```bash
+# The key is the part of the DSN before the @; the project id is its last path segment.
+DSN_KEY=745aa4d38b3b07ac90ce48a267ea4181
+PROJECT=4512066983559168
+
+cat > probe.envelope <<'ENVELOPE'
+{"event_id":"aa11bb22cc33dd44ee55ff6677889901","sent_at":"2026-09-11T12:00:00.000Z"}
+{"type":"event","content_type":"application/json"}
+{"event_id":"aa11bb22cc33dd44ee55ff6677889901","timestamp":"2026-09-11T12:00:00.000Z","platform":"other","level":"error","release":"probe","environment":"dev","exception":{"values":[{"type":"ProbeError","value":"runbook probe"}]}}
+ENVELOPE
+
+curl -sS -X POST -H 'Content-Type: text/plain;charset=UTF-8' --data-binary @probe.envelope "https://o4511910022217728.ingest.us.sentry.io/api/$PROJECT/envelope/?sentry_key=$DSN_KEY&sentry_version=7"
+# 200 + {"id":"…"} = accepted. The issue appears within seconds.
+```
+
+**The auth is in the QUERY and the body is `text/plain` on purpose** — that keeps the web
+channel's POST a CORS-simple request with no preflight, the same trap the Umami transport
+avoids (T-37). Moving either one into a custom header is how the web channel would go quiet
+without failing.
+
+### 13.5 What still needs the owner
+
+1. **An alert rule**, per project — Sentry does not notify anyone by default. Production wants
+   at least "a new issue, first seen" by e-mail; dev wants none.
+2. **T-68 shares this destination.** A failed publish is the same defect one floor up, and three
+   channels of ops signal is the same as none.
+3. **Web stack traces read minified** until the source-map upload lands (T-66, PR 3). Events
+   group and count correctly today; the frames name `main.dart.js` positions rather than Dart
+   symbols. Android is unobfuscated, so its frames are already readable.
