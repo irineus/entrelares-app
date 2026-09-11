@@ -28,6 +28,14 @@ import { account, common, formatDateIn, type Lang, resolveLang } from "../_share
 //     gets the final heads-up with the purge date.
 //   · family_deletion_completed — cron only, AFTER the purge: the profiles are
 //     gone, so the payload carries explicit `recipients` + `familyName`.
+//   · elevation_code — S-21, `elevate` only: the one-time code that lets a
+//     session with no password pass the S-10 sudo gate. The odd one out in
+//     every way, and each difference is deliberate: it is keyed by `userId`
+//     (the subject may have no profile yet — a deferred OAuth sign-up), it
+//     e-mails ONLY the subject, it refuses a user-session caller, and it reads
+//     the destination address from `auth.users` instead of trusting the
+//     payload. A caller that could name both the recipient and the code would
+//     be a way to mail a valid elevation code to an address of its choosing.
 //   · premium_grace_ending — S-15/B-3, cron: subject = a family ADMIN, warned
 //     that the Premium grace period is about to expire. Unlike every type above
 //     it e-mails ONLY the subject, never the other members: the checkout and the
@@ -56,7 +64,8 @@ type EmailType =
   | "family_deletion_requested" | "family_deletion_refused"
   | "family_deletion_withdrawn" | "family_deletion_reminder"
   | "family_deletion_completed"
-  | "premium_grace_ending";
+  | "premium_grace_ending"
+  | "elevation_code";
 
 interface Payload {
   emailType: EmailType;
@@ -67,6 +76,12 @@ interface Payload {
   familyName?: string;
   // premium_grace_ending only — ISO date the grace period runs out.
   graceEndsAt?: string;
+  // elevation_code only — the subject and the code itself. `elevate` mints the
+  // code, stores only its digest, and hands the plaintext here; this is the one
+  // place it exists outside that function's memory.
+  userId?: string;
+  code?: string;
+  expiresInMinutes?: number;
 }
 
 interface Profile {
@@ -108,17 +123,58 @@ serve(async (req: Request) => {
       return jsonResponse({ error: "Não autorizado." }, 401);
     }
 
-    const { emailType, profileId, environmentPrefix = "", recipients, familyName, graceEndsAt }: Payload =
-      await req.json();
+    const { emailType, profileId, environmentPrefix = "", recipients, familyName, graceEndsAt,
+            userId, code, expiresInMinutes }: Payload = await req.json();
 
     const validTypes: EmailType[] = [
       "member_left", "member_joined", "member_returned",
       "family_deletion_requested", "family_deletion_refused",
       "family_deletion_withdrawn", "family_deletion_reminder",
-      "family_deletion_completed", "premium_grace_ending",
+      "family_deletion_completed", "premium_grace_ending", "elevation_code",
     ];
     if (!validTypes.includes(emailType)) {
       return jsonResponse({ error: "Payload inválido." }, 400);
+    }
+
+    // S-21 — the sudo gate's e-mail code. `elevate` is the only legitimate
+    // caller, and it holds the secret key; a user session reaching here would
+    // mean someone found a way to ask us to mail a code they also chose.
+    if (emailType === "elevation_code") {
+      if (!isSecretKeyCaller(req, serviceKey)) {
+        console.warn("[send-account-email] elevation_code refused — not a secret-key caller");
+        return jsonResponse({ error: "Não autorizado." }, 401);
+      }
+      if (!userId || !code || !expiresInMinutes) {
+        return jsonResponse({ error: "Payload inválido." }, 400);
+      }
+
+      // The address is READ, never accepted: see the note at the top of this file.
+      const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(userId);
+      const to = authUser?.user?.email;
+      if (authError || !to) {
+        console.error("[send-account-email] elevation_code — no address for that user");
+        return jsonResponse({ error: "Usuário não encontrado." }, 404);
+      }
+
+      // U-13: the subject may legitimately have NO profile — a deferred OAuth
+      // sign-up (F-57) that has not onboarded yet still owns an account it is
+      // entitled to delete. `maybeSingle` and the PT-BR fallback are the honest
+      // answer there, not an error.
+      const { data: langRow } = await supabase
+        .from("profiles")
+        .select("language_effective")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const lang = resolveLang((langRow?.language_effective as string | null) ?? null);
+
+      const sent = await sendEmail(resendKey, fromEmail, fromName, {
+        to,
+        subject: `${environmentPrefix}${account(lang).subjElevationCode}`,
+        html: elevationCodeHtml(lang, code, String(expiresInMinutes)),
+      });
+      // S-13: never log the address, and never the code.
+      console.log(`[send-account-email] elevation_code → ${lang}${sent ? "" : " (suppressed)"}`);
+      return jsonResponse({ sent: sent ? 1 : 0, suppressed: sent ? 0 : 1, failed: 0 });
     }
 
     // The purge already removed the profiles — recipients come in the payload.
@@ -322,6 +378,20 @@ const shell = (body: string, lang: Lang) => `
 
 const list = (...items: string[]) =>
   `<ul style="line-height: 1.6;">${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
+
+// S-21. No greeting by name: the code mail is keyed by user, and the subject
+// may have no profile to take a name from. No button either — a confirmation
+// code must be TYPED into the app the reader already has open, and a link here
+// would be one more thing a phishing copy could imitate.
+function elevationCodeHtml(lang: Lang, code: string, minutes: string): string {
+  const t = account(lang);
+  return shell(`
+      <h2>${t.elevationHeading}</h2>
+      <p>${t.elevationIntro}</p>
+      <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">${escapeHtml(code)}</p>
+      <p>${t.elevationExpiry(escapeHtml(minutes))}</p>
+      <p>${t.elevationIgnore}</p>`, lang);
+}
 
 function selfHtml(lang: Lang, name: string, graceDate: string): string {
   const t = account(lang);
