@@ -29,13 +29,21 @@
 #     `fcmregistrations` exchanges it for the registration token. Both are
 #     `fetch`, from the page AND from the messaging worker (a worker's requests
 #     are judged by the CSP served with the worker script, which is this one).
+#   * T-66 adds ONE connect-src host and nothing else: the Sentry ingest
+#     endpoint the crash reporter POSTs its envelope to. There is no SDK and no
+#     third-party SCRIPT — the payload is built by our own code — so this is the
+#     same shape as the T-62 line above: what is third-party is the API we TALK
+#     to. Without this source the browser blocks the POST and the web channel
+#     reports NOTHING, silently, because a reporter that may never break the app
+#     swallows its own transport failure. `web_channel_test` reads the host out
+#     of `Env.sentryDsn` and fails the build if the two ever drift.
 /*
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cloud.umami.is https://fonts.gstatic.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cloud.umami.is https://fonts.gstatic.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://o4511910022217728.ingest.us.sentry.io; frame-ancestors 'none'
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Cache control
