@@ -959,11 +959,11 @@ abstract final class StringsPtBr {
     K.rolesPremiumGate: '💙 Criar e editar papéis personalizados (ex.: "Vovó materna") é um recurso Premium. Os papéis que sua família já criou continuam valendo, e os papéis padrão seguem disponíveis para todos.',
     K.rolesToastCreated: 'Papel criado! Ele já está disponível nos convites e nos membros.',
     // ── Sudo prompt ──
-    K.sudoTitle: '🔐 Confirme sua senha',
-    K.sudoHint: 'Por segurança, esta ação exige a confirmação da sua senha. A confirmação vale por alguns minutos.',
+    K.sudoTitle: '🔐 Confirme que é você',
+    K.sudoHint: 'Por segurança, esta ação exige uma confirmação. Ela vale por alguns minutos.',
     K.sudoCurrentPassword: 'Senha atual',
     K.sudoConfirm: 'Confirmar',
-    K.sudoForgot: 'Esqueceu a senha? Use "Redefinir senha por e-mail" na seção Senha.',
+    K.sudoForgot: 'Não tem uma senha, ou não lembra dela? Peça um código por e-mail aqui mesmo.',
     // ── Not found ──
     K.notFoundTitle: 'Página não encontrada',
     K.notFoundBody: 'O conteúdo que você está procurando não existe.',

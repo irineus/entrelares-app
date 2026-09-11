@@ -985,6 +985,56 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     }
   }
 
+  @override
+  Future<int> requestElevationCode() async {
+    // Same refresh as `elevate`: a stale access token makes the function answer
+    // 401 before it ever looks at what was asked, and the user would read a
+    // refusal about a code that was never minted.
+    try {
+      await _client.auth.refreshSession();
+    } catch (_) {/* the invoke below surfaces a dead session honestly */}
+
+    try {
+      final response =
+          await _client.functions.invoke('elevate', body: {'request_code': true});
+      final data = response.data;
+      final minutes = data is Map ? data['expires_in_minutes'] : null;
+      // A success that forgot to say how long the code lasts still sent one —
+      // fall back to the mirrored constant rather than refusing.
+      return minutes is int ? minutes : SudoRules.codeTtl.inMinutes;
+    } on FunctionException catch (e) {
+      throw ElevationRefused(
+        serverMessage: _functionErrorText(e),
+        // 429 here is the resend throttle, and its message says the PREVIOUS
+        // code is still valid — which is an instruction, not an error.
+        rateLimited: e.status == 429,
+      );
+    }
+  }
+
+  @override
+  Future<String?> elevateWithCode(String code) async {
+    try {
+      await _client.auth.refreshSession();
+    } catch (_) {/* as above */}
+
+    try {
+      final response = await _client.functions
+          .invoke('elevate', body: {'code': SudoRules.normalizeCode(code)});
+      final data = response.data;
+      if (data is Map && data['elevated_until'] is String) {
+        return data['elevated_until'] as String;
+      }
+      return null;
+    } on FunctionException catch (e) {
+      throw ElevationRefused(
+        serverMessage: _functionErrorText(e),
+        wrongCode: e.status == 401,
+        rateLimited: e.status == 429,
+      );
+    }
+  }
+
   // ── Lote 4: sign-up and invitations ───────────────────────────────────────
 
   @override

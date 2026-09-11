@@ -234,9 +234,13 @@ say which one is blocking: sweep the whole list.
       **Yes**) — the page's *"Apagar dados sem excluir a conta"* section: the LGPD art. 18
       rights exercised through `privacidade@entrelares.app`, including the by-annotation
       correction the immutable history requires.
-    - `privacidade@entrelares.app` stays as the channel for whoever cannot sign in — including,
-      today, anyone who signs in with Google: deletion is sudo-gated (S-10) and an OAuth session
-      has no password to confirm (**S-21**).
+    - `privacidade@entrelares.app` stays as the channel for whoever cannot sign in. It is no
+      longer the only channel for a Google account: deletion is sudo-gated (S-10), and since
+      **S-21** the gate takes a second proof — a one-time code mailed to the account — so a
+      session with no password confirms and deletes like any other. The caveat this line carried
+      on 10/09/2026 was true for exactly one day, and it is the reason the item existed: the
+      declared URL promises a path a STRANGER can walk, and three of the four affected accounts
+      were the sole admin of a one-seat family, i.e. people with no in-app way out at all.
   - The consent log stores the accepting IP (disclosed in the policy) — server-side
     security/audit data tied to the account; declare it under Personal info only if the form's
     current wording requires IP disclosure (re-read the help text at fill time).

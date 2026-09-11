@@ -410,6 +410,34 @@ class FakeCustodyDataSource implements CustodyDataSource {
         serverMessage: 'Senha incorreta.', wrongPassword: true);
   }
 
+  // ── S-21: the second proof ────────────────────────────────────────────────
+
+  /// Codes asked for, in order. `null` entries are impossible: the sheet never
+  /// asks without a session.
+  int codeRequests = 0;
+  final List<String> codeAttempts = [];
+
+  /// The code this fake will accept. Null means every code is refused.
+  String? sudoCode;
+
+  /// Set to make the request itself fail — a throttle (429) or an outage.
+  ElevationRefused? throwOnRequestCode;
+
+  @override
+  Future<int> requestElevationCode() async {
+    codeRequests++;
+    if (throwOnRequestCode != null) throw throwOnRequestCode!;
+    return SudoRules.codeTtl.inMinutes;
+  }
+
+  @override
+  Future<String?> elevateWithCode(String code) async {
+    codeAttempts.add(code);
+    if (sudoCode != null && code == sudoCode) return sudoElevatedUntil;
+    throw const ElevationRefused(
+        serverMessage: 'Código incorreto.', wrongCode: true);
+  }
+
   // ── Lote 4: sign-up and invitations ──
   /// What [fetchInviteInfo] resolves to; null makes every token invalid.
   InviteInfo? inviteInfo;

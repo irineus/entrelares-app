@@ -80,17 +80,87 @@ class SudoService extends ChangeNotifier {
     }
   }
 
+  /// S-21 — the address the code goes to, so the prompt can name it. Read
+  /// through the data source rather than stored: the session is the only thing
+  /// that knows, and it can change under us (F-16).
+  String? get accountEmail => _dataSource.sessionEmail();
+
+  /// S-21 — asks for a one-time code.
+  ///
+  /// [codeReady] says whether there is a code to type, and it is TRUE for the
+  /// throttled answer too: a 429 here means one was sent moments ago and is
+  /// still valid, so the prompt must move on to the code field and pass the
+  /// server's sentence along as a note. Sending someone back to wait for a
+  /// message already sitting in their inbox is how they end up asking for a
+  /// third one.
+  ///
+  /// The local password throttle is deliberately untouched: asking for a code
+  /// is not a guess at anything, and the server's own resend interval is what
+  /// stops a loop.
+  Future<({bool codeReady, String? message})> requestCode(
+      Localization l) async {
+    try {
+      _codeMinutes = await _dataSource.requestElevationCode();
+      notifyListeners();
+      return (codeReady: true, message: null);
+    } on ElevationRefused catch (e) {
+      if (e.rateLimited) {
+        _codeMinutes ??= SudoRules.codeTtl.inMinutes;
+        notifyListeners();
+        return (codeReady: true, message: e.serverMessage);
+      }
+      return (
+        codeReady: false,
+        message: e.serverMessage ?? l[KApp.sudoErrCodeSend]
+      );
+    } catch (_) {
+      return (codeReady: false, message: l[KApp.sudoErrConnection]);
+    }
+  }
+
+  /// S-21 — redeems a code. Returns null when the window is now open, or the
+  /// message to show.
+  ///
+  /// A refused code never feeds [cooldownSecondsRemaining]: the ceiling on a
+  /// code lives on the SERVER, which destroys it after three wrong guesses, and
+  /// a local cooldown on top would be the same mistake punished twice — once
+  /// invisibly.
+  Future<String?> elevateWithCode(String code, Localization l) async {
+    if (!SudoRules.isCodeShaped(code)) return l[KApp.sudoErrCodeShape];
+
+    try {
+      final until = await _dataSource.elevateWithCode(code);
+      _elevatedUntilUtc =
+          SudoRules.elevatedUntilFrom(until, DateTime.now().toUtc());
+      _failedAttempts = 0;
+      _cooldownUntilUtc = null;
+      notifyListeners();
+      return null;
+    } on ElevationRefused catch (e) {
+      return e.serverMessage ?? l[KApp.sudoErrGeneric];
+    } catch (_) {
+      return l[KApp.sudoErrConnection];
+    }
+  }
+
+  /// How long the code the server just sent lasts, in minutes. Null until one
+  /// has been asked for.
+  int? get codeMinutes => _codeMinutes;
+  int? _codeMinutes;
+
   /// Drops the window. Called when the authenticated phase ends — an elevation
   /// must never outlive the session that earned it.
   void reset() {
     if (_elevatedUntilUtc == null &&
         _cooldownUntilUtc == null &&
-        _failedAttempts == 0) {
+        _failedAttempts == 0 &&
+        _codeMinutes == null) {
       return;
     }
     _elevatedUntilUtc = null;
     _cooldownUntilUtc = null;
     _failedAttempts = 0;
+    _codeMinutes = null;
     notifyListeners();
   }
 }
