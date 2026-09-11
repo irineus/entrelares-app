@@ -241,6 +241,24 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   (`com.entrelares.flutter`, certificado de sideload T-55) entra por PR pareado no
   `entrelares-app-legacy`. Build DEBUG nunca verifica (certificado por máquina) — QA de deep
   link usa o release dev.
+- **Entrega entre canais (T-65, 11/09/2026):** quem lê `web.entrelares.app` no Chrome do
+  Android e TAMBÉM tem o app instalado ganha um convite para atravessar — e ele existe
+  justamente porque **nenhum endereço `https` muda de dono**. Cobrir `/` com App Link não
+  conserta o canal web, acaba com ele; App Link por rota interna tem o mesmo defeito em
+  miniatura (a MESMA URL, colada ou mandada por e-mail, passaria a abrir o app para todo
+  mundo que o tenha). Então o convite usa o scheme que o app já possui, num segundo host ao
+  lado do `login-callback`: `<applicationId>://open/<rota>`. A rota viaja no PATH porque o
+  embedding do Android monta a rota inicial com `getPath()` + query + fragment — o go_router
+  recebe a localização inteira, sem listener nosso, e `…://open/` cai no `initialLocation`
+  em vez de num erro. Nada de sessão viaja junto. O banner só aparece quando o NAVEGADOR
+  confirma o app no aparelho (`navigator.getInstalledRelatedApps()`), o que exige as três
+  fontes que falham caladas — `asset_statements` (app→site, em `res/values/strings.xml`),
+  `assetlinks.json` (site→app) e `related_applications` (em `web/manifest.json`): faltando
+  qualquer uma a API devolve lista VAZIA, igualzinho a "não instalado". Fora do Chrome
+  Android não aparece nada (fail-closed, forma do T-38), e o convite para INSTALAR fica de
+  fora de propósito enquanto a Play não for pública — é checkbox do T-59. Regra pura em
+  `ChannelHandoffRules`; as três fontes e a ausência de App Link em `/` são presas no
+  `web_channel_test`.
 - **Recovery:** "Esqueci minha senha" → `resetPasswordForEmail` com `redirectTo` para o
   deep link; o `supabase_flutter` consome os tokens do link e emite `passwordRecovery`,
   que roteia para a tela de nova senha (validação espelhada em `UpdatePasswordRules`).

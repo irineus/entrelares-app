@@ -27,6 +27,23 @@ class FamilyDeletionBanner {
   });
 }
 
+/// T-65 — the offer to cross from the web channel into the installed app.
+///
+/// Data, not a widget, for the same reason [FamilyDeletionBanner] is: the shell
+/// owns how a banner looks, and the state deciding whether there IS one lives
+/// in `main.dart`. Null is the overwhelmingly common case — every native build,
+/// and on the web every reader whose browser did not confirm the app is on this
+/// device.
+class AppHandoffBanner {
+  /// Opens the app at the reader's current location.
+  final VoidCallback onOpen;
+
+  /// Puts the offer away for good on this browser.
+  final VoidCallback onDismiss;
+
+  const AppHandoffBanner({required this.onOpen, required this.onDismiss});
+}
+
 /// The authenticated hull — the same four destinations as the web's NavMenu
 /// bottom tab bar (Calendário, Família, Avisos, Relatórios). Branch state is
 /// preserved per tab by the indexed stack, the native improvement over the
@@ -53,6 +70,11 @@ class HomeShell extends StatelessWidget {
   /// scheduled for removal.
   final FamilyDeletionBanner? deletionBanner;
 
+  /// T-65: the web→app offer, or null. It sits with the other banners rather
+  /// than inside a screen because the reader's channel is a fact about the
+  /// whole app, not about the tab they happen to be on.
+  final AppHandoffBanner? appHandoff;
+
   /// U-23: the notifications tab is the tour's fourth stop, and it lives here
   /// rather than in any screen — so the key registry is shared.
   final TourKeys? tourKeys;
@@ -66,6 +88,7 @@ class HomeShell extends StatelessWidget {
       required this.onSignOut,
       required this.onOpenProfile,
       this.deletionBanner,
+      this.appHandoff,
       this.tourKeys});
 
   @override
@@ -123,6 +146,7 @@ class HomeShell extends StatelessWidget {
                     ),
             ),
             if (deletionBanner != null) _deletionBanner(context, l),
+            if (appHandoff != null) _handoffBanner(context, l),
             Expanded(
               child: AccountScope(
                 identity: identity,
@@ -205,6 +229,46 @@ class HomeShell extends StatelessWidget {
                       ])}',
               style: const TextStyle(color: Colors.white, fontSize: 13),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// T-65 — quiet by construction: the `info` tone, one line, and a way out
+  /// that stays out. It is an offer, not a warning, and it must never read
+  /// like the two banners above it, which report states the reader did not
+  /// choose.
+  Widget _handoffBanner(BuildContext context, Localization l) {
+    final handoff = appHandoff!;
+    final tone = context.tokens.info;
+    return Material(
+      color: tone.container,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l[KApp.handoffBanner],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: tone.onContainer, fontSize: 13),
+                ),
+              ),
+              TextButton(
+                onPressed: handoff.onOpen,
+                child: Text(l[KApp.handoffOpen]),
+              ),
+              IconButton(
+                onPressed: handoff.onDismiss,
+                icon: const Icon(Icons.close, size: 18),
+                color: tone.onContainer,
+                tooltip: l[KApp.handoffDismiss],
+              ),
+            ],
           ),
         ),
       ),
