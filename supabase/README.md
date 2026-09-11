@@ -2277,6 +2277,32 @@ catch. A server message that interpolates one would carry it. That is why the me
 at 1 000 characters and why the app never attaches a response body — the unknown-shaped data is
 kept out by not sending the places it lives, not by matching it.
 
+### 13.2-bis The one field the client cannot scrub: the IP
+
+**Sentry derives the reporter's IP from the request itself**, server-side, and a coarse
+geolocation from it — measured 11/09/2026 on a probe event, which came back tagged
+`user: ip:201.37.167.23` and `user.geo: BR, Porto Alegre` although the payload carried no user
+object at all. No client-side scrubber can prevent this: the address is on the packet, not in the
+body.
+
+An IP is personal data under LGPD, so this is not a detail. Two consequences, both outside the
+client code:
+
+1. **"Prevent Storing of IP Addresses"**, per project (Sentry → Settings → Security & Privacy).
+   It is the only control that stops it, it applies at ingest, and it is **not exposed by the
+   API** — a human has to click it. **Enabled on both projects 11/09/2026.**
+2. **Sentry processes data for us now**, exactly as allowing `fonts.gstatic.com` made Google an
+   operator for the web client (see the `_headers` commentary). The privacy policy on the landing
+   names who does that, and a processor the policy does not name is the S-15 failure mode in its
+   purest form: a claim about the system that the system contradicts. Tracked as **L-24**.
+
+**What the switch does NOT remove, measured after turning it on:** the event came back with no
+`user` and `Users Impacted: 0`, but still carrying **`user.geo: BR, Porto Alegre`**. Sentry derives
+the coarse location at ingest and keeps it even when the address it derived it from is discarded.
+City-level geography is not an identifier on its own, and it is the honest thing to disclose rather
+than to claim the sink receives nothing about the reader — which is the claim that would be
+checked, under the S-15 method, against exactly this measurement.
+
 ### 13.3 Rate limiting, on both ends
 
 The client sends **one event per distinct fingerprint per process**, with a ceiling of **20 per

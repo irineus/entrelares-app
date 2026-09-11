@@ -11,6 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:entrelares_core/entrelares_core.dart';
+
 import 'package:entrelares_app/env.dart';
 import 'package:entrelares_app/services/crash_reporter.dart';
 
@@ -41,6 +43,8 @@ void main() {
         now: () => DateTime.utc(2026, 9, 11, 12),
         random: Random(1),
       );
+
+  final pt = Localization(AppLanguage.ptBr);
 
   Map<String, Object?> eventOf(http.Request request) {
     final lines = const LineSplitter().convert(request.body);
@@ -191,6 +195,54 @@ void main() {
       await crash.report(StateError('boom'), null);
 
       expect(sent, hasLength(1));
+    });
+  });
+
+  // T-66 (PR 2) — the handled half, wired through the core seam.
+  group('an error the app caught and could not explain', () {
+    tearDown(() => saveErrorObserver = null);
+
+    test('reaches the sink as its own type, at error level', () async {
+      final crash = reporter();
+      saveErrorObserver = crash.reportUnexplainedSaveError;
+
+      translateSaveError('total garbage', 'Erro ao salvar.', pt);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(sent, hasLength(1));
+      final values = (eventOf(sent.single)['exception'] as Map)['values'] as List;
+      expect((values.single as Map)['type'], 'UnexplainedSaveError');
+      expect(eventOf(sent.single)['level'], 'error',
+          reason: 'the app kept working and told the reader something — it is '
+              'a signal, not a crash');
+    });
+
+    test('tags a stable slug, never the translated sentence', () async {
+      final crash = reporter();
+      saveErrorObserver = crash.reportUnexplainedSaveError;
+
+      translateSaveError('total garbage', 'Erro ao salvar.', pt);
+      await Future<void>.delayed(Duration.zero);
+
+      expect((eventOf(sent.single)['tags'] as Map)['context'],
+          'unexplained-save-error',
+          reason: 'a tag whose value is a localized paragraph splits one event '
+              'into one per language');
+    });
+
+    test('stays quiet on a refusal the product explained', () async {
+      final crash = reporter();
+      saveErrorObserver = crash.reportUnexplainedSaveError;
+
+      translateSaveError(
+        'PostgrestException(message: Esta família já atingiu o limite de 4 '
+        'responsáveis., code: 23514, details: Bad Request, hint: null)',
+        'Erro ao salvar.',
+        pt,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(sent, isEmpty);
     });
   });
 

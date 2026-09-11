@@ -35,6 +35,7 @@ import 'screens/update_password_screen.dart';
 import 'services/account_identity.dart';
 import 'services/admin_mode.dart';
 import 'services/analytics_service.dart';
+import 'services/boot_handoff.dart';
 import 'services/auth_providers.dart';
 import 'services/crash_reporter.dart';
 import 'services/custody_data_source.dart';
@@ -63,7 +64,18 @@ Future<void> main() async {
   // .initialize` or in the language resolution below is exactly the kind that
   // used to be invisible. It is additive (the console still prints, the red
   // screen still paints) and a no-op where the DSN is blank.
-  CrashReporter().install();
+  final crash = CrashReporter()..install();
+  // T-66 (PR 2): the handled half. `translateSaveError` is the ONE place where
+  // a caught exception becomes a sentence for the reader, and it calls this
+  // only when it could not explain the error — the case where the product says
+  // "check your connection" about something that has nothing to do with the
+  // connection. Hung off the choke point rather than wired at ~25 call sites,
+  // the way F-09 hangs push off the single writer.
+  saveErrorObserver = crash.reportUnexplainedSaveError;
+  // T-66 (PR 2): from here on the Dart hooks are the better watcher, so the
+  // boot script in `web/index.html` stands down — otherwise the same failure
+  // would travel twice, under two shapes. A no-op off the web.
+  markAppBooted();
   // The web channel serves REAL paths (`/family`), not `/#/family`. Three
   // things ride on it: F5 restores the screen the reader was on, the URLs
   // match the ones the Blazor app has always published (so a bookmark survives

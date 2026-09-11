@@ -99,6 +99,32 @@ final _postgrestToString =
   return (code: null, message: null);
 }
 
+/// T-66 — what to do when this function could NOT explain an error.
+///
+/// **Only the fallback is worth reporting, and that is the whole design.** A
+/// recognized refusal is the product working: a day conflict means somebody
+/// saved first, a seat cap means the plan says no, `42501` means the session
+/// died. Sending those to a crash sink would bury the signal under correct
+/// behaviour. The fallback is the opposite — it means the SERVER said something
+/// this client does not know, and the reader is being shown "check your
+/// connection" for a reason that has nothing to do with their connection.
+///
+/// That is not a hypothetical: on 27/08/2026 every DB-raised rule — seat caps,
+/// admin-only, day protection — reached this function in a shape it did not
+/// parse and surfaced as that generic sentence, with the product blaming the
+/// user's network for a rule the server had explained perfectly well. Nobody
+/// found it for weeks, because an unexplained error looks exactly like a bad
+/// connection from the outside.
+///
+/// Hung off the single choke point rather than wired at ~25 call sites, for the
+/// reason F-09 hangs push off the single writer: a future call site gets it for
+/// free, and one that forgets is not a possibility.
+typedef SaveErrorObserver = void Function(String raw, String fallback);
+
+/// Set once at boot by the app (never in core, which stays pure and has no
+/// transport). Null in every test that does not opt in.
+SaveErrorObserver? saveErrorObserver;
+
 /// Mirror of CalendarHelpers.TranslateSaveError. The two known-signature
 /// messages come from the catalog since the U-13 port (the web helper never
 /// extracted its literals — a residue frozen with the Blazor app); the
@@ -121,6 +147,14 @@ String translateSaveError(String raw, String fallback, Localization l) {
       message.isNotEmpty &&
       message.split('').any(_accented.contains)) {
     return message;
+  }
+  // Unexplained: the caller's generic sentence is about to be shown for a
+  // reason nobody understands. See [saveErrorObserver].
+  try {
+    saveErrorObserver?.call(raw, fallback);
+  } catch (_) {
+    // An observer may never cost the user their error message. This function
+    // has one job and it is not reporting.
   }
   return fallback;
 }
