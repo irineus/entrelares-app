@@ -119,12 +119,22 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # ninguém confere apodrece calado, e é o lane mais barato do run.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
 cd apps/entrelares_app && fvm flutter analyze && fvm flutter test
-# The two source gates live in that suite: no_literal_snack_test (catalog strings)
-# and no_color_literal_test (U-27 — colours only in lib/theme/tokens.dart).
+# The three source gates live in that suite: no_literal_snack_test (catalog strings),
+# no_color_literal_test (U-27 — colours only in lib/theme/tokens.dart) e o
+# web_channel_test, que prova como FONTE o que só se manifestaria SERVIDO — a CSP,
+# o _redirects, o assetlinks, a config Firebase Web e, desde o T-66, o host do
+# Sentry dentro de connect-src (sem ele o navegador bloqueia o POST e o canal web
+# reporta NADA, em silêncio, porque o reporter engole a própria falha por contrato)
+# mais o espelho do watcher pré-Flutter do index.html.
 cd apps/entrelares_app && fvm flutter build apk --debug --flavor dev --split-per-abi
 # Canal web: os dois flags NÃO são opcionais — sem o define o build aponta para o
 # banco de QA, e sem o --no-web-resources-cdn o CanvasKit vem do gstatic.
 cd apps/entrelares_app && fvm flutter build web --release --no-web-resources-cdn --dart-define=APP_ENV=prod
+# O DEPLOY faz três coisas a mais que este comando local (T-66, runbook §13.6):
+# compila com --source-maps, sobe os mapas para o Sentry numa release nomeada
+# `entrelares-app@<versão do pubspec>` — a mesma string que o cliente manda, senão
+# mapas e eventos nunca se encontram — e APAGA todo .map antes de publicar, porque
+# um mapa servido da nossa origem entrega o fonte Dart inteiro a quem pedir.
 # Gate de banco (279 testes de RLS/RPC/trigger contra o projeto dev), Dart puro
 # desde o PR 16 do T-56. Exige a service_role do DEV — nunca a de produção. Sem
 # ela a suíte aborta com instruções em vez de rodar pela metade.
