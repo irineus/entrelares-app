@@ -2357,8 +2357,10 @@ leave production's alone:
 > under **Monitors**. The direct rule URLs above come from the API and are the reliable way in;
 > hunting for the word "Alerts" in the sidebar is how this was nearly declared impossible.
 
-**T-68 shares this destination.** A failed publish is the same defect one floor up, and three
-channels of ops signal is the same as none.
+**T-68 shares this destination — delivered 11/09/2026, see §14.** A failed publish is the same
+defect one floor up, and three channels of ops signal is the same as none. It writes into THIS
+project, through the same envelope shape as §13.4, and its alert was measured against this very
+rule: 46 seconds from POST to inbox.
 ### 13.6 Source maps — making a web stack readable
 
 Android release builds carry no obfuscation (`--obfuscate` is in no workflow), so their frames are
@@ -2404,3 +2406,119 @@ project.)
 
 Verify on the next merge to `main`: the run summary stops carrying the "upload PULADO" line, and
 the release appears under Sentry → Releases with its artifacts.
+
+## 14. T-68 — a failed publish reaching a human
+
+> **The inverse of §13.** A crash is the product breaking loudly for a user who is there; this is
+> the product **not changing at all** for a user who is not. On 10/09/2026 `db-prod` failed at
+> 10:47 UTC, `deploy-web` was skipped, and `web.entrelares.app` stopped publishing. It was noticed
+> only because someone happened to be watching the run of a **documentation** PR.
+
+### 14.1 What was measured before anything was built
+
+The card ordered a measurement first, and it changed the item.
+
+**GitHub's failure e-mail DID arrive** — three of them, into `irineus@gmail.com`, the first at
+**10:56:09 UTC, twenty seconds after the run concluded**. Latency was never the problem. Two other
+things were:
+
+| What the mail cannot do | Evidence |
+|---|---|
+| Stand out | In those three days GitHub sent **13** CI-failure mails; 10 were routine PR noise. `Run failed: verify - main` and `PR run failed: verify - …` look the same at a glance |
+| Survive a re-run | The run reports `success` today: it went green on **attempt 4**. The incident is only visible per ATTEMPT (`/actions/runs/<id>/attempts/1`) |
+
+So this item is not a second notifier. It is a **destination** for the signal and a **proof** that
+the publish happened.
+
+### 14.2 Three outputs, one incident — and what each is for
+
+| Output | Where | Why this one |
+|---|---|---|
+| **The alarm** | Sentry, project `entrelares-app` (production) | The stream that already means "production is breaking". Its project alert rule e-mails the owner — **measured 11/09/2026 with a probe of this exact shape: 46 seconds from POST to inbox**, subject carrying `PipelineFailure` |
+| **The record** | A GitHub issue, `🚨 main vermelha em <sha>` | An e-mail is read once and scrolls away. This stays OPEN until a human closes it, which is what "production is not publishing" needs. A re-run of the same commit COMMENTS instead of opening a second issue |
+| **The triage** | A Gmail filter, owner-side | Makes the mail that already arrives legible without touching the repo — see the filter in §14.5 |
+
+**None of it touches the product's rails**, and that is pinned by a test rather than remembered:
+Resend is one shared account capped at 100/day with `send-auth-email` behind it (§5 of the
+decisions), and push hangs off an `AFTER INSERT` trigger on `notifications`, whose rows are family
+data (F-09). `web_channel_test` greps `ops_alert.sh` for both and fails if either appears in the
+code.
+
+### 14.3 The alert itself
+
+`.github/ops_alert.sh`, called by the `ops-alert` job of `verify.yml`. It POSTs a hand-written
+envelope with the **production DSN** — PUBLIC config by construction, the same string `env.dart`
+ships to every browser, and `web_channel_test` pins the two against each other. The dev project is
+deliberately not an option: its alert rule is disabled (§13.5), so an alert sent there wakes nobody.
+
+Two decisions inside it that are not obvious:
+
+- **The fingerprint carries the commit sha.** Grouping by job alone would land the next incident
+  inside an existing Sentry issue, and an issue that is open but unresolved fires **no** new-issue
+  alert — a silent alarm, which is this item's own defect reintroduced. One issue per failing
+  commit; re-runs of the SAME commit group together, so an incident alerts once, not once per
+  attempt.
+- **A `cancelled` job does not alert.** A cancelled `db-gate` is usually an EVICTION from its
+  depth-1 queue (§5), a documented false alarm — hence `contains(needs.*.result, 'failure')` and
+  not `always()`. An alarm that cries wolf is how the next real one gets ignored.
+
+> **If you ever hand-write an envelope again:** a CRLF anywhere in it comes back as
+> `{"detail":"invalid event envelope","causes":["missing newline after header or payload"]}`,
+> which reads like malformed JSON and is not. Writing the file in text mode on Windows is enough to
+> cause it. Write it binary, as the script does.
+
+### 14.4 Proving the publish actually landed
+
+Exit code 0 from `wrangler` is not proof — **T-58** is on the board for a gate that reported
+"All tests passed." while running zero tests. So `deploy-web` now stamps the bundle and reads it
+back:
+
+1. `printf '%s' "$GITHUB_SHA" > build/web/build-id.txt`, immediately before the upload;
+2. after the publish, `.github/smoke_web.sh` fetches `https://web.entrelares.app/build-id.txt` and
+   compares the **body** to that sha, retrying 18 × 10 s.
+
+**Why the commit and not `version.json`.** The version only moves when the pubspec does. T-69 was a
+pure rename with no bump — a version-based check would have passed while publishing nothing.
+
+**Why the body and never the status.** `_redirects` ends with `/*  /index.html  200`, the SPA
+fallback every deep link needs. A request for a file that is **not there** comes back **200 with
+the whole index.html** (measured: 5 917 bytes). A check written as `curl -f` passes over the void.
+The script says so in its own error message: *"serviu o FALLBACK SPA (index.html) — /build-id.txt
+não está publicado"* is a different diagnosis from *"serviu `<old sha>`"*, and they are different
+bugs.
+
+**Validated the hard way, per T-58** (11/09/2026), against the live site and a local server:
+
+| Situation | Result |
+|---|---|
+| Live site, marker not published yet | **RED**, naming the SPA fallback |
+| Marker matches | green, first attempt |
+| Marker is a STALE sha | **RED**, printing what it got |
+
+The six source assertions in `web_channel_test` were validated the same way — each was watched
+failing under a mutation of the thing it describes. One of them was **vacuous when first written**:
+it matched the comment that quotes the `if:` condition rather than the condition, and passed on a
+workflow whose condition had been replaced. That is why the file now has `_withoutComments()`.
+
+### 14.5 The Gmail filter (owner-side, optional but free)
+
+Gmail → Settings → Filters and Blocked Addresses → **Create a new filter**:
+
+```
+Has the words:  from:notifications@github.com subject:"Run failed" -subject:"PR run failed"
+```
+
+Apply: **Star it**, **Apply label** `CI-prod`, **Never send it to Spam**. That is the entire
+difference between the mail that says production stopped publishing and the ten that say a PR is
+mid-loop.
+
+### 14.6 Verifying the whole path
+
+On the next merge to `main`, the run summary of `deploy-web` carries two new lines — the marker
+published and **"Canal web: publicação PROVADA"** with the sha. If it instead says **"publicação
+NÃO PROVADA"**, the channel is serving the previous build and the `ops-alert` job has already
+raised the issue and the Sentry alert.
+
+To exercise the alarm deliberately (and only deliberately), rotate a Supabase secret to a bad value
+and merge anything: `db-prod` fails, `deploy-web` is skipped, and both the Sentry e-mail and the
+issue appear within a minute. Rotate it back.

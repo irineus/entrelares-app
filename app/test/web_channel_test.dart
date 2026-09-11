@@ -63,6 +63,21 @@ String _pluginSdkVersion() {
   return version;
 }
 
+/// A shell or YAML source with its comment lines dropped — what the file DOES,
+/// without what it explains.
+///
+/// T-68 needed this three times in one sitting, and the third one was caught
+/// only by watching the assertion FAIL: `ops_alert.sh` names the product rails
+/// in its header precisely to say why it does not touch them, `smoke_web.sh`
+/// names `curl -f` to say why it is not used, and the `ops-alert` job comments
+/// its own `if:` condition. Every guard written as "this string is (not) in the
+/// file" matches the prose that explains the rule — and a guard that trips on
+/// its own explanation is an argument for deleting the explanation.
+String _withoutComments(String source) => source
+    .split('\n')
+    .where((line) => !line.trimLeft().startsWith('#'))
+    .join('\n');
+
 /// Does one CSP source cover `<scheme>://<host>`? A source matches exactly or
 /// through a single leading `*.` on the host, and `*.example.com` does NOT
 /// cover the bare `example.com` — nothing else in this CSP is dynamic, so a
@@ -530,6 +545,65 @@ void main() {
               'Cloudflare publish uses');
     });
 
+    // ── T-68: a publish that succeeded loudly and delivered nothing ──────────
+    //
+    // Exit code 0 from `wrangler` is not proof — T-58 is on the board for a
+    // gate that said "All tests passed." while running zero tests. These pin
+    // the two halves that make the publish PROVABLE: a marker that changes on
+    // every commit, and a check that reads it back from the served site.
+
+    test('the bundle is stamped with the commit, BEFORE it is published', () {
+      final stamp = workflow.indexOf('build/web/build-id.txt');
+      final publish = workflow.indexOf('wrangler pages deploy');
+      expect(stamp, greaterThan(-1),
+          reason: 'without a per-commit marker there is nothing to read back');
+      expect(stamp, lessThan(publish),
+          reason: 'a marker written after the upload is not in the bundle');
+      expect(workflow,
+          contains(r"""printf '%s' "$GITHUB_SHA" > build/web/build-id.txt"""),
+          reason: 'the marker is the COMMIT, not the app version: '
+              '`version.json` only moves when the pubspec does, so a delivery '
+              'that does not bump it (T-69 was a pure rename) would publish '
+              'nothing and still match');
+    });
+
+    test('the publish is PROVED after the upload, not assumed', () {
+      final publish = workflow.indexOf('run: wrangler pages deploy');
+      // The `run:` line, not the first mention: the step above it explains the
+      // marker and names this script in a comment, so a bare `indexOf` would
+      // compare prose against execution and fail on a workflow that is right.
+      final smoke = workflow.indexOf('run: bash .github/smoke_web.sh');
+      expect(smoke, greaterThan(publish),
+          reason: 'the check has to read the site AFTER it was published');
+      expect(workflow, contains(r'"https://${{ env.WEB_HOSTNAME }}"'),
+          reason: 'the check reads the host the app believes it is served '
+              'from, not a string typed twice');
+      expect(workflow, contains('WEB_HOSTNAME: ${Env.prod.webHostname}'),
+          reason: 'the workflow and `Env.prod.webHostname` must name the same '
+              'host — a smoke check pointed at the wrong one is green about '
+              'somebody else');
+    });
+
+    test('the smoke check cannot pass on a file that is not there', () {
+      // THE trap of this half, measured 11/09/2026: `_redirects` ends with the
+      // SPA fallback, so a request for a file that does NOT exist comes back
+      // 200 with the whole index.html. Any check that reads the status passes
+      // over the void — which is the vacuous green in its purest form.
+      final script = File('../.github/smoke_web.sh').readAsStringSync();
+      expect(_web('_redirects').readAsStringSync(),
+          contains('/*  /index.html  200'),
+          reason: 'the fallback this test exists about');
+      expect(script, contains(r'[ "$served" = "$expected" ]'),
+          reason: 'the check compares the BODY to the expected sha');
+      // Over the code, for the same reason as the ops-alert guard below: the
+      // header of that script names `curl -f` to say why it is NOT used.
+      final code = _withoutComments(script);
+      expect(code, isNot(contains('curl -f')),
+          reason: '`-f` reads the STATUS, and the status is 200 for a file '
+              'that is not published at all');
+      expect(code, isNot(contains('--fail')),
+          reason: 'same as above, spelled the long way');
+    });
     // ── The docs-only skip, and the two assumptions holding it up ────────────
     //
     // Since 29/08/2026 a change touching ONLY markdown runs no jobs at all
@@ -626,6 +700,78 @@ void main() {
       expect(job, contains("github.ref_name == 'main'"));
       expect(job, contains('wrangler pages deploy build/web'));
     });
+  });
+
+  // ── T-68 — a red `main` reaching a human ──────────────────────────────────
+  //
+  // The e-mail GitHub already sends arrives in 20 seconds (measured on the
+  // 10/09/2026 incident); what it cannot do is stand out among the routine PR
+  // failures. So the alert goes where "production is breaking" already means
+  // something — and, above all, NOT through the product's own rails.
+  group('the ops alert', () {
+    late String workflow;
+    late String script;
+
+    setUp(() {
+      workflow = _workflow().readAsStringSync();
+      script = File('../.github/ops_alert.sh').readAsStringSync();
+    });
+
+    test('it alerts the PRODUCTION Sentry project, and the DSN cannot drift',
+        () {
+      expect(workflow, contains('SENTRY_DSN_PROD: ${Env.prod.sentryDsn}'),
+          reason: 'the dev project\'s alert rule is DISABLED by decision '
+              '(runbook §13.5), so an ops alert sent there wakes nobody');
+      expect(workflow, isNot(contains(Env.dev.sentryDsn)),
+          reason: 'the QA stream must never carry a production ops alert');
+    });
+
+    test('the alarm fires on a FAILED job, never on an evicted one', () {
+      // Read the job's own condition, with the comments stripped: the comment
+      // above it quotes the condition to explain it, and the first version of
+      // this test matched THAT — it passed on a workflow whose `if:` had been
+      // replaced, which is the vacuous green in miniature.
+      final yaml = _withoutComments(workflow);
+      final job = yaml.substring(yaml.indexOf('  ops-alert:'));
+      final condition = job.substring(0, job.indexOf('needs:'));
+
+      expect(condition, contains("contains(needs.*.result, 'failure')"),
+          reason: 'the alarm names the result it fires on. A cancelled '
+              '`db-gate` is usually an EVICTION from its depth-1 queue — a '
+              'documented false alarm, and an alarm that cries wolf is how the '
+              'next real one gets ignored');
+      expect(condition, isNot(contains('cancelled')),
+          reason: 'a cancelled job is not an incident');
+      expect(condition, contains("github.ref_name == 'main'"),
+          reason: 'a red PR is the normal working loop; only a red `main` '
+              'means production stopped receiving what was merged');
+    });
+
+    test('the alert path touches none of the product rails', () {
+      // The card's explicit trap. Resend is one shared account capped at
+      // 100/day with `send-auth-email` behind it (§5), and push hangs off an
+      // AFTER INSERT trigger on `notifications`, whose rows are family data
+      // (F-09). An ops alert is neither.
+      // Over the CODE, not the comments: the header of that file names both
+      // rails precisely to say why they are absent, and a guard that trips on
+      // its own explanation teaches people to delete the explanation.
+      final code = _withoutComments(script).toLowerCase();
+      for (final rail in ['resend', 'send-auth-email', 'send-push']) {
+        expect(code, isNot(contains(rail)),
+            reason: '`$rail` is a PRODUCT rail; ops signal must not share it');
+      }
+      expect(RegExp(r'\bnotifications\b').hasMatch(code), isFalse,
+          reason: 'the `notifications` table is family data, not an ops log');
+    });
+
+    test('the alert groups per COMMIT, so a second incident still alerts', () {
+      // Grouping by job alone would land the next failure inside an existing
+      // issue, and an open-but-unresolved Sentry issue fires no new-issue
+      // alert — a silent alarm, which is this item's own defect reintroduced.
+      expect(script, contains(r'fingerprint: [ "ci", "verify", $jobs, $sha ]'),
+          reason: 'the sha in the fingerprint is what keeps the alarm audible');
+    });
+
   });
 
   // T-66 (PR 2) — the EIGHTH mirror. `index.html` carries a boot watcher
