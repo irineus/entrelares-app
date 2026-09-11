@@ -261,6 +261,24 @@ abstract class CustodyDataSource {
   /// is proof, never a claim about WHO is elevating.
   Future<String?> elevate(String password);
 
+  /// S-21 — asks the server to mail a one-time code to the account's address.
+  ///
+  /// Grants nothing by itself. Returns how many minutes the code lasts, so the
+  /// prompt can say so without repeating the number; throws [ElevationRefused]
+  /// with [ElevationRefused.rateLimited] when a code was already sent recently,
+  /// in which case the message says the OLD one is still good.
+  Future<int> requestElevationCode();
+
+  /// S-21 — redeems a code. Same return and the same window as [elevate]:
+  /// `is_elevated()` cannot tell which proof was given, by design.
+  ///
+  /// Throws [ElevationRefused] with [ElevationRefused.wrongCode] when the
+  /// server refused it. That flag exists so a refused CODE never feeds the
+  /// password throttle — the server already destroys a code after three wrong
+  /// guesses, and a local cooldown on top would lock someone out of a code they
+  /// are still holding.
+  Future<String?> elevateWithCode(String code);
+
   // ── Lote 4: sign-up and invitations ───────────────────────────────────────
 
   /// Resolves an invitation token for an anonymous visitor, or null when the
@@ -661,10 +679,17 @@ class ElevationRefused implements Exception {
   final bool wrongPassword;
   final bool rateLimited;
 
+  /// S-21: the refusal came from the CODE path. Kept apart from
+  /// [wrongPassword] because the two have different throttles — the code's
+  /// ceiling lives on the server and destroys the code, so counting it locally
+  /// as well would punish the same mistake twice.
+  final bool wrongCode;
+
   const ElevationRefused({
     this.serverMessage,
     this.wrongPassword = false,
     this.rateLimited = false,
+    this.wrongCode = false,
   });
 
   @override

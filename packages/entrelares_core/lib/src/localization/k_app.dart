@@ -68,6 +68,18 @@ abstract final class KApp {
   static const String sudoErrGeneric = 'app.sudo.errGeneric';
   static const String sudoErrConnection = 'app.sudo.errConnection';
 
+  // ── Sudo S-21 — the gate's SECOND proof. The sheet offers BOTH to every
+  //    session: production carries an account with a password and no `email`
+  //    identity, so the client was never in a position to know which one a
+  //    person can give. Asking is cheaper than guessing wrong ──
+  static const String sudoSendCode = 'app.sudo.sendCode';
+  static const String sudoSendingCode = 'app.sudo.sendingCode';
+  static const String sudoCodeSentTo = 'app.sudo.codeSentTo';
+  static const String sudoCodeLabel = 'app.sudo.codeLabel';
+  static const String sudoUsePassword = 'app.sudo.usePassword';
+  static const String sudoErrCodeShape = 'app.sudo.errCodeShape';
+  static const String sudoErrCodeSend = 'app.sudo.errCodeSend';
+
   // ── Custom roles F-41 (lote 4) — four labels the web left as pre-U-13
   //    literals (CustomRolesPage.razor:73/86/216). Client-only strings with no
   //    server twin, so cataloguing them is a strict improvement ──
@@ -193,6 +205,13 @@ abstract final class KApp {
     sudoErrWrongPassword,
     sudoErrGeneric,
     sudoErrConnection,
+    sudoSendCode,
+    sudoSendingCode,
+    sudoCodeSentTo,
+    sudoCodeLabel,
+    sudoUsePassword,
+    sudoErrCodeShape,
+    sudoErrCodeSend,
     profErrNameTooShort,
     profErrPasswordShort,
     rolesCreateTitle,
@@ -299,6 +318,15 @@ abstract final class StringsAppPtBr {
     KApp.sudoErrConnection:
         'Falha na conexão com o servidor. Verifique sua internet e tente '
             'novamente.',
+    KApp.sudoSendCode: 'Receber um código por e-mail',
+    KApp.sudoSendingCode: 'Enviando...',
+    KApp.sudoCodeSentTo:
+        'Enviamos um código para {0}. Ele vale por {1} minutos.',
+    KApp.sudoCodeLabel: 'Código de 6 dígitos',
+    KApp.sudoUsePassword: 'Confirmar com a senha',
+    KApp.sudoErrCodeShape: 'O código tem 6 dígitos.',
+    KApp.sudoErrCodeSend:
+        'Não foi possível enviar o código. Tente novamente.',
     KApp.profErrNameTooShort: 'Informe um nome com pelo menos 2 caracteres.',
     KApp.profErrPasswordShort: 'A senha precisa ter pelo menos 8 caracteres.',
     KApp.rolesCreateTitle: 'Criar papel',
@@ -441,6 +469,13 @@ abstract final class StringsAppEn {
     KApp.sudoErrGeneric: 'Could not confirm. Try again.',
     KApp.sudoErrConnection:
         'Connection to the server failed. Check your internet and try again.',
+    KApp.sudoSendCode: 'Get a code by e-mail',
+    KApp.sudoSendingCode: 'Sending...',
+    KApp.sudoCodeSentTo: 'We sent a code to {0}. It is valid for {1} minutes.',
+    KApp.sudoCodeLabel: '6-digit code',
+    KApp.sudoUsePassword: 'Confirm with your password',
+    KApp.sudoErrCodeShape: 'The code has 6 digits.',
+    KApp.sudoErrCodeSend: 'Could not send the code. Try again.',
     KApp.profErrNameTooShort: 'Enter a name with at least 2 characters.',
     KApp.profErrPasswordShort: 'The password needs at least 8 characters.',
     KApp.rolesCreateTitle: 'Create role',

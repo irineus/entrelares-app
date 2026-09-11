@@ -150,4 +150,38 @@ void main() {
           now.add(SudoRules.serverWindow));
     });
   });
+
+  // ── S-21: the e-mail code ──────────────────────────────────────────────────
+
+  group('isCodeShaped', () {
+    test('accepts exactly six digits', () {
+      expect(SudoRules.isCodeShaped('246810'), isTrue);
+    });
+
+    test('accepts a code copied out of an e-mail with its spacing', () {
+      // Selecting the bold digits in the message picks up whatever separator
+      // the mail client rendered. Refusing that would be the client inventing
+      // a rule the server does not have.
+      expect(SudoRules.isCodeShaped('246 810'), isTrue);
+      expect(SudoRules.isCodeShaped(' 246-810 '), isTrue);
+      expect(SudoRules.normalizeCode('246 810'), '246810');
+    });
+
+    test('refuses anything that could not be a code', () {
+      expect(SudoRules.isCodeShaped(''), isFalse);
+      expect(SudoRules.isCodeShaped('2468'), isFalse, reason: 'too short');
+      expect(SudoRules.isCodeShaped('2468109'), isFalse, reason: 'too long');
+      expect(SudoRules.isCodeShaped('24681a'), isFalse, reason: 'not digits');
+      // The one that matters: someone typing their password into the code
+      // field must not spend a request, and must not spend an attempt.
+      expect(SudoRules.isCodeShaped('minhasenha'), isFalse);
+    });
+
+    test('is a keyboard check, never a verdict', () {
+      // A well-formed code the server has never issued is still well-formed.
+      // Nothing here may be read as "this code is good".
+      expect(SudoRules.isCodeShaped('000000'), isTrue);
+      expect(SudoRules.isCodeShaped('999999'), isTrue);
+    });
+  });
 }

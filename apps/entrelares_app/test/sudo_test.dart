@@ -1,6 +1,13 @@
 // S-10 — the elevation client: the service's window/throttle behaviour against
 // a fake `elevate`, the 🔐 sheet, and the two-layer `runWithSudo` gate.
 //
+// S-21 adds the SECOND proof — a code mailed to the account — and with it the
+// case the sheet could not serve before: a session with no password. Those
+// tests are at the bottom, and the one that matters is that the code path is
+// reachable WITHOUT the client deciding in advance who has a password. It is
+// not in a position to decide: production carries an account whose only
+// identity provider is `google` and which nonetheless has one.
+//
 // The layer that matters most is the SECOND one: an action that comes back
 // with the `ELEVATION_REQUIRED:` marker must prompt and retry, because the
 // optimistic check can be wrong (window expired mid-flight, or a drifted
@@ -9,6 +16,7 @@ import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/sudo_sheet.dart';
@@ -341,6 +349,232 @@ void main() {
 
       expect(outcome, isFalse);
       expect(ran, 0);
+    });
+  });
+
+  // ── S-21: the second proof ──────────────────────────────────────────────────
+
+  group('SudoService — the e-mail code', () {
+    test('a correct code opens the same window a password opens', () async {
+      final source = fakeSource()..sudoCode = '246810';
+      final sudo = SudoService(source);
+
+      final asked = await sudo.requestCode(Localization(AppLanguage.ptBr));
+      expect(asked.codeReady, isTrue);
+      expect(source.codeRequests, 1);
+
+      final error =
+          await sudo.elevateWithCode('246810', Localization(AppLanguage.ptBr));
+
+      expect(error, isNull);
+      expect(sudo.isElevated, isTrue);
+    });
+
+    test('a code copied with its spacing is not refused on shape', () async {
+      final source = fakeSource()..sudoCode = '246 810';
+      final sudo = SudoService(source);
+
+      // Normalising for the WIRE is the data source's job; what the service
+      // must not do is refuse a pasted code for carrying a space.
+      expect(
+          await sudo.elevateWithCode('246 810', Localization(AppLanguage.ptBr)),
+          isNull);
+    });
+
+    test('a malformed code never leaves the device', () async {
+      final source = fakeSource()..sudoCode = '246810';
+      final sudo = SudoService(source);
+
+      final error =
+          await sudo.elevateWithCode('2468', Localization(AppLanguage.ptBr));
+
+      expect(error, Localization(AppLanguage.ptBr)[KApp.sudoErrCodeShape]);
+      expect(source.codeAttempts, isEmpty,
+          reason: 'a four-character guess must not spend a request, and must '
+              'not spend one of the three attempts the server allows');
+    });
+
+    test('a refused code does NOT start the password cooldown', () async {
+      // The ceiling on a code lives on the SERVER, which destroys it after
+      // three wrong guesses. A local cooldown on top would punish the same
+      // mistake twice — and the second time invisibly, on a proof the person
+      // may still be holding a valid copy of.
+      final source = fakeSource();
+      final sudo = SudoService(source);
+
+      for (var i = 0; i < 3; i++) {
+        await sudo.elevateWithCode('000000', Localization(AppLanguage.ptBr));
+      }
+
+      expect(sudo.isCoolingDown, isFalse);
+      expect(source.codeAttempts.length, 3);
+    });
+
+    test('the throttled answer still hands over a code to type', () async {
+      // 429 here means one was sent moments ago and is STILL VALID. Sending
+      // someone back to wait for a message already in their inbox is how they
+      // end up asking for a third one.
+      final source = fakeSource()
+        ..throwOnRequestCode = const ElevationRefused(
+            serverMessage: 'Já enviamos um código há pouco.',
+            rateLimited: true);
+      final sudo = SudoService(source);
+
+      final asked = await sudo.requestCode(Localization(AppLanguage.ptBr));
+
+      expect(asked.codeReady, isTrue);
+      expect(asked.message, 'Já enviamos um código há pouco.');
+      expect(sudo.codeMinutes, SudoRules.codeTtl.inMinutes);
+    });
+
+    test('a failed send says so and offers no code field', () async {
+      final source = fakeSource()
+        ..throwOnRequestCode =
+            const ElevationRefused(serverMessage: 'Não foi possível enviar.');
+      final sudo = SudoService(source);
+
+      final asked = await sudo.requestCode(Localization(AppLanguage.ptBr));
+
+      expect(asked.codeReady, isFalse);
+      expect(asked.message, 'Não foi possível enviar.');
+    });
+
+    test('reset drops the code state with the window', () async {
+      final sudo = SudoService(fakeSource()..sudoCode = '246810');
+      await sudo.requestCode(Localization(AppLanguage.ptBr));
+      await sudo.elevateWithCode('246810', Localization(AppLanguage.ptBr));
+
+      sudo.reset();
+
+      expect(sudo.isElevated, isFalse);
+      expect(sudo.codeMinutes, isNull);
+    });
+  });
+
+  group('the sheet — both proofs, no guessing', () {
+    final l = Localization(AppLanguage.ptBr);
+
+    testWidgets('a session with NO password reaches the code and elevates',
+        (tester) async {
+      // The whole item, in one test: this source accepts no password at all,
+      // which is exactly what `elevate` answers for a Google account. Before
+      // S-21 the sheet ended here, and so did the person.
+      final source = fakeSource()
+        ..sudoPassword = null
+        ..sudoCode = '246810'
+        ..sessionEmailValue = 'sem.senha@example.com';
+      final sudo = SudoService(source);
+      bool? granted;
+
+      await tester.pumpWidget(harness(
+        sudo: sudo,
+        onTap: (context) async {
+          granted = await showSudoSheet(context: context, sudo: sudo);
+        },
+      ));
+      await tester.tap(find.text('gatilho'));
+      await tester.pumpAndSettle();
+
+      // The way across is offered without the sheet being told anything about
+      // this account — it never asks which proof applies, because it is not in
+      // a position to know.
+      await tester.tap(find.text(l[KApp.sudoSendCode]));
+      await tester.pumpAndSettle();
+
+      expect(source.codeRequests, 1);
+      expect(
+          find.text(l.format(KApp.sudoCodeSentTo,
+              ['sem.senha@example.com', '${SudoRules.codeTtl.inMinutes}'])),
+          findsOne,
+          reason: 'the prompt must name the address the code went to');
+
+      await tester.enterText(find.byType(TextField), '246810');
+      await tester.pump();
+      await tester.tap(find.text(l[K.sudoConfirm]));
+      await tester.pumpAndSettle();
+
+      expect(granted, isTrue);
+      expect(sudo.isElevated, isTrue);
+      expect(source.codeAttempts, ['246810']);
+    });
+
+    testWidgets('the confirm button stays down until the code is well formed',
+        (tester) async {
+      final source = fakeSource()
+        ..sudoCode = '246810'
+        ..sessionEmailValue = 'alguem@example.com';
+      final sudo = SudoService(source);
+
+      await tester.pumpWidget(harness(
+        sudo: sudo,
+        onTap: (context) => showSudoSheet(context: context, sudo: sudo),
+      ));
+      await tester.tap(find.text('gatilho'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[KApp.sudoSendCode]));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), '2468');
+      await tester.pump();
+      final short = tester.widget<FilledButton>(find.ancestor(
+          of: find.text(l[K.sudoConfirm]),
+          matching: find.byType(FilledButton)));
+      expect(short.onPressed, isNull);
+
+      await tester.enterText(find.byType(TextField), '246810');
+      await tester.pump();
+      final full = tester.widget<FilledButton>(find.ancestor(
+          of: find.text(l[K.sudoConfirm]),
+          matching: find.byType(FilledButton)));
+      expect(full.onPressed, isNotNull);
+    });
+
+    testWidgets('the way back to the password is never a dead end',
+        (tester) async {
+      final source = fakeSource()..sessionEmailValue = 'alguem@example.com';
+      final sudo = SudoService(source);
+
+      await tester.pumpWidget(harness(
+        sudo: sudo,
+        onTap: (context) => showSudoSheet(context: context, sudo: sudo),
+      ));
+      await tester.tap(find.text('gatilho'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[KApp.sudoSendCode]));
+      await tester.pumpAndSettle();
+      expect(find.text(l[K.sudoCurrentPassword]), findsNothing);
+
+      await tester.tap(find.text(l[KApp.sudoUsePassword]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[K.sudoCurrentPassword]), findsOne);
+      expect(find.text(l[KApp.sudoSendCode]), findsOne);
+    });
+
+    testWidgets('the password cooldown does not disable the code',
+        (tester) async {
+      // Three wrong passwords start the LOCAL throttle. Someone who then
+      // remembers they never had a password must still be able to ask for a
+      // code — the cooldown is about guessing, and asking is not a guess.
+      final source = fakeSource()..sessionEmailValue = 'alguem@example.com';
+      final sudo = SudoService(source);
+      for (var i = 0; i < 3; i++) {
+        await sudo.elevate('errada', l);
+      }
+      expect(sudo.isCoolingDown, isTrue);
+
+      await tester.pumpWidget(harness(
+        sudo: sudo,
+        onTap: (context) => showSudoSheet(context: context, sudo: sudo),
+      ));
+      await tester.tap(find.text('gatilho'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(l[KApp.sudoSendCode]));
+      await tester.pumpAndSettle();
+
+      expect(source.codeRequests, 1);
+      expect(find.text(l[KApp.sudoCodeLabel]), findsOne);
     });
   });
 }

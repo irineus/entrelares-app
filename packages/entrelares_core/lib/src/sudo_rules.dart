@@ -27,6 +27,47 @@ abstract final class SudoRules {
   /// Wrong-password attempts before the local throttle kicks in.
   static const int maxAttempts = 3;
 
+  // ── S-21: the e-mail code, the gate's SECOND proof ────────────────────────
+  //
+  // A session that signed in with Google has no password, so the password sheet
+  // asked it for a credential that does not exist and every sudo-gated action
+  // was unreachable. The three numbers below are the FUNCTION's — they are
+  // declared in `supabase/functions/elevate/index.ts` and passed from there into
+  // the RPCs — and `elevate_constants_mirror_test` reads that file to keep these
+  // copies honest. They live here so the prompt can say how long a code lasts
+  // and refuse a malformed one without spending a round-trip; the server is
+  // still the only thing that decides whether a code is right.
+
+  /// Digits in a code.
+  static const int codeLength = 6;
+
+  /// How long a code stays redeemable.
+  static const Duration codeTtl = Duration(minutes: 10);
+
+  /// The shortest gap between two code requests. The server answers the second
+  /// one inside this window with "you already have one" rather than mailing
+  /// another — the old code is the one in the reader's inbox.
+  static const Duration codeResendInterval = Duration(seconds: 60);
+
+  /// What someone typed, reduced to what could be a code.
+  ///
+  /// Spaces and dashes come along for free when a code is copied out of an
+  /// e-mail, and refusing `246 810` for having a space in it would be the
+  /// client inventing a rule the server does not have.
+  static String normalizeCode(String raw) =>
+      raw.replaceAll(RegExp(r'[\s-]'), '');
+
+  /// Whether [raw] could be a code at all — [codeLength] digits, nothing else.
+  ///
+  /// This is a KEYBOARD check, never a verdict: it stops the prompt from
+  /// spending a request on four characters. A code of the right shape is still
+  /// judged entirely by `consume_elevation_code`.
+  static bool isCodeShaped(String raw) {
+    final normalized = normalizeCode(raw);
+    return normalized.length == codeLength &&
+        RegExp(r'^\d+$').hasMatch(normalized);
+  }
+
   static const Duration cooldown = Duration(seconds: 60);
 
   /// Detects the marker on EITHER transport: a PostgREST error whose JSON body

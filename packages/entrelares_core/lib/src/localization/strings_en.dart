@@ -959,11 +959,11 @@ abstract final class StringsEn {
     K.rolesPremiumGate: '💙 Creating and editing custom roles (e.g. "Grandma Rose") is a Premium feature. The roles your family already created keep working, and the standard roles stay available to everyone.',
     K.rolesToastCreated: 'Role created! It is already available on invitations and members.',
     // ── Sudo prompt ──
-    K.sudoTitle: '🔐 Confirm your password',
-    K.sudoHint: 'For security, this action requires you to confirm your password. The confirmation lasts a few minutes.',
+    K.sudoTitle: '🔐 Confirm it is you',
+    K.sudoHint: 'For security, this action requires a confirmation. It lasts a few minutes.',
     K.sudoCurrentPassword: 'Current password',
     K.sudoConfirm: 'Confirm',
-    K.sudoForgot: 'Forgot your password? Use "Reset password by e-mail" in the Password section.',
+    K.sudoForgot: 'No password, or cannot remember it? Ask for a code by e-mail right here.',
     // ── Not found ──
     K.notFoundTitle: 'Page not found',
     K.notFoundBody: 'The content you are looking for does not exist.',
