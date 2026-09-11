@@ -563,6 +563,10 @@ jobs:
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_ORG: irineu-pinheiro
       SENTRY_PROJECT: entrelares-app
+      # T-68: the host the smoke check reads back. Not a secret and not a
+      # guess — `web_channel_test` pins it against `Env.prod.webHostname`, the
+      # same string the app believes it is served from.
+      WEB_HOSTNAME: web.entrelares.app
     steps:
       - uses: actions/checkout@v4
       - name: Read Flutter version from .fvmrc
@@ -629,6 +633,18 @@ jobs:
           # moves, so the maps Sentry holds still line up.
           find build/web -name '*.js' -exec sed -i '/^\/\/# sourceMappingURL=/d' {} +
           echo "Source maps stripped from the published bundle: $count" >> "$GITHUB_STEP_SUMMARY"
+      # T-68 — the marker that makes the publish PROVABLE, written into the
+      # bundle just before it goes up. The commit sha and not `version.json`:
+      # the version only moves when the pubspec does, so a delivery that does
+      # not bump it (T-69 was a pure rename) would publish nothing and still
+      # match. Published at the root, uncached by the Pages default measured on
+      # `version.json` (`max-age=0, must-revalidate`), and read back by
+      # `smoke_web.sh` after the deploy.
+      - name: Stamp the bundle with the commit being published
+        working-directory: app
+        run: |
+          printf '%s' "$GITHUB_SHA" > build/web/build-id.txt
+          echo "Marcador publicado: \`$GITHUB_SHA\` em /build-id.txt" >> "$GITHUB_STEP_SUMMARY"
       # Wrangler, as in the app repo. The Pages project name is IMMUTABLE once
       # created (a lesson the F-54 rebrand paid for), so it is pinned here and
       # created by the owner before the first run.
@@ -645,8 +661,112 @@ jobs:
         working-directory: app
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: wrangler pages deploy build/web --project-name=entrelares-web --branch=main --commit-dirty=true
+      # T-68 — exit code 0 is not proof. This fetches the published site and
+      # asserts it is serving the commit stamped above; a publish that succeeded
+      # loudly and delivered nothing goes RED here, which is what makes the
+      # `ops-alert` job below fire. See `smoke_web.sh` for why it compares the
+      # BODY and never the status: `_redirects` answers 200 with `index.html`
+      # for a file that is not there, so a `curl -f` check would pass over the
+      # void.
+      - name: Prove the channel is serving THIS commit
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: bash .github/smoke_web.sh "https://${{ env.WEB_HOSTNAME }}" "$GITHUB_SHA"
       - name: Say why nothing was published
         if: env.CLOUDFLARE_API_TOKEN == ''
         run: |
           echo "### Canal web: build OK, publicação PULADA" >> "$GITHUB_STEP_SUMMARY"
           echo "Faltam os secrets \`CLOUDFLARE_API_TOKEN\` e \`CLOUDFLARE_ACCOUNT_ID\` neste repo (e o projeto Pages \`entrelares-web\`)." >> "$GITHUB_STEP_SUMMARY"
+
+  # ── T-68 — a failed publish reaching a human ────────────────────────────
+  # `main` is production and there is no rollback, so the loud failure is
+  # already covered: a merge that breaks reaches users as a broken app. The
+  # INVERSE was invisible — a merge that silently does NOT publish. On
+  # 10/09/2026 `db-prod` failed, `deploy-web` was skipped, and the web channel
+  # stopped publishing; it was noticed only because someone happened to be
+  # watching the run of a DOCUMENTATION PR.
+  #
+  # MEASURED FIRST, per the card: GitHub's own failure e-mail DID arrive, 20
+  # seconds after the run concluded. What it cannot do is stand out — in those
+  # three days it sent 13 CI-failure mails, 10 of them routine PR noise, and the
+  # one that meant "production stopped publishing" looked like all the others.
+  # So this job does not duplicate that e-mail; it gives the event a destination
+  # that already means production (Sentry, T-66 — runbook §13.5) and a durable
+  # record that stays open until a human closes it (a GitHub issue).
+  #
+  # `cancelled` deliberately does NOT alert. A cancelled `db-gate` is usually an
+  # EVICTION from its depth-1 queue (§5), a documented false alarm — and an
+  # alarm that cries wolf is how the next real one gets ignored. Hence
+  # `contains(needs.*.result, 'failure')` rather than `failure()`.
+  ops-alert:
+    if: >-
+      always() && github.event_name == 'push' && github.ref_name == 'main'
+      && contains(needs.*.result, 'failure')
+    needs: [verify, db-gate, web-e2e, db-prod, deploy-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    env:
+      # PUBLIC by construction: a Sentry DSN can only WRITE events, which is why
+      # it ships in every browser that loads the web channel. `web_channel_test`
+      # pins this string against `Env.prod.sentryDsn` so the two cannot drift —
+      # and the PRODUCTION project on purpose: the dev project's alert rule is
+      # disabled (runbook §13.5), so an alert sent there wakes nobody.
+      SENTRY_DSN_PROD: https://207fdf4ae55dd391583ecaa369b3319b@o4511910022217728.ingest.us.sentry.io/4512066983231488
+    steps:
+      - uses: actions/checkout@v4
+      - name: Name the jobs that failed
+        id: failed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jobs=$(printf '%s' "$NEEDS" \
+            | jq -r 'to_entries | map(select(.value.result == "failure") | .key) | join(", ")')
+          echo "jobs=$jobs" >> "$GITHUB_OUTPUT"
+          echo "### 🚨 \`main\` vermelha — o canal web NÃO publicou" >> "$GITHUB_STEP_SUMMARY"
+          echo "Falharam: \`$jobs\`. O merge \`${GITHUB_SHA:0:7}\` não chegou a \`web.entrelares.app\`." >> "$GITHUB_STEP_SUMMARY"
+      # The alert. Sentry's project alert rule ("high priority issues") e-mails
+      # the owner — measured 11/09/2026 with a probe event of this exact shape:
+      # 46 seconds from POST to inbox, subject carrying `PipelineFailure`.
+      - name: Alertar no Sentry de produção
+        run: |
+          bash .github/ops_alert.sh \
+            "$SENTRY_DSN_PROD" \
+            "${{ steps.failed.outputs.jobs }}" \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            "$GITHUB_SHA"
+      # The durable record. An e-mail is read once and scrolls away; this stays
+      # OPEN until a human closes it, which is what a "production is not
+      # publishing" item needs. `always()` so a Sentry outage does not take the
+      # record down with it.
+      - name: Abrir (ou atualizar) o registro do incidente
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FAILED_JOBS: ${{ steps.failed.outputs.jobs }}
+        run: |
+          set -euo pipefail
+          short="${GITHUB_SHA:0:7}"
+          marker="🚨 main vermelha em $short"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          jobs="${FAILED_JOBS:-desconhecidos}"
+          existing=$(gh issue list --state open --limit 50 --json number,title \
+            --jq "map(select(.title | startswith(\"$marker\"))) | .[0].number // empty")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Nova tentativa, mesma falha: \`$jobs\` — $run_url"
+            echo "Registro atualizado: #$existing"
+          else
+            gh issue create \
+              --title "$marker — o canal web não publicou" \
+              --body "$(printf '%s\n' \
+                "O merge \`$short\` foi para \`main\` e **não chegou a \`web.entrelares.app\`**." \
+                "" \
+                "- Jobs vermelhos: \`$jobs\`" \
+                "- Run: $run_url" \
+                "- O canal segue servindo o build ANTERIOR até que isto seja corrigido e o run refeito." \
+                "" \
+                "Se o job vermelho for \`db-prod\` ou \`db-gate\` e a falha vier de *Authorization failed for the access token and project ref pair*, é o par de tokens do Supabase — \`SUPABASE_ACCESS_TOKEN_DEV\` e \`SUPABASE_ACCESS_TOKEN_PROD\` são secrets DIFERENTES e rotacionar um não conserta o outro (Decisões vigentes, \"Tests, gates and CI\")." \
+                "" \
+                "Fechar esta issue quando um run verde em \`main\` tiver publicado — o passo *Prove the channel is serving THIS commit* é a evidência." )"
+          fi

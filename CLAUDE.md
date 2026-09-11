@@ -137,7 +137,15 @@ cd app && fvm flutter build apk --debug --flavor dev --split-per-abi
 # Canal web: os dois flags NÃO são opcionais — sem o define o build aponta para o
 # banco de QA, e sem o --no-web-resources-cdn o CanvasKit vem do gstatic.
 cd app && fvm flutter build web --release --no-web-resources-cdn --dart-define=APP_ENV=prod
-# O DEPLOY faz três coisas a mais que este comando local (T-66, runbook §13.6):
+# O DEPLOY faz CINCO coisas a mais que este comando local. Três são do T-66
+# (runbook §13.6) e duas do T-68 (runbook §14): carimba `build/web/build-id.txt`
+# com o `$GITHUB_SHA` logo antes do upload e, DEPOIS de publicar, lê esse
+# arquivo de volta de `web.entrelares.app` e compara o corpo — porque o código
+# de saída 0 do `wrangler` não é prova, e porque `_redirects` responde 200 com o
+# index.html para um arquivo que NÃO existe (um `curl -f` passaria no vazio).
+# Se a publicação não se provar, o job `ops-alert` alarma no Sentry de produção
+# e abre uma issue; `main` vermelha nunca mais fica só no e-mail do GitHub.
+# As três do T-66 (runbook §13.6):
 # compila com --source-maps, sobe os mapas para o Sentry numa release nomeada
 # `entrelares-app@<versão do pubspec>` — a mesma string que o cliente manda, senão
 # mapas e eventos nunca se encontram — e APAGA todo .map antes de publicar, porque
