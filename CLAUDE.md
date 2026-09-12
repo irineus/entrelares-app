@@ -60,7 +60,7 @@ URL with the ids already in it, never `https://<console>` with a placeholder.
 | GitHub Actions (app) | https://github.com/irineus/entrelares-app/actions | `workflow_dispatch`: `run-e2e`, `build-apk`, full run on a docs-only branch |
 | GitHub branches (app) | https://github.com/irineus/entrelares-app/branches | branch deletion — the cloud session CANNOT do it (403 by design) |
 | Landing repo | https://github.com/irineus/entrelares-site | `L-*` items, branch `preview` |
-| Cloudflare Pages | https://dash.cloudflare.com/?to=/:account/pages/view/entrelares-web | project `entrelares-web` serves `web.entrelares.app`; the `?to=/:account/…` form resolves the account itself |
+| Cloudflare Pages | https://dash.cloudflare.com/1185ad84960bdaf12e52096fe8df0dc9/pages/view/entrelares-web | project `entrelares-web` serves `web.entrelares.app`. Same account as the landing's workers — confirmed by the owner opening this exact link on 12/09/2026 (L-26) |
 | Play Console — the app | https://play.google.com/console/u/0/developers/5188946194088545235/app/4976020657794164634/app-dashboard | package `com.entrelares.app`. Bundle promotion is the owner's, always. Developer `5188946194088545235`, app `4976020657794164634` — keep these, they are the only way to deep-link a Play screen |
 | Firebase **prod** | https://console.firebase.google.com/project/entrelares-prod | FCM / web push. Sender `575356979434` |
 | Firebase **dev** | https://console.firebase.google.com/project/entrelares-dev | Sender `51960618124` |
@@ -73,10 +73,10 @@ registers a webhook) move between product redesigns. So a handoff block always p
 the **in-UI navigation path** as plan B — and when an exact deep link needs an internal numeric id
 this repo does not hold, say so and ask for it once instead of guessing a URL that 404s. The
 Cloudflare account id is **`1185ad84960bdaf12e52096fe8df0dc9`** — declared as `account_id` in the
-landing's `wrangler.jsonc` and confirmed by L-25 for the landing's two workers and KV namespaces.
-Whether the Pages project `entrelares-web` sits on that same account is NOT confirmed by anything
-in this repo (the `deploy-web` job reads it from the `CLOUDFLARE_ACCOUNT_ID` secret), so the
-Pages row above keeps the `?to=/:account/…` form until the owner opens the direct link (L-26).
+landing's `wrangler.jsonc`, confirmed by L-25 for the landing's two workers and KV namespaces and
+by L-26 for the Pages project `entrelares-web` (nothing in this repo proves the latter — the
+`deploy-web` job reads the id from the `CLOUDFLARE_ACCOUNT_ID` secret — so it was the owner
+opening the direct link, 12/09/2026).
 
 ## Repository layout
 
