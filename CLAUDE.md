@@ -65,13 +65,18 @@ URL with the ids already in it, never `https://<console>` with a placeholder.
 | Firebase **prod** | https://console.firebase.google.com/project/entrelares-prod | FCM / web push. Sender `575356979434` |
 | Firebase **dev** | https://console.firebase.google.com/project/entrelares-dev | Sender `51960618124` |
 | Asaas (prod / sandbox) | https://www.asaas.com · https://sandbox.asaas.com | billing rail. Prod must OPT IN via `ASAAS_API_URL` |
-| Umami | https://cloud.umami.is | prod site `6fdd6c5a-4bce-449f-8188-3b7399a859d8` |
+| Umami — the **app**'s site | https://cloud.umami.is | login **`irineus@gmail.com`**. Website `6fdd6c5a-4bce-449f-8188-3b7399a859d8` = `web.entrelares.app`, the id `env.dart` sends. **Hobby tier, no API** ("API access requires a Pro plan", verified 12/09/2026): every reading is the owner's dashboard — ask for a screenshot, never for an API key (L-26) |
+| Umami — the **landing**'s site | https://cloud.umami.is | login **`irineus.adp@gmail.com`** — a SECOND account, because the free tier allowed one website per account when T-37/L-01 created them (July 2026). Website `8b182992-68ce-4f2e-abb9-e798c33e48d8` = `entrelares.app`. Two accounts, one provider: L-25 lost a whole round trip because no document said which login held which site (L-26) |
 
 ⚠️ The **sub-paths inside** these consoles (which tab holds Edge Function secrets, which screen
 registers a webhook) move between product redesigns. So a handoff block always pairs the URL with
 the **in-UI navigation path** as plan B — and when an exact deep link needs an internal numeric id
-this repo does not hold (the Cloudflare account id is the one still missing), say so and ask for it
-once instead of guessing a URL that 404s.
+this repo does not hold, say so and ask for it once instead of guessing a URL that 404s. The
+Cloudflare account id is **`1185ad84960bdaf12e52096fe8df0dc9`** — declared as `account_id` in the
+landing's `wrangler.jsonc` and confirmed by L-25 for the landing's two workers and KV namespaces.
+Whether the Pages project `entrelares-web` sits on that same account is NOT confirmed by anything
+in this repo (the `deploy-web` job reads it from the `CLOUDFLARE_ACCOUNT_ID` secret), so the
+Pages row above keeps the `?to=/:account/…` form until the owner opens the direct link (L-26).
 
 ## Repository layout
 
