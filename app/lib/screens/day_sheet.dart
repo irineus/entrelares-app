@@ -113,8 +113,8 @@ class _DaySheetState extends State<_DaySheet> {
   int _actualParentId = 0; // 0 = same as planned (web sentinel)
   late final TextEditingController _notes;
   late final TextEditingController _swapMessage; // F-44
-  int _handoffHour = -1;
-  int _handoffMinute = 0;
+  /// U-37: one value, picked by the platform; null is "no handoff time".
+  TimeOfDay? _handoff;
   bool _saving = false;
   bool _deleting = false;
   String? _error;
@@ -206,11 +206,9 @@ class _DaySheetState extends State<_DaySheet> {
     _actualParentId = day?.actualParentId ?? 0;
     _notes = TextEditingController(text: day?.notes ?? '');
     _swapMessage = TextEditingController();
-    final handoff = day?.handoffTime;
+    final handoff = parseTimeOfDay(day?.handoffTime);
     if (handoff != null) {
-      final parts = handoff.split(':');
-      _handoffHour = int.tryParse(parts[0]) ?? -1;
-      _handoffMinute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+      _handoff = TimeOfDay(hour: handoff.hour, minute: handoff.minute);
     }
     final previous = widget.previousDay;
     if (previous != null) {
@@ -271,12 +269,13 @@ class _DaySheetState extends State<_DaySheet> {
       // clearing here keeps the saved value equal to what the user was warned
       // about, instead of letting the server silently rewrite it.
       String? handoffWire;
-      if (_handoffHour >= 0) {
+      final handoff = _handoff;
+      if (handoff != null) {
         final prev = await _prevEffective;
         if (isTransitionDay(prev, _effectiveBeingSaved)) {
           handoffWire =
-              '${_handoffHour.toString().padLeft(2, '0')}:'
-              '${_handoffMinute.toString().padLeft(2, '0')}:00';
+              '${handoff.hour.toString().padLeft(2, '0')}:'
+              '${handoff.minute.toString().padLeft(2, '0')}:00';
         }
       }
 
@@ -762,51 +761,21 @@ class _DaySheetState extends State<_DaySheet> {
 
       // ── Handoff time (T-27: transition days only) ──
       //
-      // The two pickers were bare `DropdownButton`s — an underline where every
-      // other field in the app has a border, which is what made this block look
-      // switched off. As form fields they get the same outline AND the same
-      // integrated label as the rest.
-      AppFieldLabel(l[K.editorHandoffTime],
-          info: l[K.editorHandoffHint], optionalLabel: l[K.commonOptional]),
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: DropdownButtonFormField<int>(
-              key: const Key('handoffHour'),
-              initialValue: _handoffHour,
-              decoration: InputDecoration(labelText: l[K.editorHourLabel]),
-              items: [
-                const DropdownMenuItem(value: -1, child: Text('--')),
-                for (var h = 0; h < 24; h++)
-                  DropdownMenuItem(
-                      value: h, child: Text(h.toString().padLeft(2, '0'))),
-              ],
-              onChanged: (v) => setState(() => _handoffHour = v ?? -1),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 16),
-            child: Text(':'),
-          ),
-          Expanded(
-            child: DropdownButtonFormField<int>(
-              key: const Key('handoffMinute'),
-              initialValue: _handoffMinute,
-              decoration: InputDecoration(labelText: l[K.editorMinuteLabel]),
-              items: [
-                for (var m = 0; m < 60; m++)
-                  DropdownMenuItem(
-                      value: m, child: Text(m.toString().padLeft(2, '0'))),
-              ],
-              onChanged: _handoffHour < 0
-                  ? null
-                  : (v) => setState(() => _handoffMinute = v ?? 0),
-            ),
-          ),
-        ],
+      // U-37: one field, the platform's picker. The hour + minute dropdown
+      // pair was the Blazor `<select>` pair ported literally — on a phone the
+      // minute list was a three-screen scroll to reach "30".
+      AppTimeField(
+        fieldKey: const Key('handoff'),
+        label: l[K.editorHandoffTime],
+        info: l[K.editorHandoffHint],
+        optionalLabel: l[K.commonOptional],
+        value: _handoff,
+        emptyText: l[K.editorHandoffEmpty],
+        clearLabel: l[K.editorHandoffClear],
+        formatValue: (t) => l.formatTime(DateTime(2000, 1, 1, t.hour, t.minute)),
+        onChanged: (t) => setState(() => _handoff = t),
       ),
-      if (_handoffHour >= 0 && _scheduledParentId != null)
+      if (_handoff != null && _scheduledParentId != null)
         FutureBuilder<int?>(
           future: _prevEffective,
           builder: (context, snapshot) =>

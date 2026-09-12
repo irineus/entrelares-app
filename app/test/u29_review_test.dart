@@ -102,8 +102,7 @@ void main() {
       for (final key in const [
         'bulkScheduled',
         'bulkActual',
-        'bulkHandoffHour',
-        'bulkHandoffMinute',
+        'bulkHandoff',
       ]) {
         expect(
             find.descendant(

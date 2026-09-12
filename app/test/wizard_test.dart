@@ -77,9 +77,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await openWizard(tester);
-    await tapSheet(tester, find.byKey(const Key('wizHandoffHour')));
-    await tester.tap(find.text('01').last);
-    await tester.pumpAndSettle();
+    await pickTime(tester, find.byKey(const Key('wizHandoff')), hour: 1);
     await generate(tester);
 
     expect(ds.inserted.first.handoffTime, isNull);

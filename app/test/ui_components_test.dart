@@ -193,6 +193,113 @@ void main() {
     });
   });
 
+  group('AppTimeField', () {
+    // U-37: the hour + minute dropdown pair became one field and the
+    // platform's picker. These pin the field's three states — empty, set,
+    // cleared — and that the picker is the platform dialog, not a menu.
+    String fmt(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:'
+        '${t.minute.toString().padLeft(2, '0')}';
+
+    Widget field({TimeOfDay? value, ValueChanged<TimeOfDay?>? onChanged,
+            bool enabled = true}) =>
+        AppTimeField(
+          fieldKey: const Key('time'),
+          label: 'Horário',
+          info: 'dica',
+          optionalLabel: 'opcional',
+          value: value,
+          enabled: enabled,
+          emptyText: 'Sem horário',
+          clearLabel: 'Remover',
+          formatValue: fmt,
+          onChanged: onChanged ?? (_) {},
+        );
+
+    testWidgets('empty says so, with no clear button', (tester) async {
+      await tester.pumpWidget(_host(field()));
+      expect(find.text('Horário'), findsOneWidget);
+      expect(find.text('opcional'), findsOneWidget);
+      expect(find.text('Sem horário'), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsNothing);
+    });
+
+    testWidgets('a value renders through the caller\'s formatter and the ✕ '
+        'clears it', (tester) async {
+      TimeOfDay? reported = const TimeOfDay(hour: 18, minute: 30);
+      await tester.pumpWidget(_host(field(
+          value: reported, onChanged: (t) => reported = t)));
+      expect(find.text('18:30'), findsOneWidget);
+      // The decorator keeps its hint in the tree at zero opacity; what a
+      // reader gets is the value, so the semantics is the assertion here.
+      final handle = tester.ensureSemantics();
+      expect(find.bySemanticsLabel(RegExp('Horário')), findsWidgets);
+      expect(
+          tester.getSemantics(find.byKey(const Key('time'))).value, '18:30');
+      handle.dispose();
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(reported, isNull);
+      // The clear did not open the picker on its way out.
+      expect(find.byType(TimePickerDialog), findsNothing);
+    });
+
+    testWidgets('tapping the field opens the platform picker, titled by the '
+        'label', (tester) async {
+      await tester.pumpWidget(_host(field()));
+      await tester.tap(find.byKey(const Key('time')));
+      await tester.pumpAndSettle();
+      expect(find.byType(TimePickerDialog), findsOneWidget);
+      expect(find.text('Horário'), findsNWidgets(2));
+    });
+
+    testWidgets('the picked time comes back through onChanged',
+        (tester) async {
+      TimeOfDay? reported;
+      await tester.pumpWidget(
+          _host(field(onChanged: (t) => reported = t)));
+      await tester.tap(find.byKey(const Key('time')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.keyboard_outlined));
+      await tester.pumpAndSettle();
+      final inputs = find.descendant(
+          of: find.byType(TimePickerDialog),
+          matching: find.byType(TextFormField));
+      await tester.enterText(inputs.at(0), '6');
+      await tester.enterText(inputs.at(1), '30');
+      await tester.tap(find.text('PM'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(reported, const TimeOfDay(hour: 18, minute: 30));
+    });
+
+    testWidgets('disabled opens nothing and the ✕ does nothing',
+        (tester) async {
+      var changed = false;
+      await tester.pumpWidget(_host(field(
+          value: const TimeOfDay(hour: 8, minute: 0),
+          enabled: false,
+          onChanged: (_) => changed = true)));
+      await tester.tap(find.byKey(const Key('time')));
+      await tester.pumpAndSettle();
+      expect(find.byType(TimePickerDialog), findsNothing);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(changed, isFalse);
+    });
+
+    testWidgets('wears the bordered field decoration like every other field',
+        (tester) async {
+      await tester.pumpWidget(_host(field()));
+      expect(
+          find.descendant(
+              of: find.byKey(const Key('time')),
+              matching: find.byType(InputDecorator)),
+          findsOneWidget);
+    });
+  });
+
   group('AppAvatar', () {
     testWidgets('wears the carer\'s slot colours when given one',
         (tester) async {
@@ -217,6 +324,13 @@ void main() {
           const AppSectionHeader(title: 'Seção'),
           AppCard(title: 'Cartão', child: const Text('conteúdo')),
           const AppTextField(label: 'Campo'),
+          AppTimeField(
+              label: 'Hora',
+              value: const TimeOfDay(hour: 9, minute: 0),
+              onChanged: (_) {},
+              emptyText: 'vazio',
+              clearLabel: 'limpar',
+              formatValue: (t) => '${t.hour}:${t.minute}'),
           AppActionPair(primaryLabel: 'ok', onPrimary: () {}),
           const AppAvatar(initials: 'AB'),
         ]),
