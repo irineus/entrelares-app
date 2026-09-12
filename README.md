@@ -175,11 +175,14 @@ Se divergir, o build sai assinado com a chave errada e a Play recusa o upload.
 
 Bilíngue por leitor (PT-BR / EN), portado do app web:
 
-- **Catálogos gerados, nunca editados à mão:** `packages/entrelares_core/lib/src/localization/`
-  (`k.dart` + `strings_pt_br.dart` + `strings_en.dart`, 961 chaves) são espelhos mecânicos
-  dos `K.cs`/`StringsPtBr.cs`/`StringsEn.cs` do repo `entrelares-app-legacy`, regenerados por
-  `python tool/port_catalogs.py <caminho-do-entrelares-app-legacy>`. Strings que só existem
-  neste cliente vivem em `k_app.dart` (prefixo `app.`), à mão.
+- **Catálogos nativos em Dart, mantidos à mão:** `packages/entrelares_core/lib/src/localization/`
+  (`k.dart` + `strings_pt_br.dart` + `strings_en.dart`) nasceram como espelho mecânico dos
+  `K.cs`/`StringsPtBr.cs`/`StringsEn.cs` do cliente Blazor (porte do T-53), mas desde o cutover
+  toda string nova existe só aqui. O porter foi apagado no T-70 (12/09/2026): a única execução
+  segura dele era nenhuma — re-rodá-lo sobrescreveria os catálogos vivos com um conjunto mais
+  antigo e menor, lido de um repo arquivado que §6 das Decisões vigentes manda não consultar.
+  Edita-se o VALOR nos dois catálogos; chave nova entra em `k_app.dart` (prefixo `app.`). A
+  paridade de chaves entre os três é gate de `dart test` (`localization_test.dart`).
 - **Resolução** (`LanguageResolver`): escolha local > `profiles.language` > locale do
   aparelho > PT-BR. Idioma fixo no boot; a troca (picker no login e no calendário)
   reconstrói a árvore da raiz — o análogo do `forceLoad` do web. Adoção cross-device e
