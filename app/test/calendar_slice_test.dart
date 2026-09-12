@@ -997,6 +997,29 @@ Future<void> tapSheet(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+/// U-37: sets a time through the platform picker an [AppTimeField] opens.
+///
+/// The dial's numbers are painted, not widgets, so the test switches the
+/// dialog to keyboard entry and types hour and minute into its two fields.
+/// The test host has no localization delegates, so the picker runs on the
+/// English defaults — a 12-hour clock — and the period is tapped explicitly
+/// rather than inherited from the wall clock the empty field opens on.
+Future<void> pickTime(WidgetTester tester, Finder field,
+    {required int hour, int minute = 0}) async {
+  await tapSheet(tester, field);
+  await tester.tap(find.byIcon(Icons.keyboard_outlined));
+  await tester.pumpAndSettle();
+  final inputs = find.descendant(
+      of: find.byType(TimePickerDialog), matching: find.byType(TextFormField));
+  final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+  await tester.enterText(inputs.at(0), '$hour12');
+  await tester.enterText(inputs.at(1), minute.toString().padLeft(2, '0'));
+  await tester.tap(find.text(hour < 12 ? 'AM' : 'PM'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('OK'));
+  await tester.pumpAndSettle();
+}
+
 /// Lets the save/clear SnackBar's dismiss timer fire so none outlives a test.
 Future<void> settleSnack(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 9));

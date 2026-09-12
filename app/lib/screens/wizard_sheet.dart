@@ -73,8 +73,8 @@ class _WizardSheetState extends State<_WizardSheet> {
   List<_MutableBlock> _blocks = [];
   late DateTime _startDate;
   int _durationMonths = 3;
-  int _handoffHour = -1;
-  int _handoffMinute = 0;
+  /// U-37: one value, picked by the platform; null is "no handoff time".
+  TimeOfDay? _handoff;
   bool _generating = false;
   bool _completed = false;
   String? _successMessage;
@@ -143,9 +143,9 @@ class _WizardSheetState extends State<_WizardSheet> {
         start: _startDate,
         end: clampResult.end,
         blocks: _cycleBlocks,
-        handoffTime: _handoffHour >= 0
-            ? (hour: _handoffHour, minute: _handoffMinute)
-            : null,
+        handoffTime: _handoff == null
+            ? null
+            : (hour: _handoff!.hour, minute: _handoff!.minute),
       );
       final rows = [
         for (final g in generated)
@@ -412,47 +412,20 @@ class _WizardSheetState extends State<_WizardSheet> {
       const SizedBox(height: Spacing.md),
 
       // ── Handoff time (transitions only — T-27) ──
-      AppFieldLabel(l[K.wizHandoffTime],
-          info: l[K.wizHandoffHint], optionalLabel: l[K.commonOptional]),
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: DropdownButtonFormField<int>(
-              key: const Key('wizHandoffHour'),
-              decoration: InputDecoration(labelText: l[K.editorHourLabel]),
-              initialValue: _handoffHour,
-              items: [
-                const DropdownMenuItem(value: -1, child: Text('--')),
-                for (var h = 0; h < 24; h++)
-                  DropdownMenuItem(
-                      value: h, child: Text(h.toString().padLeft(2, '0'))),
-              ],
-              onChanged: _generating
-                  ? null
-                  : (v) => setState(() => _handoffHour = v ?? -1),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: 16),
-            child: Text(':'),
-          ),
-          Expanded(
-            child: DropdownButtonFormField<int>(
-              key: const Key('wizHandoffMinute'),
-              decoration: InputDecoration(labelText: l[K.editorMinuteLabel]),
-              initialValue: _handoffMinute,
-              items: [
-                for (var m = 0; m < 60; m++)
-                  DropdownMenuItem(
-                      value: m, child: Text(m.toString().padLeft(2, '0'))),
-              ],
-              onChanged: _generating || _handoffHour < 0
-                  ? null
-                  : (v) => setState(() => _handoffMinute = v ?? 0),
-            ),
-          ),
-        ],
+      //
+      // U-37: one field, the platform's picker, instead of the hour + minute
+      // dropdown pair.
+      AppTimeField(
+        fieldKey: const Key('wizHandoff'),
+        label: l[K.wizHandoffTime],
+        info: l[K.wizHandoffHint],
+        optionalLabel: l[K.commonOptional],
+        value: _handoff,
+        enabled: !_generating,
+        emptyText: l[K.editorHandoffEmpty],
+        clearLabel: l[K.editorHandoffClear],
+        formatValue: (t) => l.formatTime(DateTime(2000, 1, 1, t.hour, t.minute)),
+        onChanged: (t) => setState(() => _handoff = t),
       ),
           ],
         ),

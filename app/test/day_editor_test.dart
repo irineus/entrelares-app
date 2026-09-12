@@ -23,12 +23,9 @@ int? get pastDay => today.day == 1 ? null : today.day - 1;
 
 AdminMode activeAdminMode() => AdminMode()..toggle();
 
-Future<void> pickHour(WidgetTester tester, int hour) async {
-  await tapSheet(tester, find.byKey(const Key('handoffHour')));
-  // The overlay's menu item comes after the grid's day cell in tree order.
-  await tester.tap(find.text(hour.toString().padLeft(2, '0')).last);
-  await tester.pumpAndSettle();
-}
+/// U-37: the hour + minute dropdowns became one field and the platform picker.
+Future<void> pickHour(WidgetTester tester, int hour) =>
+    pickTime(tester, find.byKey(const Key('handoff')), hour: hour);
 
 void main() {
   testWidgets('note and handoff save together on a transition day',

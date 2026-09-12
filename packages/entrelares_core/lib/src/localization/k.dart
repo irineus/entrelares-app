@@ -144,9 +144,6 @@ abstract final class K {
   /// about which was the carer and which the number of days.
   static const String wizBlockParentLabel = 'wiz.blockParentLabel';
 
-  static const String editorHourLabel = 'editor.hourLabel';
-  static const String editorMinuteLabel = 'editor.minuteLabel';
-
   static const String navAccount = 'nav.account';
   static const String navProfile = 'nav.profile';
   static const String navAdmin = 'nav.admin';
@@ -258,6 +255,11 @@ abstract final class K {
   static const String editorDayNotePlaceholder = 'editor.dayNotePlaceholder';
   static const String editorHandoffTime = 'editor.handoffTime';
   static const String editorHandoffHint = 'editor.handoffHint';
+
+  /// U-37: the single time field — what it says while empty, and the name of
+  /// the ✕ that clears it (the dropdowns' "--" option, now one tap).
+  static const String editorHandoffEmpty = 'editor.handoffEmpty';
+  static const String editorHandoffClear = 'editor.handoffClear';
   static const String editorNoTransitionHint = 'editor.noTransitionHint';
   static const String editorMessageLabel = 'editor.messageLabel';
   static const String editorMessagePlaceholder = 'editor.messagePlaceholder';
@@ -1215,8 +1217,6 @@ abstract final class K {
     commonShowPassword,
     commonHidePassword,
     wizBlockParentLabel,
-    editorHourLabel,
-    editorMinuteLabel,
     navAccount,
     navProfile,
     navAdmin,
@@ -1312,6 +1312,8 @@ abstract final class K {
     editorDayNotePlaceholder,
     editorHandoffTime,
     editorHandoffHint,
+    editorHandoffEmpty,
+    editorHandoffClear,
     editorNoTransitionHint,
     editorMessageLabel,
     editorMessagePlaceholder,

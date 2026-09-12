@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import 'sheets.dart';
 
 /// A text field with a label that is always visible.
 ///
@@ -246,6 +247,122 @@ class AppAvatar extends StatelessWidget {
       radius: radius,
       backgroundColor: tone!.solid,
       child: label,
+    );
+  }
+}
+
+/// U-37 — one field for a time of day, filled by the platform's own picker.
+///
+/// The three sheets that ask for a handoff time used to ask it as TWO
+/// `DropdownButtonFormField`s (hour 0–23, minute 0–59): the Blazor `<select>`
+/// pair ported literally. On a phone the minute list is ~60 rows tall, so
+/// picking "30" is a scroll of three screens, and the pair reads as two
+/// questions when it is one. `showTimePicker` is exactly the platform
+/// improvement the "parity is the floor" rule authorises: 12/24 h follows the
+/// session locale (`MaterialApp.locale`), so the dial agrees with what
+/// `formatTimeString` renders on the read side.
+///
+/// The wire format never enters here. The field speaks [TimeOfDay]; the sheet
+/// keeps writing `HH:mm:00`, byte-identical to what the dropdowns produced.
+///
+/// The label, the optional marker and the ⓘ ride an [AppFieldLabel] above the
+/// control, the convention for every control that is not an [AppTextField];
+/// [trailing] sits at the far end of that label row — the bulk sheet parks its
+/// *Limpar* checkbox there. Words come from the caller: the catalog owns them.
+class AppTimeField extends StatelessWidget {
+  final String label;
+  final String? info;
+  final String? optionalLabel;
+  final Widget? trailing;
+
+  /// The value shown, or null for "no time". Clearing reports null through
+  /// [onChanged] — the "--" option the dropdowns had, now one tap on the ✕.
+  final TimeOfDay? value;
+  final ValueChanged<TimeOfDay?> onChanged;
+
+  /// What the field says while it holds no time.
+  final String emptyText;
+
+  /// The tooltip and accessible name of the ✕ that clears the value.
+  final String clearLabel;
+
+  /// Renders [value] in the reader's format — the sheets pass the catalog's
+  /// `formatTime`, so "18:00" and "6:00 PM" are decided in one place.
+  final String Function(TimeOfDay) formatValue;
+  final bool enabled;
+
+  /// Goes on the tappable control itself, where the widget and E2E finders
+  /// look for it.
+  final Key? fieldKey;
+
+  const AppTimeField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.emptyText,
+    required this.clearLabel,
+    required this.formatValue,
+    this.info,
+    this.optionalLabel,
+    this.trailing,
+    this.enabled = true,
+    this.fieldKey,
+  });
+
+  Future<void> _pick(BuildContext context) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: value ?? TimeOfDay.now(),
+      helpText: label,
+    );
+    if (picked != null) onChanged(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final labelRow =
+        AppFieldLabel(label, info: info, optionalLabel: optionalLabel);
+    final current = value;
+    final display = current == null ? emptyText : formatValue(current);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (trailing == null)
+          labelRow
+        else
+          Row(children: [Expanded(child: labelRow), trailing!]),
+        Semantics(
+          button: true,
+          enabled: enabled,
+          label: label,
+          value: display,
+          child: InkWell(
+            key: fieldKey,
+            borderRadius: BorderRadius.circular(Radii.md),
+            onTap: enabled ? () => _pick(context) : null,
+            child: InputDecorator(
+              isEmpty: current == null,
+              decoration: InputDecoration(
+                enabled: enabled,
+                hintText: emptyText,
+                prefixIcon: const Icon(Icons.schedule_outlined),
+                suffixIcon: current == null
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: clearLabel,
+                        onPressed: enabled ? () => onChanged(null) : null,
+                      ),
+              ),
+              child: current == null
+                  ? null
+                  : Text(display, style: textTheme.bodyLarge),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

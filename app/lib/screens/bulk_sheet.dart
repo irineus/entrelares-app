@@ -106,8 +106,8 @@ class _BulkSheetState extends State<_BulkSheet> {
   int _actualParentId = 0; // 0 = same as planned (web sentinel)
   late final TextEditingController _notes;
   late final TextEditingController _swapMessage; // F-44
-  int _handoffHour = -1;
-  int _handoffMinute = 0;
+  /// U-37: one value, picked by the platform; null is "no common handoff".
+  TimeOfDay? _handoff;
   bool _clearNotes = false;
   bool _clearHandoff = false;
   bool _clearActual = false;
@@ -147,8 +147,9 @@ class _BulkSheetState extends State<_BulkSheet> {
     _actualParentId = prefill.actualParentId;
     _notes = TextEditingController(text: prefill.notes ?? '');
     _swapMessage = TextEditingController();
-    _handoffHour = prefill.handoffHour;
-    _handoffMinute = prefill.handoffMinute;
+    _handoff = prefill.handoffHour < 0
+        ? null
+        : TimeOfDay(hour: prefill.handoffHour, minute: prefill.handoffMinute);
   }
 
   @override
@@ -340,12 +341,12 @@ class _BulkSheetState extends State<_BulkSheet> {
         // T-27: like the wizard, a bulk-set handoff lands only on TRANSITION
         // days; the others get null (and the summary says where it landed).
         HandoffTime? proposedHandoff = bulkProposedHandoff(
-          bulkHour: _handoffHour,
-          bulkMinute: _handoffMinute,
+          bulkHour: _handoff?.hour ?? -1,
+          bulkMinute: _handoff?.minute ?? 0,
           clearHandoff: _clearHandoff,
           existing: existing?.handoffTime,
         );
-        if (_handoffHour >= 0) {
+        if (_handoff != null) {
           final effectiveBeingSaved = proposedActual ?? dayScheduled;
           final prevEffective = await _prevEffective(date, inSelection);
           if (!isTransitionDay(prevEffective, effectiveBeingSaved)) {
@@ -466,7 +467,7 @@ class _BulkSheetState extends State<_BulkSheet> {
           clearActual: _clearActual,
           bulkNotes: notesText.isEmpty ? null : notesText,
           clearNotes: _clearNotes,
-          bulkHour: _handoffHour,
+          bulkHour: _handoff?.hour ?? -1,
           clearHandoff: _clearHandoff,
           proposedHandoff: proposedHandoff,
         );
@@ -523,7 +524,7 @@ class _BulkSheetState extends State<_BulkSheet> {
                 : K.bulkConflictSuffixMany,
             [conflictCount]);
       }
-      if (_handoffHour >= 0 && handoffCleared > 0) {
+      if (_handoff != null && handoffCleared > 0) {
         summary += l.format(
             K.bulkHandoffSuffix, [handoffApplied, handoffApplied + handoffCleared]);
       }
@@ -695,73 +696,29 @@ class _BulkSheetState extends State<_BulkSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                              child: AppFieldLabel(l[K.editorHandoffTime])),
-                          _clearCheckbox(
-                            l,
-                            value: _clearHandoff,
-                            unavailable: _handoffHour >= 0,
-                            enabled: fieldsEnabled,
-                            onChanged: (v) =>
-                                setState(() => _clearHandoff = v),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              key: const Key('bulkHandoffHour'),
-                              decoration: InputDecoration(
-                                  labelText: l[K.editorHourLabel]),
-                              initialValue: _handoffHour,
-                              items: [
-                                const DropdownMenuItem(
-                                    value: -1, child: Text('--')),
-                                for (var h = 0; h < 24; h++)
-                                  DropdownMenuItem(
-                                      value: h,
-                                      child:
-                                          Text(h.toString().padLeft(2, '0'))),
-                              ],
-                              onChanged: !fieldsEnabled
-                                  ? null
-                                  : (v) => setState(() {
-                                        _handoffHour = v ?? -1;
-                                        if (_handoffHour >= 0) {
-                                          _clearHandoff = false;
-                                        }
-                                      }),
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: Spacing.sm, vertical: 16),
-                            child: Text(':'),
-                          ),
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              key: const Key('bulkHandoffMinute'),
-                              decoration: InputDecoration(
-                                  labelText: l[K.editorMinuteLabel]),
-                              initialValue: _handoffMinute,
-                              items: [
-                                for (var m = 0; m < 60; m++)
-                                  DropdownMenuItem(
-                                      value: m,
-                                      child:
-                                          Text(m.toString().padLeft(2, '0'))),
-                              ],
-                              onChanged: !fieldsEnabled || _handoffHour < 0
-                                  ? null
-                                  : (v) =>
-                                      setState(() => _handoffMinute = v ?? 0),
-                            ),
-                          ),
-                        ],
+                      // U-37: one field, the platform's picker; *Limpar*
+                      // keeps its meaning ("clear the time on every selected
+                      // day") and rides the label row, where it already was.
+                      AppTimeField(
+                        fieldKey: const Key('bulkHandoff'),
+                        label: l[K.editorHandoffTime],
+                        trailing: _clearCheckbox(
+                          l,
+                          value: _clearHandoff,
+                          unavailable: _handoff != null,
+                          enabled: fieldsEnabled,
+                          onChanged: (v) => setState(() => _clearHandoff = v),
+                        ),
+                        value: _handoff,
+                        enabled: fieldsEnabled,
+                        emptyText: l[K.editorHandoffEmpty],
+                        clearLabel: l[K.editorHandoffClear],
+                        formatValue: (t) =>
+                            l.formatTime(DateTime(2000, 1, 1, t.hour, t.minute)),
+                        onChanged: (t) => setState(() {
+                          _handoff = t;
+                          if (t != null) _clearHandoff = false;
+                        }),
                       ),
                       const SizedBox(height: Spacing.md),
 

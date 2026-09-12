@@ -9,7 +9,8 @@
 ///   [AppTimelineEntry] — structure
 /// * [showAppSheet], [AppSheetFrame], [AppFieldLabel], [AppInfoTip] — sheets
 /// * [AppBanner], [AppBadge], [AppEmptyState], [AppDangerZone] — state
-/// * [AppTextField], [AppSegmented], [AppActionPair], [AppAvatar] — action
+/// * [AppTextField], [AppTimeField], [AppSegmented], [AppActionPair],
+///   [AppAvatar] — action
 library;
 
 export 'controls.dart';
