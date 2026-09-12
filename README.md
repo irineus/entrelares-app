@@ -405,10 +405,11 @@ regras e ~0% do visual — por um sistema de tokens. O que ela estabelece:
   (paridade), e com a textura o grid é legível sem visão de cores nenhuma. O dia
   **trocado** voltou à convenção do web (âmbar + borda tracejada), o que libera o rosa
   `#E11D48` para voltar a ser um papel.
-- **Onze componentes compartilhados** em `lib/widgets/ui/` (barril `ui.dart`): cabeçalho de
+- **Doze componentes compartilhados** em `lib/widgets/ui/` (barril `ui.dart`): cabeçalho de
   seção, cartão, badge, estado vazio, linha rótulo/valor, cabeçalho de folha, par de ações,
-  banner, campo de texto, segmentado e avatar. Cada um substituiu de três a seis cópias que
-  já tinham divergido entre telas. Duas convenções ficam gravadas neles: **o par de ações
+  banner, campo de texto, campo de horário (U-37: um campo que abre o seletor nativo, no
+  lugar do par de dropdowns hora + minuto), segmentado e avatar. Cada um substituiu de três
+  a seis cópias que já tinham divergido entre telas. Duas convenções ficam gravadas neles: **o par de ações
   põe a confirmação PRIMEIRO** (ordem do Blazor — quem chega no cutover tem essa memória
   muscular) e **todo campo tem rótulo permanente**, que é como a WCAG 1.4.11 é satisfeita
   sem engrossar a borda.
