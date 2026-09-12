@@ -193,7 +193,9 @@ copy and nothing updates it automatically (the en-US one at *Manage translations
 declaration on that page must be ✅ before a release rolls out, and the Console does not always
 say which one is blocking: sweep the whole list.
 
-- **Privacy policy URL**: `https://entrelares.app/privacidade.html`
+- **Privacy policy URL**: `https://entrelares.app/privacidade` — **no `.html`**: the Worker redirects the
+  extension away, and a URL declared to a third party names the form that answers 200 (S-19, L-23).
+  The field held the bouncing form until S-18; re-paste it in the same sitting as the table below.
 - **App access** — the declaration that rejects apps whose reviewers cannot get in. The whole app
   sits behind login, so answer **"All or some functionality in my app is restricted"** and add an
   instruction set with a REAL test account (a dedicated reviewer account created through the
@@ -201,14 +203,33 @@ say which one is blocking: sweep the whole list.
   Instructions: *"Log in with the credentials provided; the custody calendar is the home screen.
   All features are reachable from the bottom navigation."* Keep the account alive — Google
   re-reviews on later releases too.
-- **Data Safety** — declare:
-  | Data type | Collected? | Shared? | Notes |
-  |---|---|---|---|
-  | Personal info → Name | Yes — required, account | No | Profile name |
-  | Personal info → Email address | Yes — required, account | No | Login + notifications |
-  | App activity → App interactions | Yes — not linked to identity | No | Umami, cookieless product analytics; no device id, paths sanitized |
-  | Financial info | **No** | — | See the caveat below |
-  | Location, contacts, photos, device ids | No | — | Not requested |
+- **Data Safety** — declare. **Re-verified against the CODE on 12/09/2026 (S-18)**, the way the
+  listing was in T-57: every row names the function or table that makes it true, so the next
+  sweep compares the row with the code and not with the previous sweep. The Console form is
+  answered by the owner from this table; **step 5 of the wizard (*Preview*) must match it line
+  for line, in both directions** — nothing declared that the code does not do, nothing the code
+  does left out.
+  | Data type | Collected? | Shared? | Purpose | Notes — what in the code makes it true |
+  |---|---|---|---|---|
+  | Personal info → Name | Yes — required, linked | No | App functionality | `profiles.name`, shown to the family |
+  | Personal info → Email address | Yes — required, linked | No | App functionality | GoTrue login + the transactional e-mails (`send-*-email`) |
+  | Personal info → User IDs | Yes — required, linked | No | App functionality | the account id (`auth.uid()` / `profiles.id`); Play's own example of a User ID is *"an account ID"* |
+  | Financial info → Purchase history | Yes — required, linked | No | App functionality | `billing-store-verify` writes `subscriptions.store_purchase_token` and the `billing_events` ledger; the RTDN webhook writes the lifecycle. **Marked 25/08/2026** — the store rail is LIVE since 23/08 |
+  | Messages → Other in-app messages | Yes — optional, linked | No | App functionality | F-44 `request_message` / `approval_note` / `rejection_reason`: free text one caregiver writes, the server stores, the OTHER caregiver reads — inside the app, the e-mail and the push |
+  | App activity → Other user-generated content | Yes — optional, linked | No | App functionality | `care_schedules.notes` (the day note) and `families.name` — Play's own example of this row is *"notes"* |
+  | App activity → App interactions | Yes — not linked | No | Analytics | Umami (`analytics_service.dart`): cookieless, no device id, paths sanitized by `sanitizeAnalyticsPath`; dev flavour sends nothing |
+  | App info and performance → Crash logs | Yes — not linked | No | Analytics | T-66 crash sink (Sentry): exception type, scrubbed message, stack, release/environment/channel — no user, no breadcrumbs, no route args (`crash_rules.dart`) |
+  | Location → Approximate location | Yes — not linked | No | Analytics | NOT requested from the device: Sentry derives country + city from the IP of the crash report at ingest and KEEPS it after discarding the address (measured, T-66). The policy §7 says so since L-24, so the form has to |
+  | Device or other IDs | Yes — optional, linked | No | App functionality | the FCM registration token (`push_subscriptions.token`), written only after the user turns push on (F-09); Play's own example of this row is *"Firebase installation ID"* |
+  | Contacts, photos, files, health, calendar (device), precise location | No | — | — | never requested; the "calendar" is ours, not the device's |
+  **"Shared" is No on every row on purpose.** Play's definition of sharing excludes transfers to a
+  *service provider* processing on the developer's behalf, and that is what every operator in
+  the policy's §7 is (Supabase, Resend, Cloudflare, Google — Fonts, FCM, Play —, Umami, Sentry,
+  Asaas). Nothing goes to a third party for its own purposes; §4 of the policy says the same.
+  **Account creation** lists both `Username, password, and other authentication` **and** `OAuth`
+  (F-57; ticked 10/09/2026 — see below). **Every row is deletable** by the user: leaving the family
+  (S-19 page) removes the profile and its push tokens after the 30-day grace, and the family's own
+  data — days, notes, messages, subscription — goes with the family when it is deleted.
   - Data is **encrypted in transit** (HTTPS only): Yes.
   - **Account creation** — the form asks HOW an account is created, and the answer lists
     **`Username, password, and other authentication`** *and* **`OAuth`**, ticked on 10/09/2026.
@@ -244,13 +265,18 @@ say which one is blocking: sweep the whole list.
   - The consent log stores the accepting IP (disclosed in the policy) — server-side
     security/audit data tied to the account; declare it under Personal info only if the form's
     current wording requires IP disclosure (re-read the help text at fill time).
-  - ⚠️ **The "Financial info → No" line has an expiry date.** It was written when the Android
-    app had no purchase flow at all and every payment happened on the website. The Play Billing
-    rail (T-48) now ships **dormant** behind `billing.store_enabled = false`; the day that switch
-    is flipped, the app does sell in-app — re-read the Financial info questions before, not
-    after. The flip is the last step of [`supabase/README.md`](../supabase/README.md) §9-bis,
-    which also records what Play does and does not ask about IAP (nothing on the App content
-    page: Play derives it from the products that exist).
+  - **Why this table had to be rewritten (S-18, 12/09/2026).** The first version was answered on
+    25/08/2026 with *Financial info → No* and a caveat written in the future tense — *"the day
+    that switch is flipped"* — when `billing.store_enabled` had been `true` since **23/08**. Then
+    F-09 (29/08) put a device token in the database, F-57 (27/08) added OAuth, T-66 (11/09) sent
+    crash reports to a third party, and each of them moved the code without anyone re-reading
+    this form. **A store declaration is a claim about the system, and it ages the moment the
+    code moves** — the S-15 rule, which is also why the rows above cite the code that makes
+    them true. Sweep this table in every item that adds an operator, a token, a sink or a
+    free-text field, in the same delivery, together with the policy's §7. What Play does and
+    does not ask about IAP is unchanged: nothing on the App content page, Play derives it from
+    the products in *Monetize → Subscriptions* ([`supabase/README.md`](../supabase/README.md)
+    §9-bis).
 - **Content rating questionnaire**: category *Utility/Productivity*; no violence, no user-to-user
   public content (messages are private within a family), no gambling → expected rating L/3+.
 - **Target audience**: 18+ (parents/guardians). The app is **not** child-directed — the child is
