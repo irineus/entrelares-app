@@ -22,6 +22,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:entrelares_app/main.dart' as app;
 
 import 'e2e_family.dart';
+import 'e2e_proof.dart';
 
 /// S-15: the consent version the sign-up trigger stamps. Kept as a define so
 /// a policy bump does not need a code change in the lane.
@@ -33,7 +34,10 @@ const pack = String.fromEnvironment('E2E_PACK', defaultValue: 'full');
 final l = Localization(AppLanguage.ptBr);
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  // T-58: the suite reports what ran; without this the web driver is green
+  // over a `setUpAll` that throws.
+  proveExecution(binding);
 
   late E2eFamily family;
   late DateTime targetDay;
@@ -225,9 +229,10 @@ void main() {
     expect(afterApproval?['actual_parent_id'], family.member.profileId);
   }, timeout: const Timeout(Duration(minutes: 5)));
 
+  // Full pack only — `skip:`, never an early `return`: a body that returns on
+  // its first line counts as an executed test in the T-58 proof.
   testWidgets('the approver sees the request on the Notifications page',
       (tester) async {
-    if (pack == 'p0') return; // full pack only
     final day = DateTime.now().add(const Duration(days: 5));
     await family.seedDay(
         date: day, scheduledParentId: family.founder.profileId);
@@ -263,5 +268,5 @@ void main() {
     expect(requests.where((r) => r['schedule_date'].toString().endsWith(
         '-${day.day.toString().padLeft(2, '0')}')), isEmpty,
         reason: 'the rejection closed the request');
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  }, skip: pack == 'p0', timeout: const Timeout(Duration(minutes: 5)));
 }

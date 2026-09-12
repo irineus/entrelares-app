@@ -28,6 +28,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:entrelares_app/main.dart' as app;
 
 import 'e2e_family.dart';
+import 'e2e_proof.dart';
+import 'e2e_wait.dart';
 
 const policyVersion =
     String.fromEnvironment('E2E_POLICY_VERSION', defaultValue: '2026-07-30');
@@ -37,7 +39,10 @@ const pack = String.fromEnvironment('E2E_PACK', defaultValue: 'full');
 final l = Localization(AppLanguage.ptBr);
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  // T-58: the suite reports what ran; without this the web driver is green
+  // over a `setUpAll` that throws.
+  proveExecution(binding);
 
   late E2eFamily family;
   // Whether `app.main()` has already initialized the Supabase singleton in
@@ -144,6 +149,13 @@ void main() {
         reason: 'F-56: the invitation is FOR the placeholder the form created');
 
     // ── Revoke ──
+    // T-58 hypothesis 4: the page REFETCHES after `create_invitation`
+    // (`_sendInvite` → `await _load()`), and `pumpAndSettle` cannot see a
+    // request in flight — run 355 attempt 1 died here with the row already in
+    // the database. Wait for the card, not for the frames.
+    await pumpUntilFound(tester, find.text(l[K.famRevoke]),
+        reason: 'the invitation card must appear once the Família page '
+            'refetches after create_invitation');
     await tapVisible(tester, find.text(l[K.famRevoke]).first);
 
     expect(await family.openInvitations(), isEmpty,
@@ -153,10 +165,10 @@ void main() {
         isNotNull);
   }, timeout: const Timeout(Duration(minutes: 5)));
 
+  // Full pack only — `skip:`, never an early `return`: a body that returns on
+  // its first line counts as an executed test in the T-58 proof.
   testWidgets('S-10 — promoting a member really passes through the elevate '
       'Edge Function and the gated RPC', (tester) async {
-    if (pack == 'p0') return; // full pack only
-
     // Precondition from the DB, not from the screen.
     expect((await family.profileOf(family.member.profileId))?['is_admin'],
         isFalse);
@@ -195,12 +207,11 @@ void main() {
         reason: 'a live elevation window is reused for 5 minutes');
     expect((await family.profileOf(family.member.profileId))?['is_admin'],
         isFalse);
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  }, skip: pack == 'p0', timeout: const Timeout(Duration(minutes: 5)));
 
+  // Full pack only, same reasoning as above.
   testWidgets('a wrong password is refused by the real Edge Function',
       (tester) async {
-    if (pack == 'p0') return; // full pack only
-
     await bootApp(tester);
     await signIn(tester, family.founder.email);
     await openFamilyTab(tester);
@@ -216,5 +227,5 @@ void main() {
     expect(find.text(l[K.sudoTitle]), findsOneWidget);
     expect((await family.profileOf(family.member.profileId))?['is_admin'],
         isFalse);
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  }, skip: pack == 'p0', timeout: const Timeout(Duration(minutes: 5)));
 }

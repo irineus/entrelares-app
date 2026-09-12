@@ -137,7 +137,8 @@ cd app && fvm flutter analyze && fvm flutter test
 # o _redirects, o assetlinks, a config Firebase Web e, desde o T-66, o host do
 # Sentry dentro de connect-src (sem ele o navegador bloqueia o POST e o canal web
 # reporta NADA, em silêncio, porque o reporter engole a própria falha por contrato)
-# mais o espelho do watcher pré-Flutter do index.html.
+# mais o espelho do watcher pré-Flutter do index.html e, desde o T-58, a prova de
+# execução do web-e2e (driver próprio, toda suíte reporta, contagens espelhadas).
 cd app && fvm flutter build apk --debug --flavor dev --split-per-abi
 # Canal web: os dois flags NÃO são opcionais — sem o define o build aponta para o
 # banco de QA, e sem o --no-web-resources-cdn o CanvasKit vem do gstatic.
@@ -165,6 +166,20 @@ cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm 
 # URL interna só se comporta mal onde o navegador entrega o endereço ao app).
 # Exige chromedriver no PATH (`chromedriver --port=4444 &` antes).
 cd app && fvm flutter drive --driver=test_driver/integration_test.dart   --target=integration_test/swap_workflow_test.dart -d web-server --browser-name=chrome --headless   --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev>
+# T-58 (12/09/2026): esse gate tem de PROVAR que rodou. Na web o `flutter drive`
+# imprime "All tests passed." e sai 0 também com ZERO testes (um setUpAll que
+# estoura — foi assim por cinco dias, e reproduz-se aqui rodando sem a chave), então
+# cada suíte reporta os testes que chegaram ao fim (integration_test/e2e_proof.dart,
+# `proveExecution(binding)` antes do primeiro testWidgets), o driver é NOSSO
+# (test_driver/integration_test.dart, veredito em test_driver/e2e_proof.dart) e
+# recusa run sem relatório, com zero testes ou com contagem diferente de
+# E2E_EXPECTED_TESTS — que o verify.yml fixa por alvo e por pack (`alvo:p0:full`) e o
+# web_channel_test espelha contra as declarações `testWidgets(` de cada arquivo:
+# teste novo = bump no verify.yml na MESMA entrega, ou o lane barato fica vermelho.
+# Sem a variável (rodada à mão, como acima) vale "pelo menos um". A prova fica em
+# app/build/e2e_proof.json e o sumário do run lista os testes pelo nome. Teste "só
+# full" usa `skip: pack == 'p0'`, nunca `return` na primeira linha — um corpo que
+# retorna conta como executado. Runbook §15.
 ```
 ⚠️ **Uma mudança só de markdown NÃO roda CI nenhum** (`paths-ignore: ['**/*.md']`,
 29/08/2026). A economia não são os três minutos do `verify`: são o `db-gate`, que segura

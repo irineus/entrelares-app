@@ -2528,3 +2528,86 @@ raised the issue and the Sentry alert.
 To exercise the alarm deliberately (and only deliberately), rotate a Supabase secret to a bad value
 and merge anything: `db-prod` fails, `deploy-web` is skipped, and both the Sentry e-mail and the
 issue appear within a minute. Rotate it back.
+
+## 15. T-58 — the web flow gate has to prove it ran
+
+> **The inverse of §14's proof, one layer earlier.** §14 proves the PUBLISH happened; this proves
+> the GATE in front of it asserted something. `web-e2e` blocked the web publish from 24/08/2026
+> on a green that was empty from its first run: the suite's `setUpAll` threw, no test executed, and
+> `flutter drive` printed `All tests passed.` and exited 0 — for five days, until somebody read a
+> log by accident.
+
+### 15.1 Why the tool lies, in one sentence each
+
+- `IntegrationTestWidgetsFlutterBinding` completes `allTestsPassed` in its own `tearDownAll` with
+  `failureMethodsDetails.isEmpty` — and an empty run has no failures.
+- Only a `testWidgets` that reached `runTest` is in `binding.results`; a `setUpAll` that throws is
+  reported by `package:test`, never through `reportTestException`, so the binding never hears of it.
+- The stock `integrationDriver()` prints `All tests passed.` whenever `result == true`, and writes
+  `build/integration_response_data.json` with whatever the suite reported — which, before T-58, was
+  literally `null`.
+
+**Reproduced on 12/09/2026 without a single secret**: `flutter drive` on `deep_link_test` in a
+headless Chromium WITHOUT `E2E_SUPABASE_SERVICE_ROLE_KEY` (so `requireKey()` throws in `setUpAll`,
+the exact 25/08 shape) went green in 90 s. That reproduction is the validation bench for the
+guard, and it is free.
+
+### 15.2 The three pieces, and why all three
+
+| Piece | File | What it does |
+|---|---|---|
+| **The suite reports** | `app/integration_test/e2e_proof.dart` — `proveExecution(binding)` | A per-test `tearDown` copies `binding.results` into `binding.reportData` (`executed`, `failed`). Zero tests → zero tearDowns → no report. It is deliberately NOT a `tearDownAll`: that would run after a broken `setUpAll` and share its slot with `family.purge()`, which throws on an uninitialised `late` in exactly that case |
+| **The driver judges** | `app/test_driver/integration_test.dart` + `e2e_proof.dart` (pure Dart) | Same sequence as the stock driver (connect → request → close), then `judge()`: red on a failure, on no report, on a report without the list, on an empty list, on a count ≠ `E2E_EXPECTED_TESTS`. Writes `app/build/e2e_proof.json` in every outcome and exits 1 on red |
+| **The workflow demands** | `verify.yml`, job `web-e2e` | `for spec in swap_workflow_test:1:2 account_flows_test:1:3 deep_link_test:4:4` — `<target>:<p0>:<full>`. Removes the proof BEFORE each drive (a stale one must never stand in for a missing one), passes the count, and prints the executed names in the run summary |
+
+Full-pack tests are skipped with **`skip: pack == 'p0'`**, never with an early `return`: a body
+that returns on its first line reaches `runTest` and counts as executed — the vacuous green in
+miniature.
+
+**`web_channel_test` keeps the three agreeing in the cheap lane:** every suite under
+`integration_test/` calls `proveExecution` before its first test; no suite skips by `return`; the
+driver is ours (no `integrationDriver(`); the counts in the workflow equal the `testWidgets(`
+declarations per pack in each file, and the set of targets equals the set of suites — a suite the
+workflow does not name is a suite nothing runs. **A new integration test therefore bumps
+`verify.yml` in the same delivery**, or the app lane goes red before the web lane ever runs.
+
+### 15.3 Validated the hard way
+
+Every guard was watched FAILING under a mutation of the thing it describes before it was trusted
+(12/09/2026):
+
+| Situation | Result |
+|---|---|
+| `deep_link_test` driven without the key (setUpAll throws) — BEFORE the guard | **green**, `All tests passed.`, report `null` |
+| The same drive AFTER the guard | **RED** — *"a suíte não reportou NADA … um setUpAll que estoura"* |
+| A one-test probe suite, `E2E_EXPECTED_TESTS=1` | green — *"1 de 1 teste(s) PROVADO(S): probe — …"*, proof file names it |
+| The same probe, `E2E_EXPECTED_TESTS=2` | **RED** — *"esperava 2 … executou 1"* |
+| Workflow count mutated 4 → 5 for `deep_link_test` | mirror test RED, naming both numbers |
+| `proveExecution` removed from a suite | mirror test RED |
+| A full-pack test skipped by `return` instead of `skip:` | mirror test RED |
+| `judge()` mutated to always pass | every red case in `e2e_proof_test` RED, the green ones still green |
+| An undriven suite left under `integration_test/` | mirror test RED — *"a suite the workflow does not name is a suite nothing runs"* |
+
+### 15.4 Reading a red `web-e2e` now
+
+The driver's last line says which of the five it was, in PT-BR, with the names it has:
+
+| Message | Meaning | Where to look |
+|---|---|---|
+| `teste(s) com falha: …` | an assertion failed — the same red as before T-58 | the `Failure Details` block above it |
+| `a suíte não reportou NADA` | no test reached its tearDown: a `setUpAll` that threw, or a suite without `proveExecution` | the log lines between *Debug service listening* and the verdict; the fixture's `StateError` prints there |
+| `não traz a lista "executed"` | driver and suite stopped sharing the key | `test_driver/e2e_proof.dart` vs `integration_test/e2e_proof.dart` |
+| `ZERO testes executados` | the suite reported, but nothing ran | a suite whose every test is skipped |
+| `esperava N … executou M` | the count moved | a test added/removed without the `verify.yml` bump (the app lane should have caught it first) |
+
+### 15.5 The lane's oscillation — what T-58 measured and what it left
+
+The second way to spend a gate's trust is refusing for reasons unrelated to the change. Four
+hypotheses were on the card: **H2 (the calendar) was confirmed and fixed in #109. H4 (the Família
+list not yet refetched when the test looks for the card) was measured on 12/09/2026**: the page
+refetches after the RPC (`_sendInvite` → `await _load()` → `fetchOpenInvitations`), not through
+Realtime, and `pumpAndSettle` waits for frames, not for a request in flight — so
+`account_flows_test` now waits for the WIDGET (`e2e_wait.dart`, `pumpUntilFound`, 20 s ceiling,
+naming what was on screen when it hits). **H1 vs H3** (two concurrent runs on the dev project vs an
+ordinary render race) got the experiment the card asked for — two `workflow_dispatch` on the same
+tree, one second apart (runs 361 and 362, 12/09/2026) — and its result is on the T-58 card.

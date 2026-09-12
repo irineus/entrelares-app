@@ -15,6 +15,9 @@ import 'package:entrelares_app/deep_link_urls.dart';
 import 'package:entrelares_app/env.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../test_driver/e2e_proof.dart'
+    show executedKey, expectedTestsVariable, failedKey, proofFile;
+
 File _web(String name) => File('web/$name');
 File _workflow() => File('../.github/workflows/verify.yml');
 File _androidManifest() =>
@@ -800,6 +803,154 @@ void main() {
           reason: 'a broken two-user flow must stop the channel, not reach users');
       expect(job, contains("github.ref_name == 'main'"));
       expect(job, contains('wrangler pages deploy build/web'));
+    });
+  });
+
+  // ── T-58 — the flow gate has to PROVE it ran ──────────────────────────────
+  //
+  // `flutter drive` on web prints "All tests passed." and exits 0 over a suite
+  // whose `setUpAll` threw, because the binding completes `allTestsPassed`
+  // with "no failure recorded" and an empty run records none. The gate blocked
+  // the web publish for five days on that green (25/08/2026). What makes it
+  // unable to lie now is three pieces that have to agree — the suites report,
+  // the driver judges, the workflow demands a count — and these tests keep
+  // them agreeing in the cheap lane, before the expensive one runs.
+  group('the flow gate proves it ran (T-58)', () {
+    late String workflow;
+    late String driver;
+    late List<File> suites;
+
+    String code(File file) => file
+        .readAsLinesSync()
+        .where((line) => !line.trimLeft().startsWith('//'))
+        .join('\n');
+
+    setUp(() {
+      workflow = _withoutComments(_workflow().readAsStringSync());
+      driver = File('test_driver/integration_test.dart').readAsStringSync();
+      suites = Directory('integration_test')
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('_test.dart'))
+          .toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
+      expect(suites, isNotEmpty, reason: 'the lane has suites to drive');
+    });
+
+    test('the driver is ours, and it judges before it exits', () {
+      // The stock `integrationDriver()` is the one that says "All tests
+      // passed." over nothing. Over the code, not the header that names it to
+      // say why it is gone.
+      final body = code(File('test_driver/integration_test.dart'));
+      expect(body, isNot(contains('integrationDriver(')),
+          reason: 'the stock driver cannot tell an empty run from a full one');
+      expect(body, contains('judge('),
+          reason: 'the verdict is what turns a report into an exit code');
+      expect(body, contains('exit(verdict.passed ? 0 : 1)'),
+          reason: 'the exit code IS the gate; a verdict that is only printed '
+              'is a report, not a guard');
+      expect(body, contains('File(proofFile)'),
+          reason: 'the driver writes the proof where the workflow reads it — '
+              'through the shared constant, so the two cannot drift');
+      expect(proofFile, 'build/e2e_proof.json',
+          reason: 'the workflow spells this path in its `rm -f` and its '
+              '`jq`; the tests below match it there');
+      expect(driver, contains("import 'e2e_proof.dart'"));
+    });
+
+    test('the suite and the driver spell the report keys the same way', () {
+      // The suite cannot import the driver's constants: on the web
+      // `flutter drive` compiles `integration_test/` as the application root
+      // and `../test_driver/…` is not there (measured 12/09/2026). So the two
+      // spellings are a mirror, and a mirror nobody checks rots quietly —
+      // into a driver that reads `executed` from a suite that wrote
+      // something else, which is the "report without the list" red.
+      final suiteSide = File('integration_test/e2e_proof.dart').readAsStringSync();
+      String spelled(String name) =>
+          RegExp("const $name = '([^']+)';").firstMatch(suiteSide)?.group(1) ??
+          '<missing>';
+      expect(spelled('executedKey'), executedKey);
+      expect(spelled('failedKey'), failedKey);
+    });
+
+    test('every suite installs the proof, before any test is declared', () {
+      for (final suite in suites) {
+        final body = code(suite);
+        final install = body.indexOf('proveExecution(');
+        expect(install, greaterThan(-1),
+            reason: '${suite.path} never reports what ran — the web driver '
+                'would be red on "the suite reported nothing", which is '
+                'right, but this lane says so for free');
+        expect(install, lessThan(body.indexOf('testWidgets(')),
+            reason: '${suite.path}: a tearDown registered after a test does '
+                'not run for it');
+      }
+    });
+
+    test('no suite skips a pack by returning early', () {
+      // A body that returns on its first line reaches `runTest` and is counted
+      // as executed — the vacuous green in miniature. `skip:` is the way.
+      for (final suite in suites) {
+        expect(code(suite), isNot(contains("pack == 'p0') return")),
+            reason: '${suite.path} must skip full-pack tests with `skip:`, '
+                'never with an early return');
+      }
+    });
+
+    test('the workflow demands, per pack, exactly what each suite declares',
+        () {
+      // The spec line: `<target>:<p0>:<full>` for every suite. Read from the
+      // code so the comment explaining it is not what gets matched.
+      final job = workflow.substring(workflow.indexOf('  web-e2e:'));
+      final specLine =
+          RegExp(r'for spec in ([^;]+); do').firstMatch(job)?.group(1);
+      expect(specLine, isNotNull,
+          reason: 'the web-e2e step must loop over target:p0:full specs');
+      final specs = <String, (int, int)>{};
+      for (final spec in specLine!.trim().split(RegExp(r'\s+'))) {
+        final parts = spec.split(':');
+        expect(parts, hasLength(3), reason: 'malformed spec: $spec');
+        specs[parts[0]] = (int.parse(parts[1]), int.parse(parts[2]));
+      }
+
+      final declared = <String, (int, int)>{};
+      for (final suite in suites) {
+        final body = code(suite);
+        final total = 'testWidgets('.allMatches(body).length;
+        final fullOnly = "skip: pack == 'p0'".allMatches(body).length;
+        final name = suite.uri.pathSegments.last.replaceAll('.dart', '');
+        declared[name] = (total - fullOnly, total);
+      }
+
+      expect(specs.keys.toSet(), declared.keys.toSet(),
+          reason: 'every suite under integration_test/ is driven, and every '
+              'driven target exists — a suite the workflow does not name is a '
+              'suite nothing runs');
+      for (final entry in declared.entries) {
+        expect(specs[entry.key], entry.value,
+            reason: '${entry.key}: the workflow demands ${specs[entry.key]} '
+                '(p0, full) and the file declares ${entry.value}. A test '
+                'added or removed changes verify.yml in the same delivery');
+      }
+      expect(declared.values.every((v) => v.$1 >= 1), isTrue,
+          reason: 'a suite with no p0 test is not in the gate at all');
+    });
+
+    test('the expectation reaches the driver, and the proof is fresh', () {
+      final job = workflow.substring(workflow.indexOf('  web-e2e:'));
+      final drive = job.indexOf('flutter drive');
+      expect(drive, greaterThan(-1));
+      expect(job, contains('$expectedTestsVariable="\$expected" flutter drive'),
+          reason: 'a drive without the variable accepts any positive count, '
+              'which is fine at a keyboard and not in the gate');
+      final removal = job.indexOf('rm -f $proofFile');
+      expect(removal, greaterThan(-1),
+          reason: 'a stale proof from the previous target must never stand in '
+              'for a missing one');
+      expect(removal, lessThan(drive));
+      expect(job.indexOf(proofFile, drive), greaterThan(drive),
+          reason: 'the workflow reads the proof AFTER the drive, for the '
+              'summary — the names that ran are the evidence a human reads');
     });
   });
 
