@@ -111,6 +111,12 @@ dev_dependencies:
   # one the web suite pays for (`E2E-<runId>`, `@resend.dev`, purge_e2e_family).
   integration_test:
     sdk: flutter
+  # T-58 — the web lane's driver is our own (`test_driver/integration_test.dart`)
+  # since the stock `integrationDriver()` was green over a suite that ran zero
+  # tests. It talks to the browser through `flutter_driver` directly, so the
+  # package is declared here rather than reached through a re-export.
+  flutter_driver:
+    sdk: flutter
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your

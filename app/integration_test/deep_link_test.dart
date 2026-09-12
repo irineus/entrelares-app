@@ -32,6 +32,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:entrelares_app/main.dart' as app;
 
 import 'e2e_family.dart';
+import 'e2e_proof.dart';
 
 const policyVersion =
     String.fromEnvironment('E2E_POLICY_VERSION', defaultValue: '2026-07-30');
@@ -39,7 +40,10 @@ const policyVersion =
 final l = Localization(AppLanguage.ptBr);
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  // T-58: the suite reports what ran; without this the web driver is green
+  // over a `setUpAll` that throws.
+  proveExecution(binding);
 
   late E2eFamily family;
   var appBooted = false;

@@ -95,6 +95,14 @@ da suíte web (`E2E-<runId>`, e-mails `@resend.dev`, teardown sempre via
 O job `web-e2e` (esse SIM no gate) roda os mesmos arquivos num Chrome headless, mais
 `deep_link_test` — o único que é web por construção: uma entrada fria numa URL interna
 só se comporta mal onde o navegador entrega o próprio endereço ao app (T-64).
+**Desde o T-58 (12/09/2026) esse job tem de PROVAR que rodou:** na web o `flutter drive`
+imprime "All tests passed." e sai 0 também com zero testes (um `setUpAll` que estoura — e
+foi assim, sem ninguém notar, por cinco dias em agosto). Cada suíte reporta os testes que
+chegaram ao fim (`integration_test/e2e_proof.dart`), o driver é nosso
+(`test_driver/integration_test.dart`) e recusa run sem relatório, com zero testes ou com
+contagem diferente da que o `verify.yml` fixa por alvo e pack (`alvo:p0:full`, espelhada
+pelo `web_channel_test` contra as declarações `testWidgets(`). A prova fica em
+`app/build/e2e_proof.json` e o sumário do run lista os testes pelo nome. Runbook §15.
 
 ## Gate de banco (`packages/entrelares_db_gate/`)
 

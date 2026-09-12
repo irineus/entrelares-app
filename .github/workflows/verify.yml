@@ -386,7 +386,7 @@ jobs:
   #     10-15 min of the emulator lane. Most of that difference is booting an
   #     emulator and installing an APK, neither of which the browser needs.
   #
-  # THAT MEASUREMENT DOES NOT COVER THE CASE THAT ACTUALLY HAPPENED (T-58,
+  # THAT MEASUREMENT DID NOT COVER THE CASE THAT ACTUALLY HAPPENED (T-58,
   # discovered 25/08/2026 — the day AFTER this gate was trusted). Every bullet
   # above exercised a suite whose tests RAN: the probe proved the harness reports
   # a FAILING test, not that any test existed. `flutter drive` on web prints
@@ -395,9 +395,19 @@ jobs:
   # nothing. This gate was born five days AFTER the bug that broke its
   # `setUpAll`: the green that justified letting it block production was empty
   # from the first run. Hypothesis 2 (the calendar) was confirmed and fixed in
-  # #109; the guard that makes a ZERO-test run RED is still open, and is T-58's
-  # first half. Until it lands, a green here means "nothing reported a failure",
-  # never "the flows passed" — do not add a bullet above that reads like proof.
+  # #109.
+  #
+  # SINCE T-58 (12/09/2026) THE GATE HAS TO PROVE IT RAN. Each suite records
+  # the tests that reached their end (`integration_test/e2e_proof.dart`), the
+  # driver is our own (`test_driver/integration_test.dart`) and refuses a run
+  # that reported nothing, zero tests, or a count other than the one this job
+  # demands through `E2E_EXPECTED_TESTS` — and it writes what ran to
+  # `build/e2e_proof.json`, which the summary prints by name. The counts below
+  # are MIRRORED by `web_channel_test` against the `testWidgets(` declarations
+  # of each suite per pack, so a new test bumps them in the cheap lane before
+  # it ever reaches this one. Validated the hard way: the same drive without the
+  # service-role key — a `setUpAll` that throws, the exact 25/08 shape — went
+  # green in 90 s before the guard and RED, naming the empty report, after it.
   #
   # It does NOT replace the emulator lane: what needs a device — Play Billing,
   # the share sheet, the native print dialog — only runs there.
@@ -441,27 +451,44 @@ jobs:
         working-directory: app
         env:
           E2E_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
+          E2E_PACK: ${{ inputs.e2e-pack || 'p0' }}
         run: |
           set -euo pipefail
           flutter pub get
           chromedriver --port=4444 &
           for i in $(seq 1 20); do curl -sf http://localhost:4444/status >/dev/null && break; sleep 1; done
-          echo "### Gate de fluxo (web)" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Gate de fluxo (web) — pack $E2E_PACK" >> "$GITHUB_STEP_SUMMARY"
           # One invocation per target: `flutter drive` takes a single target and
           # each one pays its own ~40 s compile. The first two files are the SAME
           # ones the emulator lane runs; `deep_link_test` is the exception T-64
           # bought — a cold entry into an inner URL only misbehaves where the
           # browser hands the app its own address, so that one is web-only by
           # construction and the emulator lane does not run it.
-          for target in swap_workflow_test account_flows_test deep_link_test; do
+          #
+          # T-58: `<target>:<p0 count>:<full count>` — the number of tests each
+          # pack must PROVE it ran, handed to the driver as E2E_EXPECTED_TESTS.
+          # `web_channel_test` mirrors these against the suites' `testWidgets(`
+          # declarations, so a new test bumps them in the cheap lane first. The
+          # proof file is removed BEFORE each drive: a stale one from the previous
+          # target must never stand in for a missing one.
+          for spec in swap_workflow_test:1:2 account_flows_test:1:3 deep_link_test:4:4; do
+            IFS=: read -r target p0 full <<< "$spec"
+            expected="$p0"
+            if [ "$E2E_PACK" = full ]; then expected="$full"; fi
+            rm -f build/e2e_proof.json
             start=$(date +%s)
-            flutter drive \
+            E2E_EXPECTED_TESTS="$expected" flutter drive \
               --driver=test_driver/integration_test.dart \
               --target="integration_test/$target.dart" \
               -d web-server --browser-name=chrome --headless \
               --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY="$E2E_KEY" \
-              --dart-define=E2E_PACK=${{ inputs.e2e-pack || 'p0' }}
-            echo "- $target: $(( $(date +%s) - start ))s" >> "$GITHUB_STEP_SUMMARY"
+              --dart-define=E2E_PACK="$E2E_PACK"
+            # The driver exits 1 without a proof; this is the belt to that brace,
+            # for a driver that died before writing one.
+            [ -f build/e2e_proof.json ] || { echo "::error title=T-58::$target terminou sem build/e2e_proof.json — nada prova que a suíte rodou"; exit 1; }
+            ran=$(jq -r ".executed | length" build/e2e_proof.json)
+            names=$(jq -r '.executed | join("; ")' build/e2e_proof.json)
+            echo "- $target: $(( $(date +%s) - start ))s — $ran/$expected teste(s) provado(s): $names" >> "$GITHUB_STEP_SUMMARY"
           done
 
   # ── Production database ──────────────────────────────────────────────────
