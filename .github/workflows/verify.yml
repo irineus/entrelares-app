@@ -488,7 +488,12 @@ jobs:
             [ -f build/e2e_proof.json ] || { echo "::error title=T-58::$target terminou sem build/e2e_proof.json — nada prova que a suíte rodou"; exit 1; }
             ran=$(jq -r ".executed | length" build/e2e_proof.json)
             names=$(jq -r '.executed | join("; ")' build/e2e_proof.json)
-            echo "- $target: $(( $(date +%s) - start ))s — $ran/$expected teste(s) provado(s): $names" >> "$GITHUB_STEP_SUMMARY"
+            # T-71: the setUpAll's window, green or red — it is what a later
+            # red is crossed against the db-gate's window on the shared dev
+            # project (H1). Printed from the proof, so a run whose setUpAll
+            # never reported shows "-" instead of a guessed time.
+            window=$(jq -r '.setUpAll | if . then "\(.startedAt)→\(.finishedAt) (\(.elapsedMs / 1000 | floor)s)" else "-" end' build/e2e_proof.json)
+            echo "- $target: $(( $(date +%s) - start ))s — $ran/$expected teste(s) provado(s): $names · setUpAll $window" >> "$GITHUB_STEP_SUMMARY"
           done
 
   # ── Production database ──────────────────────────────────────────────────

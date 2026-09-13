@@ -180,6 +180,12 @@ cd app && fvm flutter drive --driver=test_driver/integration_test.dart   --targe
 # app/build/e2e_proof.json e o sumário do run lista os testes pelo nome. Teste "só
 # full" usa `skip: pack == 'p0'`, nunca `return` na primeira linha — um corpo que
 # retorna conta como executado. Runbook §15.
+# T-71 (13/09/2026): o setUpAll é registrado por `provedSetUpAll(binding, …)`, nunca
+# cru (o web_channel_test recusa): a janela dele (início/fim UTC) entra no relatório em
+# todo run e, quando estoura, a exceção e a pilha vão junto — `-d web-server` não tem
+# DWDS, então é o ÚNICO caminho pelo qual a causa de um "não reportou NADA" chega ao
+# log do job. Um vermelho no setUpAll se lê no veredito e em app/build/e2e_proof.json;
+# a janela sai no sumário, por alvo, para cruzar com a do db-gate (H1).
 ```
 ⚠️ **Uma mudança só de markdown NÃO roda CI nenhum** (`paths-ignore: ['**/*.md']`,
 29/08/2026). A economia não são os três minutos do `verify`: são o `db-gate`, que segura
