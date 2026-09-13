@@ -63,6 +63,100 @@ void main() {
     });
   });
 
+  group('judge — the setUpAll that threw, by name (T-71)', () {
+    const window = {
+      'startedAt': '2026-09-13T02:00:08.000Z',
+      'finishedAt': '2026-09-13T02:00:19.000Z',
+      'elapsedMs': 11000,
+    };
+
+    test('a setUpAll error is red and the message carries the exception', () {
+      // Main run 34731668538 attempt 1 (13/09/2026): before T-71 this was
+      // "não reportou NADA", with the exception text left in the browser
+      // console — a red whose cause could not be read after the fact.
+      final verdict = judge(
+          _response(data: {
+            setUpAllKey: {
+              ...window,
+              'error': 'Bad state: POST /auth/v1/admin/users → 429: '
+                  '{"code":"over_request_rate_limit"}',
+              'stack': List.generate(20, (i) => '#$i frame').join('\n'),
+            },
+          }),
+          expected: 1);
+      expect(verdict.passed, isFalse);
+      expect(verdict.message, contains('o setUpAll estourou'));
+      expect(verdict.message, contains('over_request_rate_limit'),
+          reason: 'the cause is the whole point — it never reached the log');
+      expect(verdict.message, contains('02:00:08'),
+          reason: 'the window is what crosses this red with the db-gate');
+      expect(verdict.message, contains('11.0 s'));
+      expect(verdict.message, contains('#0 frame'));
+      expect(verdict.message, isNot(contains('#$stackLinesInMessage frame')),
+          reason: 'the message carries the head of the stack, the proof file '
+              'the whole of it');
+      expect(verdict.message, contains('linhas a mais em $proofFile'));
+      expect(verdict.message, isNot(contains('não reportou NADA')),
+          reason: 'a named cause must not be reported as "nothing"');
+      expect(verdict.executed, isEmpty);
+      expect(verdict.toJson()[setUpAllKey], isA<Map<String, Object?>>(),
+          reason: 'the proof file keeps the full report');
+      expect((verdict.toJson()[setUpAllKey] as Map)['stack'],
+          contains('#19 frame'));
+    });
+
+    test('a setUpAll window without an error is not a red on its own', () {
+      final verdict = judge(
+          _response(data: {
+            setUpAllKey: window,
+            executedKey: ['p0 — a'],
+            failedKey: <String>[],
+          }),
+          expected: 1);
+      expect(verdict.passed, isTrue);
+      expect(verdict.message, contains('1 de 1 teste(s) PROVADO(S)'));
+      expect(verdict.message, contains('setUpAll 2026-09-13T02:00:08.000Z→'),
+          reason: 'green runs print the window too — that is the data the '
+              'H1 log is built from');
+      expect(verdict.toJson()[setUpAllKey], window);
+    });
+
+    test('a report with only the window and no executed list is still red',
+        () {
+      // The setUpAll finished, then no test reached its tearDown — a suite
+      // without proveExecution(), or every test skipped. Not the T-71 red,
+      // and not a green.
+      final verdict = judge(_response(data: {setUpAllKey: window}), expected: 1);
+      expect(verdict.passed, isFalse);
+      expect(verdict.message, contains('não traz a lista "$executedKey"'));
+    });
+
+    test('a harness failure keeps its own red, window attached', () {
+      final verdict = judge(
+          _response(passed: false, data: {
+            setUpAllKey: window,
+            executedKey: <String>[],
+            failedKey: ['p0 — b'],
+          }),
+          expected: 1);
+      expect(verdict.passed, isFalse);
+      expect(verdict.message, contains('com falha: p0 — b'));
+      expect(verdict.message, contains('| setUpAll'));
+    });
+
+    test('a report with no setUpAll entry prints no window', () {
+      final verdict = judge(
+          _response(data: {
+            executedKey: ['p0 — a'],
+            failedKey: <String>[]
+          }),
+          expected: 1);
+      expect(verdict.passed, isTrue);
+      expect(verdict.message, isNot(contains('setUpAll')));
+      expect(verdict.toJson().containsKey(setUpAllKey), isFalse);
+    });
+  });
+
   group('judge — the count the workflow demands', () {
     final twoRan = {
       executedKey: ['p0 — a', 'p0 — b'],

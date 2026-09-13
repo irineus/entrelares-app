@@ -49,7 +49,7 @@ void main() {
   // this process. See `bootApp` — the answer cannot simply be asked.
   var appBooted = false;
 
-  setUpAll(() async {
+  provedSetUpAll(binding, () async {
     E2eFamily.requireKey();
     family = await E2eFamily.create(policyVersion: policyVersion);
     // Two live members already fill the FREE cap, and this lane is about the

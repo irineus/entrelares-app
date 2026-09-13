@@ -48,7 +48,7 @@ void main() {
   late E2eFamily family;
   var appBooted = false;
 
-  setUpAll(() async {
+  provedSetUpAll(binding, () async {
     E2eFamily.requireKey();
     family = await E2eFamily.create(policyVersion: policyVersion);
   });
