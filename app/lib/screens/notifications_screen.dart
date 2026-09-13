@@ -12,6 +12,7 @@ import '../services/push_service.dart';
 import '../widgets/account_button.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
+import 'frozen_day_sheet.dart';
 
 /// The Notifications page — port of `Notifications.razor`: three tabs
 /// ("Para você" = open requests where I am the approver, "Enviadas" = my
@@ -19,6 +20,16 @@ import '../widgets/app_snack.dart';
 /// rebuilt in the READER's language by the NotificationRenderer). Opening the
 /// page marks everything read (web parity — one bulk PATCH); the F-45 diff
 /// list arrives with the audit mirror in lote 6 (decision 19/08/2026).
+///
+/// U-42: the first two tabs are LISTS, not forms. Each request is one compact
+/// row and tapping it opens [showFrozenDaySheet] — the same sheet the calendar
+/// opens for a frozen day, which already knows the three roles (target
+/// approves/rejects with the F-44 note, requester cancels, observer reads).
+/// Approve/reject/cancel therefore exist in ONE place; this screen renders no
+/// action button of its own. Before U-42 every incoming card carried a text
+/// field and two buttons, so four open requests were four fields and eight
+/// buttons on one screen, and the two copies of the action had already
+/// drifted apart.
 class NotificationsScreen extends StatefulWidget {
   final CustodyDataSource dataSource;
   final NotificationBadge badge;
@@ -86,15 +97,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<SwapRequest> _sent = const [];
   List<AppNotification> _history = const [];
 
-  /// F-44: one dual-purpose note per incoming card (approval note on approve,
-  /// rejection reason on reject — same decision as the frozen panel).
-  final Map<int, TextEditingController> _approverNotes = {};
-
-  /// Which request is being acted on (disables its card's buttons) and the
-  /// per-card error text.
-  final Map<int, String> _actioning = {};
-  final Map<int, String> _actionErrors = {};
-
   @override
   void initState() {
     super.initState();
@@ -122,17 +124,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       NotificationLanding.history => _Tab.history,
     };
   }
-
-  @override
-  void dispose() {
-    for (final c in _approverNotes.values) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  TextEditingController _noteFor(int requestId) =>
-      _approverNotes.putIfAbsent(requestId, TextEditingController.new);
 
   Future<void> _init() async {
     await _loadAll();
@@ -188,38 +179,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return null;
   }
 
-  Future<void> _act(
-    SwapRequest req,
-    String action,
-    String errorKey,
-    String toastKey,
-    Future<void> Function() run,
-  ) async {
-    final l = AppL10n.of(context).l;
-    setState(() {
-      _actioning[req.id] = action;
-      _actionErrors.remove(req.id);
-    });
-    try {
-      await run();
-      await _loadAll();
-      await widget.badge.refresh();
-      if (mounted) showAppSnack(context, l[toastKey]);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _actionErrors[req.id] = isSessionExpired(e.toString())
-            ? sessionExpiredMessage(l)
-            : l.format(errorKey, [e.toString()]);
-      });
-    } finally {
-      if (mounted) setState(() => _actioning.remove(req.id));
+  /// The one way to act on a request from this screen (U-42). The sheet does
+  /// the work and reports the outcome; this screen reloads, refreshes the bell
+  /// and shows the SAME toast the calendar shows for the same outcome.
+  Future<void> _openRequest(SwapRequest req) async {
+    final outcome = await showFrozenDaySheet(
+      context: context,
+      request: req,
+      allProfiles: _allProfiles,
+      ownProfileId: _ownProfile?.id,
+      dataSource: widget.dataSource,
+    );
+    if (outcome == null || !mounted) return;
+    await _loadAll();
+    await widget.badge.refresh();
+    if (mounted) {
+      showAppSnack(
+          context, AppL10n.of(context).l[frozenOutcomeToastKey(outcome)]);
     }
-  }
-
-  String? _noteText(int requestId) {
-    final text = _noteFor(requestId).text;
-    return text.trim().isEmpty ? null : text;
   }
 
   @override
@@ -377,10 +354,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ],
       );
 
-  Widget _infoRow(String label, String value) =>
-      AppListRow(label: label, value: value);
-
-  /// U-28 — a card's first line: the day on the left, its state pills on the
+  /// U-28 — a row's first line: the day on the left, its state pills on the
   /// right, and a SECOND LINE for the pills when they do not fit.
   ///
   /// It was a `Row` with the date in an `Expanded` beside a `Wrap` of up to
@@ -389,7 +363,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// pixels, which the date then filled ONE CHARACTER PER LINE while the badges
   /// still reported `RIGHT OVERFLOWED BY 85 PIXELS`. A `Wrap` cannot do that to
   /// itself: what does not fit moves down.
-  Widget _cardHeader(String title, List<Widget> badges) => Wrap(
+  Widget _rowHeader(String title, List<Widget> badges) => Wrap(
         spacing: Spacing.sm,
         runSpacing: Spacing.xs,
         alignment: WrapAlignment.spaceBetween,
@@ -407,28 +381,66 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         semantics: semantics,
       );
 
-  Widget _tagBanner(SwapPriorityTag tag, Localization l) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-        child: AppBanner(
-          tone: tag == SwapPriorityTag.overdue
-              ? context.tokens.danger
-              : context.tokens.warning,
-          bordered: false,
-          message: l[
-              tag == SwapPriorityTag.overdue ? K.frozenOverdue : K.frozenUrgent],
-        ),
+  /// F-20 urgency as a pill. The banner it replaces took a full line per card;
+  /// on a row the state is a badge beside the date, and the sheet still says
+  /// the whole sentence.
+  Widget _tagBadge(SwapPriorityTag tag, Localization l) => _statusBadge(
+        l[tag == SwapPriorityTag.overdue
+            ? K.notifTagOverdueShort
+            : K.notifTagUrgentShort],
+        tone: tag == SwapPriorityTag.overdue
+            ? context.tokens.danger
+            : context.tokens.warning,
       );
 
-  Widget _card({required List<Widget> children}) => Padding(
+  /// One request, one compact row (U-42): the date and its pills, one line of
+  /// facts, and a chevron when tapping it leads somewhere. [onTap] null is a
+  /// resolved request in "Enviadas" — there is nothing left to do on it, so it
+  /// is read-only here rather than opening a sheet whose only content would be
+  /// an action the database is about to refuse.
+  ///
+  /// The key names the request so the E2E lane can find THIS row without
+  /// depending on how the date or a name is rendered.
+  Widget _requestRow({
+    required SwapRequest req,
+    required String title,
+    required List<Widget> badges,
+    required List<String> lines,
+    required VoidCallback? onTap,
+  }) {
+    final theme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.sm + Spacing.xs, vertical: Spacing.sm - 2),
+      child: AppCard(
+        key: ValueKey('swap-request-${req.id}'),
+        onTap: onTap,
         padding: const EdgeInsets.symmetric(
-            horizontal: Spacing.sm + Spacing.xs, vertical: Spacing.sm - 2),
-        child: AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: children,
-          ),
+            horizontal: Spacing.md, vertical: Spacing.sm + Spacing.xs),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _rowHeader(title, badges),
+                  const SizedBox(height: Spacing.xs),
+                  for (final line in lines)
+                    Text(line, style: theme.bodySmall),
+                ],
+              ),
+            ),
+            if (onTap != null) ...[
+              const SizedBox(width: Spacing.xs),
+              Icon(Icons.chevron_right,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ],
+          ],
         ),
-      );
+      ),
+    );
+  }
 
   // ── "Para você" ────────────────────────────────────────────────────────────
 
@@ -438,133 +450,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        for (final req in _incoming) _incomingCard(req, now, l),
+        for (final req in _incoming) _incomingRow(req, now, l),
         const SizedBox(height: 12),
       ],
     );
   }
 
-  Widget _incomingCard(SwapRequest req, DateTime now, Localization l) {
+  Widget _incomingRow(SwapRequest req, DateTime now, Localization l) {
     final isRevert = req.isRevertPending;
     final tag = req.toView().priorityTag(now); // F-20: pending → clock
-    final handoff = parseTimeOfDay(req.proposedHandoffTime);
-    final createdLocal = req.createdAt == null
-        ? null
-        : DateTime.tryParse(req.createdAt!)?.toLocal();
-    final acting = _actioning.containsKey(req.id);
-    final error = _actionErrors[req.id];
-
-    return _card(children: [
-      _cardHeader('📅 ${l.formatDate(req.scheduleDate)}', [
+    return _requestRow(
+      req: req,
+      title: '📅 ${l.formatDate(req.scheduleDate)}',
+      badges: [
         _statusBadge(
           l[isRevert ? K.notifRevertPendingBadge : K.notifPendingBadge],
           tone: isRevert ? context.tokens.accent : context.tokens.warning,
         ),
-      ]),
-      if (tag != SwapPriorityTag.none) _tagBanner(tag, l),
-      _infoRow(l[K.notifLabelRequester],
-          _nameOf(req.requestingProfileId) ?? '—'),
-      // F-44: the requester's message, shown to the approver.
-      if ((req.requestMessage ?? '').isNotEmpty)
-        _infoRow(l[K.notifLabelRequesterMessage], req.requestMessage!),
-      if (isRevert)
-        _infoRow(
-            l[K.notifLabelRevertTo], _nameOf(req.proposedActualParentId) ?? '—')
-      else
-        _infoRow(l[K.notifLabelProposes],
-            '${_nameOf(req.proposedActualParentId) ?? '—'} ${l[K.notifProposesSuffix]}'),
-      if (handoff != null)
-        _infoRow(
-            l[K.notifLabelTime],
-            '${handoff.hour.toString().padLeft(2, '0')}:'
-            '${handoff.minute.toString().padLeft(2, '0')}'),
-      if (createdLocal != null)
-        _infoRow(
-            l[K.notifLabelRequestedAt], l.formatDateTimeShort(createdLocal)),
-      if (error != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text('⚠️ $error',
-              style: TextStyle(
-                  color: context.tokens.danger.onContainer,
-                  fontSize: TypeScale.label)),
-        ),
-      const SizedBox(height: 8),
-      // U-27: a placeholder-only field has no accessible name once it has
-      // text in it — the label is permanent, the placeholder stays a hint.
-      AppTextField(
-        label: l[K.wfMessage],
-        hint: l[K.notifNotePlaceholder],
-        controller: _noteFor(req.id),
-        maxLength: 200,
-        enabled: !acting,
-      ),
-      const SizedBox(height: 8),
-      Row(
-        children: [
-          Expanded(
-            child: FilledButton(
-              onPressed: acting
-                  ? null
-                  : () => isRevert
-                      ? _act(
-                          req,
-                          'approve',
-                          K.errConfirmRevertFailed,
-                          K.toastRevertConfirmed,
-                          () => widget.dataSource.approveRevert(req.id,
-                              approvalNote: _noteText(req.id),
-                              allProfiles: _allProfiles))
-                      : _act(
-                          req,
-                          'approve',
-                          K.errApproveFailed,
-                          K.toastSwapApproved,
-                          () => widget.dataSource.approveSwap(req.id,
-                              approvalNote: _noteText(req.id),
-                              allProfiles: _allProfiles)),
-              child: _actioning[req.id] == 'approve'
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(l[
-                      isRevert ? K.notifBtnConfirmRevert : K.notifBtnApprove]),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton(
-              onPressed: acting
-                  ? null
-                  : () => isRevert
-                      ? _act(
-                          req,
-                          'reject',
-                          K.errRejectRevertFailed,
-                          K.toastRevertRejected,
-                          () => widget.dataSource.rejectRevert(req.id,
-                              reason: _noteText(req.id),
-                              allProfiles: _allProfiles))
-                      : _act(
-                          req,
-                          'reject',
-                          K.errRejectFailed,
-                          K.toastSwapRejected,
-                          () => widget.dataSource.rejectSwap(req.id,
-                              reason: _noteText(req.id),
-                              allProfiles: _allProfiles)),
-              child: _actioning[req.id] == 'reject'
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(l[K.notifBtnReject]),
-            ),
-          ),
-        ],
-      ),
-    ]);
+        if (tag != SwapPriorityTag.none) _tagBadge(tag, l),
+      ],
+      lines: [
+        '${l[K.notifLabelRequester]}: '
+            '${_nameOf(req.requestingProfileId) ?? '—'} · '
+            '${l[isRevert ? K.notifLabelRevertTo : K.notifLabelProposed]}: '
+            '${_nameOf(req.proposedActualParentId) ?? '—'}',
+      ],
+      onTap: () => _openRequest(req),
+    );
   }
 
   // ── "Enviadas" ─────────────────────────────────────────────────────────────
@@ -575,25 +487,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        for (final req in _sent) _sentCard(req, now, l),
+        for (final req in _sent) _sentRow(req, now, l),
         const SizedBox(height: 12),
       ],
     );
   }
 
-  Widget _sentCard(SwapRequest req, DateTime now, Localization l) {
+  Widget _sentRow(SwapRequest req, DateTime now, Localization l) {
     final isPending = req.status == 'pending' || req.status == 'revert_pending';
     // F-20: pending → live tag; resolved → frozen at resolved_at.
     final tag = req.toView().priorityTag(now);
-    final createdLocal = req.createdAt == null
-        ? null
-        : DateTime.tryParse(req.createdAt!)?.toLocal();
-    final acting = _actioning.containsKey(req.id);
-    final error = _actionErrors[req.id];
     final statusKey = swapStatusLabelKey(req.status);
 
-    return _card(children: [
-      _cardHeader('📅 ${l.formatDate(req.scheduleDate)}', [
+    return _requestRow(
+      req: req,
+      title: '📅 ${l.formatDate(req.scheduleDate)}',
+      badges: [
         // The state the request had AT RESOLUTION, kept forever (F-20).
         if (!isPending && tag != SwapPriorityTag.none)
           _statusBadge(
@@ -606,68 +515,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             semantics: l[K.notifResolvedStateTitle],
           ),
         _statusBadge(statusKey == null ? req.status : l[statusKey]),
+        if (isPending && tag != SwapPriorityTag.none) _tagBadge(tag, l),
         // F-24: resolved by the 48h server cron.
         if (req.isAutoResolved)
           _statusBadge(l[K.notifAutoBadge],
               tone: context.tokens.info,
               semantics: l[K.notifAutoBadgeTitle]),
-      ]),
-      _infoRow(l[K.notifLabelTo], _nameOf(req.targetProfileId) ?? '—'),
-      _infoRow(l[K.notifLabelProposed],
-          _nameOf(req.proposedActualParentId) ?? '—'),
-      if (isPending && tag != SwapPriorityTag.none) _tagBanner(tag, l),
-      // F-44: the sender sees their own message and, once resolved, the
-      // approver's note / rejection reason.
-      if ((req.requestMessage ?? '').isNotEmpty)
-        _infoRow(l[K.notifLabelYourMessage], req.requestMessage!),
-      if ((req.approvalNote ?? '').isNotEmpty)
-        _infoRow(l[K.notifLabelApproverMessage], req.approvalNote!),
-      if ((req.rejectionReason ?? '').isNotEmpty)
-        _infoRow(l[K.notifLabelApproverMessage], req.rejectionReason!),
-      if (createdLocal != null)
-        _infoRow(
-            l[K.notifLabelRequestedAt], l.formatDateTimeShort(createdLocal)),
-      if (isPending) ...[
-        if (error != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text('⚠️ $error',
-                style: TextStyle(
-                    color: context.tokens.danger.onContainer,
-                    fontSize: TypeScale.label)),
-          ),
-        const SizedBox(height: 8),
-        OutlinedButton(
-          onPressed: acting
-              ? null
-              : () => req.isRevertPending
-                  ? _act(
-                      req,
-                      'cancel',
-                      K.errCancelRevertFailed,
-                      K.toastRevertCancelled,
-                      () => widget.dataSource
-                          .cancelRevert(req.id, allProfiles: _allProfiles))
-                  : _act(
-                      req,
-                      'cancel',
-                      K.errCancelFailed,
-                      K.toastRequestCancelled,
-                      () => widget.dataSource
-                          .cancelSwap(req.id, allProfiles: _allProfiles)),
-          style: OutlinedButton.styleFrom(
-              foregroundColor: context.tokens.danger.onContainer),
-          child: acting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(l[req.isRevertPending
-                  ? K.notifBtnCancelRevert
-                  : K.notifBtnCancelRequest]),
-        ),
       ],
-    ]);
+      lines: [
+        '${l[K.notifLabelTo]}: ${_nameOf(req.targetProfileId) ?? '—'} · '
+            '${l[K.notifLabelProposed]}: '
+            '${_nameOf(req.proposedActualParentId) ?? '—'}',
+        // F-44 on a RESOLVED request: the sheet never opens for it again, so
+        // the two messages live on the row — the sender's own and the
+        // approver's note or rejection reason. A pending one shows them in
+        // the sheet, where the cancel action is.
+        if (!isPending) ...[
+          if ((req.requestMessage ?? '').isNotEmpty)
+            '${l[K.notifLabelYourMessage]}: ${req.requestMessage}',
+          if ((req.approvalNote ?? '').isNotEmpty)
+            '${l[K.notifLabelApproverMessage]}: ${req.approvalNote}',
+          if ((req.rejectionReason ?? '').isNotEmpty)
+            '${l[K.notifLabelApproverMessage]}: ${req.rejectionReason}',
+        ],
+      ],
+      onTap: isPending ? () => _openRequest(req) : null,
+    );
   }
 
   // ── "Histórico" ────────────────────────────────────────────────────────────

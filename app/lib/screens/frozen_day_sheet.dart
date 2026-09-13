@@ -260,11 +260,15 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                     infoRow(
                         isRevert ? K.frozenRevertTo : K.frozenProposedParent,
                         proposedName ?? '—'),
+                    // U-42 (a U-24 fix that rode along): the wire string is
+                    // `HH:mm:ss`; the READER's clock decides how it renders
+                    // — `14:30` in PT-BR, `2:30 PM` in English. A hand-made
+                    // padLeft was a third copy of the 24 h format, bypassing
+                    // `formatTimeString` on the one sheet where the time is
+                    // the whole question.
                     if (handoff != null)
-                      infoRow(
-                          K.frozenProposedTime,
-                          '${handoff.hour.toString().padLeft(2, '0')}:'
-                          '${handoff.minute.toString().padLeft(2, '0')}'),
+                      infoRow(K.frozenProposedTime,
+                          l.formatTimeString(request.proposedHandoffTime!)),
                     // F-44: the requester's message travels with the request.
                     if ((request.requestMessage ?? '').isNotEmpty)
                       infoRow(

@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 
+import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_app/main.dart' as app;
 
 import 'e2e_family.dart';
@@ -231,8 +232,13 @@ void main() {
 
   // Full pack only — `skip:`, never an early `return`: a body that returns on
   // its first line counts as an executed test in the T-58 proof.
-  testWidgets('the approver sees the request on the Notifications page',
-      (tester) async {
+  //
+  // U-42: the page lists the request as a ROW and the action lives in the
+  // frozen-day sheet the row opens — the same sheet the calendar test above
+  // drives. Approve/reject exists once; this test proves the second door into
+  // it, rejecting where the other approves.
+  testWidgets('the approver sees the request on the Notifications page and '
+      'rejects it from the sheet the row opens', (tester) async {
     final day = DateTime.now().add(const Duration(days: 5));
     await family.seedDay(
         date: day, scheduledParentId: family.founder.profileId);
@@ -255,13 +261,31 @@ void main() {
     await bootApp(tester);
     await signIn(tester, family.member.email);
 
-    // The bell badge counts the request awaiting this member.
+    // The row is found by the request's OWN id, read from the database — never
+    // by a rendered date or name, whose format is the reader's business.
+    final iso = CareSchedule.isoDate(day);
+    final pending = (await family.openRequests())
+        .where((r) => r['schedule_date'] == iso)
+        .toList();
+    expect(pending, hasLength(1),
+        reason: 'exactly one open request on the seeded day: $pending');
+    final row = find.byKey(ValueKey('swap-request-${pending.single['id']}'));
+
     await tester.tap(find.text(l[K.navNotificationsShort]));
     await tester.pumpAndSettle(const Duration(seconds: 8));
     expect(find.text(l[K.notifPageTitle]), findsOneWidget);
-    expect(find.text(l[K.notifBtnApprove]), findsWidgets);
+    // U-42 acceptance: the list carries NO action button of its own.
+    expect(find.text(l[K.frozenApprove]), findsNothing);
+    expect(find.text(l[K.frozenRejectAction]), findsNothing);
+    expect(row, findsOneWidget,
+        reason: 'the request awaiting this member is one row on Para você');
 
-    await tester.tap(find.text(l[K.notifBtnReject]).first);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(find.textContaining(l[K.frozenSwapTitle]), findsOneWidget,
+        reason: 'tapping the row opens the frozen-day sheet, the one place '
+            'to act');
+    await tester.tap(find.text(l[K.frozenRejectAction]));
     await tester.pumpAndSettle(const Duration(seconds: 10));
 
     final requests = await family.openRequests();
