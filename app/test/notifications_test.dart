@@ -1,6 +1,12 @@
 // Lote 3 PR 4 — the Notifications page (3 tabs), the bell badge (⚠️ counts
 // open requests awaiting me, NOT unread rows) and the F-23 safety poll, all
 // against the fake data source.
+//
+// U-42 (13/09/2026): "Para você" and "Enviadas" are LISTS. A request is one
+// compact row and the action lives in the frozen-day sheet the row opens —
+// the same sheet `frozen_day_test.dart` drives from the calendar. So these
+// tests prove the second door into that sheet, and that the list itself
+// carries no button of its own.
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,11 +39,25 @@ Widget notifApp(FakeCustodyDataSource ds, NotificationBadge badge,
       ),
     );
 
+/// The row of request [id] — how the E2E lane finds it too, so the key is
+/// part of the contract, not an implementation detail.
+Finder requestRow(int id) => find.byKey(ValueKey('swap-request-$id'));
+
+/// Every action label the frozen-day sheet can render. The list must show
+/// NONE of them (U-42 acceptance) — the sheet is the one place to act.
+final _actionLabels = [
+  K.frozenApprove,
+  K.frozenRejectAction,
+  K.frozenConfirmRevert,
+  K.frozenCancelRequest,
+  K.frozenCancelRevert,
+];
+
 void main() {
   _landingTests();
 
-  testWidgets('opening the page marks everything read and shows the '
-      'incoming requests', (tester) async {
+  testWidgets('opening the page marks everything read and lists the incoming '
+      'request as a row with no action button', (tester) async {
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
       ..pendingForMe = [
         swapReq(10, dayOfMonth(today.day), message: 'Tenho consulta')
@@ -49,16 +69,27 @@ void main() {
     expect(ds.markAllReadCalls, 1);
     // The incoming tab is the default and carries its count.
     expect(find.text('${pt[K.notifTabIncoming]} (1)'), findsOneWidget);
-    expect(find.text('Bruno Lima'), findsOneWidget); // requester
-    expect(find.text('Tenho consulta'), findsOneWidget); // F-44
-    expect(find.text(pt[K.notifBtnApprove]), findsOneWidget);
-    expect(find.text(pt[K.notifBtnReject]), findsOneWidget);
+    expect(requestRow(10), findsOneWidget);
+    expect(find.textContaining('Bruno Lima'), findsOneWidget); // requester
+    expect(find.text(pt[K.notifPendingBadge]), findsOneWidget);
+    expect(find.byIcon(Icons.chevron_right), findsOneWidget,
+        reason: 'a pending row leads somewhere, and says so');
+    for (final key in _actionLabels) {
+      expect(find.text(pt[key]), findsNothing,
+          reason: 'U-42: the list renders no action of its own ($key)');
+    }
+    expect(find.byType(TextField), findsNothing,
+        reason: 'the F-44 note field lives in the sheet, not on every row');
+    // The requester's message is a fact for the sheet, not for the scan line.
+    expect(find.text('Tenho consulta'), findsNothing);
   });
 
-  testWidgets('approving from the page records the F-44 note and refreshes '
-      'the badge', (tester) async {
+  testWidgets('tapping a row opens the frozen-day sheet; approving there '
+      'records the F-44 note, refreshes the badge and toasts', (tester) async {
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
-      ..pendingForMe = [swapReq(10, dayOfMonth(today.day))];
+      ..pendingForMe = [
+        swapReq(10, dayOfMonth(today.day), message: 'Tenho consulta')
+      ];
     final badge = NotificationBadge(ds);
     await badge.refresh();
     expect(badge.count, 1);
@@ -66,18 +97,89 @@ void main() {
     await tester.pumpWidget(notifApp(ds, badge));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, 'Busco às 18h');
+    await tester.tap(requestRow(10));
+    await tester.pumpAndSettle();
+    // The sheet's title carries the urgency emoji, so `textContaining`.
+    expect(find.textContaining(pt[K.frozenSwapTitle]), findsOneWidget,
+        reason: 'the row opens the SAME sheet the calendar opens');
+    expect(find.text('Tenho consulta'), findsOneWidget,
+        reason: 'the F-44 message is in the sheet');
+
+    await tester.enterText(find.byType(TextField).last, 'Busco às 18h');
     ds.pendingForMe = []; // the approval resolves it server-side
-    await tester.tap(find.text(pt[K.notifBtnApprove]));
+    await tester.tap(find.text(pt[K.frozenApprove]));
     await tester.pumpAndSettle();
 
     expect(ds.approvedSwaps, [(id: 10, note: 'Busco às 18h')]);
     expect(badge.count, 0);
     expect(find.text(pt[K.toastSwapApproved]), findsOneWidget);
+    expect(requestRow(10), findsNothing,
+        reason: 'the list reloaded on the sheet\'s outcome');
+    expect(find.textContaining(pt[K.frozenSwapTitle]), findsNothing,
+        reason: 'the sheet closed with its outcome');
   });
 
-  testWidgets('the sent tab shows status, the 🤖 auto badge and cancels '
-      'pending requests', (tester) async {
+  testWidgets('rejecting from the sheet a row opened closes the request',
+      (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..pendingForMe = [swapReq(10, dayOfMonth(today.day))];
+    final badge = NotificationBadge(ds);
+    await tester.pumpWidget(notifApp(ds, badge));
+    await tester.pumpAndSettle();
+
+    await tester.tap(requestRow(10));
+    await tester.pumpAndSettle();
+    ds.pendingForMe = [];
+    await tester.tap(find.text(pt[K.frozenRejectAction]));
+    await tester.pumpAndSettle();
+
+    expect(ds.rejectedSwaps, [(id: 10, reason: null)]);
+    expect(find.text(pt[K.toastSwapRejected]), findsOneWidget);
+  });
+
+  testWidgets('a revert_pending row wears its own badge and opens the sheet '
+      'with the revert actions', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..pendingForMe = [
+        swapReq(11, dayOfMonth(today.day), status: 'revert_pending')
+      ];
+    final badge = NotificationBadge(ds);
+    await tester.pumpWidget(notifApp(ds, badge));
+    await tester.pumpAndSettle();
+
+    expect(find.text(pt[K.notifRevertPendingBadge]), findsOneWidget);
+    expect(find.textContaining(pt[K.notifLabelRevertTo]), findsOneWidget);
+
+    await tester.tap(requestRow(11));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(pt[K.frozenRevertTitle]), findsOneWidget);
+    await tester.tap(find.text(pt[K.frozenConfirmRevert]));
+    await tester.pumpAndSettle();
+    expect(ds.approvedReverts, [(id: 11, note: null)]);
+    expect(find.text(pt[K.toastRevertConfirmed]), findsOneWidget);
+  });
+
+  testWidgets('the proposed time renders through formatTimeString in the '
+      'reader\'s clock (U-24)', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..pendingForMe = [
+        swapReq(12, dayOfMonth(today.day), handoff: '18:30:00')
+      ];
+    final badge = NotificationBadge(ds);
+
+    // An English reader gets the 12-hour clock…
+    await tester.pumpWidget(notifApp(ds, badge, language: AppLanguage.en));
+    await tester.pumpAndSettle();
+    await tester.tap(requestRow(12));
+    await tester.pumpAndSettle();
+    expect(find.text('6:30 PM'), findsOneWidget);
+    expect(find.text('18:30'), findsNothing,
+        reason: 'the hand-made padLeft copy of the 24 h format is gone');
+  });
+
+  testWidgets('the sent tab shows status, the 🤖 auto badge and the F-44 '
+      'messages; a resolved row is read-only, a pending one cancels from the '
+      'sheet', (tester) async {
     final autoApproved = SwapRequest.fromJson({
       'id': 20,
       'schedule_date': CareSchedule.isoDate(dayOfMonth(today.day)),
@@ -87,6 +189,7 @@ void main() {
       'status': 'approved',
       'resolved_by': 'system',
       'resolved_at': '2026-08-18T12:00:00+00:00',
+      'request_message': 'Consigo trocar?',
       'approval_note': 'Combinado',
     });
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
@@ -105,11 +208,31 @@ void main() {
     expect(find.text(pt[K.notifStatusPending]), findsOneWidget);
     expect(find.text(pt[K.notifStatusApproved]), findsOneWidget);
     expect(find.text(pt[K.notifAutoBadge]), findsOneWidget); // F-24
-    expect(find.text('Combinado'), findsOneWidget); // approver's note
+    // F-44 on the RESOLVED row — the sheet never opens for it again.
+    expect(find.textContaining('Consigo trocar?'), findsOneWidget);
+    expect(find.textContaining('Combinado'), findsOneWidget);
+    // Only the pending row leads somewhere.
+    expect(find.byIcon(Icons.chevron_right), findsOneWidget);
+    for (final key in _actionLabels) {
+      expect(find.text(pt[key]), findsNothing);
+    }
 
-    await tester.tap(find.text(pt[K.notifBtnCancelRequest]));
+    // A resolved row is inert: tapping it opens nothing.
+    await tester.tap(requestRow(20));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(pt[K.frozenSwapTitle]), findsNothing);
+
+    // The pending one opens the sheet in the REQUESTER role: cancel only.
+    await tester.tap(requestRow(21));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(pt[K.frozenSwapTitle]), findsOneWidget);
+    expect(find.text(pt[K.frozenApprove]), findsNothing);
+    ds.sentRequests = [autoApproved];
+    await tester.tap(find.text(pt[K.frozenCancelRequest]));
     await tester.pumpAndSettle();
     expect(ds.cancelledSwaps, [21]);
+    expect(find.text(pt[K.toastRequestCancelled]), findsOneWidget);
+    expect(requestRow(21), findsNothing, reason: 'the list reloaded');
   });
 
   testWidgets('the history tab rebuilds rows through the renderer in the '
@@ -223,7 +346,7 @@ void _landingTests() {
         landing: NotificationLanding.incoming, landingNonce: '2'));
     await tester.pumpAndSettle();
 
-    expect(find.text(pt[K.notifBtnApprove]), findsOneWidget);
+    expect(requestRow(10), findsOneWidget);
   });
 
   testWidgets('a SECOND tap re-applies the tab', (tester) async {
@@ -252,7 +375,7 @@ void _landingTests() {
     // The label carries its count once something is pending — "Para você (1)".
     await tester.tap(find.text('${pt[K.notifTabIncoming]} (1)'));
     await tester.pumpAndSettle();
-    expect(find.text(pt[K.notifBtnApprove]), findsOneWidget);
+    expect(requestRow(10), findsOneWidget);
 
     // A second receipt arrives and is tapped: same landing, new notification.
     await tester.pumpWidget(notifApp(ds, badge,

@@ -413,6 +413,14 @@ regras e ~0% do visual — por um sistema de tokens. O que ela estabelece:
   põe a confirmação PRIMEIRO** (ordem do Blazor — quem chega no cutover tem essa memória
   muscular) e **todo campo tem rótulo permanente**, que é como a WCAG 1.4.11 é satisfeita
   sem engrossar a borda.
+- **Uma lista se lê, uma folha se age (U-42, 13/09/2026).** "Para você" e "Enviadas" são
+  LINHAS compactas (data · badges · solicitante/para · proposto · chevron) e o toque abre
+  `showFrozenDaySheet` — a mesma folha que o calendário abre num dia congelado. Aprovar,
+  recusar e cancelar existem em UM lugar (`frozen_day_sheet.dart`); a lista não renderiza
+  botão de ação nenhum, e uma linha de "Enviadas" já resolvida é só leitura (as mensagens
+  F-44 ficam nela, porque a folha não abre mais para um pedido fechado). Antes eram duas
+  cópias da mesma ação — o cartão com campo de texto e dois botões POR pedido, e a folha —
+  que já divergiam; as duas formatavam o horário à mão, ignorando `formatTimeString`.
 - **Skeletons no lugar dos spinners** onde a forma do que vem é conhecida: o grid do mês, as
   listas de Notificações e de auditoria, os cartões do resumo, Família, Perfil, papéis
   personalizados e o histórico premium. Ficam spinner de propósito: botão em ação (o giro é

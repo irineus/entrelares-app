@@ -793,11 +793,7 @@ abstract final class K {
   static const String notifRevertPendingBadge = 'notif.badge.revertPending';
   static const String notifPendingBadge = 'notif.badge.pending';
   static const String notifLabelRequester = 'notif.label.requester';
-  static const String notifLabelRequesterMessage = 'notif.label.requesterMessage';
   static const String notifLabelRevertTo = 'notif.label.revertTo';
-  static const String notifLabelProposes = 'notif.label.proposes';
-  static const String notifLabelTime = 'notif.label.time';
-  static const String notifLabelRequestedAt = 'notif.label.requestedAt';
   static const String notifLabelTo = 'notif.label.to';
   static const String notifLabelProposed = 'notif.label.proposed';
   static const String notifLabelYourMessage = 'notif.label.yourMessage';
@@ -816,13 +812,6 @@ abstract final class K {
   static const String notifStatusRevertCancelled = 'notif.status.revertCancelled';
   static const String notifTagOverdueShort = 'notif.tag.overdueShort';
   static const String notifTagUrgentShort = 'notif.tag.urgentShort';
-  static const String notifProposesSuffix = 'notif.proposesSuffix';
-  static const String notifNotePlaceholder = 'notif.notePlaceholder';
-  static const String notifBtnConfirmRevert = 'notif.btn.confirmRevert';
-  static const String notifBtnReject = 'notif.btn.reject';
-  static const String notifBtnApprove = 'notif.btn.approve';
-  static const String notifBtnCancelRevert = 'notif.btn.cancelRevert';
-  static const String notifBtnCancelRequest = 'notif.btn.cancelRequest';
   static const String notifErrApprove = 'notif.err.approve';
   static const String notifErrReject = 'notif.err.reject';
   static const String notifErrCancel = 'notif.err.cancel';
@@ -1812,11 +1801,7 @@ abstract final class K {
     notifRevertPendingBadge,
     notifPendingBadge,
     notifLabelRequester,
-    notifLabelRequesterMessage,
     notifLabelRevertTo,
-    notifLabelProposes,
-    notifLabelTime,
-    notifLabelRequestedAt,
     notifLabelTo,
     notifLabelProposed,
     notifLabelYourMessage,
@@ -1835,13 +1820,6 @@ abstract final class K {
     notifStatusRevertCancelled,
     notifTagOverdueShort,
     notifTagUrgentShort,
-    notifProposesSuffix,
-    notifNotePlaceholder,
-    notifBtnConfirmRevert,
-    notifBtnReject,
-    notifBtnApprove,
-    notifBtnCancelRevert,
-    notifBtnCancelRequest,
     notifErrApprove,
     notifErrReject,
     notifErrCancel,
