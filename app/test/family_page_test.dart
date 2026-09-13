@@ -5,16 +5,22 @@
 // cap), a DEPARTED member does not, and the invitation list is only fetched
 // while a seat is free — which is also why the arithmetic reads an empty list
 // at the cap without that being a bug.
+import 'dart:convert';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_invitation.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
+import 'package:entrelares_db_contracts/models/subscription.dart';
 import 'package:entrelares_app/screens/family_screen.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
+import 'package:entrelares_app/services/analytics_service.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 
@@ -112,6 +118,10 @@ Future<void> pumpFamily(
   AdminMode? adminMode,
   AppLanguage language = AppLanguage.ptBr,
   VoidCallback? onOpenCustomRoles,
+  VoidCallback? onOpenPlan,
+  VoidCallback? onOpenAdminMode,
+  VoidCallback? onOpenDeletion,
+  AnalyticsService? analytics,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 2400));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -124,11 +134,48 @@ Future<void> pumpFamily(
         adminMode: adminMode ?? AdminMode(),
         sudo: SudoService(ds),
         onOpenCustomRoles: onOpenCustomRoles,
+        onOpenPlan: onOpenPlan,
+        onOpenAdminMode: onOpenAdminMode,
+        onOpenDeletion: onOpenDeletion,
+        analytics: analytics,
       ),
     ),
   ));
   await tester.pumpAndSettle();
 }
+
+/// The funnel events the roster fires, captured through the REAL service so
+/// the props travel exactly as they would in production.
+class FakeFunnel {
+  final List<Map<String, dynamic>> payloads = [];
+
+  late final AnalyticsService service = AnalyticsService(
+    websiteId: 'site-1',
+    host: 'https://umami.example',
+    hostname: 'app.entrelares.app',
+    client: MockClient((request) async {
+      payloads.add((jsonDecode(request.body) as Map<String, dynamic>)['payload']
+          as Map<String, dynamic>);
+      return http.Response('', 200);
+    }),
+  );
+
+  Map<String, dynamic>? dataOf(String name) {
+    for (final payload in payloads) {
+      if (payload['name'] == name) return payload['data'] as Map<String, dynamic>?;
+    }
+    return null;
+  }
+
+  int count(String name) => payloads.where((p) => p['name'] == name).length;
+}
+
+const _billingOn = {
+  'billing.enabled': 'true',
+  'billing.price_monthly_cents': '549',
+  'billing.price_annual_cents': '5490',
+  'billing.grace_days': '7',
+};
 
 void main() {
   final l = Localization(AppLanguage.ptBr);
@@ -639,36 +686,152 @@ void main() {
     });
   });
 
-  group('admin mode section', () {
-    testWidgets('an admin can turn it on, and the tier copy explains F-40',
+  // U-35: the three things that are not the family are rows now, one tap
+  // away, each saying its state — and nothing of what they open is on the
+  // roster.
+  group('the sub-page rows', () {
+    final planRow = find.byKey(const ValueKey('family-plan-row'));
+    final adminRow = find.byKey(const ValueKey('family-admin-mode-row'));
+    final deleteRow = find.byKey(const ValueKey('family-delete-row'));
+
+    testWidgets('the roster carries no offer, no toggle and no danger zone',
+        (tester) async {
+      await pumpFamily(tester, source(settings: _billingOn),
+          onOpenPlan: () {}, onOpenAdminMode: () {}, onOpenDeletion: () {});
+
+      expect(find.text(l[K.premTitle]), findsNothing);
+      expect(find.byKey(const ValueKey('premium-subscribe')), findsNothing);
+      expect(find.text(l[K.famAdminActivate]), findsNothing);
+      expect(find.text(l[K.famDelReqOpen]), findsNothing);
+      expect(planRow, findsOne);
+      expect(adminRow, findsOne);
+      expect(deleteRow, findsOne);
+    });
+
+    testWidgets('a free family\'s plan row says Gratuito', (tester) async {
+      await pumpFamily(tester, source(settings: _billingOn), onOpenPlan: () {});
+
+      expect(find.descendant(of: planRow, matching: find.text(l[KApp.famPlanRowFree])),
+          findsOne);
+    });
+
+    testWidgets('a trial family\'s plan row counts the days', (tester) async {
+      final ds = source(settings: _billingOn)
+        ..family = Family(
+            id: 7,
+            name: 'Souza',
+            plan: 'free',
+            trialEndsAt: DateTime.now().toUtc().add(const Duration(days: 4, hours: 12)));
+      await pumpFamily(tester, ds, onOpenPlan: () {});
+
+      expect(
+          find.descendant(
+              of: planRow,
+              matching: find.text(l.format(KApp.famPlanRowTrialMany, [5]))),
+          findsOne);
+    });
+
+    testWidgets('a paying family\'s plan row names the date the period runs to',
+        (tester) async {
+      final end = DateTime.now().toUtc().add(const Duration(days: 20));
+      final ds = source(plan: 'premium', settings: _billingOn)
+        ..subscription = Subscription(
+            id: 1,
+            familyId: 7,
+            status: 'active',
+            cycle: 'monthly',
+            priceCents: 549,
+            currentPeriodEnd: end);
+      await pumpFamily(tester, ds, onOpenPlan: () {});
+
+      expect(
+          find.descendant(
+              of: planRow,
+              matching: find.text(l.format(KApp.famPlanRowPremiumUntil,
+                  [l.formatDate(end.toLocal())]))),
+          findsOne);
+    });
+
+    testWidgets('grandfathered premium is plain Premium — no date by design',
+        (tester) async {
+      await pumpFamily(tester, source(plan: 'premium', settings: _billingOn),
+          onOpenPlan: () {});
+
+      expect(
+          find.descendant(
+              of: planRow, matching: find.text(l[KApp.famPlanRowPremium])),
+          findsOne);
+    });
+
+    testWidgets('the plan row opens the plan page', (tester) async {
+      var opened = false;
+      await pumpFamily(tester, source(), onOpenPlan: () => opened = true);
+
+      await tester.tap(planRow);
+      await tester.pumpAndSettle();
+      expect(opened, isTrue);
+    });
+
+    testWidgets('the admin-mode row is the admin\'s, and reads the mode live',
         (tester) async {
       final mode = AdminMode();
-      await pumpFamily(tester, source(), adminMode: mode);
+      var opened = false;
+      await pumpFamily(tester, source(),
+          adminMode: mode, onOpenAdminMode: () => opened = true);
 
-      expect(find.text(l[K.famAdminSection]), findsOne);
-      expect(find.textContaining('plano gratuito'), findsWidgets);
+      expect(
+          find.descendant(
+              of: adminRow, matching: find.text(l[KApp.famAdminRowOff])),
+          findsOne);
 
-      await tester.tap(find.text(l[K.famAdminActivate]));
+      mode.toggle();
       await tester.pumpAndSettle();
+      expect(
+          find.descendant(
+              of: adminRow, matching: find.text(l[KApp.famAdminRowOn])),
+          findsOne);
 
-      expect(mode.isActive, isTrue);
-      expect(find.text(l[K.famAdminActiveNote]), findsOne);
+      await tester.tap(adminRow);
+      await tester.pumpAndSettle();
+      expect(opened, isTrue);
     });
 
-    testWidgets('a premium family reads the months, not the days',
-        (tester) async {
-      await pumpFamily(tester, source(plan: 'premium'));
-
-      expect(find.textContaining('Administrador (Premium)'), findsOne);
-    });
-
-    testWidgets('a non-admin never sees the section', (tester) async {
+    testWidgets('a non-admin never sees the admin-mode row', (tester) async {
       final ds = FakeCustodyDataSource(members: const [plain, admin], days: [])
         ..family = const Family(id: 7, name: 'Souza', plan: 'free')
         ..roles = const [roleMother, roleFather];
-      await pumpFamily(tester, ds);
+      await pumpFamily(tester, ds, onOpenAdminMode: () {});
 
-      expect(find.text(l[K.famAdminSection]), findsNothing);
+      expect(adminRow, findsNothing);
+    });
+
+    testWidgets('a row without a destination is not offered', (tester) async {
+      await pumpFamily(tester, source());
+
+      expect(planRow, findsNothing);
+      expect(adminRow, findsNothing);
+      expect(deleteRow, findsNothing);
+    });
+
+    testWidgets('the F-37 gate CTA records the intent and opens the plan page — '
+        'no price, no scroll', (tester) async {
+      final funnel = FakeFunnel();
+      var opened = false;
+      await pumpFamily(
+        tester,
+        source(settings: {..._billingOn, 'freemium.free_caregivers': '2'}),
+        analytics: funnel.service,
+        onOpenPlan: () => opened = true,
+      );
+
+      await tester.tap(find.text(l[K.famSeePremium]));
+      await tester.pumpAndSettle();
+
+      expect(funnel.dataOf('premium-gate-click'), {'gate': 'extra-caregiver'});
+      expect(opened, isTrue);
+      // U-35: the roster is no longer a paywall view — that event is the plan
+      // page's, and the F-48 funnel's denominator moved with it.
+      expect(funnel.count('premium-paywall-view'), 0);
     });
   });
 

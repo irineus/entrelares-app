@@ -173,4 +173,56 @@ void main() {
       expect(status.trialDaysLeft, isNull);
     });
   });
+
+  group('describePlanRow — the Família row\'s one-line plan summary (U-35)',
+      () {
+    PlanStatus plan(String p, {DateTime? trial}) =>
+        describePlan(plan: p, trialEndsAtUtc: trial, nowUtc: now);
+
+    test('a trial family reads the countdown, whatever the subscription says',
+        () {
+      final row = describePlanRow(
+          plan: plan('free', trial: now.add(const Duration(days: 5))),
+          currentPeriodEndUtc: now.add(const Duration(days: 30)),
+          nowUtc: now);
+      expect(row.kind, PlanRowKind.trial);
+      expect(row.trialDaysLeft, 5);
+      expect(row.untilUtc, isNull);
+    });
+
+    test('a paid family reads the date its period runs to', () {
+      final end = now.add(const Duration(days: 12));
+      final row = describePlanRow(
+          plan: plan('premium'), currentPeriodEndUtc: end, nowUtc: now);
+      expect(row.kind, PlanRowKind.premiumUntil);
+      expect(row.untilUtc, end);
+    });
+
+    test('a period end already behind us is never announced — an overdue '
+        'family in grace is plain Premium here, the page has the deadline',
+        () {
+      final row = describePlanRow(
+          plan: plan('premium'),
+          currentPeriodEndUtc: now.subtract(const Duration(days: 1)),
+          nowUtc: now);
+      expect(row.kind, PlanRowKind.premium);
+      expect(row.untilUtc, isNull);
+    });
+
+    test('permanent premium has no date by design', () {
+      final row = describePlanRow(
+          plan: plan('premium'), currentPeriodEndUtc: null, nowUtc: now);
+      expect(row.kind, PlanRowKind.premium);
+    });
+
+    test('a free family is free, even with a stale period end on file', () {
+      // The canceled subscription row outlives the entitlement (U-22 reads
+      // the lapse from it); the row must not resurrect "Premium até".
+      final row = describePlanRow(
+          plan: plan('free'),
+          currentPeriodEndUtc: now.add(const Duration(days: 3)),
+          nowUtc: now);
+      expect(row.kind, PlanRowKind.free);
+    });
+  });
 }

@@ -353,9 +353,13 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
 
 ## Premium e billing (lote 5)
 
-- **A seção Premium na Família** roda a máquina de estados do `BillingService` da web
-  (`computeBillingUi`): waitlist, oferta, ativa, em atraso, agendada (F-42) e premium sem
-  assinatura. O cancelamento pede confirmação e a frase **promete o tempo já pago**; o
+- **A página Plano e pagamento (`/family/plan`, U-35 — até então uma seção da Família)**
+  roda a máquina de estados do `BillingService` da web (`computeBillingUi`): waitlist,
+  oferta, ativa, em atraso, agendada (F-42) e premium sem assinatura. A Família guarda só a
+  linha *Plano e pagamento*, com o estado do plano no subtítulo (`describePlanRow`, core),
+  e todo CTA de gate (F-37, F-40, F-41) navega para ela. O `premium-paywall-view` (F-48)
+  dispara quando ESSA página carrega com a oferta — o denominador do funil é a visita à
+  página, não mais a visita à aba. O cancelamento pede confirmação e a frase **promete o tempo já pago**; o
   caminho de volta F-42 só aparece para método faturável com cliente no gateway — cartão
   nunca, porque retomar débito automático exige um token que o fluxo hospedado não guarda e
   o servidor recusaria o clique.

@@ -15,11 +15,9 @@ import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
 import 'package:entrelares_db_contracts/models/subscription.dart';
-import 'package:entrelares_app/screens/family_screen.dart';
-import 'package:entrelares_app/services/admin_mode.dart';
+import 'package:entrelares_app/screens/family_plan_screen.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/services/store_billing.dart';
-import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/ui/ui.dart';
 
@@ -107,10 +105,8 @@ Future<void> _pump(
     l: Localization(AppLanguage.ptBr),
     setLanguage: (_) async {},
     child: MaterialApp(
-      home: FamilyScreen(
+      home: FamilyPlanScreen(
         dataSource: ds,
-        adminMode: AdminMode(),
-        sudo: SudoService(ds),
         isStoreChannel: true,
         storeBilling: store,
         openExternal: opened == null ? (_) async {} : (url) async => opened.add(url),
