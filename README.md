@@ -103,6 +103,13 @@ chegaram ao fim (`integration_test/e2e_proof.dart`), o driver é nosso
 contagem diferente da que o `verify.yml` fixa por alvo e pack (`alvo:p0:full`, espelhada
 pelo `web_channel_test` contra as declarações `testWidgets(`). A prova fica em
 `app/build/e2e_proof.json` e o sumário do run lista os testes pelo nome. Runbook §15.
+**Desde o T-71 (13/09/2026) o `setUpAll` também reporta:** cada suíte o registra por
+`provedSetUpAll(binding, …)` (o `web_channel_test` recusa um `setUpAll` cru), que grava no
+relatório a janela (início/fim UTC, duração) em todo run e, quando estoura, a exceção e a
+pilha — porque `-d web-server` não tem DWDS e o que a suíte imprime fica só no console do
+navegador. O veredito passa a nomear a causa ("o setUpAll estourou … : POST … → 429") em
+vez de só a forma ("não reportou NADA"), e o sumário imprime a janela por alvo, para cruzar
+um vermelho com a janela do `db-gate` no mesmo projeto dev (hipótese H1 do T-71).
 
 ## Gate de banco (`packages/entrelares_db_gate/`)
 

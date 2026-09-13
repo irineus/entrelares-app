@@ -16,7 +16,7 @@ import 'package:entrelares_app/env.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../test_driver/e2e_proof.dart'
-    show executedKey, expectedTestsVariable, failedKey, proofFile;
+    show executedKey, expectedTestsVariable, failedKey, proofFile, setUpAllKey;
 
 File _web(String name) => File('web/$name');
 File _workflow() => File('../.github/workflows/verify.yml');
@@ -871,6 +871,30 @@ void main() {
           '<missing>';
       expect(spelled('executedKey'), executedKey);
       expect(spelled('failedKey'), failedKey);
+      expect(spelled('setUpAllKey'), setUpAllKey,
+          reason: 'T-71: the setUpAll report rides the same mirror — a driver '
+              'reading a key the suite never writes would name a "reported '
+              'nothing" red as before, with the cause lost again');
+    });
+
+    test('every suite sets up through the reporting wrapper, never bare (T-71)',
+        () {
+      // A `setUpAll` that throws outside `provedSetUpAll` prints its exception
+      // to the browser console and nowhere else — `-d web-server` has no
+      // DWDS — so the driver can only say "reported nothing". Main run
+      // 34731668538 attempt 1 (13/09/2026) is the red nobody could root-cause.
+      // Over the code, not the comments that explain this.
+      for (final suite in suites) {
+        final body = code(suite);
+        expect(body, isNot(matches(RegExp(r'(?<![A-Za-z_])setUpAll\('))),
+            reason: '${suite.path} registers a bare setUpAll; use '
+                'provedSetUpAll(binding, …) so its window and its error '
+                'reach the proof');
+        expect(body, contains('provedSetUpAll(binding,'),
+            reason: '${suite.path} has no setUpAll at all — every suite '
+                'creates its throwaway family there, and the lane reads the '
+                'window from its report');
+      }
     });
 
     test('every suite installs the proof, before any test is declared', () {
