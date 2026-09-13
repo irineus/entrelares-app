@@ -26,6 +26,7 @@ import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
+import 'package:entrelares_app/widgets/ui/ui.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource;
 
@@ -107,6 +108,29 @@ Subscription _subscription({
 /// text is compared against the STRIPPED catalog entry — `<strong>` is markup
 /// for the reader, never characters on screen.
 Finder _text(String value) => find.text(stripRichText(value));
+
+/// U-46: the offer's pieces, found by key — the labels change with the cycle.
+final Finder _subscribe = find.byKey(const ValueKey('premium-subscribe'));
+final Finder _avulso = find.byKey(const ValueKey('premium-avulso'));
+final Finder _priceCard = find.byKey(const ValueKey('premium-price-card'));
+
+/// The Premium section's column — the nearest one above the price card, so a
+/// count of buttons inside it is a count of the OFFER's buttons and never of
+/// the roster's or the danger zone's.
+Finder get _offer =>
+    find.ancestor(of: _priceCard, matching: find.byType(Column)).first;
+
+/// The fill the subscribe CTA resolved to: the brand primary when it IS the
+/// primary, the tonal container when another block (F-42) holds that role.
+/// `FilledButton.tonal` is the same class as `FilledButton`, so the colour
+/// is the only thing a test can read.
+Color? _subscribeFill(WidgetTester tester) => tester
+    .widget<Material>(
+        find.descendant(of: _subscribe, matching: find.byType(Material)).first)
+    .color;
+
+ColorScheme _scheme(WidgetTester tester) =>
+    Theme.of(tester.element(_subscribe)).colorScheme;
 
 /// The funnel events this screen fires, captured through the REAL service so
 /// the props travel exactly as they would in production (channel included).
@@ -469,6 +493,9 @@ void main() {
         ])),
         findsOne,
       );
+      // U-46: the way back is the cheaper choice and keeps the ONE filled
+      // button — the new-subscription CTA steps down to the tonal fill.
+      expect(_subscribeFill(tester), _scheme(tester).secondaryContainer);
 
       await tester.tap(_text(l[K.premReactivateButton]));
       await tester.pumpAndSettle();
@@ -581,35 +608,106 @@ void main() {
     });
   });
 
-  group('checkout rails (web)', () {
-    testWidgets('the monthly subscription leaves for the gateway URL',
+  group('checkout rails (web) — U-46, one decision at a time', () {
+    testWidgets('annual opens the offer: big price, per-month line, badge',
+        (tester) async {
+      await _pump(tester, _source());
+
+      expect(_text(l.format(K.premPriceAnnual, ['R\$ 54,90'])), findsOne);
+      // 5490 / 12 = 457.5 → rounded UP: the claim never understates.
+      expect(_text(l.format(K.premPriceEquivalent, ['R\$ 4,58'])), findsOne);
+      // Derived from the prices (10 × monthly), not typed into a string.
+      expect(_text(l.format(K.premFreeMonthsMany, [2])), findsOne);
+      expect(_text(l.format(K.premPriceMonthly, ['R\$ 5,49'])), findsNothing);
+    });
+
+    testWidgets('exactly ONE filled button, and it is the brand primary',
+        (tester) async {
+      await _pump(tester, _source());
+
+      expect(
+          find.descendant(of: _offer, matching: find.byType(FilledButton)),
+          findsOne);
+      expect(_subscribeFill(tester), _scheme(tester).primary);
+      expect(
+          find.descendant(of: _offer, matching: find.byType(OutlinedButton)),
+          findsOne);
+    });
+
+    testWidgets('the subscribe CTA follows the picker: annual, then monthly',
         (tester) async {
       final ds = _source();
       final funnel = _Funnel();
       final opened = <String>[];
       await _pump(tester, ds, funnel: funnel, opened: opened);
 
-      await tester.tap(_text(l.format(K.premSubscribeMonthly, ['R\$ 5,49'])));
+      await tester.tap(_subscribe);
       await tester.pumpAndSettle();
-
-      expect(ds.checkouts, [(action: 'checkout', cycle: 'monthly')]);
+      expect(ds.checkouts, [(action: 'checkout', cycle: 'annual')]);
       expect(opened, ['https://pagamento.example/abc']);
       expect(funnel.dataOf('premium-checkout-start'),
-          {'channel': 'web', 'cycle': 'monthly', 'mode': 'recurring'});
+          {'channel': 'web', 'cycle': 'annual', 'mode': 'recurring'});
+
+      await tester.tap(_text(l[K.premPickMonthly]));
+      await tester.pumpAndSettle();
+      // The card changed with the choice: monthly price, no annual facts.
+      expect(_text(l.format(K.premPriceMonthly, ['R\$ 5,49'])), findsOne);
+      expect(_text(l.format(K.premPriceAnnual, ['R\$ 54,90'])), findsNothing);
+      expect(_text(l.format(K.premFreeMonthsMany, [2])), findsNothing);
+      expect(find.textContaining(stripRichText(l[K.premPriceEquivalent]
+              .replaceAll('{0}', '')
+              .trim())),
+          findsNothing);
+
+      await tester.tap(_subscribe);
+      await tester.pumpAndSettle();
+      expect(ds.checkouts.last, (action: 'checkout', cycle: 'monthly'));
     });
 
-    testWidgets('F-48: the avulso rail is a different mode, same function',
+    testWidgets('F-48: the Pix path is a different mode, same cycle',
         (tester) async {
       final ds = _source();
       final funnel = _Funnel();
       await _pump(tester, ds, funnel: funnel);
 
-      await tester.tap(_text(l.format(K.premAvulsoAnnual, ['R\$ 54,90'])));
+      // The secondary button quotes the selected cycle's price...
+      expect(_text(l.format(K.premAvulsoButton, ['R\$ 54,90'])), findsOne);
+      await tester.tap(_avulso);
       await tester.pumpAndSettle();
-
       expect(ds.checkouts, [(action: 'avulso', cycle: 'annual')]);
       expect(funnel.dataOf('premium-checkout-start'),
           {'channel': 'web', 'cycle': 'annual', 'mode': 'avulso'});
+
+      // ...and follows the picker like the primary does.
+      await tester.tap(_text(l[K.premPickMonthly]));
+      await tester.pumpAndSettle();
+      expect(_text(l.format(K.premAvulsoButton, ['R\$ 5,49'])), findsOne);
+      await tester.tap(_avulso);
+      await tester.pumpAndSettle();
+      expect(ds.checkouts.last, (action: 'avulso', cycle: 'monthly'));
+      // The no-recurrence sentence stays: the button label does not say it.
+      expect(_text(l[K.premAvulsoLead]), findsOne);
+    });
+
+    testWidgets('the badge disappears when the prices stop earning it',
+        (tester) async {
+      // The claim is computed from app_settings — a ratio that is not a whole
+      // number of months shows no badge rather than a rounded one.
+      await _pump(
+        tester,
+        _source(settings: const {
+          'billing.enabled': 'true',
+          'billing.price_monthly_cents': '549',
+          'billing.price_annual_cents': '5000',
+          'billing.grace_days': '7',
+        }),
+      );
+
+      expect(_text(l.format(K.premPriceAnnual, ['R\$ 50,00'])), findsOne);
+      expect(_text(l.format(K.premFreeMonthsMany, [2])), findsNothing);
+      // The roster's admin pill is an AppBadge too — scope to the card.
+      expect(find.descendant(of: _priceCard, matching: find.byType(AppBadge)),
+          findsNothing);
     });
 
     testWidgets('the 7-day guarantee is on the payment surface', (tester) async {
@@ -628,7 +726,7 @@ void main() {
         ..throwOnBillingAction = const BillingRefused('Cobrança desativada.');
       await _pump(tester, ds, opened: opened);
 
-      await tester.tap(_text(l.format(K.premSubscribeMonthly, ['R\$ 5,49'])));
+      await tester.tap(_subscribe);
       await tester.pumpAndSettle();
 
       expect(_text('Cobrança desativada.'), findsOne);
@@ -639,8 +737,9 @@ void main() {
         (tester) async {
       await _pump(tester, _source(), store: true);
 
-      expect(_text(l.format(K.premSubscribeMonthly, ['R\$ 5,49'])), findsNothing);
-      expect(_text(l.format(K.premAvulsoMonthly, ['R\$ 5,49'])), findsNothing);
+      expect(_subscribe, findsNothing);
+      expect(_avulso, findsNothing);
+      expect(_priceCard, findsNothing);
     });
   });
 

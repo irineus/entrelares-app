@@ -21,6 +21,7 @@ import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/services/store_billing.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
+import 'package:entrelares_app/widgets/ui/ui.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource;
 
@@ -122,6 +123,7 @@ Future<void> _pump(
 void main() {
   final l = Localization(AppLanguage.ptBr);
   Finder text(String value) => find.text(stripRichText(value));
+  final subscribe = find.byKey(const ValueKey('premium-subscribe'));
 
   group('the master switch', () {
     testWidgets('off keeps the T-38 neutral note and never asks the store',
@@ -137,7 +139,8 @@ void main() {
       );
 
       expect(text(l[K.premStoreNote]), findsOne);
-      expect(text(l.format(K.premSubscribeMonthly, ['R\$ 6,90'])), findsNothing);
+      expect(subscribe, findsNothing);
+      expect(text(l.format(K.premPriceMonthly, ['R\$ 6,90'])), findsNothing);
     });
 
     testWidgets('on, with products, shows PLAY prices — not app_settings ones',
@@ -148,9 +151,49 @@ void main() {
       final store = _FakeStore();
       await _pump(tester, _source(), store);
 
-      expect(text(l.format(K.premSubscribeMonthly, ['R\$ 6,90'])), findsOne);
-      expect(text(l.format(K.premSubscribeAnnual, ['R\$ 69,00'])), findsOne);
-      expect(text(l.format(K.premSubscribeMonthly, ['R\$ 5,49'])), findsNothing);
+      // U-46: annual opens the card, the picker flips it to monthly.
+      expect(text(l.format(K.premPriceAnnual, ['R\$ 69,00'])), findsOne);
+      expect(text(l.format(K.premPriceAnnual, ['R\$ 54,90'])), findsNothing);
+      await tester.tap(text(l[K.premPickMonthly]));
+      await tester.pumpAndSettle();
+      expect(text(l.format(K.premPriceMonthly, ['R\$ 6,90'])), findsOne);
+      expect(text(l.format(K.premPriceMonthly, ['R\$ 5,49'])), findsNothing);
+    });
+
+    testWidgets('the store card claims nothing the client cannot compute',
+        (tester) async {
+      // Play's price is a localized STRING; "2 meses grátis" and "equivale a
+      // R\$ X/mês" are arithmetic on app_settings, which rules the web rail
+      // only. The Console decides the store ratio and the app cannot read it.
+      final store = _FakeStore();
+      await _pump(tester, _source(), store);
+
+      final card = find.byKey(const ValueKey('premium-price-card'));
+      expect(text(l.format(K.premPriceAnnual, ['R\$ 69,00'])), findsOne);
+      expect(find.descendant(of: card, matching: find.byType(AppBadge)),
+          findsNothing);
+      expect(find.textContaining('/mês'), findsNothing);
+      // And exactly one filled button in the offer (the Premium section's
+      // column, the nearest one above the card).
+      final offer = find.ancestor(of: card, matching: find.byType(Column)).first;
+      expect(find.descendant(of: offer, matching: find.byType(FilledButton)),
+          findsOne);
+    });
+
+    testWidgets('a single product means no picker — one price, one button',
+        (tester) async {
+      final store = _FakeStore()
+        ..products = const [
+          StoreProduct(
+              id: storeProductMonthly, price: 'R\$ 6,90', cycle: 'monthly'),
+        ];
+      await _pump(tester, _source(), store);
+
+      expect(find.byKey(const ValueKey('premium-cycle')), findsNothing);
+      expect(text(l.format(K.premPriceMonthly, ['R\$ 6,90'])), findsOne);
+      await tester.tap(subscribe);
+      await tester.pumpAndSettle();
+      expect(store.bought, [storeProductMonthly]);
     });
 
     testWidgets('a store that cannot answer falls back to the neutral note',
@@ -177,10 +220,15 @@ void main() {
       final store = _FakeStore();
       await _pump(tester, _source(), store);
 
-      await tester.tap(text(l.format(K.premSubscribeAnnual, ['R\$ 69,00'])));
+      await tester.tap(subscribe);
       await tester.pumpAndSettle();
-
       expect(store.bought, [storeProductAnnual]);
+
+      await tester.tap(text(l[K.premPickMonthly]));
+      await tester.pumpAndSettle();
+      await tester.tap(subscribe);
+      await tester.pumpAndSettle();
+      expect(store.bought, [storeProductAnnual, storeProductMonthly]);
     });
 
     testWidgets('a pending purchase says it is being confirmed, grants nothing',
@@ -314,7 +362,8 @@ void main() {
         opened: opened,
       );
 
-      expect(text(l.format(K.premSubscribeAnnual, ['R\$ 69,00'])), findsNothing);
+      expect(subscribe, findsNothing);
+      expect(text(l.format(K.premPriceAnnual, ['R\$ 69,00'])), findsNothing);
 
       await tester.tap(text(l[KApp.storeManage]));
       await tester.pumpAndSettle();

@@ -138,6 +138,11 @@ class _FamilyScreenState extends State<FamilyScreen> {
   // query failed, the ids are not published yet) means the neutral note.
   bool _storeAvailable = false;
   List<StoreProduct> _storeProducts = const [];
+
+  // U-46: the ONE question the offer asks first. Annual opens it — the better
+  // deal, with its badge and per-month equivalent in view — and a tap flips
+  // it. The choice is screen state only: nothing is charged until the CTA.
+  String _offerCycle = 'annual';
   bool _storePurchasePending = false;
   StreamSubscription<StorePurchase>? _storeSubscription;
 
@@ -1823,11 +1828,101 @@ class _FamilyScreenState extends State<FamilyScreen> {
           externalCustomerId: subscription?.externalCustomerId,
           nowUtc: now,
           singleCharge: subscription?.singleCharge ?? false,
-        ))
+        )) ...[
           ..._reactivateControls(l, subscription!),
-        ..._checkoutControls(l),
+          // U-46: the way back is the cheaper choice (F-42) and keeps the ONE
+          // filled button; a new subscription is the tonal alternative here.
+          ..._checkoutControls(l, primaryTaken: true),
+        ] else
+          ..._checkoutControls(l, primaryTaken: false),
       ],
     ];
+  }
+
+  // ── U-46: the offer as one decision at a time. The cycle picker and the
+  // price card are shared by both rails; what differs is where the number
+  // comes from (app_settings on the web, Play's own string on the store) and
+  // what the buttons call.
+
+  /// `monthly` | `annual`, restricted to the cycles the rail can actually sell
+  /// (the store may answer with one product). The picker never offers a
+  /// cycle with nothing behind it.
+  Widget _cyclePicker(Localization l, {required List<String> cycles}) =>
+      AppSegmented<String>(
+        key: const ValueKey('premium-cycle'),
+        options: [
+          for (final cycle in cycles)
+            (
+              value: cycle,
+              label: l[cycle == 'annual' ? K.premPickAnnual : K.premPickMonthly]
+            ),
+        ],
+        selected: _offerCycle,
+        semantics: l[K.premPickSemantics],
+        enabled: !_billingBusy,
+        onChanged: (cycle) => setState(() => _offerCycle = cycle),
+      );
+
+  /// The chosen cycle's price, large, with the two annual facts under and
+  /// beside it when the rail can vouch for them. [equivalent] and [freeMonths]
+  /// are the WEB rail's: both come from app_settings arithmetic, and the store
+  /// rail passes neither — Play's price is a localized string set in the
+  /// Console, and the client asserts nothing it cannot compute.
+  Widget _priceCard(
+    Localization l, {
+    required String price,
+    String? equivalent,
+    int freeMonths = 0,
+  }) {
+    final theme = Theme.of(context);
+    return AppCard(
+      key: const ValueKey('premium-price-card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: Spacing.sm,
+            runSpacing: Spacing.xs,
+            children: [
+              Text(price, style: theme.textTheme.headlineSmall),
+              if (freeMonths > 0)
+                AppBadge(
+                  text: l.format(
+                      freeMonths == 1
+                          ? K.premFreeMonthsOne
+                          : K.premFreeMonthsMany,
+                      [freeMonths]),
+                  tone: context.tokens.success,
+                ),
+            ],
+          ),
+          if (equivalent != null) ...[
+            const SizedBox(height: Spacing.xs),
+            Text(equivalent, style: theme.textTheme.bodySmall),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The one primary CTA — filled, unless another block already holds the
+  /// primary (the F-42 way back), in which case it is the tonal alternative.
+  Widget _subscribeButton(
+    Localization l, {
+    required bool primaryTaken,
+    required VoidCallback? onPressed,
+  }) {
+    final label = Text(l[K.premSubscribe]);
+    return primaryTaken
+        ? FilledButton.tonal(
+            key: const ValueKey('premium-subscribe'),
+            onPressed: onPressed,
+            child: label)
+        : FilledButton(
+            key: const ValueKey('premium-subscribe'),
+            onPressed: onPressed,
+            child: label);
   }
 
   /// T-48: what the STORE channel may offer. With the rail off — or with a
@@ -1852,28 +1947,49 @@ class _FamilyScreenState extends State<FamilyScreen> {
     };
   }
 
-  List<Widget> _storeOffer(Localization l) => [
-        if (!_isAdmin)
-          RichLabel.of(l, K.premAdminOnly)
-        else ...[
-          for (final product in _storeProducts)
-            FilledButton(
-              onPressed: _billingBusy ? null : () => _buyFromStore(l, product),
-              child: Text(l.format(
-                  product.cycle == 'annual'
-                      ? K.premSubscribeAnnual
-                      : K.premSubscribeMonthly,
-                  // The price is PLAY's, formatted by the store for this
-                  // buyer's country — never a number from app_settings, which
-                  // rules the web rail only.
-                  [product.price])),
-            ),
-          TextButton(
-            onPressed: _billingBusy ? null : () => _restoreFromStore(l),
-            child: Text(l[KApp.storeRestore]),
-          ),
-        ],
-      ];
+  List<Widget> _storeOffer(Localization l) {
+    if (!_isAdmin) return [RichLabel.of(l, K.premAdminOnly)];
+    // The cycles Play answered for, in the picker's order. A selected cycle
+    // the store did not answer for falls back to whatever it did — the card
+    // never shows a price for a product that does not exist.
+    final cycles = [
+      for (final cycle in const ['monthly', 'annual'])
+        if (_storeProducts.any((p) => p.cycle == cycle)) cycle,
+    ];
+    // The service already drops ids it does not recognise; this is the same
+    // fail-closed default one layer up, so the card can never be built around
+    // nothing.
+    if (cycles.isEmpty) return [RichLabel.of(l, K.premStoreNote)];
+    final selected = cycles.contains(_offerCycle) ? _offerCycle : cycles.first;
+    final product = _storeProducts.firstWhere((p) => p.cycle == selected);
+    return [
+      const SizedBox(height: 12),
+      if (cycles.length > 1) ...[
+        _cyclePicker(l, cycles: cycles),
+        const SizedBox(height: Spacing.sm),
+      ],
+      // The price is PLAY's, formatted by the store for this buyer's country —
+      // never a number from app_settings, which rules the web rail only. No
+      // per-month equivalent and no free-months badge: both would be
+      // arithmetic on a localized string, i.e. a claim the client cannot check.
+      _priceCard(
+        l,
+        price: l.format(
+            selected == 'annual' ? K.premPriceAnnual : K.premPriceMonthly,
+            [product.price]),
+      ),
+      const SizedBox(height: Spacing.sm),
+      _subscribeButton(
+        l,
+        primaryTaken: false,
+        onPressed: _billingBusy ? null : () => _buyFromStore(l, product),
+      ),
+      TextButton(
+        onPressed: _billingBusy ? null : () => _restoreFromStore(l),
+        child: Text(l[KApp.storeRestore]),
+      ),
+    ];
+  }
 
   Widget _manageOnPlay(Localization l) => Align(
         alignment: Alignment.centerLeft,
@@ -1920,40 +2036,50 @@ class _FamilyScreenState extends State<FamilyScreen> {
     }
   }
 
-  List<Widget> _checkoutControls(Localization l) {
-    final monthly = formatPriceBrl(_settings.priceMonthlyCents);
-    final annual = formatPriceBrl(_settings.priceAnnualCents);
+  List<Widget> _checkoutControls(Localization l, {required bool primaryTaken}) {
+    final monthlyCents = _settings.priceMonthlyCents;
+    final annualCents = _settings.priceAnnualCents;
+    final annual = _offerCycle == 'annual';
+    final price = formatPriceBrl(annual ? annualCents : monthlyCents);
     return [
       const SizedBox(height: 12),
-      FilledButton(
-        onPressed: _billingBusy
-            ? null
-            : () => _startCheckout(l, 'monthly', avulso: false),
-        child: Text(l.format(K.premSubscribeMonthly, [monthly])),
-      ),
+      _cyclePicker(l, cycles: const ['monthly', 'annual']),
+      const SizedBox(height: Spacing.sm),
       // "2 meses grátis" is a factual claim and holds by construction: the
-      // annual price is exactly ten times the monthly one, both from
-      // app_settings.
-      FilledButton(
+      // badge is COMPUTED from the same app_settings prices the checkout
+      // charges (annual = 10 × monthly today), and so is the per-month line.
+      _priceCard(
+        l,
+        price: l.format(
+            annual ? K.premPriceAnnual : K.premPriceMonthly, [price]),
+        equivalent: annual
+            ? l.format(K.premPriceEquivalent,
+                [formatPriceBrl(monthlyEquivalentCents(annualCents))])
+            : null,
+        freeMonths: annual
+            ? annualFreeMonths(
+                monthlyCents: monthlyCents, annualCents: annualCents)
+            : 0,
+      ),
+      const SizedBox(height: Spacing.sm),
+      _subscribeButton(
+        l,
+        primaryTaken: primaryTaken,
         onPressed: _billingBusy
             ? null
-            : () => _startCheckout(l, 'annual', avulso: false),
-        child: Text(l.format(K.premSubscribeAnnual, [annual])),
+            : () => _startCheckout(l, _offerCycle, avulso: false),
       ),
       const SizedBox(height: 8),
       // F-48: Pix avulso — the no-recurrence rail. One single charge for one
       // period: no card on file, no auto-renew, renewing later is an explicit
-      // new payment (additive).
+      // new payment (additive). It follows the cycle chosen above.
       RichLabel.of(l, K.premAvulsoLead),
       OutlinedButton(
-        onPressed:
-            _billingBusy ? null : () => _startCheckout(l, 'monthly', avulso: true),
-        child: Text(l.format(K.premAvulsoMonthly, [monthly])),
-      ),
-      OutlinedButton(
-        onPressed:
-            _billingBusy ? null : () => _startCheckout(l, 'annual', avulso: true),
-        child: Text(l.format(K.premAvulsoAnnual, [annual])),
+        key: const ValueKey('premium-avulso'),
+        onPressed: _billingBusy
+            ? null
+            : () => _startCheckout(l, _offerCycle, avulso: true),
+        child: Text(l.format(K.premAvulsoButton, [price])),
       ),
       const SizedBox(height: 8),
       // F-48: trust signals on the payment surface — Pix first (no card data
