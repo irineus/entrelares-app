@@ -122,6 +122,29 @@ String formatPriceBrl(int cents) {
   return 'R\$ ${negative ? '-' : ''}$grouped,$centavos';
 }
 
+/// U-46: what the annual price works out to per month, in cents — the line
+/// under the big annual price ("equivale a R\$ 4,58/mês"). Rounds UP: a
+/// per-month figure is a marketing claim about a charge, and the safe error is
+/// to overstate it by a centavo, never to understate what the family pays.
+int monthlyEquivalentCents(int annualCents) => (annualCents + 11) ~/ 12;
+
+/// U-46: how many months the annual cycle gives away against twelve monthly
+/// charges — the "2 meses grátis" badge. Computed from the SAME `app_settings`
+/// prices the buttons charge, so the badge is a factual claim by construction:
+/// change the ratio in the database and the badge follows (or disappears)
+/// without a code change.
+///
+/// Zero when the annual price is not a whole number of monthly charges, or
+/// buys nothing back — an approximate saving is not a badge, it is a sentence
+/// nobody wrote, so the card shows no badge rather than a rounded one.
+int annualFreeMonths({required int monthlyCents, required int annualCents}) {
+  if (monthlyCents <= 0 || annualCents <= 0) return 0;
+  if (annualCents % monthlyCents != 0) return 0;
+  final chargedMonths = annualCents ~/ monthlyCents;
+  if (chargedMonths >= 12) return 0;
+  return 12 - chargedMonths;
+}
+
 /// When a canceled (or re-purchase-pending) subscription still has paid time,
 /// the date it runs until — the offer then announces "Premium ativo até X" and
 /// that a new subscription ADDS to that date (the webhook extends from the

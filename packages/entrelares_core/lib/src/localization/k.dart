@@ -516,11 +516,19 @@ abstract final class K {
   static const String premReactivateHintDate = 'prem.reactivate.hintDate';
   static const String premReactivateHintMethod = 'prem.reactivate.hintMethod';
   static const String premReactivateHintMethodDate = 'prem.reactivate.hintMethodDate';
-  static const String premSubscribeMonthly = 'prem.subscribe.monthly';
-  static const String premSubscribeAnnual = 'prem.subscribe.annual';
+  // U-46: the offer asks one question at a time — the cycle picker, the price
+  // card that follows the choice, ONE primary CTA and the Pix way underneath.
+  static const String premPickMonthly = 'prem.pick.monthly';
+  static const String premPickAnnual = 'prem.pick.annual';
+  static const String premPickSemantics = 'prem.pick.semantics';
+  static const String premPriceMonthly = 'prem.price.monthly';
+  static const String premPriceAnnual = 'prem.price.annual';
+  static const String premPriceEquivalent = 'prem.price.equivalent';
+  static const String premFreeMonthsOne = 'prem.freeMonths.one';
+  static const String premFreeMonthsMany = 'prem.freeMonths.many';
+  static const String premSubscribe = 'prem.subscribe';
   static const String premAvulsoLead = 'prem.avulso.lead';
-  static const String premAvulsoMonthly = 'prem.avulso.monthly';
-  static const String premAvulsoAnnual = 'prem.avulso.annual';
+  static const String premAvulsoButton = 'prem.avulso.button';
   static const String premPaymentHint = 'prem.paymentHint';
   static const String premGuarantee = 'prem.guarantee';
   static const String premAdminOnly = 'prem.adminOnly';
@@ -1543,11 +1551,17 @@ abstract final class K {
     premReactivateHintDate,
     premReactivateHintMethod,
     premReactivateHintMethodDate,
-    premSubscribeMonthly,
-    premSubscribeAnnual,
+    premPickMonthly,
+    premPickAnnual,
+    premPickSemantics,
+    premPriceMonthly,
+    premPriceAnnual,
+    premPriceEquivalent,
+    premFreeMonthsOne,
+    premFreeMonthsMany,
+    premSubscribe,
     premAvulsoLead,
-    premAvulsoMonthly,
-    premAvulsoAnnual,
+    premAvulsoButton,
     premPaymentHint,
     premGuarantee,
     premAdminOnly,

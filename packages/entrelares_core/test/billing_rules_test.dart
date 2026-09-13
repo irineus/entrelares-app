@@ -327,6 +327,30 @@ void main() {
     });
   });
 
+  group('U-46 price card', () {
+    test('the per-month equivalent of the annual price rounds UP', () {
+      // 5490 / 12 = 457.5 → R$ 4,58, never R$ 4,57: the safe error on a
+      // claim about a charge is to overstate it by a centavo.
+      expect(monthlyEquivalentCents(5490), 458);
+      expect(monthlyEquivalentCents(1200), 100);
+      expect(monthlyEquivalentCents(1201), 101);
+    });
+
+    test('the free-months badge is derived from the prices, not hardcoded', () {
+      // The F-48 promotional pair: annual = 10 × monthly → 2 months free.
+      expect(annualFreeMonths(monthlyCents: 549, annualCents: 5490), 2);
+      expect(annualFreeMonths(monthlyCents: 100, annualCents: 1100), 1);
+    });
+
+    test('no badge when the saving is not a whole number of months', () {
+      expect(annualFreeMonths(monthlyCents: 549, annualCents: 5000), 0);
+      // Twelve charges, or more, buy nothing back.
+      expect(annualFreeMonths(monthlyCents: 100, annualCents: 1200), 0);
+      expect(annualFreeMonths(monthlyCents: 100, annualCents: 1300), 0);
+      expect(annualFreeMonths(monthlyCents: 0, annualCents: 1300), 0);
+    });
+  });
+
   group('F-43 label keys', () {
     test('every timeline category maps to a key, unknown falls back', () {
       expect(historyCategoryKey('payment'), K.premHistoryPayment);
