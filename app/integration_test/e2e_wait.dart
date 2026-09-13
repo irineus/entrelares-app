@@ -40,3 +40,41 @@ Future<void> pumpUntilFound(
   }
   await tester.pumpAndSettle();
 }
+
+/// The other direction (T-71, measured 13/09/2026): pumps until [finder]
+/// matches NOTHING, or fails after [timeout] naming what stayed on screen.
+///
+/// Run 371 (`main`, same tree as the green run 372 beside it) died on the
+/// DATABASE assertion after the revoke tap: `tapVisible` had settled the
+/// frames, the test read `open invitations` from the server, and the row was
+/// still open — because `_revokeInvite` → `await revokeInvitation()` was
+/// still in flight. A still screen with a pending request returns from
+/// `pumpAndSettle` at once; under contention on the shared dev project (the
+/// db-gate had started 23 s earlier and a second web-e2e was running) the
+/// request took longer than the frames, and the test asserted a state the app
+/// had not been given the time to produce. The page refetches after the RPC
+/// (`_load()`), so the card leaving the screen is the signal that BOTH the
+/// request and the refetch completed — wait for that, then read the database.
+Future<void> pumpUntilGone(
+  WidgetTester tester,
+  Finder finder, {
+  required String reason,
+  Duration timeout = const Duration(seconds: 20),
+  Duration step = const Duration(milliseconds: 250),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (finder.evaluate().isNotEmpty) {
+    if (DateTime.now().isAfter(deadline)) {
+      final onScreen = find
+          .byType(Text)
+          .evaluate()
+          .map((e) => (e.widget as Text).data)
+          .whereType<String>()
+          .toList();
+      fail('$reason — ${finder.describeMatch(Plurality.one)} still on screen '
+          'after ${timeout.inSeconds}s | texts on screen: $onScreen');
+    }
+    await tester.pump(step);
+  }
+  await tester.pumpAndSettle();
+}

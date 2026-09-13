@@ -140,6 +140,16 @@ void main() {
     await tester.pumpAndSettle();
     await tapVisible(tester, find.text(l[K.famSendInvite]));
 
+    // T-58 hypothesis 4: the page REFETCHES after `create_invitation`
+    // (`_sendInvite` → `await _load()`), and `pumpAndSettle` cannot see a
+    // request in flight — run 355 attempt 1 died here with the row already in
+    // the database. Wait for the card, not for the frames — and BEFORE reading
+    // the database (T-71): the card on screen is the proof that the RPC the
+    // tap fired has returned, so a server read after it cannot race the write.
+    await pumpUntilFound(tester, find.text(l[K.famRevoke]),
+        reason: 'the invitation card must appear once the Família page '
+            'refetches after create_invitation');
+
     final created = await family.openInvitations();
     expect(created.where((i) => i['email'] == invitee), hasLength(1),
         reason: 'create_invitation wrote the row the UI asked for');
@@ -149,14 +159,17 @@ void main() {
         reason: 'F-56: the invitation is FOR the placeholder the form created');
 
     // ── Revoke ──
-    // T-58 hypothesis 4: the page REFETCHES after `create_invitation`
-    // (`_sendInvite` → `await _load()`), and `pumpAndSettle` cannot see a
-    // request in flight — run 355 attempt 1 died here with the row already in
-    // the database. Wait for the card, not for the frames.
-    await pumpUntilFound(tester, find.text(l[K.famRevoke]),
-        reason: 'the invitation card must appear once the Família page '
-            'refetches after create_invitation');
     await tapVisible(tester, find.text(l[K.famRevoke]).first);
+    // T-71 (run 371, 13/09/2026, same tree as the green run 372 beside it):
+    // the tap fires `_revokeInvite` → `await revokeInvitation()` → `_load()`,
+    // and `tapVisible` settles FRAMES, not the request — so with the dev
+    // project under load (a db-gate 23 s in, a second web-e2e alongside) the
+    // database was read while the RPC was still in flight and the row was
+    // still open. The card leaving the screen is the signal that the request
+    // and the refetch both completed; only then is the server state a fact.
+    await pumpUntilGone(tester, find.text(l[K.famRevoke]),
+        reason: 'the invitation card must leave the Família page once '
+            'revoke_invitation returns and the page refetches');
 
     expect(await family.openInvitations(), isEmpty,
         reason: 'revoke_invitation closed it');
