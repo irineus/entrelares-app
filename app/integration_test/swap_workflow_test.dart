@@ -46,7 +46,7 @@ void main() {
   // this process. See `bootApp` for why the answer cannot simply be asked.
   var appBooted = false;
 
-  setUpAll(() async {
+  provedSetUpAll(binding, () async {
     E2eFamily.requireKey();
     family = await E2eFamily.create(policyVersion: policyVersion);
     // A day the founder owns, comfortably inside the visible month.
