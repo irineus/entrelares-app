@@ -12,6 +12,7 @@ import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_deletion.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
+import 'package:entrelares_app/screens/family_delete_screen.dart';
 import 'package:entrelares_app/screens/family_screen.dart';
 import 'package:entrelares_app/screens/leaving_screen.dart';
 import 'package:entrelares_app/screens/policy_update_screen.dart';
@@ -72,7 +73,8 @@ FakeCustodyDataSource source({
       ..pendingDeletion = pending;
 
 Future<void> pumpFamily(WidgetTester tester, FakeCustodyDataSource ds,
-    {Future<void> Function()? onFamilyDeleted}) async {
+    {Future<void> Function()? onFamilyDeleted,
+    VoidCallback? onOpenDeletion}) async {
   await tester.binding.setSurfaceSize(const Size(800, 3000));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(AppL10n(
@@ -84,6 +86,24 @@ Future<void> pumpFamily(WidgetTester tester, FakeCustodyDataSource ds,
         adminMode: AdminMode(),
         sudo: SudoService(ds),
         onFamilyDeleted: onFamilyDeleted,
+        onOpenDeletion: onOpenDeletion,
+      ),
+    ),
+  ));
+  await tester.pumpAndSettle();
+}
+
+/// U-35: the request is its own page — the roster only offers the row.
+Future<void> pumpDelete(WidgetTester tester, FakeCustodyDataSource ds,
+    {VoidCallback? onRequested}) async {
+  await tester.pumpWidget(AppL10n(
+    l: Localization(AppLanguage.ptBr),
+    setLanguage: (_) async {},
+    child: MaterialApp(
+      home: FamilyDeleteScreen(
+        dataSource: ds,
+        sudo: SudoService(ds),
+        onRequested: onRequested,
       ),
     ),
   ));
@@ -104,12 +124,29 @@ void main() {
   final l = Localization(AppLanguage.ptBr);
 
   group('requesting the family deletion', () {
-    testWidgets('an admin with company may open it, behind two steps',
+    testWidgets('an admin with company is offered the row on the roster — '
+        'nothing destructive inline (U-35)', (tester) async {
+      var opened = false;
+      await pumpFamily(tester, source(), onOpenDeletion: () => opened = true);
+
+      final row = find.byKey(const ValueKey('family-delete-row'));
+      expect(row, findsOne);
+      expect(find.text(l[K.famDelReqOpen]), findsNothing,
+          reason: 'the danger zone is the sub-page\'s, never the roster\'s');
+
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(opened, isTrue);
+    });
+
+    testWidgets('the sub-page opens it behind two steps, then hands back',
         (tester) async {
       final ds = source();
-      await pumpFamily(tester, ds);
+      var handedBack = false;
+      await pumpDelete(tester, ds, onRequested: () => handedBack = true);
 
-      expect(find.text(l[K.famDelReqTitle]), findsOne);
+      // The danger zone's own title is the page's app bar too.
+      expect(find.text(l[K.famDelReqTitle]), findsWidgets);
       await tester.tap(find.text(l[K.famDelReqOpen]));
       await tester.pumpAndSettle();
       expect(find.text(l[K.famDelReqConfirmText]), findsOne);
@@ -121,19 +158,39 @@ void main() {
 
       expect(ds.deletionRequests, 1);
       expect(ds.accountEmails, contains('family_deletion_requested'));
+      expect(handedBack, isTrue,
+          reason: 'the countdown lives on the roster — the page returns there');
     });
 
-    testWidgets('a LONE member gets no request panel — they delete the family '
-        'by leaving instead', (tester) async {
-      await pumpFamily(tester, source(members: const [ana]));
+    testWidgets('a LONE member gets no row — they delete the family by '
+        'leaving instead', (tester) async {
+      await pumpFamily(tester, source(members: const [ana]),
+          onOpenDeletion: () {});
 
       expect(find.text(l[K.famDelReqTitle]), findsNothing);
     });
 
     testWidgets('a non-admin gets none either', (tester) async {
-      await pumpFamily(tester, source(members: const [bruno, ana]));
+      await pumpFamily(tester, source(members: const [bruno, ana]),
+          onOpenDeletion: () {});
 
       expect(find.text(l[K.famDelReqTitle]), findsNothing);
+    });
+
+    testWidgets('the sub-page reached by URL offers a lone member nothing, '
+        'and says so', (tester) async {
+      await pumpDelete(tester, source(members: const [ana]));
+
+      expect(find.text(l[KApp.famDelReqUnavailable]), findsOne);
+      expect(find.text(l[K.famDelReqOpen]), findsNothing);
+    });
+
+    testWidgets('a request already open closes the sub-page too — the panel '
+        'is the roster\'s', (tester) async {
+      await pumpDelete(tester, source(pending: deletion()));
+
+      expect(find.text(l[KApp.famDelReqUnavailable]), findsOne);
+      expect(find.text(l[K.famDelReqOpen]), findsNothing);
     });
   });
 

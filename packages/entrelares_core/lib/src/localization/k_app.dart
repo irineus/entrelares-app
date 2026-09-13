@@ -183,6 +183,20 @@ abstract final class KApp {
   static const String handoffOpen = 'app.handoff.open';
   static const String handoffDismiss = 'app.handoff.dismiss';
 
+  // ── U-35 Família split: the roster's three navigation rows and the pages
+  //    behind them. Row TITLES reuse what already names the thing (the
+  //    danger zone's `K.famDelReqTitle`); these are the words the split added.
+  static const String famPlanRow = 'app.fam.planRow';
+  static const String famPlanRowFree = 'app.fam.planRowFree';
+  static const String famPlanRowTrialOne = 'app.fam.planRowTrialOne';
+  static const String famPlanRowTrialMany = 'app.fam.planRowTrialMany';
+  static const String famPlanRowPremiumUntil = 'app.fam.planRowPremiumUntil';
+  static const String famPlanRowPremium = 'app.fam.planRowPremium';
+  static const String famAdminRow = 'app.fam.adminRow';
+  static const String famAdminRowOn = 'app.fam.adminRowOn';
+  static const String famAdminRowOff = 'app.fam.adminRowOff';
+  static const String famDelReqUnavailable = 'app.fam.delReqUnavailable';
+
   /// See `K.allKeys`.
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -286,6 +300,16 @@ abstract final class KApp {
     handoffBanner,
     handoffOpen,
     handoffDismiss,
+    famPlanRow,
+    famPlanRowFree,
+    famPlanRowTrialOne,
+    famPlanRowTrialMany,
+    famPlanRowPremiumUntil,
+    famPlanRowPremium,
+    famAdminRow,
+    famAdminRowOn,
+    famAdminRowOff,
+    famDelReqUnavailable,
   ];
 }
 
@@ -441,6 +465,18 @@ abstract final class StringsAppPtBr {
     KApp.handoffBanner: 'Você já tem o app neste aparelho.',
     KApp.handoffOpen: 'Abrir no app',
     KApp.handoffDismiss: 'Agora não',
+    // ── U-35 Família split ──
+    KApp.famPlanRow: 'Plano e pagamento',
+    KApp.famPlanRowFree: 'Gratuito',
+    KApp.famPlanRowTrialOne: 'Avaliação Premium — {0} dia restante',
+    KApp.famPlanRowTrialMany: 'Avaliação Premium — {0} dias restantes',
+    KApp.famPlanRowPremiumUntil: 'Premium até {0}',
+    KApp.famPlanRowPremium: 'Premium',
+    KApp.famAdminRow: 'Modo administrador',
+    KApp.famAdminRowOn: 'Ativo',
+    KApp.famAdminRowOff: 'Desativado',
+    KApp.famDelReqUnavailable:
+        'Não há pedido de exclusão para abrir aqui. Só um administrador com outros responsáveis na família pode abrir um — e um pedido já aberto aparece na tela Família.',
   };
 }
 
@@ -592,5 +628,17 @@ abstract final class StringsAppEn {
     KApp.handoffBanner: 'You already have the app on this device.',
     KApp.handoffOpen: 'Open in the app',
     KApp.handoffDismiss: 'Not now',
+    // ── U-35 Família split ──
+    KApp.famPlanRow: 'Plan and payment',
+    KApp.famPlanRowFree: 'Free',
+    KApp.famPlanRowTrialOne: 'Premium trial — {0} day left',
+    KApp.famPlanRowTrialMany: 'Premium trial — {0} days left',
+    KApp.famPlanRowPremiumUntil: 'Premium until {0}',
+    KApp.famPlanRowPremium: 'Premium',
+    KApp.famAdminRow: 'Administrator mode',
+    KApp.famAdminRowOn: 'On',
+    KApp.famAdminRowOff: 'Off',
+    KApp.famDelReqUnavailable:
+        'There is no deletion request to open here. Only an administrator with other caregivers in the family can open one — and an open request shows on the Família screen.',
   };
 }

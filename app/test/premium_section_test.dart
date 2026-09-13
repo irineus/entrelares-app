@@ -1,4 +1,5 @@
-// The Premium section of the Família page — the T-39 state machine on screen.
+// The plan page (`/family/plan`, U-35 — the Premium section of Família until
+// then) — the T-39 state machine on screen.
 //
 // What makes this worth its own suite: the six blocks say different things
 // about MONEY, and the wrong one is not a cosmetic bug. A canceled family that
@@ -21,10 +22,8 @@ import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
 import 'package:entrelares_db_contracts/models/subscription.dart';
-import 'package:entrelares_app/screens/family_screen.dart';
-import 'package:entrelares_app/services/admin_mode.dart';
+import 'package:entrelares_app/screens/family_plan_screen.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
-import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/ui/ui.dart';
 
@@ -114,9 +113,9 @@ final Finder _subscribe = find.byKey(const ValueKey('premium-subscribe'));
 final Finder _avulso = find.byKey(const ValueKey('premium-avulso'));
 final Finder _priceCard = find.byKey(const ValueKey('premium-price-card'));
 
-/// The Premium section's column — the nearest one above the price card, so a
-/// count of buttons inside it is a count of the OFFER's buttons and never of
-/// the roster's or the danger zone's.
+/// The offer's column — the nearest one above the price card, so a count of
+/// buttons inside it is a count of the OFFER's buttons and never of the
+/// page's chrome.
 Finder get _offer =>
     find.ancestor(of: _priceCard, matching: find.byType(Column)).first;
 
@@ -176,10 +175,8 @@ Future<void> _pump(
     l: Localization(language),
     setLanguage: (_) async {},
     child: MaterialApp(
-      home: FamilyScreen(
+      home: FamilyPlanScreen(
         dataSource: ds,
-        adminMode: AdminMode(),
-        sudo: SudoService(ds),
         isStoreChannel: store,
         analytics: funnel?.service,
         openExternal: opened == null
@@ -819,6 +816,7 @@ void main() {
   });
 
   group('funnel (T-37)', () {
+    // U-35: "visit" is a visit to THIS page — the roster no longer counts.
     testWidgets('the paywall view fires once per visit, only on the offer',
         (tester) async {
       final funnel = _Funnel();
@@ -842,21 +840,6 @@ void main() {
       );
 
       expect(funnel.count('premium-paywall-view'), 0);
-    });
-
-    testWidgets('the F-37 gate CTA records the intent and scrolls, no price',
-        (tester) async {
-      final funnel = _Funnel();
-      await _pump(
-        tester,
-        _source(settings: {..._billingOn, 'freemium.free_caregivers': '2'}),
-        funnel: funnel,
-      );
-
-      await tester.tap(_text(l[K.famSeePremium]));
-      await tester.pumpAndSettle();
-
-      expect(funnel.dataOf('premium-gate-click'), {'gate': 'extra-caregiver'});
     });
 
     testWidgets('the store cohort is tagged as store, not web', (tester) async {

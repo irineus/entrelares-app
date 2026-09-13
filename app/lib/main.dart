@@ -18,6 +18,9 @@ import 'env.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'screens/calendar_screen.dart';
 import 'screens/custom_roles_screen.dart';
+import 'screens/family_admin_mode_screen.dart';
+import 'screens/family_delete_screen.dart';
+import 'screens/family_plan_screen.dart';
 import 'screens/family_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/leaving_screen.dart';
@@ -311,7 +314,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         builder: (_, _) => PremiumReturnScreen(
           dataSource: _dataSource,
           analytics: _analytics,
-          onBackToFamily: () => _router.go('/family'),
+          // U-35: back to where the plan state lives now.
+          onBackToFamily: () => _router.go('/family/plan'),
         ),
       ),
       GoRoute(
@@ -352,7 +356,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   onOpenNotifications: () => _router.go('/notifications')),
             ),
           ]),
-          StatefulShellBranch(routes: [
+          // U-35: the branch's navigator reports to the roster's observer, so
+          // a sub-page popping back reloads what its row summarises.
+          StatefulShellBranch(observers: [familyRouteObserver], routes: [
             GoRoute(
               path: '/family',
               builder: (_, _) => FamilyScreen(
@@ -360,13 +366,16 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                 adminMode: _adminMode,
                 analytics: _analytics,
                 sudo: _sudo,
-                storeBilling: _storeBilling,
                 onFamilyDeleted: _signOut,
                 onOpenCustomRoles: () => _router.go('/family/custom-roles'),
                 // F-16: own card opens my profile; another member's opens
                 // theirs, and the screen itself re-checks that I may look.
                 onOpenProfile: (member, isOwn) => _router.go(
                     isOwn ? '/family/profile' : '/family/profile/${member.id}'),
+                // U-35: the three sub-pages behind the roster's rows.
+                onOpenPlan: () => _router.go('/family/plan'),
+                onOpenAdminMode: () => _router.go('/family/admin-mode'),
+                onOpenDeletion: () => _router.go('/family/delete'),
               ),
               routes: [
                 // Nested so the bottom bar stays put — the web navigates away
@@ -377,7 +386,36 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   builder: (_, _) => CustomRolesScreen(
                     dataSource: _dataSource,
                     analytics: _analytics,
-                    onSeePremium: () => _router.go('/family'),
+                    // U-35: every gate CTA lands on the plan page.
+                    onSeePremium: () => _router.go('/family/plan'),
+                  ),
+                ),
+                // U-35: what used to be three sections of the Família scroll.
+                GoRoute(
+                  path: 'plan',
+                  builder: (_, _) => FamilyPlanScreen(
+                    dataSource: _dataSource,
+                    analytics: _analytics,
+                    storeBilling: _storeBilling,
+                  ),
+                ),
+                GoRoute(
+                  path: 'admin-mode',
+                  builder: (_, _) => FamilyAdminModeScreen(
+                    dataSource: _dataSource,
+                    adminMode: _adminMode,
+                    analytics: _analytics,
+                    onOpenPlan: () => _router.go('/family/plan'),
+                  ),
+                ),
+                GoRoute(
+                  path: 'delete',
+                  builder: (_, _) => FamilyDeleteScreen(
+                    dataSource: _dataSource,
+                    sudo: _sudo,
+                    // The countdown lives on the roster: back to it, which
+                    // reloads on the pop (familyRouteObserver).
+                    onRequested: () => _router.go('/family'),
                   ),
                 ),
                 GoRoute(
