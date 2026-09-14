@@ -28,7 +28,10 @@ set -euo pipefail
 dsn="${1:?usage: ops_alert.sh <dsn> <failed jobs> <run url> <sha>}"
 jobs="${2:?usage: ops_alert.sh <dsn> <failed jobs> <run url> <sha>}"
 run_url="${3:?usage: ops_alert.sh <dsn> <failed jobs> <run url> <sha>}"
-sha="${4:?usage: ops_alert.sh <dsn> <failed jobs> <run url> <sha>}"
+sha="${4:?usage: ops_alert.sh <dsn> <failed jobs> <run url> <sha> [published]}"
+# T-73: `true` when `smoke_web.sh` proved the commit is served, so the red came
+# from a check AFTER the publish. Absent means what it always meant.
+published="${5:-}"
 
 # https://<key>@<host>/<project>
 key="${dsn#https://}"; key="${key%%@*}"
@@ -40,7 +43,13 @@ short="${sha:0:7}"
 
 # PT-BR because a human reads it at whatever hour it fires, and this repo already
 # writes its run summaries that way. Code and comments stay English.
-title="main vermelha em $short: $jobs — web.entrelares.app não publicou"
+if [ "$published" = "true" ]; then
+  title="main vermelha em $short: $jobs — web.entrelares.app publicou, mas serve script que a CSP recusa"
+  consequence="O merge CHEGOU a web.entrelares.app. A página servida carrega um script que a própria CSP bloqueia — injeção de borda até prova em contrário (T-73)."
+else
+  title="main vermelha em $short: $jobs — web.entrelares.app não publicou"
+  consequence="O merge NÃO chegou a web.entrelares.app. O canal segue servindo o build anterior."
+fi
 
 # The fingerprint carries the SHA on purpose. Grouping by job alone would make
 # the SECOND incident land inside an existing issue, and an issue that is open
@@ -50,6 +59,7 @@ title="main vermelha em $short: $jobs — web.entrelares.app não publicou"
 event=$(jq -nc \
   --arg id "$event_id" --arg ts "$now" --arg title "$title" \
   --arg jobs "$jobs" --arg run "$run_url" --arg sha "$sha" --arg short "$short" \
+  --arg consequence "$consequence" \
   '{
     event_id: $id, timestamp: $ts, platform: "other", level: "error",
     environment: "prod", logger: "ci",
@@ -58,7 +68,7 @@ event=$(jq -nc \
     tags: { channel: "ci", workflow: "verify", job: $jobs, branch: "main", commit: $short },
     extra: {
       run_url: $run,
-      consequencia: "O merge NÃO chegou a web.entrelares.app. O canal segue servindo o build anterior.",
+      consequencia: $consequence,
       item: "T-68"
     }
   }')

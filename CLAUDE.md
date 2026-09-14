@@ -145,8 +145,12 @@ cd app && fvm flutter build apk --debug --flavor dev --split-per-abi
 # Canal web: os dois flags NÃO são opcionais — sem o define o build aponta para o
 # banco de QA, e sem o --no-web-resources-cdn o CanvasKit vem do gstatic.
 cd app && fvm flutter build web --release --no-web-resources-cdn --dart-define=APP_ENV=prod
-# O DEPLOY faz CINCO coisas a mais que este comando local. Três são do T-66
-# (runbook §13.6) e duas do T-68 (runbook §14): carimba `build/web/build-id.txt`
+# O DEPLOY faz SEIS coisas a mais que este comando local. Três são do T-66
+# (runbook §13.6), duas do T-68 (runbook §14) e uma do T-73 (runbook §14.7):
+# depois da prova, lê a página servida pedindo HTML como um navegador pede e
+# recusa todo script externo de host que o `script-src` SERVIDO bloqueia — a
+# borda do Cloudflare injetava um beacon de Web Analytics que o web_channel_test,
+# que só lê fonte, nunca teria como ver. As duas do T-68: carimba `build/web/build-id.txt`
 # com o `$GITHUB_SHA` logo antes do upload e, DEPOIS de publicar, lê esse
 # arquivo de volta de `web.entrelares.app` e compara o corpo — porque o código
 # de saída 0 do `wrangler` não é prova, e porque `_redirects` responde 200 com o

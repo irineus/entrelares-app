@@ -599,6 +599,11 @@ jobs:
       # guess — `web_channel_test` pins it against `Env.prod.webHostname`, the
       # same string the app believes it is served from.
       WEB_HOSTNAME: web.entrelares.app
+    # T-73: `ops-alert` reads this to tell "the channel did not publish" from
+    # "it published, and a check AFTER the proof went red". Saying the first
+    # when the second happened is an alarm that lies about its own incident.
+    outputs:
+      published: ${{ steps.proof.outputs.published }}
     steps:
       - uses: actions/checkout@v4
       - name: Read Flutter version from .fvmrc
@@ -701,8 +706,19 @@ jobs:
       # for a file that is not there, so a `curl -f` check would pass over the
       # void.
       - name: Prove the channel is serving THIS commit
+        id: proof
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: bash .github/smoke_web.sh "https://${{ env.WEB_HOSTNAME }}" "$GITHUB_SHA"
+      # T-73 — `web_channel_test` proves the CSP against what the SOURCE
+      # references; it cannot see what the edge adds after the build. On
+      # 14/09/2026 Cloudflare Web Analytics was appending a beacon the CSP blocks
+      # on every load. This reads the page as a browser asks for it and refuses
+      # a script the SERVED policy would refuse. After the proof on purpose: it
+      # is a property of what is being served, and it only means something once
+      # THIS commit is what is being served.
+      - name: Refuse a served script the CSP would block
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: bash .github/smoke_web_csp.sh "https://${{ env.WEB_HOSTNAME }}"
       - name: Say why nothing was published
         if: env.CLOUDFLARE_API_TOKEN == ''
         run: |
@@ -746,6 +762,10 @@ jobs:
       # and the PRODUCTION project on purpose: the dev project's alert rule is
       # disabled (runbook §13.5), so an alert sent there wakes nobody.
       SENTRY_DSN_PROD: https://207fdf4ae55dd391583ecaa369b3319b@o4511910022217728.ingest.us.sentry.io/4512066983231488
+      # T-73: `true` only when `smoke_web.sh` PROVED this commit is served —
+      # then the red is a check after the proof (the served-CSP guard), and
+      # every message below says the channel published. Empty otherwise.
+      PUBLISHED: ${{ needs.deploy-web.outputs.published }}
     steps:
       - uses: actions/checkout@v4
       - name: Name the jobs that failed
@@ -756,8 +776,13 @@ jobs:
           jobs=$(printf '%s' "$NEEDS" \
             | jq -r 'to_entries | map(select(.value.result == "failure") | .key) | join(", ")')
           echo "jobs=$jobs" >> "$GITHUB_OUTPUT"
-          echo "### 🚨 \`main\` vermelha — o canal web NÃO publicou" >> "$GITHUB_STEP_SUMMARY"
-          echo "Falharam: \`$jobs\`. O merge \`${GITHUB_SHA:0:7}\` não chegou a \`web.entrelares.app\`." >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PUBLISHED" = "true" ]; then
+            echo "### 🚨 \`main\` vermelha — o canal PUBLICOU, mas serve script que a CSP recusa" >> "$GITHUB_STEP_SUMMARY"
+            echo "Falharam: \`$jobs\`. O merge \`${GITHUB_SHA:0:7}\` chegou a \`web.entrelares.app\`; o passo *Refuse a served script the CSP would block* diz qual script." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### 🚨 \`main\` vermelha — o canal web NÃO publicou" >> "$GITHUB_STEP_SUMMARY"
+            echo "Falharam: \`$jobs\`. O merge \`${GITHUB_SHA:0:7}\` não chegou a \`web.entrelares.app\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
       # The alert. Sentry's project alert rule ("high priority issues") e-mails
       # the owner — measured 11/09/2026 with a probe event of this exact shape:
       # 46 seconds from POST to inbox, subject carrying `PipelineFailure`.
@@ -767,7 +792,8 @@ jobs:
             "$SENTRY_DSN_PROD" \
             "${{ steps.failed.outputs.jobs }}" \
             "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            "$GITHUB_SHA"
+            "$GITHUB_SHA" \
+            "$PUBLISHED"
       # The durable record. An e-mail is read once and scrolls away; this stays
       # OPEN until a human closes it, which is what a "production is not
       # publishing" item needs. `always()` so a Sentry outage does not take the
@@ -788,6 +814,18 @@ jobs:
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "Nova tentativa, mesma falha: \`$jobs\` — $run_url"
             echo "Registro atualizado: #$existing"
+          elif [ "$PUBLISHED" = "true" ]; then
+            gh issue create \
+              --title "$marker — o canal publicou, mas serve script que a CSP recusa" \
+              --body "$(printf '%s\n' \
+                "O merge \`$short\` **chegou a \`web.entrelares.app\`** (o passo *Prove the channel is serving THIS commit* provou), mas a página servida carrega um script que a própria CSP bloqueia." \
+                "" \
+                "- Jobs vermelhos: \`$jobs\`" \
+                "- Run: $run_url — o passo *Refuse a served script the CSP would block* nomeia o script e o host." \
+                "" \
+                "Host que nenhum arquivo do repo cita é injeção de BORDA — o T-73 foi o Web Analytics do Cloudflare. Desligar na borda, não alargar a CSP (T-62: nada de código executável de terceiro)." \
+                "" \
+                "Fechar esta issue quando um run verde em \`main\` passar por esse passo." )"
           else
             gh issue create \
               --title "$marker — o canal web não publicou" \
