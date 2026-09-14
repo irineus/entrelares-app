@@ -88,6 +88,12 @@ class HomeShell extends StatelessWidget {
   /// reason [deletionBanner] gives.
   final ValueListenable<AppHandoffBanner?>? appHandoff;
 
+  /// T-18: the "Sem conexão · dados de HH:mm" strip. Above every tab because
+  /// connectivity is a fact about the app, and because the calendar is not the
+  /// only screen whose data stops being current. Listened to for the reason
+  /// [deletionBanner] gives — the network drops long after the shell mounted.
+  final ValueListenable<ConnectivitySnapshot>? connectivity;
+
   /// U-23: the notifications tab is the tour's fourth stop, and it lives here
   /// rather than in any screen — so the key registry is shared.
   final TourKeys? tourKeys;
@@ -102,6 +108,7 @@ class HomeShell extends StatelessWidget {
       required this.onOpenProfile,
       this.deletionBanner,
       this.appHandoff,
+      this.connectivity,
       this.tourKeys});
 
   @override
@@ -171,6 +178,13 @@ class HomeShell extends StatelessWidget {
                 builder: (context, handoff, _) => handoff == null
                     ? const SizedBox.shrink()
                     : _handoffBanner(context, l, handoff),
+              ),
+            if (connectivity != null)
+              ValueListenableBuilder<ConnectivitySnapshot>(
+                valueListenable: connectivity!,
+                builder: (context, snapshot, _) => !snapshot.offline
+                    ? const SizedBox.shrink()
+                    : _offlineStrip(context, l, snapshot),
               ),
             Expanded(
               child: AccountScope(
@@ -292,6 +306,43 @@ class HomeShell extends StatelessWidget {
                 icon: const Icon(Icons.close, size: 18),
                 color: tone.onContainer,
                 tooltip: l[KApp.handoffDismiss],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// T-18 — the `warning` tone: not the danger of the two banners above (the
+  /// reader did nothing wrong and nothing is lost), not the quiet `info` of
+  /// an offer either — what is on screen may no longer be the plan, and the
+  /// sentence says since when. No close button: the strip leaves on its own
+  /// the moment the server answers again, and a dismissed strip over an old
+  /// plan is the exact mistake it exists to prevent.
+  Widget _offlineStrip(
+      BuildContext context, Localization l, ConnectivitySnapshot snapshot) {
+    final tone = context.tokens.warning;
+    return Material(
+      key: const Key('offline-strip'),
+      color: tone.container,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              Icon(Icons.cloud_off_outlined, size: 16, color: tone.onContainer),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  offlineStripText(l,
+                      dataAsOf: snapshot.dataAsOf?.toLocal(),
+                      now: DateTime.now()),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: tone.onContainer, fontSize: 13),
+                ),
               ),
             ],
           ),

@@ -13,6 +13,7 @@ export 'src/auth_rules.dart';
 export 'src/bulk_rules.dart';
 export 'src/calendar_rules.dart';
 export 'src/channel_handoff_rules.dart';
+export 'src/connectivity_rules.dart';
 export 'src/consent_declarations.dart';
 export 'src/crash_rules.dart';
 export 'src/custom_role_rules.dart';

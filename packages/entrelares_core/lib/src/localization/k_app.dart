@@ -195,6 +195,12 @@ abstract final class KApp {
   static const String handoffOpen = 'app.handoff.open';
   static const String handoffDismiss = 'app.handoff.dismiss';
 
+  // ── T-18 offline strip. Says how OLD what is on screen is, never just
+  //    "offline" — an undated old plan reads as the current one. ──
+  static const String offlineStrip = 'app.offline.strip';
+  static const String offlineStripNoData = 'app.offline.stripNoData';
+  static const String offlineMonthNotLoaded = 'app.offline.monthNotLoaded';
+
   // ── U-35 Família split: the roster's three navigation rows and the pages
   //    behind them. Row TITLES reuse what already names the thing (the
   //    danger zone's `K.famDelReqTitle`); these are the words the split added.
@@ -318,6 +324,9 @@ abstract final class KApp {
     handoffBanner,
     handoffOpen,
     handoffDismiss,
+    offlineStrip,
+    offlineStripNoData,
+    offlineMonthNotLoaded,
     famPlanRow,
     famPlanRowFree,
     famPlanRowTrialOne,
@@ -494,6 +503,10 @@ abstract final class StringsAppPtBr {
     KApp.handoffBanner: 'Você já tem o app neste aparelho.',
     KApp.handoffOpen: 'Abrir no app',
     KApp.handoffDismiss: 'Agora não',
+    KApp.offlineStrip: 'Sem conexão · dados de {0}',
+    KApp.offlineStripNoData: 'Sem conexão · nada carregado ainda',
+    KApp.offlineMonthNotLoaded:
+        'Sem conexão — este mês ainda não foi carregado neste aparelho.',
     // ── U-35 Família split ──
     KApp.famPlanRow: 'Plano e pagamento',
     KApp.famPlanRowFree: 'Gratuito',
@@ -668,6 +681,10 @@ abstract final class StringsAppEn {
     KApp.handoffBanner: 'You already have the app on this device.',
     KApp.handoffOpen: 'Open in the app',
     KApp.handoffDismiss: 'Not now',
+    KApp.offlineStrip: 'Offline · data from {0}',
+    KApp.offlineStripNoData: 'Offline · nothing loaded yet',
+    KApp.offlineMonthNotLoaded:
+        'Offline — this month has not been loaded on this device yet.',
     // ── U-35 Família split ──
     KApp.famPlanRow: 'Plan and payment',
     KApp.famPlanRowFree: 'Free',

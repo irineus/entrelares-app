@@ -13,6 +13,7 @@ import 'package:entrelares_db_contracts/models/role.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
 import '../services/admin_mode.dart';
 import '../services/analytics_service.dart';
+import '../services/connectivity_status.dart';
 import '../services/custody_data_source.dart';
 import '../theme/slot_pattern.dart';
 import '../theme/tokens.dart';
@@ -67,6 +68,11 @@ SlotColors _slotOf(BuildContext context, DayPaint paint) => switch (paint) {
 class CalendarScreen extends StatefulWidget {
   final CustodyDataSource dataSource;
 
+  /// T-18 — the app's connectivity state. The calendar dates what it shows
+  /// here (the strip names that moment) and reloads the moment the server
+  /// answers again. Null in tests that do not exercise it.
+  final ConnectivityStatus? connectivity;
+
   /// T-37 — optional, and only passed through to the wizard.
   final AnalyticsService? analytics;
   final AdminMode adminMode;
@@ -89,6 +95,7 @@ class CalendarScreen extends StatefulWidget {
       {super.key,
       required this.dataSource,
       required this.adminMode,
+      this.connectivity,
       this.onboarding,
       this.tourKeys,
       this.analytics,
@@ -128,6 +135,12 @@ class _CalendarScreenState extends State<CalendarScreen>
   Map<String, SwapRequest> _frozenByIso = const {};
   bool _loading = true;
   String? _loadError;
+
+  /// T-18: the month [_daysByIso] and [_frozenByIso] were last read for.
+  /// Offline, a failed reload of THAT month keeps what is on screen — the strip
+  /// dates it — while any other month has nothing to show and says so.
+  DateTime? _loadedMonth;
+  bool _wasOffline = false;
   void Function()? _unwatch;
   void Function()? _unwatchWorkflow;
 
@@ -185,6 +198,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     // passos" ping this — the State lives on in the tab stack, so nothing
     // else runs when the user lands back.
     widget.onboarding?.addListener(_onOnboardingPing);
+    _wasOffline = widget.connectivity?.offline ?? false;
+    widget.connectivity?.addListener(_onConnectivityChanged);
     _load();
     _loadHorizonInputs();
     _watch();
@@ -219,6 +234,16 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (mounted) setState(() {});
   }
 
+  /// T-18 — refresh on reconnect. Any response from the server (another tab's
+  /// read, the badge, a push registration) ends the offline state, and the plan
+  /// on screen is the first thing that should stop being old.
+  void _onConnectivityChanged() {
+    final offline = widget.connectivity!.offline;
+    final reconnected = _wasOffline && !offline;
+    _wasOffline = offline;
+    if (reconnected && mounted) _load(silent: true);
+  }
+
   /// Defensive like the web: neither read may break the calendar — entitlement
   /// falls to premium, settings to the seeded fallbacks (no wrongful block).
   Future<void> _loadHorizonInputs() async {
@@ -251,6 +276,11 @@ class _CalendarScreenState extends State<CalendarScreen>
       },
       onStatus: (connected) {
         if (!mounted) return;
+        // T-18: the socket coming back while the app is offline is the first
+        // sign of the network — try the plan now instead of at the next poll.
+        if (connected && (widget.connectivity?.offline ?? false)) {
+          _load(silent: true);
+        }
         if (connected != _socketConnected) {
           _socketConnected = connected;
           if (_pollTimer != null) _schedulePoll();
@@ -269,6 +299,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     WidgetsBinding.instance.removeObserver(this);
     widget.adminMode.removeListener(_onAdminModeChanged);
     widget.onboarding?.removeListener(_onOnboardingPing);
+    widget.connectivity?.removeListener(_onConnectivityChanged);
     _unwatch?.call();
     _unwatchWorkflow?.call();
     _pollTimer?.cancel();
@@ -281,6 +312,9 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Future<void> _load({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
+    // Captured once: a swipe during the load must not date one month's rows
+    // as another's.
+    final month = _visibleMonth;
     try {
       final members = await widget.dataSource.fetchMembers();
       // Best-effort: a family whose roles fail to load still gets its
@@ -289,10 +323,9 @@ class _CalendarScreenState extends State<CalendarScreen>
       try {
         roles = await widget.dataSource.fetchRoles();
       } catch (_) {/* keep whatever we had */}
-      final days = await widget.dataSource
-          .fetchMonth(_visibleMonth.year, _visibleMonth.month);
+      final days = await widget.dataSource.fetchMonth(month.year, month.month);
       final frozen = await widget.dataSource
-          .fetchFrozenRequestsForMonth(_visibleMonth.year, _visibleMonth.month);
+          .fetchFrozenRequestsForMonth(month.year, month.month);
       final ownProfile = await widget.dataSource.fetchOwnProfile();
       final upcoming = await widget.dataSource
           .fetchUpcoming(_today, nextHandoffWindowDays + 1);
@@ -310,9 +343,11 @@ class _CalendarScreenState extends State<CalendarScreen>
         };
         _ownProfile = ownProfile;
         _upcoming = upcoming;
+        _loadedMonth = month;
         _loading = false;
         _loadError = null;
       });
+      widget.connectivity?.loadedData(DateTime.now());
       // U-28: the account button in every tab's app bar wears this.
       AccountScope.identityOf(context)?.adopt(
           fullName: ownProfile?.fullName, colorSlot: ownProfile?.colorSlot);
@@ -320,11 +355,26 @@ class _CalendarScreenState extends State<CalendarScreen>
     } catch (e) {
       if (!mounted) return;
       final l = AppL10n.of(context).l;
+      final raw = e.toString();
+      final offline = isNetworkFailure(raw);
+      final monthOnScreen = _loadedMonth != null &&
+          _loadedMonth!.year == month.year &&
+          _loadedMonth!.month == month.month;
       setState(() {
         _loading = false;
-        _loadError = isSessionExpired(e.toString())
+        // T-18: before, the F-23 poll's first failure with no signal replaced
+        // a perfectly good month with an error banner — the calendar went
+        // blank at the exact moment the reader needed it. What was read stays;
+        // the shell's strip says how old it is.
+        if (offline && monthOnScreen) {
+          _loadError = null;
+          return;
+        }
+        _loadError = isSessionExpired(raw)
             ? sessionExpiredMessage(l)
-            : l[KApp.errCalendarLoad];
+            : offline
+                ? l[KApp.offlineMonthNotLoaded]
+                : l[KApp.errCalendarLoad];
       });
     }
   }

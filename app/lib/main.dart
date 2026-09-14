@@ -40,6 +40,7 @@ import 'services/account_identity.dart';
 import 'services/admin_mode.dart';
 import 'services/analytics_service.dart';
 import 'services/boot_handoff.dart';
+import 'services/connectivity_status.dart';
 import 'services/auth_providers.dart';
 import 'services/crash_reporter.dart';
 import 'services/custody_data_source.dart';
@@ -56,6 +57,14 @@ import 'widgets/app_l10n.dart';
 import 'widgets/app_width_cap.dart';
 import 'widgets/app_splash.dart';
 import 'widgets/onboarding.dart';
+
+/// T-18 — the app's one connectivity state, fed by [ConnectivityHttpClient].
+///
+/// Process-wide rather than a field of the app's State for the same reason
+/// `Supabase.initialize` is guarded below: the client is handed to the
+/// singleton ONCE, and a boot that re-runs `main()` (the E2E harness switching
+/// users) must keep reporting to the instance that client already holds.
+final ConnectivityStatus appConnectivity = ConnectivityStatus();
 
 /// Whether [usePathUrlStrategy] already ran in this PAGE. See its call site.
 bool _urlStrategyApplied = false;
@@ -107,9 +116,12 @@ Future<void> main() async {
   // key prod already has, so the S-16 shape ports for free (stage 0).
   // Incoming App Links with auth tokens (recovery) are consumed here too:
   // supabase_flutter parses them and emits `passwordRecovery`.
+  // T-18: every exchange with Supabase reports to [appConnectivity] — the one
+  // place the app learns whether it can reach the server at all.
   await Supabase.initialize(
     url: Env.current.supabaseUrl,
     publishableKey: Env.current.supabaseKey,
+    httpClient: ConnectivityHttpClient(appConnectivity),
   );
   // U-13: the language is resolved BEFORE the first frame — override beats
   // profile beats device, PT-BR fallback. The profile half is null here (no
@@ -341,6 +353,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
             onOpenProfile: () => _router.go('/family/profile'),
             deletionBanner: _deletionBanner,
             appHandoff: _appHandoff,
+            connectivity: appConnectivity,
             tourKeys: _tourKeys),
         branches: [
           StatefulShellBranch(routes: [
@@ -348,6 +361,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
               path: '/',
               builder: (_, _) => CalendarScreen(
                   dataSource: _dataSource,
+                  connectivity: appConnectivity,
                   adminMode: _adminMode,
                   analytics: _analytics,
                   onboarding: _onboarding,
@@ -576,6 +590,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _sudo = SudoService(_dataSource);
     _onboarding = OnboardingService(_dataSource, push: _push);
     _l = Localization(widget.initialLanguage);
+    appConnectivity.addListener(_onConnectivityChanged);
     _openGate();
     _authSub = _client.auth.onAuthStateChange.listen((state) {
       switch (state.event) {
@@ -607,12 +622,19 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         default:
           break;
       }
-    });
+    },
+        // T-18: gotrue reports a refresh that could not reach the server as an
+        // ERROR on this stream, and keeps the session. With no handler it
+        // becomes an uncaught error — a crash report per failed refresh for a
+        // reader who merely has no signal. The refusal that matters arrives as
+        // `signedOut` above; a transport failure is the strip's to show.
+        onError: (Object _) {});
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    appConnectivity.removeListener(_onConnectivityChanged);
     _authSub?.cancel();
     if (_routerLive) {
       _router.routeInformationProvider.removeListener(_trackPageView);
@@ -655,6 +677,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     if (phase != _AuthPhase.authed) {
       _adminMode.deactivate();
       _sudo.reset();
+      // T-18: the age the strip names belongs to what THIS person saw.
+      appConnectivity.forgetData();
+      _profileGatesDeferred = false;
     }
     if (phase == _AuthPhase.authed) {
       _lastInteraction = DateTime.now();
@@ -763,12 +788,22 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     // refreshSession() BEFORE routing (Blazor got this for free via
     // forceLoad; Flutter has no equivalent).
     final hadSession = _client.auth.currentSession != null;
-    final alive = await _gate.validateRestoredSession();
+    // T-18: a refresh that cannot reach the server keeps the session and opens
+    // the app offline; only a refusal lands on login.
+    final verdict = await _gate.validateRestoredSession(
+        networkLost: appConnectivity.nextLoss());
     if (!mounted) return;
+    final alive = verdict != RestoredSession.signedOut;
     _expiredReason = !alive && hadSession
         ? SessionExpiredReason.restored
         : SessionExpiredReason.none;
-    if (alive) {
+    if (verdict == RestoredSession.offline) {
+      // T-18: the profile read would only spend postgrest's retries (~7 s)
+      // under the splash to fail anyway. Open on what the device has; the
+      // gates the profile decides settle at the first server response.
+      _setPhase(_AuthPhase.authed);
+      _deferProfileGates();
+    } else if (alive) {
       // The splash stays up while the profile decides the phase — the shell
       // must never flash for a session that turns out to be onboarding.
       await _resolveAuthedPhase();
@@ -824,10 +859,55 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         return;
       }
       _setPhase(_AuthPhase.authed);
-      if (me != null) await _applyProfileGates(me);
+      if (me != null) {
+        await _applyProfileGates(me);
+      } else {
+        _deferProfileGates();
+      }
     } finally {
       _resolvingPhase = false;
     }
+  }
+
+  /// T-18 — the profile could not be read when the session opened, so the
+  /// S-11/S-15 gates, the onboarding verdict and push registration were never
+  /// decided. Before T-18 that was a rare transient; now that a restored
+  /// session opens OFFLINE on purpose it is the normal path at the school door,
+  /// and leaving it undecided would skip the S-15 consent gate for the whole
+  /// process. The first server response settles it.
+  bool _profileGatesDeferred = false;
+
+  void _deferProfileGates() {
+    _profileGatesDeferred = true;
+    // The server may already have answered between the failed read and this
+    // line — then no transition is coming to wake the listener.
+    _onConnectivityChanged();
+  }
+
+  void _onConnectivityChanged() {
+    if (appConnectivity.offline || !_profileGatesDeferred) return;
+    if (_phase != _AuthPhase.authed) return;
+    _profileGatesDeferred = false;
+    unawaited(_settleDeferredProfileGates());
+  }
+
+  Future<void> _settleDeferredProfileGates() async {
+    final Member? me;
+    try {
+      me = await _dataSource.fetchOwnProfile();
+    } catch (_) {
+      // Still not a verdict: wait for the next time the server answers.
+      _profileGatesDeferred = true;
+      return;
+    }
+    if (!mounted || _phase != _AuthPhase.authed) return;
+    if (me == null) {
+      // A deferred OAuth sign-up that opened offline — onboarding after all.
+      _setPhase(_AuthPhase.onboarding);
+      return;
+    }
+    unawaited(_startPush());
+    await _applyProfileGates(me);
   }
 
   Future<void> _signOut() async {
