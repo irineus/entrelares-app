@@ -107,6 +107,22 @@ bool _covers(String source, String scheme, String host) {
   return host.endsWith('.$pattern');
 }
 
+/// Every image URL a web manifest names, wherever it sits — `icons`,
+/// `screenshots`, a shortcut's own icons, and any member the spec adds later.
+/// Walked rather than listed, so a new image-bearing member is covered the day
+/// it is written instead of the day somebody remembers this test.
+List<String> _manifestSources(Object? node) => switch (node) {
+      Map<String, dynamic>() => [
+          for (final MapEntry(:key, :value) in node.entries)
+            if (key == 'src' && value is String)
+              value
+            else
+              ..._manifestSources(value),
+        ],
+      List<dynamic>() => [for (final item in node) ..._manifestSources(item)],
+      _ => const [],
+    };
+
 void main() {
   group('_redirects (SPA fallback)', () {
     test('every unmatched path falls back to index.html with a 200', () {
@@ -487,6 +503,49 @@ void main() {
         related.cast<Map<String, dynamic>>().map((a) => a['id']),
         contains(Env.prod.androidPackage),
       );
+    });
+
+    // T-72 \u2014 the T-66 defect in another directive. The manifest pointed its
+    // six screenshots at the LANDING's origin while `img-src` allows only this
+    // one, so Chrome fetched all six on every load, was refused by our own
+    // policy, and showed none \u2014 found only because a device console happened
+    // to be open for T-65. A same-origin URL is not safe by being same-origin
+    // either: `_redirects` answers a missing file with a 200 `index.html`
+    // (T-68), which the browser then fails to decode as an image, so a
+    // relative `src` has to name a file that ships.
+    test('every image it names is one the CSP lets the browser load', () {
+      final manifest = jsonDecode(_web('manifest.json').readAsStringSync());
+      final imgSrc =
+          _sources(_csp(_web('_headers').readAsStringSync())!, 'img-src');
+      final page = Uri.parse('https://${Env.prod.webHostname}/manifest.json');
+      final sources = _manifestSources(manifest);
+
+      // Not vacuous: the walk has to reach the members this manifest has.
+      expect(sources.where((s) => s.contains('Icon-')), isNotEmpty);
+      expect(sources.where((s) => s.contains('screenshots/')), isNotEmpty);
+
+      for (final src in sources) {
+        final url = page.resolve(src);
+        if (url.scheme == 'data' || url.scheme == 'blob') {
+          expect(imgSrc, contains('${url.scheme}:'),
+              reason: 'manifest.json names a ${url.scheme}: image and img-src '
+                  'does not allow ${url.scheme}:');
+        } else if (url.origin == page.origin) {
+          expect(imgSrc, contains("'self'"));
+          expect(_web(url.path.substring(1)).existsSync(), isTrue,
+              reason: 'manifest.json names $src, which is not in app/web/ \u2014 '
+                  'served, `_redirects` answers it with index.html and a 200');
+        } else {
+          expect(
+            imgSrc.any((s) => _covers(s, url.scheme, url.host)),
+            isTrue,
+            reason: 'manifest.json names $url, and img-src ($imgSrc) does not '
+                'allow ${url.scheme}://${url.host}: the browser fetches it on '
+                'every load and our own policy refuses it. Serve the file from '
+                'app/web/ (T-72) rather than widening img-src.',
+          );
+        }
+      }
     });
   });
 

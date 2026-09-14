@@ -136,7 +136,9 @@ cd app && fvm flutter analyze && fvm flutter test
 # web_channel_test, que prova como FONTE o que só se manifestaria SERVIDO — a CSP,
 # o _redirects, o assetlinks, a config Firebase Web e, desde o T-66, o host do
 # Sentry dentro de connect-src (sem ele o navegador bloqueia o POST e o canal web
-# reporta NADA, em silêncio, porque o reporter engole a própria falha por contrato)
+# reporta NADA, em silêncio, porque o reporter engole a própria falha por contrato),
+# desde o T-72 toda imagem que o manifest.json nomeia (host coberto pelo img-src,
+# ou arquivo que existe em web/ — a mesma família de defeito, noutra diretiva)
 # mais o espelho do watcher pré-Flutter do index.html e, desde o T-58, a prova de
 # execução do web-e2e (driver próprio, toda suíte reporta, contagens espelhadas).
 cd app && fvm flutter build apk --debug --flavor dev --split-per-abi

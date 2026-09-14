@@ -47,43 +47,43 @@
     ],
     "screenshots": [
         {
-            "src": "https://entrelares.app/img/screenshots/today-calendar-meu-dia.png",
-            "type": "image/png",
+            "src": "screenshots/today-calendar-meu-dia.webp",
+            "type": "image/webp",
             "sizes": "1080x1920",
             "form_factor": "narrow",
             "label": "Hoje: seu dia com a criança"
         },
         {
-            "src": "https://entrelares.app/img/screenshots/today-calendar-dia-do-outro.png",
-            "type": "image/png",
+            "src": "screenshots/today-calendar-dia-do-outro.webp",
+            "type": "image/webp",
             "sizes": "1080x1920",
             "form_factor": "narrow",
             "label": "Hoje: dia do outro responsável"
         },
         {
-            "src": "https://entrelares.app/img/screenshots/editor-dia.png",
-            "type": "image/png",
+            "src": "screenshots/editor-dia.webp",
+            "type": "image/webp",
             "sizes": "1080x1920",
             "form_factor": "narrow",
             "label": "Editor do dia"
         },
         {
-            "src": "https://entrelares.app/img/screenshots/troca-aguardando-aprovacao.png",
-            "type": "image/png",
+            "src": "screenshots/troca-aguardando-aprovacao.webp",
+            "type": "image/webp",
             "sizes": "1080x1920",
             "form_factor": "narrow",
             "label": "Troca de dia aguardando aprovação"
         },
         {
-            "src": "https://entrelares.app/img/screenshots/calendario-tres-cuidadores.png",
-            "type": "image/png",
+            "src": "screenshots/calendario-tres-cuidadores.webp",
+            "type": "image/webp",
             "sizes": "1080x1920",
             "form_factor": "narrow",
             "label": "Calendário com três cuidadores"
         },
         {
-            "src": "https://entrelares.app/img/screenshots/historico-auditoria.png",
-            "type": "image/png",
+            "src": "screenshots/historico-auditoria.webp",
+            "type": "image/webp",
             "sizes": "1080x1920",
             "form_factor": "narrow",
             "label": "Histórico com trilha de auditoria"
