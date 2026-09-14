@@ -51,6 +51,24 @@ class CareSchedule {
         revisionToken: (json['revision_token'] as String?) ?? '',
       );
 
+  /// T-18 — the row back in the shape [fromJson] reads, for the device's
+  /// offline copy of the calendar. **Never a write payload**: it carries
+  /// server-stamped columns a write must not send. `offline_cache_test` reads
+  /// this file and fails if the keys here and in [fromJson] ever differ, so a
+  /// column added to one side cannot silently vanish from the cache.
+  Map<String, dynamic> toRowJson() => {
+        'id': id,
+        'schedule_date': isoDate(scheduleDate),
+        'handoff_time': handoffTime,
+        'scheduled_parent_id': scheduledParentId,
+        'actual_parent_id': actualParentId,
+        'notes': notes,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+        'revision': revision,
+        'revision_token': revisionToken,
+      };
+
   /// INSERT payload: no id (identity), no tokens (server-stamped), no
   /// family_id (trigger_a derives it from scheduled_parent_id).
   Map<String, dynamic> toInsertJson() => {

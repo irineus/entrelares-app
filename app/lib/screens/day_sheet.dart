@@ -41,6 +41,7 @@ Future<DaySheetOutcome?> showDaySheet({
   bool? isPremium,
   PublicSettings settings = PublicSettings.unloaded,
   Iterable<DateTime> frozenDates = const [],
+  bool offline = false,
 }) {
   return showAppSheet<DaySheetOutcome>(
     context: context,
@@ -59,6 +60,7 @@ Future<DaySheetOutcome?> showDaySheet({
       isPremium: isPremium,
       settings: settings,
       frozenDates: frozenDates,
+      offline: offline,
     ),
   );
 }
@@ -87,6 +89,12 @@ class _DaySheet extends StatefulWidget {
   final PublicSettings settings;
   final Iterable<DateTime> frozenDates;
 
+  /// T-18: the app had no connection when the day was opened. The sheet is
+  /// the read-only one — nothing typed here could be saved, and every rule
+  /// that would judge it (the T-35 token, a freeze, the horizon) lives on the
+  /// server, so no write is attempted or parked for later.
+  final bool offline;
+
   const _DaySheet({
     required this.date,
     required this.day,
@@ -102,6 +110,7 @@ class _DaySheet extends StatefulWidget {
     required this.isPremium,
     required this.settings,
     required this.frozenDates,
+    this.offline = false,
   });
 
   @override
@@ -505,7 +514,7 @@ class _DaySheetState extends State<_DaySheet> {
     // it keeps exactly what it had. The responsible line survives only in this
     // branch: with the form on screen it repeats what "Agendado" and "Real"
     // already say two lines below.
-    final readOnly = _saveBlocked;
+    final readOnly = _saveBlocked || widget.offline;
     return AppSheetFrame(
       title: _capitalize('${formatHandoffDate(widget.date, l)} · '
           '${daysUntilLabel(widget.date, widget.today, l)}'),
@@ -617,6 +626,9 @@ class _DaySheetState extends State<_DaySheet> {
 
   List<Widget> _guardBanners(Localization l, DayAssignment? assignment) {
     final widgets = <Widget>[];
+    if (widget.offline) {
+      widgets.add(_banner(l[KApp.offlineWriteBlocked]));
+    }
     if (widget.adminBypass && (_isPast || isApprovedSwapDay(assignment))) {
       widgets.add(_banner(l[K.editorAdminOverride],
           tone: context.tokens.danger));

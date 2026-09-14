@@ -6,6 +6,7 @@ import '../theme/tokens.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
+import '../services/connectivity_status.dart';
 import '../services/custody_data_source.dart';
 import '../services/notification_badge.dart';
 import '../services/push_service.dart';
@@ -48,10 +49,15 @@ class NotificationsScreen extends StatefulWidget {
   /// tap that wants the same tab the person has since navigated away from.
   final String? landingNonce;
 
+  /// T-18: offline, a request opens without its answer buttons (see
+  /// `showFrozenDaySheet`). Null in tests that do not exercise it.
+  final ConnectivityStatus? connectivity;
+
   const NotificationsScreen(
       {super.key,
       required this.dataSource,
       required this.badge,
+      this.connectivity,
       this.push,
       this.landing,
       this.landingNonce});
@@ -189,6 +195,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       allProfiles: _allProfiles,
       ownProfileId: _ownProfile?.id,
       dataSource: widget.dataSource,
+      offline: widget.connectivity?.offline ?? false,
     );
     if (outcome == null || !mounted) return;
     await _loadAll();

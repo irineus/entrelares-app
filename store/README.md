@@ -231,6 +231,15 @@ say which one is blocking: sweep the whole list.
   *service provider* processing on the developer's behalf, and that is what every operator in
   the policy's §7 is (Supabase, Resend, Cloudflare, Google — Fonts, FCM, Play —, Umami, Sentry,
   Asaas). Nothing goes to a third party for its own purposes; §4 of the policy says the same.
+  **The offline copy of the calendar adds NO row (T-18, 14/09/2026).** The Android app keeps the
+  last-read current month, the 90-day upcoming window, that month's open requests and the family's
+  profiles on the device (`offline_cache.dart`), so the plan can be read with no signal. Play
+  counts data as *collected* only when it is transmitted off the device, and this copy never is:
+  it lives in the app's cache directory (`offline_cache_store_io.dart`), which Android Auto Backup
+  never copies — **not** `shared_preferences`, which it does — and it is wiped on every exit from
+  the authenticated phase (`main.dart` `_setPhase`). Every item in it is already a row above,
+  collected when the server sent it. If the copy ever moves to a backed-up location, that stops
+  being true: re-read this paragraph in the same delivery. §9 of the policy names it.
   **Account creation** lists both `Username, password, and other authentication` **and** `OAuth`
   (F-57; ticked 10/09/2026 — see below). **Every row is deletable** by the user: leaving the family
   (S-19 page) removes the profile and its push tokens after the 30-day grace, and the family's own
