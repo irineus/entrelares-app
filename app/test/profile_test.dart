@@ -73,6 +73,9 @@ Future<void> pumpProfile(
 }
 
 /// Drives the 🔐 sheet the way a person would.
+///
+/// `.last` on both finders: U-21 opens the prompt ON TOP of an edit sheet, so
+/// the sheet's own field and its "Cancelar" are also in the tree, earlier.
 Future<void> confirmSudo(WidgetTester tester) async {
   final l = Localization(AppLanguage.ptBr);
   expect(find.text(l[K.sudoTitle]), findsOne,
@@ -81,6 +84,29 @@ Future<void> confirmSudo(WidgetTester tester) async {
   await tester.pump();
   await tester.tap(find.text(l[K.sudoConfirm]));
   await tester.pumpAndSettle();
+}
+
+/// U-21 — the pencils. The page is read at rest; every edit starts here.
+const editData = ValueKey('profile-edit-data');
+const editEmail = ValueKey('profile-edit-email');
+const editPassword = ValueKey('profile-edit-password');
+
+Future<void> openSheet(WidgetTester tester, Key pencil) async {
+  await tester.tap(find.byKey(pencil));
+  await tester.pumpAndSettle();
+}
+
+/// Taps a sheet's gated primary and lets the 🔐 prompt slide in. Not
+/// `pumpAndSettle`: the editor is BUSY while the prompt is up (its primary
+/// shows a spinner, an animation that never settles), by design — the reader
+/// is answering a prompt, not waiting on the page.
+Future<void> tapGated(WidgetTester tester, Finder button) async {
+  await tester.tap(button);
+  // The route is pushed on the tap; its animation only STARTS on the next
+  // frame, so one long pump would still find the prompt off-screen.
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.pump(const Duration(milliseconds: 400));
 }
 
 void main() {
@@ -98,10 +124,27 @@ void main() {
       expect(find.text(l[K.profSectionAdmin]), findsNothing);
     });
 
+    testWidgets('U-21 — the page is read at rest: no open input, one pencil '
+        'per group', (tester) async {
+      await pumpProfile(tester, source());
+
+      expect(find.byType(TextField), findsNothing,
+          reason: 'someone who only came to look must not meet a form');
+      expect(find.byKey(editData), findsOne);
+      expect(find.byKey(editEmail), findsOne);
+      expect(find.byKey(editPassword), findsOne);
+      // What the cards SAY instead of asking.
+      expect(find.text('Ana Souza'), findsWidgets);
+      expect(find.text('Mãe'), findsOne,
+          reason: 'the role is read by everyone now, not only by an admin');
+      expect(find.text(l[KApp.profPasswordSummary]), findsOne);
+    });
+
     testWidgets('saves the name through the own-profile path', (tester) async {
       final ds = source();
       await pumpProfile(tester, ds);
 
+      await openSheet(tester, editData);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.registerFullName]),
           'Ana Souza Lima');
@@ -110,12 +153,15 @@ void main() {
 
       expect(ds.nameUpdates,
           [{'id': 1, 'name': 'Ana Souza Lima', 'own': true}]);
+      expect(find.text(l[K.profSaveData]), findsNothing,
+          reason: 'the sheet closes on success');
     });
 
     testWidgets('a one-letter name never reaches the server', (tester) async {
       final ds = source();
       await pumpProfile(tester, ds);
 
+      await openSheet(tester, editData);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.registerFullName]), 'A');
       await tester.tap(find.text(l[K.profSaveData]));
@@ -123,6 +169,25 @@ void main() {
 
       expect(find.text(l[KApp.profErrNameTooShort]), findsOne);
       expect(ds.nameUpdates, isEmpty);
+      expect(find.text(l[K.profSaveData]), findsOne,
+          reason: 'a refusal keeps the sheet open, with the draft');
+    });
+
+    testWidgets('cancelling the sheet throws the draft away and sends nothing',
+        (tester) async {
+      final ds = source();
+      await pumpProfile(tester, ds);
+
+      await openSheet(tester, editData);
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFullName]), 'Outra');
+      await tester.tap(find.text(l[K.commonCancel]));
+      await tester.pumpAndSettle();
+
+      expect(ds.nameUpdates, isEmpty);
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('Ana Souza'), findsWidgets,
+          reason: 'the card still shows the saved name');
     });
   });
 
@@ -152,6 +217,10 @@ void main() {
       final ds = source();
       await pumpProfile(tester, ds, profileId: 2);
 
+      // At rest the role is a row ("Pai"); the dropdown is the sheet's.
+      expect(find.text('Pai'), findsOne);
+      expect(find.byType(DropdownButtonFormField<int>), findsNothing);
+      await openSheet(tester, editData);
       await tester.tap(find.byType(DropdownButtonFormField<int>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Mãe').last);
@@ -208,26 +277,54 @@ void main() {
       final ds = source();
       await pumpProfile(tester, ds);
 
+      await openSheet(tester, editEmail);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.profNewEmail]), 'nova@example.com');
-      await tester.tap(find.text(l[K.profChangeEmail]));
-      await tester.pumpAndSettle();
+      await tapGated(
+          tester, find.widgetWithText(FilledButton, l[K.profChangeEmail]));
       expect(ds.emailUpdates, isEmpty);
 
       await confirmSudo(tester);
 
       expect(ds.emailUpdates, ['nova@example.com']);
-      expect(find.text(l[K.profEmailLinkSent]), findsOne);
+      expect(find.byType(TextField), findsNothing,
+          reason: 'both sheets are gone: the prompt and the editor');
+      expect(find.text(l[K.profEmailLinkSent]), findsOne,
+          reason: 'the sentence lands on the card, where the reader is now');
       expect(ds.accountActions, contains('email_change_requested'));
+    });
+
+    testWidgets('U-21 — a dismissed prompt hands the draft back, not the page',
+        (tester) async {
+      final ds = source();
+      await pumpProfile(tester, ds);
+
+      await openSheet(tester, editEmail);
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.profNewEmail]), 'nova@example.com');
+      await tapGated(
+          tester, find.widgetWithText(FilledButton, l[K.profChangeEmail]));
+      expect(find.text(l[K.sudoTitle]), findsOne);
+
+      // The prompt's own "Cancelar" — the editor's sits under it.
+      await tester.tap(find.text(l[K.commonCancel]).last);
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[K.sudoTitle]), findsNothing);
+      expect(find.widgetWithText(TextField, 'nova@example.com'), findsOne,
+          reason: 'the editor is still open, with what was typed');
+      expect(ds.emailUpdates, isEmpty);
+      expect(find.text(l[K.profEmailLinkSent]), findsNothing);
     });
 
     testWidgets('the same address is refused before the prompt', (tester) async {
       final ds = source();
       await pumpProfile(tester, ds);
 
+      await openSheet(tester, editEmail);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.profNewEmail]), 'ANA@example.com');
-      await tester.tap(find.text(l[K.profChangeEmail]));
+      await tester.tap(find.widgetWithText(FilledButton, l[K.profChangeEmail]));
       await tester.pumpAndSettle();
 
       expect(find.text(l[K.profErrSameEmail]), findsOne);
@@ -238,20 +335,23 @@ void main() {
       final ds = source();
       await pumpProfile(tester, ds);
 
+      await openSheet(tester, editPassword);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.updatePwdNewPassword]),
           'novaSenha123');
       await tester.enterText(
           find.widgetWithText(TextField, l[K.profConfirmNewPassword]),
           'novaSenha123');
-      await tester.tap(find.text(l[K.profChangePassword]));
-      await tester.pumpAndSettle();
+      await tapGated(
+          tester, find.widgetWithText(FilledButton, l[K.profChangePassword]));
       expect(ds.passwordUpdates, isEmpty);
 
       await confirmSudo(tester);
 
       expect(ds.passwordUpdates, ['novaSenha123']);
       expect(ds.accountActions, contains('password_changed'));
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text(l[K.profPasswordChanged]), findsOne);
     });
 
     testWidgets('a mismatched confirmation never reaches the prompt',
@@ -259,13 +359,15 @@ void main() {
       final ds = source();
       await pumpProfile(tester, ds);
 
+      await openSheet(tester, editPassword);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.updatePwdNewPassword]),
           'novaSenha123');
       await tester.enterText(
           find.widgetWithText(TextField, l[K.profConfirmNewPassword]),
           'outraSenha123');
-      await tester.tap(find.text(l[K.profChangePassword]));
+      await tester
+          .tap(find.widgetWithText(FilledButton, l[K.profChangePassword]));
       await tester.pumpAndSettle();
 
       expect(find.text(l[K.profErrPasswordMismatch]), findsOne);
@@ -277,9 +379,11 @@ void main() {
       final ds = source();
       await pumpProfile(tester, ds);
 
+      await openSheet(tester, editPassword);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.updatePwdNewPassword]), 'curta');
-      await tester.tap(find.text(l[K.profChangePassword]));
+      await tester
+          .tap(find.widgetWithText(FilledButton, l[K.profChangePassword]));
       await tester.pumpAndSettle();
 
       expect(find.text(l[KApp.profErrPasswordShort]), findsOne);
@@ -291,11 +395,20 @@ void main() {
       final ds = source();
       await pumpProfile(tester, ds);
 
+      // U-21: the door lives in the sheet, beside the change it stands in for.
+      expect(find.text(l[K.profResetByEmail]), findsNothing);
+      await openSheet(tester, editPassword);
       await tester.tap(find.text(l[K.profResetByEmail]));
       await tester.pumpAndSettle();
 
       expect(find.text(l[K.sudoTitle]), findsNothing);
       expect(ds.passwordResets, ['ana@example.com']);
+      expect(find.byType(TextField), findsNothing,
+          reason: 'a mail was sent; the sheet has nothing left to ask');
+      expect(find.textContaining('ana@example.com'), findsWidgets,
+          reason: 'the card says where the link went');
+      expect(find.textContaining('<strong>'), findsNothing,
+          reason: 'the emphasis is rendered, never printed');
     });
 
     testWidgets('sending it for ANOTHER member does need elevation',

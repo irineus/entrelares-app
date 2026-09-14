@@ -354,8 +354,9 @@ void main() {
       expect(find.text(pt[KApp.profLoginMethod]), findsOneWidget);
       expect(find.text(pt[KApp.profLoginMethodGoogle]), findsOneWidget);
       expect(find.text(pt[KApp.profLoginMethodNote]), findsOneWidget);
-      expect(find.text(pt[K.profChangePassword]), findsNothing);
-      expect(find.text(pt[K.profResetByEmail]), findsNothing);
+      // U-21: the password lives behind a pencil now — no card, no pencil.
+      expect(find.text(pt[K.profSectionPassword]), findsNothing);
+      expect(find.byKey(const ValueKey('profile-edit-password')), findsNothing);
       // One door: no "more than one way in" sentence, no password row.
       expect(find.text(pt[KApp.profLoginMethodsIntro]), findsNothing);
       expect(find.text(pt[KApp.profLoginMethodPassword]), findsNothing);
@@ -366,7 +367,8 @@ void main() {
       await pumpProfile(tester, source());
 
       expect(find.text(pt[K.profSectionPassword]), findsOneWidget);
-      expect(find.text(pt[K.profChangePassword]), findsOneWidget);
+      expect(find.byKey(const ValueKey('profile-edit-password')),
+          findsOneWidget);
       // U-30: the door is listed too — one row, no intro, no Google.
       expect(find.text(pt[KApp.profLoginMethod]), findsOneWidget);
       expect(find.text(pt[KApp.profLoginMethodPassword]), findsOneWidget);
@@ -426,7 +428,8 @@ void main() {
       expect(find.text(pt[KApp.profLoginMethodNote]), findsNothing);
       // The password form is still there, unchanged (F-57's other half).
       expect(find.text(pt[K.profSectionPassword]), findsOneWidget);
-      expect(find.text(pt[K.profChangePassword]), findsOneWidget);
+      expect(find.byKey(const ValueKey('profile-edit-password')),
+          findsOneWidget);
     });
 
     testWidgets('each door carries the address it opens under', (tester) async {
@@ -478,7 +481,8 @@ void main() {
       await pumpProfile(tester, ds);
 
       expect(find.text(pt[KApp.profLoginMethod]), findsNothing);
-      expect(find.text(pt[K.profChangePassword]), findsOneWidget);
+      expect(find.byKey(const ValueKey('profile-edit-password')),
+          findsOneWidget);
     });
   });
 }

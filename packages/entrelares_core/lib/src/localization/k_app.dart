@@ -145,6 +145,13 @@ abstract final class KApp {
   static const String profLoginMethodOther = 'app.prof.loginMethodOther';
   static const String profLoginMethodOtherNote = 'app.prof.loginMethodOtherNote';
 
+  // ── U-21 — the profile is read at rest and edited in a sheet. The pencil
+  //    on Dados needs a name of its own (the e-mail and password pencils
+  //    reuse the action labels the page already had), and the Senha card
+  //    needs one line to stand in for the form it no longer shows ──
+  static const String profEditData = 'app.prof.editData';
+  static const String profPasswordSummary = 'app.prof.passwordSummary';
+
   // ── F-09 push (the Notificações control) ──
   static const String pushTitle = 'app.push.title';
   static const String pushHintOff = 'app.push.hintOff';
@@ -285,6 +292,8 @@ abstract final class KApp {
     profLoginMethodGoogleLinkedNote,
     profLoginMethodOther,
     profLoginMethodOtherNote,
+    profEditData,
+    profPasswordSummary,
     pushTitle,
     pushHintOff,
     pushHintOn,
@@ -439,6 +448,9 @@ abstract final class StringsAppPtBr {
             'e-mail nesta tela.',
     KApp.profLoginMethodOther: 'Outro provedor: {0}',
     KApp.profLoginMethodOtherNote: 'Abre este login sozinho.',
+    KApp.profEditData: 'Editar dados',
+    KApp.profPasswordSummary:
+        'Senha definida. Altere aqui ou redefina por e-mail.',
     KApp.pushTitle: 'Avisos no celular',
     KApp.pushHintOff:
         'Receba um aviso quando alguém pedir uma troca ou responder a sua — '
@@ -620,6 +632,9 @@ abstract final class StringsAppEn {
             'the e-mail on this screen.',
     KApp.profLoginMethodOther: 'Another provider: {0}',
     KApp.profLoginMethodOtherNote: 'Opens this login on its own.',
+    KApp.profEditData: 'Edit details',
+    KApp.profPasswordSummary:
+        'Password set. Change it here or reset it by e-mail.',
     KApp.pushTitle: 'Phone alerts',
     KApp.pushHintOff:
         'Get an alert when someone asks for a swap, or answers yours — even '
