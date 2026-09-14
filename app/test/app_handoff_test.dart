@@ -3,8 +3,9 @@
 //
 // What is NOT here, and cannot be: whether the browser answers
 // `getInstalledRelatedApps()` at all. That is measured on a device, and the
-// three sources it depends on are pinned in `web_channel_test`.
+// four sources it depends on are pinned in `web_channel_test`.
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -21,8 +22,11 @@ final pt = Localization(AppLanguage.ptBr);
 final en = Localization(AppLanguage.en);
 
 void main() {
-  Widget shellApp(
-      {AppHandoffBanner? handoff, AppLanguage language = AppLanguage.ptBr}) {
+  Widget shellApp({
+    ValueListenable<AppHandoffBanner?>? handoff,
+    ValueListenable<FamilyDeletionBanner?>? deletion,
+    AppLanguage language = AppLanguage.ptBr,
+  }) {
     final router = GoRouter(
       initialLocation: '/',
       routes: [
@@ -34,6 +38,7 @@ void main() {
               onSignOut: () async {},
               onOpenProfile: () {},
               appHandoff: handoff,
+              deletionBanner: deletion,
               badge: NotificationBadge(
                   FakeCustodyDataSource(members: const [], days: []))),
           branches: [
@@ -53,11 +58,14 @@ void main() {
     );
   }
 
+  AppHandoffBanner offer({VoidCallback? onOpen, VoidCallback? onDismiss}) =>
+      AppHandoffBanner(onOpen: onOpen ?? () {}, onDismiss: onDismiss ?? () {});
+
   group('the banner', () {
     testWidgets('there is none unless the shell is given one', (tester) async {
       // The overwhelmingly common case: every native build, and every browser
       // that did not confirm the app is on this device.
-      await tester.pumpWidget(shellApp());
+      await tester.pumpWidget(shellApp(handoff: ValueNotifier(null)));
       await tester.pumpAndSettle();
 
       expect(find.text(pt[KApp.handoffBanner]), findsNothing);
@@ -66,16 +74,14 @@ void main() {
 
     testWidgets('it offers the crossing in the reader\'s language',
         (tester) async {
-      await tester.pumpWidget(shellApp(
-          handoff: AppHandoffBanner(onOpen: () {}, onDismiss: () {})));
+      await tester.pumpWidget(shellApp(handoff: ValueNotifier(offer())));
       await tester.pumpAndSettle();
 
       expect(find.text(pt[KApp.handoffBanner]), findsOneWidget);
       expect(find.text(pt[KApp.handoffOpen]), findsOneWidget);
 
       await tester.pumpWidget(shellApp(
-          language: AppLanguage.en,
-          handoff: AppHandoffBanner(onOpen: () {}, onDismiss: () {})));
+          language: AppLanguage.en, handoff: ValueNotifier(offer())));
       await tester.pumpAndSettle();
 
       expect(find.text(en[KApp.handoffBanner]), findsOneWidget);
@@ -84,8 +90,7 @@ void main() {
     testWidgets('it never covers the app it sits above', (tester) async {
       // A banner that pushed the calendar off the screen would be a worse
       // defect than the one this item fixes.
-      await tester.pumpWidget(shellApp(
-          handoff: AppHandoffBanner(onOpen: () {}, onDismiss: () {})));
+      await tester.pumpWidget(shellApp(handoff: ValueNotifier(offer())));
       await tester.pumpAndSettle();
 
       expect(find.text('CALENDARIO'), findsOneWidget);
@@ -95,8 +100,8 @@ void main() {
       var opened = 0;
       var dismissed = 0;
       await tester.pumpWidget(shellApp(
-          handoff: AppHandoffBanner(
-              onOpen: () => opened++, onDismiss: () => dismissed++)));
+          handoff: ValueNotifier(offer(
+              onOpen: () => opened++, onDismiss: () => dismissed++))));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text(pt[KApp.handoffOpen]));
@@ -106,6 +111,56 @@ void main() {
       await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
       expect(dismissed, 1);
+    });
+
+    testWidgets('an answer that arrives AFTER the shell mounted still paints',
+        (tester) async {
+      // The 13/09/2026 device measurement. The browser confirmed the app, the
+      // app's state held the offer, and the screen showed nothing until the
+      // reader switched tabs: go_router caches the pages a route builder
+      // produced, so a `setState` in the root never re-ran the builder that
+      // read the value. The shell listens now — and this test drives the
+      // answer in the ORDER the real one arrives: shell first, then the
+      // browser's reply, with no navigation in between.
+      final handoff = ValueNotifier<AppHandoffBanner?>(null);
+      await tester.pumpWidget(shellApp(handoff: handoff));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[KApp.handoffBanner]), findsNothing);
+
+      handoff.value = offer();
+      await tester.pump();
+
+      expect(find.text(pt[KApp.handoffBanner]), findsOneWidget);
+      expect(find.text(pt[KApp.handoffOpen]), findsOneWidget);
+      expect(find.text('CALENDARIO'), findsOneWidget);
+
+      // And a dismissal takes it away by the same road.
+      handoff.value = null;
+      await tester.pump();
+      expect(find.text(pt[KApp.handoffBanner]), findsNothing);
+    });
+
+    testWidgets('the S-11 deletion banner takes the same road', (tester) async {
+      // Same shape, same defect: the pending-deletion read completes after
+      // the shell is on screen, and on a cold boot the family's countdown was
+      // invisible until the first tab switch — for the very member the banner
+      // exists for, the one who never opens Família.
+      final deletion = ValueNotifier<FamilyDeletionBanner?>(null);
+      await tester.pumpWidget(shellApp(deletion: deletion));
+      await tester.pumpAndSettle();
+      expect(find.textContaining(pt[K.layoutFamilyDeletionRequested]),
+          findsNothing);
+
+      deletion.value = FamilyDeletionBanner(
+        scheduledFor: DateTime(2026, 9, 30),
+        allAgreed: false,
+        iAmRequester: false,
+        onTap: () {},
+      );
+      await tester.pump();
+
+      expect(find.textContaining(pt[K.layoutFamilyDeletionRequested]),
+          findsOneWidget);
     });
   });
 

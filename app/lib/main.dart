@@ -500,11 +500,19 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   ConsentGateState _consentState = ConsentGateState.upToDate;
 
   /// S-11: what the shell's persistent deletion banner shows, or null.
-  FamilyDeletionBanner? _deletionBanner;
+  ///
+  /// A notifier, not a field read by the shell route's `builder`: go_router
+  /// caches the pages a builder produced and re-runs it only on a navigation
+  /// or an inherited-widget change, so a `setState` here never reached the
+  /// shell. Measured on a device on 13/09/2026 (T-65): the offer was in this
+  /// state, correct, and painted only when the reader switched tabs. The shell
+  /// listens to the notifier instead, and a late answer paints on its own.
+  final _deletionBanner = ValueNotifier<FamilyDeletionBanner?>(null);
 
   /// T-65: the web→app offer, or null — which is the answer on every native
   /// build and on every browser that did not confirm the app is on this device.
-  AppHandoffBanner? _appHandoff;
+  /// A notifier for the reason [_deletionBanner] gives.
+  final _appHandoff = ValueNotifier<AppHandoffBanner?>(null);
 
   /// Where a dismissal of that offer is remembered. Under the `app.` prefix
   /// the whole client uses, and read through `prefs` rather than
@@ -617,6 +625,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _badge.dispose();
     _push.dispose();
     _refresh.dispose();
+    _deletionBanner.dispose();
+    _appHandoff.dispose();
     super.dispose();
   }
 
@@ -695,15 +705,19 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// Every failure inside [isStoreAppInstalled] answers "no", so the whole
   /// path is silent by construction: nothing here may cost the reader a
   /// screen.
+  ///
+  /// The answer lands in a notifier the shell listens to, not in a `setState`:
+  /// the shell is built by a go_router route builder, which does not run again
+  /// for a rebuild of this widget (see [_deletionBanner]).
   Future<void> _resolveAppHandoff() async {
-    if (!kIsWeb || _appHandoff != null) return;
+    if (!kIsWeb || _appHandoff.value != null) return;
     if (widget.prefs.getBool(_handoffDismissedKey) ?? false) return;
     if (!await isStoreAppInstalled(Env.current.androidPackage)) return;
     if (!mounted || _phase != _AuthPhase.authed) return;
-    setState(() => _appHandoff = AppHandoffBanner(
-          onOpen: _openInApp,
-          onDismiss: _dismissAppHandoff,
-        ));
+    _appHandoff.value = AppHandoffBanner(
+      onOpen: _openInApp,
+      onDismiss: _dismissAppHandoff,
+    );
   }
 
   /// T-65 — hands the reader's CURRENT location to the app.
@@ -720,7 +734,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   }
 
   void _dismissAppHandoff() {
-    setState(() => _appHandoff = null);
+    _appHandoff.value = null;
     unawaited(widget.prefs.setBool(_handoffDismissedKey, true));
   }
 
@@ -880,33 +894,29 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       final pending = await _dataSource.fetchPendingFamilyDeletion();
       if (!mounted) return;
       if (pending == null || _isLeaving) {
-        if (_deletionBanner != null) {
-          setState(() => _deletionBanner = null);
-        }
+        _deletionBanner.value = null;
         return;
       }
       final members = await _dataSource.fetchMembers();
       if (!mounted) return;
-      setState(() {
-        _deletionBanner = FamilyDeletionBanner(
-          scheduledFor: pending.request.scheduledFor,
-          allAgreed: FamilyLifecycleRules.allAgreed(
-            members: members
-                .map((m) => LifecycleMember(
-                    id: m.id,
-                    isActiveMember: m.isActiveMember,
-                    isAdmin: m.isAdmin))
-                .toList(),
-            requesterProfileId: pending.request.requestedBy,
-            votes: pending.responses
-                .map((r) =>
-                    DeletionVote(profileId: r.profileId, agreed: r.agreed))
-                .toList(),
-          ),
-          iAmRequester: pending.request.requestedBy == me.id,
-          onTap: () => _router.go('/family'),
-        );
-      });
+      _deletionBanner.value = FamilyDeletionBanner(
+        scheduledFor: pending.request.scheduledFor,
+        allAgreed: FamilyLifecycleRules.allAgreed(
+          members: members
+              .map((m) => LifecycleMember(
+                  id: m.id,
+                  isActiveMember: m.isActiveMember,
+                  isAdmin: m.isAdmin))
+              .toList(),
+          requesterProfileId: pending.request.requestedBy,
+          votes: pending.responses
+              .map((r) =>
+                  DeletionVote(profileId: r.profileId, agreed: r.agreed))
+              .toList(),
+        ),
+        iAmRequester: pending.request.requestedBy == me.id,
+        onTap: () => _router.go('/family'),
+      );
     } catch (_) {
       // No banner is the honest fallback: the Família page still shows the
       // whole panel, and the DB enforces the deadline regardless.
