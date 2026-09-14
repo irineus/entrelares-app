@@ -55,6 +55,11 @@ points at them; this directory is about the *presence*, not the pipeline.
   cropped of its OS chrome and fitted to 9∶16 by replicating the edge column, which works only
   because the app's side edges are flat. The file names are a contract: the landing's
   `<picture>` elements and their `alt` text reference them.
+  **A re-shoot has a THIRD copy to refresh (T-72, 14/09/2026):** six of the pt-BR `webp`
+  (not `familia-membros`, not `assistente-rotacao-com-avo`) live in `app/web/screenshots/` too,
+  because `web/manifest.json` names them and the web channel's `img-src` allows only its own
+  origin — pointed at the landing, Chrome fetched them on every load and our CSP refused all
+  six. Copy them over in the same delivery; `web_channel_test` fails a `src` that does not ship.
 
 ## 2 · Brand assets
 
