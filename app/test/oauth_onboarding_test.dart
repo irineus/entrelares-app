@@ -17,6 +17,7 @@ import 'package:entrelares_app/screens/profile_screen.dart';
 import 'package:entrelares_app/screens/register_screen.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
+import 'package:entrelares_app/theme/tokens.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource;
@@ -352,8 +353,12 @@ void main() {
 
       expect(find.text(pt[KApp.profLoginMethod]), findsOneWidget);
       expect(find.text(pt[KApp.profLoginMethodGoogle]), findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodNote]), findsOneWidget);
       expect(find.text(pt[K.profChangePassword]), findsNothing);
       expect(find.text(pt[K.profResetByEmail]), findsNothing);
+      // One door: no "more than one way in" sentence, no password row.
+      expect(find.text(pt[KApp.profLoginMethodsIntro]), findsNothing);
+      expect(find.text(pt[KApp.profLoginMethodPassword]), findsNothing);
     });
 
     testWidgets('a password session keeps the password card unchanged',
@@ -362,7 +367,118 @@ void main() {
 
       expect(find.text(pt[K.profSectionPassword]), findsOneWidget);
       expect(find.text(pt[K.profChangePassword]), findsOneWidget);
+      // U-30: the door is listed too — one row, no intro, no Google.
+      expect(find.text(pt[KApp.profLoginMethod]), findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodPassword]), findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodsIntro]), findsNothing);
+      expect(find.text(pt[KApp.profLoginMethodGoogle]), findsNothing);
+    });
+  });
+
+  group('U-30 — the account surface lists EVERY door', () {
+    const me = Member(
+      id: 1,
+      fullName: 'Ana Souza',
+      userId: 'u1',
+      isAdmin: true,
+      roleId: 1,
+      email: 'nova@example.com',
+    );
+
+    Future<void> pumpProfile(
+        WidgetTester tester, FakeCustodyDataSource ds) async {
+      await tester.binding.setSurfaceSize(const Size(800, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(wrap(ProfileScreen(
+        dataSource: ds,
+        sudo: SudoService(ds),
+        deliverExport: (_, _) async {},
+      )));
+      await tester.pumpAndSettle();
+    }
+
+    /// The situation the item was opened for: a Google sign-in with the
+    /// address of a password account, linked by GoTrue — and then the account
+    /// e-mail changed, so the Google identity still answers to the OLD one.
+    FakeCustodyDataSource linked() =>
+        FakeCustodyDataSource(members: const [me], days: const [])
+          ..family = const Family(id: 7, name: 'Souza', plan: 'free')
+          ..roles = const [Role(id: 1, roleName: 'mother')]
+          ..providers = ['google', 'email']
+          ..sessionEmailValue = 'nova@example.com'
+          ..identities = const [
+            SignInIdentity('google', email: 'antiga@gmail.com'),
+            SignInIdentity('email', email: 'nova@example.com'),
+          ];
+
+    testWidgets('a linked account shows BOTH doors and keeps the password form',
+        (tester) async {
+      await pumpProfile(tester, linked());
+
+      expect(find.text(pt[KApp.profLoginMethod]), findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodsIntro]), findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodPassword]), findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodGoogle]), findsOneWidget);
+      // The Google row says it survives a password AND an e-mail change; the
+      // Google-only sentence ("no password to change here") would be false.
+      expect(find.text(pt[KApp.profLoginMethodGoogleLinkedNote]),
+          findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodNote]), findsNothing);
+      // The password form is still there, unchanged (F-57's other half).
+      expect(find.text(pt[K.profSectionPassword]), findsOneWidget);
+      expect(find.text(pt[K.profChangePassword]), findsOneWidget);
+    });
+
+    testWidgets('each door carries the address it opens under', (tester) async {
+      await pumpProfile(tester, linked());
+
+      final googleRow = find.byKey(const ValueKey('sign-in-method-google'));
+      final passwordRow = find.byKey(const ValueKey('sign-in-method-email'));
+      expect(
+          find.descendant(of: googleRow, matching: find.text('antiga@gmail.com')),
+          findsOneWidget,
+          reason: 'the Google identity did not follow the e-mail change');
+      expect(
+          find.descendant(
+              of: passwordRow, matching: find.text('nova@example.com')),
+          findsOneWidget);
+      // And the password door is listed FIRST.
+      expect(tester.getTopLeft(passwordRow).dy,
+          lessThan(tester.getTopLeft(googleRow).dy));
+    });
+
+    testWidgets('the card sits above the e-mail section', (tester) async {
+      await pumpProfile(tester, linked());
+
+      expect(tester.getTopLeft(find.text(pt[KApp.profLoginMethod])).dy,
+          lessThan(tester.getTopLeft(find.text(pt[K.profSectionEmail])).dy));
+    });
+
+    testWidgets('the Google row draws the G, never the generic account glyph',
+        (tester) async {
+      await pumpProfile(tester, linked());
+
+      final googleRow = find.byKey(const ValueKey('sign-in-method-google'));
+      expect(
+          find.descendant(
+              of: googleRow,
+              matching: find.byWidgetPredicate((w) =>
+                  w is Image &&
+                  w.image is AssetImage &&
+                  (w.image as AssetImage).assetName == GoogleBrand.logoAsset)),
+          findsOneWidget);
+      expect(find.byIcon(Icons.account_circle_outlined), findsNothing);
+    });
+
+    testWidgets('a session that said nothing lists nothing and keeps the form',
+        (tester) async {
+      final ds = linked()
+        ..providers = const []
+        ..identities = const [];
+      await pumpProfile(tester, ds);
+
       expect(find.text(pt[KApp.profLoginMethod]), findsNothing);
+      expect(find.text(pt[K.profChangePassword]), findsOneWidget);
     });
   });
 }

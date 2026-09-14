@@ -499,6 +499,10 @@ class FakeCustodyDataSource implements CustodyDataSource {
   /// What [authProviders] reports — password-only by default.
   List<String> providers = const ['email'];
 
+  /// U-30: what [signInIdentities] reports — none by default, which is the
+  /// session shape the F-57 tests were written against (providers only).
+  List<SignInIdentity> identities = const [];
+
   /// What [sessionDisplayName] prefills.
   String? displayName;
 
@@ -541,6 +545,9 @@ class FakeCustodyDataSource implements CustodyDataSource {
 
   @override
   List<String> authProviders() => providers;
+
+  @override
+  List<SignInIdentity> signInIdentities() => identities;
 
   @override
   String? sessionDisplayName() => displayName;

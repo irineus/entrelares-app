@@ -133,6 +133,18 @@ abstract final class KApp {
   static const String profLoginMethodGoogle = 'app.prof.loginMethodGoogle';
   static const String profLoginMethodNote = 'app.prof.loginMethodNote';
 
+  // ── U-30 — the account lists EVERY door it has, not just the one that
+  //    happens to have a form. A Google sign-in with the address of a
+  //    password account links the two (F-57), and the screen said nothing ──
+  static const String profLoginMethodsIntro = 'app.prof.loginMethodsIntro';
+  static const String profLoginMethodPassword = 'app.prof.loginMethodPassword';
+  static const String profLoginMethodPasswordNote =
+      'app.prof.loginMethodPasswordNote';
+  static const String profLoginMethodGoogleLinkedNote =
+      'app.prof.loginMethodGoogleLinkedNote';
+  static const String profLoginMethodOther = 'app.prof.loginMethodOther';
+  static const String profLoginMethodOtherNote = 'app.prof.loginMethodOtherNote';
+
   // ── F-09 push (the Notificações control) ──
   static const String pushTitle = 'app.push.title';
   static const String pushHintOff = 'app.push.hintOff';
@@ -260,6 +272,12 @@ abstract final class KApp {
     profLoginMethod,
     profLoginMethodGoogle,
     profLoginMethodNote,
+    profLoginMethodsIntro,
+    profLoginMethodPassword,
+    profLoginMethodPasswordNote,
+    profLoginMethodGoogleLinkedNote,
+    profLoginMethodOther,
+    profLoginMethodOtherNote,
     pushTitle,
     pushHintOff,
     pushHintOn,
@@ -395,10 +413,21 @@ abstract final class StringsAppPtBr {
     KApp.onbSwitchAccount: 'Entrar com outra conta',
     KApp.onbSignedInAs: 'Conectado como {0}',
     KApp.onbErrGeneric: 'Não foi possível concluir o cadastro. Tente novamente.',
-    KApp.profLoginMethod: 'Método de login',
+    KApp.profLoginMethod: 'Como você entra',
     KApp.profLoginMethodGoogle: 'Conta Google',
     KApp.profLoginMethodNote:
         'Você entra com sua conta Google — não há senha para alterar aqui.',
+    KApp.profLoginMethodsIntro:
+        'Esta conta tem mais de uma porta de entrada. Qualquer uma delas abre '
+            'o login sozinha.',
+    KApp.profLoginMethodPassword: 'E-mail e senha',
+    KApp.profLoginMethodPasswordNote:
+        'Seu e-mail e a senha que você define na seção Senha, abaixo.',
+    KApp.profLoginMethodGoogleLinkedNote:
+        'Abre este login sozinha — mesmo depois de você trocar a senha ou o '
+            'e-mail nesta tela.',
+    KApp.profLoginMethodOther: 'Outro provedor: {0}',
+    KApp.profLoginMethodOtherNote: 'Abre este login sozinho.',
     KApp.pushTitle: 'Avisos no celular',
     KApp.pushHintOff:
         'Receba um aviso quando alguém pedir uma troca ou responder a sua — '
@@ -558,11 +587,22 @@ abstract final class StringsAppEn {
     KApp.onbSwitchAccount: 'Sign in with another account',
     KApp.onbSignedInAs: 'Signed in as {0}',
     KApp.onbErrGeneric: 'Could not finish the sign-up. Try again.',
-    KApp.profLoginMethod: 'Sign-in method',
+    KApp.profLoginMethod: 'How you sign in',
     KApp.profLoginMethodGoogle: 'Google account',
     KApp.profLoginMethodNote:
         'You sign in with your Google account — there is no password to '
             'change here.',
+    KApp.profLoginMethodsIntro:
+        'This account has more than one way in. Any one of them opens it on '
+            'its own.',
+    KApp.profLoginMethodPassword: 'E-mail and password',
+    KApp.profLoginMethodPasswordNote:
+        'Your e-mail and the password you set in the Password section below.',
+    KApp.profLoginMethodGoogleLinkedNote:
+        'Opens this login on its own — even after you change the password or '
+            'the e-mail on this screen.',
+    KApp.profLoginMethodOther: 'Another provider: {0}',
+    KApp.profLoginMethodOtherNote: 'Opens this login on its own.',
     KApp.pushTitle: 'Phone alerts',
     KApp.pushHintOff:
         'Get an alert when someone asks for a swap, or answers yours — even '

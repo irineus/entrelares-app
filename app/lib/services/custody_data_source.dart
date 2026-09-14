@@ -1,5 +1,5 @@
 import 'package:entrelares_core/entrelares_core.dart'
-    show AppLanguage, PreEditNotes, SwapOrigin, auditPageSize;
+    show AppLanguage, PreEditNotes, SignInIdentity, SwapOrigin, auditPageSize;
 
 import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
@@ -339,6 +339,14 @@ abstract class CustodyDataSource {
   /// the sign-in-method row (the U-21 slice F-57 requires). Empty when there
   /// is no session.
   List<String> authProviders();
+
+  /// U-30 — the identities of the current session, each with the address it
+  /// signs in under. Beside [authProviders] because the two are different
+  /// session facts: `app_metadata.providers` names the doors, `identities`
+  /// says which e-mail each one answers to — and after an e-mail change only
+  /// the second still shows the OLD address the Google door keeps opening.
+  /// Empty when there is no session or the SDK carried no identities.
+  List<SignInIdentity> signInIdentities();
 
   /// The display name the OAuth provider sent with the session, for
   /// prefilling the onboarding form. Null when absent or blank.
