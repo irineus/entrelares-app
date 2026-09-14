@@ -296,8 +296,8 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   completa em `/onboarding` (papel + família + consentimento S-13, ou claim do convite
   via Edge Function `claim-invitation`, com a migração S-11 preservando a sessão). No
   Android o retorno é por scheme próprio por flavor (`<applicationId>://login-callback`);
-  runbook do owner em `supabase/README.md` §9-ter. Sessão sem senha vê o método de login
-  no perfil no lugar do cartão de senha — e, **desde o S-21 (10/09/2026), passa pelo gate
+  runbook do owner em `supabase/README.md` §9-ter. Sessão sem senha não vê cartão de
+  senha — e, **desde o S-21 (10/09/2026), passa pelo gate
   de sudo com um código enviado por e-mail**, que é o que lhe devolveu sair da família,
   promover admin e apagar a própria conta. **Desde a U-45 (10/09/2026) o botão segue as
   diretrizes de marca do *Sign in with Google*:** o "G" oficial como imagem em
@@ -305,6 +305,14 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   (dentro do `tokens.dart`, o único lugar onde uma cor se escreve), 40 dp de altura, e a
   frase continua sendo nossa — em PT-BR ou inglês, conforme o leitor. Provenência e
   licença do asset em `store/README.md` §2. Coberto por `google_sign_in_button_test`.
+  **Desde o U-30 (14/09/2026) o perfil lista TODAS as portas da conta** no cartão "Como
+  você entra", antes do E-mail: senha e/ou Google, cada uma com o endereço pelo qual abre
+  — entrar com Google usando o e-mail de uma conta com senha liga as duas identidades
+  (`SignInMethodRules`, lido de `app_metadata.providers` + `identities`, sem servidor), e
+  antes o cartão de senha sozinho deixava ler "troquei a senha, tranquei a conta" e
+  "troquei o e-mail, entro pelo novo" como verdades; a identidade Google segue abrindo
+  pelo endereço antigo, e agora a linha dela diz isso. O formulário de senha só aparece
+  quando há senha. Coberto por `oauth_onboarding_test` (grupo U-30) e `sign_in_methods_test`.
 - **S-04 inatividade:** espelho `InactivityPolicy` (30 min, poll de 30 s) — pointer-down
   em qualquer lugar reseta; o resume do lifecycle reavalia na hora (tempo em background
   conta, como a aba escondida no web). Expirou → signOut local + banner no login.

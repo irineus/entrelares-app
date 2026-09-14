@@ -1194,6 +1194,22 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  List<SignInIdentity> signInIdentities() {
+    final identities = _client.auth.currentUser?.identities;
+    if (identities == null) return const [];
+    return [
+      for (final identity in identities)
+        SignInIdentity(
+          identity.provider,
+          email: switch (identity.identityData?['email']) {
+            final String email => email,
+            _ => null,
+          },
+        ),
+    ];
+  }
+
+  @override
   String? sessionEmail() {
     final email = _client.auth.currentUser?.email?.trim();
     return (email == null || email.isEmpty) ? null : email;

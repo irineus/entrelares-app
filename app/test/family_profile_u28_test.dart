@@ -62,10 +62,12 @@ void main() {
   testWidgets('every settings section sits in its own card', (tester) async {
     await _pumpProfile(tester, family.source());
 
-    // Dados, E-mail, Senha, Idioma, Meus dados (LGPD), Primeiros passos.
-    expect(find.byType(AppCard), findsNWidgets(6));
+    // Dados, Como você entra (U-30), E-mail, Senha, Idioma, Meus dados (LGPD),
+    // Primeiros passos.
+    expect(find.byType(AppCard), findsNWidgets(7));
     for (final title in [
       K.profSectionData,
+      KApp.profLoginMethod,
       K.profSectionEmail,
       K.profSectionPassword,
       K.languageLabel,

@@ -448,10 +448,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _adminSection(l, target),
           ],
           if (_isOwn) ...[
+            // U-30: the doors of the account come FIRST, because the two
+            // sections after it are the ones a reader misreads without them —
+            // "I changed my e-mail / my password, so…" — and the notes on the
+            // rows point forward to both.
+            ..._signInMethodsSection(l, target),
             const SizedBox(height: 24),
             _emailSection(l, target),
-            const SizedBox(height: 24),
-            _passwordSection(l, target),
+            if (SignInMethodRules.hasPassword(_signInMethods(target))) ...[
+              const SizedBox(height: 24),
+              _passwordSection(l, target),
+            ],
             const SizedBox(height: 24),
             // U-28: the picker the web has on this page, and the sentence that
             // explains why it matters — both were dropped in the port. The
@@ -600,36 +607,106 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ));
 
+  /// U-30 — the doors this account has, read from the session (F-57 exposed
+  /// the providers; this adds the identities, for the address each door opens
+  /// under). Both facts are session-local: no server round trip.
+  List<SignInMethod> _signInMethods(Member target) =>
+      SignInMethodRules.methods(
+        providers: widget.dataSource.authProviders(),
+        identities: widget.dataSource.signInIdentities(),
+        accountEmail: widget.dataSource.sessionEmail() ?? target.email,
+      );
+
+  /// U-30 — "Como você entra": one row per door, each with the address it
+  /// answers to and one line saying what it means. A Google sign-in with the
+  /// address of a password account links the two (F-57's posture), and until
+  /// this card the screen showed the password form ALONE — so "I changed my
+  /// password, the account is locked" and "I changed my e-mail, I sign in with
+  /// the new one" both read as true and were both false. Nothing to list when
+  /// the session said nothing.
+  ///
+  /// The Google row carries the G itself (U-45): the generic account glyph
+  /// F-57 used here is exactly the drift that decision forbids.
+  List<Widget> _signInMethodsSection(Localization l, Member target) {
+    final methods = _signInMethods(target);
+    if (methods.isEmpty) return const [];
+    final theme = Theme.of(context).textTheme;
+    final several = methods.length > 1;
+
+    Widget row(SignInMethod method) {
+      final (leading, title, note) = switch (method.kind) {
+        SignInMethodKind.password => (
+            const Icon(Icons.key_outlined, size: GoogleBrand.logoSize),
+            l[KApp.profLoginMethodPassword],
+            l[KApp.profLoginMethodPasswordNote],
+          ),
+        SignInMethodKind.google => (
+            Image.asset(GoogleBrand.logoAsset,
+                width: GoogleBrand.logoSize,
+                height: GoogleBrand.logoSize,
+                excludeFromSemantics: true),
+            l[KApp.profLoginMethodGoogle],
+            // Alone, the F-57 sentence (there is no password to change);
+            // beside a password, the sentence that survives BOTH changes.
+            l[several
+                ? KApp.profLoginMethodGoogleLinkedNote
+                : KApp.profLoginMethodNote],
+          ),
+        SignInMethodKind.other => (
+            const Icon(Icons.login_outlined, size: GoogleBrand.logoSize),
+            l.format(KApp.profLoginMethodOther, [method.provider]),
+            l[KApp.profLoginMethodOtherNote],
+          ),
+      };
+      return Row(
+        key: ValueKey('sign-in-method-${method.provider}'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(padding: const EdgeInsets.only(top: 2), child: leading),
+          const SizedBox(width: GoogleBrand.logoGap),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.titleSmall),
+                if (method.email != null)
+                  Text(method.email!, style: theme.bodyMedium),
+                Text(note, style: theme.bodySmall),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return [
+      const SizedBox(height: 24),
+      AppCard(
+        title: l[KApp.profLoginMethod],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (several) ...[
+              Text(l[KApp.profLoginMethodsIntro], style: theme.bodySmall),
+              const SizedBox(height: 12),
+            ],
+            for (final (i, method) in methods.indexed) ...[
+              if (i > 0) const SizedBox(height: 12),
+              row(method),
+            ],
+          ],
+        ),
+      ),
+    ];
+  }
+
   /// F-57 (the U-21 slice this item requires): a session whose identity
   /// providers do not include `email` has NO password — offering "alterar
   /// senha" to it would submit against nothing, and "esqueci a atual" would
-  /// e-mail a reset for a credential that does not exist. Such a session sees
-  /// its sign-in METHOD instead.
+  /// e-mail a reset for a credential that does not exist. The caller keeps
+  /// this card off such a session (`SignInMethodRules.hasPassword`); its door
+  /// is listed in [_signInMethodsSection] instead (U-30).
   Widget _passwordSection(Localization l, Member target) {
-    final providers = widget.dataSource.authProviders();
-    final passwordless =
-        providers.isNotEmpty && !providers.contains('email');
-    if (passwordless) {
-      return AppCard(
-        title: l[KApp.profLoginMethod],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.account_circle_outlined, size: 20),
-                const SizedBox(width: 8),
-                Text(l[KApp.profLoginMethodGoogle],
-                    style: Theme.of(context).textTheme.titleSmall),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(l[KApp.profLoginMethodNote],
-                style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
-      );
-    }
     return AppCard(
         title: l[K.profSectionPassword],
         child: Column(
