@@ -134,6 +134,34 @@ class Member {
         createdAt: _utc(json['created_at'] as String?),
       );
 
+  /// T-18 — the row back in the shape [fromJson] reads, for the device's
+  /// offline copy of the calendar. **Never a write payload**: it carries
+  /// server-stamped columns a write must not send. `offline_cache_test` reads
+  /// this file and fails if the keys here and in [fromJson] ever differ, so a
+  /// column added to one side cannot silently vanish from the cache.
+  Map<String, dynamic> toRowJson() => {
+        'id': id,
+        'family_id': familyId,
+        'full_name': fullName,
+        'color_slot': colorSlot,
+        'user_id': userId,
+        'left_at': leftAt,
+        'language': language,
+        'language_detected': languageDetected,
+        'is_admin': isAdmin,
+        'role_id': roleId,
+        'email': email,
+        'deletion_scheduled_for': deletionScheduledFor?.toIso8601String(),
+        'joined_via_invite': joinedViaInvite,
+        'consent_policy_version': consentPolicyVersion,
+        'consent_accepted_at': consentAcceptedAt?.toIso8601String(),
+        'onboarding_swap_explained_at':
+            onboardingSwapExplainedAt?.toIso8601String(),
+        'onboarding_tour_seen_at': onboardingTourSeenAt?.toIso8601String(),
+        'onboarding_dismissed_at': onboardingDismissedAt?.toIso8601String(),
+        'created_at': createdAt?.toIso8601String(),
+      };
+
   static DateTime? _utc(String? wire) =>
       wire == null ? null : DateTime.parse(wire).toUtc();
 

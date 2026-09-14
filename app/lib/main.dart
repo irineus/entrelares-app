@@ -46,6 +46,8 @@ import 'services/crash_reporter.dart';
 import 'services/custody_data_source.dart';
 import 'services/installed_app.dart';
 import 'services/notification_badge.dart';
+import 'services/offline_cache.dart';
+import 'services/offline_cache_store.dart';
 import 'services/onboarding_service.dart';
 import 'services/push_service.dart';
 import 'services/session_gate.dart';
@@ -362,6 +364,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
               builder: (_, _) => CalendarScreen(
                   dataSource: _dataSource,
                   connectivity: appConnectivity,
+                  offlineCache: _offlineCache,
                   adminMode: _adminMode,
                   analytics: _analytics,
                   onboarding: _onboarding,
@@ -473,6 +476,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
               builder: (_, state) => NotificationsScreen(
                   dataSource: _dataSource,
                   badge: _badge,
+                  connectivity: appConnectivity,
                   push: _push,
                   landing: switch (state.uri.queryParameters['tab']) {
                     'incoming' => NotificationLanding.incoming,
@@ -538,6 +542,14 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// (they live in two different subtrees: the tab bar and the calendar).
   late final OnboardingService _onboarding;
   final _tourKeys = TourKeys();
+
+  /// T-18 — the device's copy of the current month, Android only (see
+  /// [OfflineCache]). Bound to whoever is signed in at the moment of each
+  /// call, and wiped on every exit from the authenticated phase.
+  late final OfflineCache _offlineCache = OfflineCache(
+      createOfflineCacheStore(),
+      userId: () => _client.auth.currentUser?.id,
+      enabled: !kIsWeb);
 
   String? _redirect(BuildContext context, GoRouterState state) =>
       _routeGate.redirect(state.matchedLocation);
@@ -677,8 +689,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     if (phase != _AuthPhase.authed) {
       _adminMode.deactivate();
       _sudo.reset();
-      // T-18: the age the strip names belongs to what THIS person saw.
+      // T-18: the age the strip names, and the device's copy of the plan,
+      // belong to what THIS person saw.
       appConnectivity.forgetData();
+      unawaited(_offlineCache.clear());
       _profileGatesDeferred = false;
     }
     if (phase == _AuthPhase.authed) {

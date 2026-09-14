@@ -200,6 +200,7 @@ abstract final class KApp {
   static const String offlineStrip = 'app.offline.strip';
   static const String offlineStripNoData = 'app.offline.stripNoData';
   static const String offlineMonthNotLoaded = 'app.offline.monthNotLoaded';
+  static const String offlineWriteBlocked = 'app.offline.writeBlocked';
 
   // ── U-35 Família split: the roster's three navigation rows and the pages
   //    behind them. Row TITLES reuse what already names the thing (the
@@ -327,6 +328,7 @@ abstract final class KApp {
     offlineStrip,
     offlineStripNoData,
     offlineMonthNotLoaded,
+    offlineWriteBlocked,
     famPlanRow,
     famPlanRowFree,
     famPlanRowTrialOne,
@@ -507,6 +509,8 @@ abstract final class StringsAppPtBr {
     KApp.offlineStripNoData: 'Sem conexão · nada carregado ainda',
     KApp.offlineMonthNotLoaded:
         'Sem conexão — este mês ainda não foi carregado neste aparelho.',
+    KApp.offlineWriteBlocked:
+        'Sem conexão — conecte-se para fazer alterações. Nada foi enviado.',
     // ── U-35 Família split ──
     KApp.famPlanRow: 'Plano e pagamento',
     KApp.famPlanRowFree: 'Gratuito',
@@ -685,6 +689,8 @@ abstract final class StringsAppEn {
     KApp.offlineStripNoData: 'Offline · nothing loaded yet',
     KApp.offlineMonthNotLoaded:
         'Offline — this month has not been loaded on this device yet.',
+    KApp.offlineWriteBlocked:
+        'Offline — connect to make changes. Nothing was sent.',
     // ── U-35 Família split ──
     KApp.famPlanRow: 'Plan and payment',
     KApp.famPlanRowFree: 'Free',

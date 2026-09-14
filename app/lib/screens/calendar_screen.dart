@@ -15,6 +15,7 @@ import '../services/admin_mode.dart';
 import '../services/analytics_service.dart';
 import '../services/connectivity_status.dart';
 import '../services/custody_data_source.dart';
+import '../services/offline_cache.dart';
 import '../theme/slot_pattern.dart';
 import '../theme/tokens.dart';
 import '../widgets/account_button.dart';
@@ -73,6 +74,11 @@ class CalendarScreen extends StatefulWidget {
   /// answers again. Null in tests that do not exercise it.
   final ConnectivityStatus? connectivity;
 
+  /// T-18 — the device's copy of the current month. Written after every good
+  /// load of it, read when the network fails with nothing on screen. Null in
+  /// tests that do not exercise it (and disabled inside on the web).
+  final OfflineCache? offlineCache;
+
   /// T-37 — optional, and only passed through to the wizard.
   final AnalyticsService? analytics;
   final AdminMode adminMode;
@@ -96,6 +102,7 @@ class CalendarScreen extends StatefulWidget {
       required this.dataSource,
       required this.adminMode,
       this.connectivity,
+      this.offlineCache,
       this.onboarding,
       this.tourKeys,
       this.analytics,
@@ -200,6 +207,10 @@ class _CalendarScreenState extends State<CalendarScreen>
     widget.onboarding?.addListener(_onOnboardingPing);
     _wasOffline = widget.connectivity?.offline ?? false;
     widget.connectivity?.addListener(_onConnectivityChanged);
+    // T-18: a boot that already knows there is no network paints the device's
+    // copy at once, instead of a skeleton for the ~7 s postgrest spends
+    // retrying. The load runs alongside and wins the moment the server answers.
+    if (_wasOffline) unawaited(_adoptCopyOf(_visibleMonth));
     _load();
     _loadHorizonInputs();
     _watch();
@@ -232,6 +243,51 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   void _onAdminModeChanged() {
     if (mounted) setState(() {});
+  }
+
+  bool get _offline => widget.connectivity?.offline ?? false;
+
+  bool _isOnScreen(DateTime month) =>
+      _loadedMonth != null &&
+      _loadedMonth!.year == month.year &&
+      _loadedMonth!.month == month.month;
+
+  /// T-18 — fills whatever is still empty from the device's copy. Only the
+  /// month the copy is FOR fills the grid, and only while nothing real holds
+  /// it: the read is async, and a copy arriving after the server answered
+  /// must lose. The members, the profile and the upcoming window fill the
+  /// legend and the today card whatever month is on screen — at the turn of
+  /// the month the card is the whole point.
+  ///
+  /// Returns whether [month] is on screen afterwards.
+  Future<bool> _adoptCopyOf(DateTime month) async {
+    final snap = await widget.offlineCache?.read();
+    if (!mounted) return false;
+    if (snap == null || _isOnScreen(month)) return _isOnScreen(month);
+    final fillsGrid = snap.isFor(month) && month == _visibleMonth;
+    setState(() {
+      if (_members.isEmpty) _members = snap.members;
+      if (_roles.isEmpty) _roles = snap.roles;
+      _ownProfile ??= snap.ownProfile;
+      if (_upcoming.isEmpty) _upcoming = snap.upcoming;
+      if (fillsGrid) {
+        _daysByIso = {
+          for (final d in snap.days) CareSchedule.isoDate(d.scheduleDate): d
+        };
+        _frozenByIso = {
+          for (final r in snap.frozen) CareSchedule.isoDate(r.scheduleDate): r
+        };
+        _loadedMonth = month;
+        _loading = false;
+        _loadError = null;
+      }
+    });
+    // The strip dates what is on screen: the copy, unless a newer real read is
+    // already there.
+    if (widget.connectivity?.value.dataAsOf == null || fillsGrid) {
+      widget.connectivity?.loadedData(snap.savedAt);
+    }
+    return fillsGrid;
   }
 
   /// T-18 — refresh on reconnect. Any response from the server (another tab's
@@ -347,7 +403,23 @@ class _CalendarScreenState extends State<CalendarScreen>
         _loading = false;
         _loadError = null;
       });
-      widget.connectivity?.loadedData(DateTime.now());
+      final readAt = DateTime.now();
+      widget.connectivity?.loadedData(readAt);
+      // T-18: only the CURRENT month is worth a device copy — the door-of-the-
+      // school moment is today and this week, and one month keeps the copy
+      // small and its purpose obvious.
+      if (isCurrentMonth(month, _today)) {
+        unawaited(widget.offlineCache?.save(OfflineCalendarSnapshot(
+          savedAt: readAt,
+          month: month,
+          members: members,
+          roles: roles,
+          days: days,
+          frozen: frozen,
+          ownProfile: ownProfile,
+          upcoming: upcoming,
+        )));
+      }
       // U-28: the account button in every tab's app bar wears this.
       AccountScope.identityOf(context)?.adopt(
           fullName: ownProfile?.fullName, colorSlot: ownProfile?.colorSlot);
@@ -357,9 +429,11 @@ class _CalendarScreenState extends State<CalendarScreen>
       final l = AppL10n.of(context).l;
       final raw = e.toString();
       final offline = isNetworkFailure(raw);
-      final monthOnScreen = _loadedMonth != null &&
-          _loadedMonth!.year == month.year &&
-          _loadedMonth!.month == month.month;
+      var monthOnScreen = _isOnScreen(month);
+      if (offline && !monthOnScreen) {
+        monthOnScreen = await _adoptCopyOf(month);
+        if (!mounted) return;
+      }
       setState(() {
         _loading = false;
         // T-18: before, the F-23 poll's first failure with no signal replaced
@@ -635,6 +709,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       allProfiles: _members,
       ownProfileId: _ownProfile?.id,
       dataSource: widget.dataSource,
+      offline: _offline,
     );
     if (outcome != null) {
       _load(silent: true);
@@ -652,7 +727,18 @@ class _CalendarScreenState extends State<CalendarScreen>
     });
   }
 
+  /// T-18 — the writes that start from the calendar itself do not start
+  /// offline. The day and frozen sheets still OPEN (reading a day is the whole
+  /// point of this item) and lose their actions instead; these three have
+  /// nothing to show but a form, so they say why and stay shut.
+  bool _refuseWriteOffline() {
+    if (!_offline) return false;
+    showAppSnack(context, AppL10n.of(context).l[KApp.offlineWriteBlocked]);
+    return true;
+  }
+
   Future<void> _openBulkSheet() async {
+    if (_refuseWriteOffline()) return;
     final summary = await showBulkSheet(
       context: context,
       selectedDays: Set.of(_selectedDays),
@@ -707,6 +793,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   Future<void> _openResolveSheet() async {
+    if (_refuseWriteOffline()) return;
     final summary = await showResolveSheet(
       context: context,
       selectedDays: Set.of(_selectedDays),
@@ -728,6 +815,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   Future<void> _openWizard() async {
+    if (_refuseWriteOffline()) return;
     final generated = await showWizardSheet(
       context: context,
       activeMembers: _assignableMembers,
@@ -767,6 +855,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       frozenDates: [for (final r in _frozenByIso.values) r.scheduleDate],
       myProfile: _ownProfile,
       allProfiles: _members,
+      offline: _offline,
     );
     if (outcome != null) {
       _load(silent: true);

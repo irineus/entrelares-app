@@ -40,6 +40,7 @@ Future<FrozenDayOutcome?> showFrozenDaySheet({
   required List<Member> allProfiles,
   required int? ownProfileId,
   required CustodyDataSource dataSource,
+  bool offline = false,
 }) {
   return showAppSheet<FrozenDayOutcome>(
     context: context,
@@ -48,6 +49,7 @@ Future<FrozenDayOutcome?> showFrozenDaySheet({
       allProfiles: allProfiles,
       ownProfileId: ownProfileId,
       dataSource: dataSource,
+      offline: offline,
     ),
   );
 }
@@ -58,11 +60,19 @@ class _FrozenDaySheet extends StatefulWidget {
   final int? ownProfileId;
   final CustodyDataSource dataSource;
 
+  /// T-18: opened with no connection — the request is shown, and no answer
+  /// to it is offered. An approval parked for later could be refused when it
+  /// finally went out (the request answered from the other phone, the 48 h
+  /// cron resolving it), and "approved" that evaporates is worse than an
+  /// honest "connect first".
+  final bool offline;
+
   const _FrozenDaySheet({
     required this.request,
     required this.allProfiles,
     required this.ownProfileId,
     required this.dataSource,
+    this.offline = false,
   });
 
   @override
@@ -236,7 +246,9 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                     fontWeight: FontWeight.w700),
               ),
             ),
-      extraAction: _actionRow(context, l,
+      extraAction: widget.offline
+          ? null
+          : _actionRow(context, l,
           request: request,
           isRevert: isRevert,
           iAmTarget: iAmTarget,
@@ -287,7 +299,11 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                         color: context.tokens.danger.onContainer)),
               ],
               const SizedBox(height: Spacing.sm),
-              if (iAmTarget) ...[
+              if (widget.offline)
+                AppBanner(
+                    tone: context.tokens.warning,
+                    message: l[KApp.offlineWriteBlocked]),
+              if (iAmTarget && !widget.offline) ...[
                 // U-27: the label used to float above the field as its own
                 // Text; folded into the field, it is the accessible name too.
                 Row(

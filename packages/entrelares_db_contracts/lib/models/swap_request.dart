@@ -100,6 +100,36 @@ class SwapRequest {
         resolvedAt: json['resolved_at'] as String?,
       );
 
+  /// T-18 — the row back in the shape [fromJson] reads, for the device's
+  /// offline copy of the calendar. **Never a write payload**: it carries
+  /// server-stamped columns a write must not send. `offline_cache_test` reads
+  /// this file and fails if the keys here and in [fromJson] ever differ, so a
+  /// column added to one side cannot silently vanish from the cache.
+  Map<String, dynamic> toRowJson() => {
+        'id': id,
+        'schedule_date': '${scheduleDate.year.toString().padLeft(4, '0')}-'
+            '${scheduleDate.month.toString().padLeft(2, '0')}-'
+            '${scheduleDate.day.toString().padLeft(2, '0')}',
+        'schedule_id': scheduleId,
+        'requesting_profile_id': requestingProfileId,
+        'target_profile_id': targetProfileId,
+        'previous_actual_parent_id': previousActualParentId,
+        'proposed_actual_parent_id': proposedActualParentId,
+        'proposed_handoff_time': proposedHandoffTime,
+        'status': status,
+        'rejection_reason': rejectionReason,
+        'request_message': requestMessage,
+        'approval_note': approvalNote,
+        'pre_edit_log_id': preEditLogId,
+        'resolution_log_id': resolutionLogId,
+        'revert_notes': revertNotes,
+        'resolved_by': resolvedBy,
+        'reminder_sent_at': reminderSentAt?.toIso8601String(),
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+        'resolved_at': resolvedAt,
+      };
+
   /// The slice the pure rules consume (frozen set, urgency, resolve subsets).
   SwapRequestView toView() => SwapRequestView(
         id: id,
