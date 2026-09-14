@@ -189,7 +189,7 @@ copy and nothing updates it automatically (the en-US one at *Manage translations
 ## 4 · Policy forms (Data Safety, content rating, app access)
 
 **Monitor and improve → Policy → App content.** The answers below map the shipped privacy policy
-(https://entrelares.app/privacidade.html) — **if the policy changes, re-answer.** Every
+(https://entrelares.app/privacidade) — **if the policy changes, re-answer.** Every
 declaration on that page must be ✅ before a release rolls out, and the Console does not always
 say which one is blocking: sweep the whole list.
 
