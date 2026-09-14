@@ -2529,6 +2529,45 @@ To exercise the alarm deliberately (and only deliberately), rotate a Supabase se
 and merge anything: `db-prod` fails, `deploy-web` is skipped, and both the Sentry e-mail and the
 issue appear within a minute. Rotate it back.
 
+### 14.7 T-73 — what the edge adds after the build
+
+Every CSP guard in `web_channel_test` reads a **source** reference (T-66's Sentry host, T-72's
+manifest images). On 14/09/2026 the served `web.entrelares.app` carried one no file in this repo
+names: Cloudflare **Web Analytics**, switched on with automatic setup for the zone `entrelares.app`,
+appended
+
+```html
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/…" data-cf-beacon='{"token":"52a853e6…"}'>
+```
+
+to every HTML response — a script `script-src` blocked on every load. The same token reached the
+landing, which serves no CSP, so there the beacon RAN. Remedy: switched off at the edge (owner),
+never allowed into the CSP (T-62 refuses third-party executable code).
+
+So `deploy-web` now runs `.github/smoke_web_csp.sh` right after the proof of §14.4. It fetches `/`
+and `/calendar`, and refuses any `<script src>` whose host the **served** `script-src` does not
+cover. Three things it is shaped around:
+
+- **It asks the way a browser navigation asks** (`Accept: text/html…`). Measured: the edge injects
+  only then — a plain `curl` over the same URL, in the same minute, came back clean.
+- **It reads the CSP header on the wire**, never `_headers`: a check against the source file agrees
+  with itself.
+- **It has to prove it looked (T-58).** A page without our own `flutter_bootstrap.js` is not a page
+  it checked, and it goes RED. So does a page served with no CSP at all.
+
+Its red fails `deploy-web` after the channel DID publish, so `deploy-web` exports
+`published=true` from the proof and `ops-alert` branches on it: the summary, the Sentry title and
+the issue say *"publicou, mas serve script que a CSP recusa"* instead of *"não publicou"*, which
+would send the reader to the wrong console.
+
+**Validated per T-58** (14/09/2026): against production while the beacon was still on, **RED** on
+both paths, naming `static.cloudflareinsights.com`; against a local fixture server, green for a
+clean page and for `https://*.host` / exact-host / `'self'` sources, **RED** for the beacon, for the
+bare host of a `*.` source, for a protocol-relative `//host` script, for a page with no CSP and for
+a page that is not the app. The three source assertions were each watched failing under five
+mutations (Accept header, bootstrap marker, the step's `if:`, the `published` output, the alert's
+argument).
+
 ## 15. T-58 — the web flow gate has to prove it ran
 
 > **The inverse of §14's proof, one layer earlier.** §14 proves the PUBLISH happened; this proves

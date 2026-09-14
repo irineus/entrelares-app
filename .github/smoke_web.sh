@@ -43,6 +43,11 @@ for attempt in $(seq 1 "$attempts"); do
 
   if [ "$served" = "$expected" ]; then
     echo "Canal web serve $expected (tentativa $attempt/$attempts)."
+    # T-73: read by `ops-alert`, so a red check AFTER this one is not reported
+    # as a publish that never landed.
+    if [ -n "${GITHUB_OUTPUT:-}" ]; then
+      echo "published=true" >> "$GITHUB_OUTPUT"
+    fi
     if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
       echo "### Canal web: publicação PROVADA" >> "$GITHUB_STEP_SUMMARY"
       echo "\`$host\` está servindo o commit \`$expected\` (tentativa $attempt de $attempts)." >> "$GITHUB_STEP_SUMMARY"

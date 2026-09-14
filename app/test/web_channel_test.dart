@@ -780,6 +780,50 @@ void main() {
       expect(code, isNot(contains('--fail')),
           reason: 'same as above, spelled the long way');
     });
+
+    // ── T-73: what the EDGE adds after the build ─────────────────────────────
+    //
+    // Every CSP guard above reads a SOURCE reference. On 14/09/2026 Cloudflare
+    // Web Analytics was appending a beacon to every served HTML page — a script
+    // the CSP blocked on every load, and one no file in this repo names, so no
+    // source guard could ever have seen it. Only the served page can.
+
+    test('the served page is checked against the SERVED CSP, after the proof',
+        () {
+      final yaml = _withoutComments(workflow);
+      final proof = yaml.indexOf('run: bash .github/smoke_web.sh');
+      final guard = yaml.indexOf(
+          r'run: bash .github/smoke_web_csp.sh "https://${{ env.WEB_HOSTNAME }}"');
+      expect(guard, greaterThan(-1),
+          reason: 'the guard reads the host the app believes it is served from');
+      expect(guard, greaterThan(proof),
+          reason: 'what the page carries only means something once THIS commit '
+              'is what is being served');
+      final step = yaml.substring(yaml.lastIndexOf('- name:', guard), guard);
+      expect(step, contains("if: env.CLOUDFLARE_API_TOKEN != ''"),
+          reason: 'self-disarming exactly like the publish it follows');
+    });
+
+    test('the guard asks as a browser does, and cannot pass over nothing', () {
+      final code =
+          _withoutComments(File('../.github/smoke_web_csp.sh').readAsStringSync());
+      expect(code, contains("-H 'Accept: text/html"),
+          reason: 'measured: the edge injects ONLY when the request asks for '
+              'HTML — a plain curl came back clean over the same URL');
+      expect(code.toLowerCase(), contains('content-security-policy:'),
+          reason: 'the policy compared is the header on the wire, not '
+              '`_headers` — a check against the source agrees with itself');
+      expect(code, isNot(contains('_headers')), reason: 'same as above');
+      expect(code, contains(r'flutter_bootstrap\.js'),
+          reason: 'T-58: a page without even our own bootstrap script is a page '
+              'nobody checked, and it must go red, not green');
+      expect(code, contains('set -f'),
+          reason: '`https://*.host` is a CSP source; unquoted, bash would glob '
+              "it against the runner's disk");
+      expect(_web('index.html').readAsStringSync(),
+          contains('src="flutter_bootstrap.js"'),
+          reason: 'the marker the guard requires must be in the page it reads');
+    });
     // ── The docs-only skip, and the two assumptions holding it up ────────────
     //
     // Since 29/08/2026 a change touching ONLY markdown runs no jobs at all
@@ -1118,6 +1162,32 @@ void main() {
       // alert — a silent alarm, which is this item's own defect reintroduced.
       expect(script, contains(r'fingerprint: [ "ci", "verify", $jobs, $sha ]'),
           reason: 'the sha in the fingerprint is what keeps the alarm audible');
+    });
+
+    test('a red AFTER the proof is not reported as a publish that never landed',
+        () {
+      // T-73 put a check after `smoke_web.sh`. Its red fails `deploy-web` like
+      // a broken publish does, and every message of this job used to say "não
+      // publicou" — an alarm lying about its own incident sends the reader to
+      // the wrong console.
+      final yaml = _withoutComments(workflow);
+      expect(yaml, contains(r'published: ${{ steps.proof.outputs.published }}'),
+          reason: '`deploy-web` exports whether the proof passed');
+      expect(yaml,
+          contains(r'PUBLISHED: ${{ needs.deploy-web.outputs.published }}'),
+          reason: '`ops-alert` reads it');
+      expect(
+          _withoutComments(File('../.github/smoke_web.sh').readAsStringSync()),
+          contains(r'echo "published=true" >> "$GITHUB_OUTPUT"'),
+          reason: 'only the proof itself may say the commit is served');
+      expect(RegExp(r'"\$GITHUB_SHA" \\\r?\n\s+"\$PUBLISHED"').hasMatch(yaml),
+          isTrue,
+          reason: 'the Sentry alert gets the same answer the summary does');
+      final code = _withoutComments(script);
+      expect(code, contains(r'if [ "$published" = "true" ]; then'));
+      expect(code, contains('publicou, mas serve script que a CSP recusa'));
+      expect(code, contains('não publicou'),
+          reason: 'the original message still stands for the original case');
     });
 
   });
