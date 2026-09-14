@@ -269,14 +269,20 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   embedding do Android monta a rota inicial com `getPath()` + query + fragment — o go_router
   recebe a localização inteira, sem listener nosso, e `…://open/` cai no `initialLocation`
   em vez de num erro. Nada de sessão viaja junto. O banner só aparece quando o NAVEGADOR
-  confirma o app no aparelho (`navigator.getInstalledRelatedApps()`), o que exige as três
+  confirma o app no aparelho (`navigator.getInstalledRelatedApps()`), o que exige as quatro
   fontes que falham caladas — `asset_statements` (app→site, em `res/values/strings.xml`),
-  `assetlinks.json` (site→app) e `related_applications` (em `web/manifest.json`): faltando
+  `assetlinks.json` (site→app), `related_applications` (em `web/manifest.json`) e o
+  `<link rel="manifest">` do `index.html`, sem o qual o navegador nem lê o manifest: faltando
   qualquer uma a API devolve lista VAZIA, igualzinho a "não instalado". Fora do Chrome
   Android não aparece nada (fail-closed, forma do T-38), e o convite para INSTALAR fica de
   fora de propósito enquanto a Play não for pública — é checkbox do T-59. Regra pura em
-  `ChannelHandoffRules`; as três fontes e a ausência de App Link em `/` são presas no
-  `web_channel_test`.
+  `ChannelHandoffRules`; as quatro fontes e a ausência de App Link em `/` são presas no
+  `web_channel_test`. **A resposta do navegador chega DEPOIS do shell montar, e o shell é
+  construído por um `builder` de rota do go_router, que guarda as páginas em cache e só roda
+  de novo numa navegação** — medido no aparelho em 13/09/2026: a API confirmava o app, o
+  estado tinha o banner, e a tela só o mostrava na primeira troca de aba. Por isso os dois
+  banners do shell (este e o de exclusão da família, S-11) chegam como `ValueListenable` e
+  o `HomeShell` os escuta, como já faz com `adminMode` e `badge`.
 - **Recovery:** "Esqueci minha senha" → `resetPasswordForEmail` com `redirectTo` para o
   deep link; o `supabase_flutter` consome os tokens do link e emite `passwordRecovery`,
   que roteia para a tela de nova senha (validação espelhada em `UpdatePasswordRules`).

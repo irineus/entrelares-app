@@ -512,7 +512,7 @@ void main() {
               'with the host ${ChannelHandoffRules.host}');
     });
 
-    test('all THREE sources getInstalledRelatedApps needs are present', () {
+    test('all FOUR sources getInstalledRelatedApps needs are present', () {
       // The API resolves to an EMPTY LIST when any of them is missing, which
       // is indistinguishable from "the app is not installed": the banner
       // simply never appears and nothing anywhere says why. This is the only
@@ -522,6 +522,7 @@ void main() {
       final webManifest =
           jsonDecode(_web('manifest.json').readAsStringSync())
               as Map<String, dynamic>;
+      final html = _web('index.html').readAsStringSync();
 
       // 1. app -> site, named by the manifest and declared in strings.xml.
       expect(manifest, contains('android:name="asset_statements"'));
@@ -546,6 +547,18 @@ void main() {
             .cast<Map<String, dynamic>>()
             .map((a) => a['id']),
         contains(Env.prod.androidPackage),
+      );
+
+      // 4. and the page has to NAME that manifest: the browser reads
+      // `related_applications` out of the document's own `<link rel="manifest">`,
+      // so a manifest nobody links to is a manifest nobody reads. The first
+      // delivery counted three sources and left this one unguarded (it was
+      // present, so it never showed as a cause); it is the fourth.
+      expect(
+        RegExp(r'<link\s+rel="manifest"\s+href="manifest\.json"\s*>')
+            .hasMatch(html),
+        isTrue,
+        reason: 'index.html must link web/manifest.json as the page manifest',
       );
     });
 

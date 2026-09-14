@@ -1,4 +1,5 @@
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import 'package:go_router/go_router.dart';
@@ -68,12 +69,24 @@ class HomeShell extends StatelessWidget {
   /// above every tab because the deadline applies to the whole app, and it is
   /// the only way a member who never opens Família learns their family is
   /// scheduled for removal.
-  final FamilyDeletionBanner? deletionBanner;
+  ///
+  /// A [ValueListenable], not a value, and the reason is the T-65 device
+  /// measurement of 13/09/2026. The shell is built inside a go_router route
+  /// `builder`, and go_router caches the pages it built: a `setState` in the
+  /// app's root re-runs `MaterialApp.router`, but the route builders run again
+  /// only when the location changes or an inherited widget notifies. Both
+  /// banners are decided AFTER the shell has mounted — one by a network read,
+  /// the other by asking the browser — so a plain value handed to the builder
+  /// would sit in the app's state, correct, and never reach the screen until
+  /// the reader happened to switch tabs. Listening here is what makes a late
+  /// answer paint, the way [adminMode] and [badge] already do.
+  final ValueListenable<FamilyDeletionBanner?>? deletionBanner;
 
   /// T-65: the web→app offer, or null. It sits with the other banners rather
   /// than inside a screen because the reader's channel is a fact about the
-  /// whole app, not about the tab they happen to be on.
-  final AppHandoffBanner? appHandoff;
+  /// whole app, not about the tab they happen to be on. Listened to for the
+  /// reason [deletionBanner] gives.
+  final ValueListenable<AppHandoffBanner?>? appHandoff;
 
   /// U-23: the notifications tab is the tour's fourth stop, and it lives here
   /// rather than in any screen — so the key registry is shared.
@@ -145,8 +158,20 @@ class HomeShell extends StatelessWidget {
                       ),
                     ),
             ),
-            if (deletionBanner != null) _deletionBanner(context, l),
-            if (appHandoff != null) _handoffBanner(context, l),
+            if (deletionBanner != null)
+              ValueListenableBuilder<FamilyDeletionBanner?>(
+                valueListenable: deletionBanner!,
+                builder: (context, banner, _) => banner == null
+                    ? const SizedBox.shrink()
+                    : _deletionBanner(context, l, banner),
+              ),
+            if (appHandoff != null)
+              ValueListenableBuilder<AppHandoffBanner?>(
+                valueListenable: appHandoff!,
+                builder: (context, handoff, _) => handoff == null
+                    ? const SizedBox.shrink()
+                    : _handoffBanner(context, l, handoff),
+              ),
             Expanded(
               child: AccountScope(
                 identity: identity,
@@ -201,8 +226,8 @@ class HomeShell extends StatelessWidget {
     );
   }
 
-  Widget _deletionBanner(BuildContext context, Localization l) {
-    final banner = deletionBanner!;
+  Widget _deletionBanner(
+      BuildContext context, Localization l, FamilyDeletionBanner banner) {
     return Material(
       color: context.tokens.dangerBarDeep,
       child: InkWell(
@@ -239,8 +264,8 @@ class HomeShell extends StatelessWidget {
   /// that stays out. It is an offer, not a warning, and it must never read
   /// like the two banners above it, which report states the reader did not
   /// choose.
-  Widget _handoffBanner(BuildContext context, Localization l) {
-    final handoff = appHandoff!;
+  Widget _handoffBanner(
+      BuildContext context, Localization l, AppHandoffBanner handoff) {
     final tone = context.tokens.info;
     return Material(
       color: tone.container,
