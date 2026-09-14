@@ -774,7 +774,7 @@ function templateInvitation(lang: Lang, inviterName: string, familyName: string,
      <p ${P_LAST}>${t.invitationExpiry(expiresBr)}</p>
      <a href="${link}" ${btn("#212529")}>${t.invitationButton}</a>
      <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">${t.invitationLinkFallback}<br/><span style="word-break:break-all;color:#6b7280;">${link}</span></p>
-     <p style="margin:20px 0 0;font-size:12px;color:#6b7280;line-height:1.6;">${privacy} <a href="https://entrelares.app/privacidade.html" style="color:#6b7280;">${t.invitationPrivacyLink}</a>.</p>`
+     <p style="margin:20px 0 0;font-size:12px;color:#6b7280;line-height:1.6;">${privacy} <a href="https://entrelares.app/privacidade" style="color:#6b7280;">${t.invitationPrivacyLink}</a>.</p>`
   );
 }
 
