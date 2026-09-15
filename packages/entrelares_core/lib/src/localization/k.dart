@@ -364,6 +364,11 @@ abstract final class K {
   static const String wizCyclePreview = 'wiz.cyclePreview';
   static const String wizGenerate = 'wiz.generate';
   static const String wizCycleSummary = 'wiz.cycleSummary';
+  // U-41: the preview strip's screen-reader sentence and its run pieces.
+  static const String wizStripSemantics = 'wiz.strip.semantics';
+  static const String wizStripRunOne = 'wiz.strip.runOne';
+  static const String wizStripRunMany = 'wiz.strip.runMany';
+  static const String wizStripNobody = 'wiz.strip.nobody';
   static const String wizErrPickParentPerBlock = 'wiz.err.pickParentPerBlock';
   static const String wizErrStartInPast = 'wiz.err.startInPast';
   static const String wizErrStartBeyondFree = 'wiz.err.startBeyondFree';
@@ -1410,6 +1415,10 @@ abstract final class K {
     wizCyclePreview,
     wizGenerate,
     wizCycleSummary,
+    wizStripSemantics,
+    wizStripRunOne,
+    wizStripRunMany,
+    wizStripNobody,
     wizErrPickParentPerBlock,
     wizErrStartInPast,
     wizErrStartBeyondFree,
