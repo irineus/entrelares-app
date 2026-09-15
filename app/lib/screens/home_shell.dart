@@ -9,6 +9,7 @@ import '../services/admin_mode.dart';
 import '../services/notification_badge.dart';
 import '../widgets/account_button.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/install_hint_sheet.dart';
 import '../widgets/onboarding.dart';
 
 /// What the shell needs to paint the S-11 banner: the deadline, whether the
@@ -43,6 +44,23 @@ class AppHandoffBanner {
   final VoidCallback onDismiss;
 
   const AppHandoffBanner({required this.onOpen, required this.onDismiss});
+}
+
+/// U-51 — the invitation to put the web app on an iPhone's Home Screen.
+///
+/// Data, not a widget, like [AppHandoffBanner]: the shell owns how the strip
+/// looks and opens the sheet with the steps; `main.dart` owns whether there
+/// is one — which on every native build, on Android, on desktop and in an
+/// app already on the Home Screen is "no".
+class InstallHintBanner {
+  /// The reader asked for the steps. The shell opens the sheet; this only
+  /// records that it happened.
+  final VoidCallback onOpen;
+
+  /// Puts the hint away for good on this browser.
+  final VoidCallback onDismiss;
+
+  const InstallHintBanner({required this.onOpen, required this.onDismiss});
 }
 
 /// The authenticated hull — the same four destinations as the web's NavMenu
@@ -88,6 +106,11 @@ class HomeShell extends StatelessWidget {
   /// reason [deletionBanner] gives.
   final ValueListenable<AppHandoffBanner?>? appHandoff;
 
+  /// U-51: the iPhone install hint, or null. With the other banners for the
+  /// same reason as [appHandoff]: which channel the reader is on is a fact
+  /// about the whole app. Listened to for the reason [deletionBanner] gives.
+  final ValueListenable<InstallHintBanner?>? installHint;
+
   /// T-18: the "Sem conexão · dados de HH:mm" strip. Above every tab because
   /// connectivity is a fact about the app, and because the calendar is not the
   /// only screen whose data stops being current. Listened to for the reason
@@ -108,6 +131,7 @@ class HomeShell extends StatelessWidget {
       required this.onOpenProfile,
       this.deletionBanner,
       this.appHandoff,
+      this.installHint,
       this.connectivity,
       this.tourKeys});
 
@@ -117,7 +141,7 @@ class HomeShell extends StatelessWidget {
     return Scaffold(
       body: ListenableBuilder(
         listenable: Listenable.merge(
-            [adminMode, deletionBanner, appHandoff, connectivity]),
+            [adminMode, deletionBanner, appHandoff, installHint, connectivity]),
         builder: (context, _) {
           // T-18 device measurement (14/09/2026): every strip here wrapped
           // itself in a SafeArea, AND the tab below still received the status
@@ -127,14 +151,19 @@ class HomeShell extends StatelessWidget {
           // any strip is showing (two strips used to take it twice as well).
           final deletion = deletionBanner?.value;
           final handoff = appHandoff?.value;
+          final install = installHint?.value;
           final offline = connectivity?.value;
           final showsOffline = offline?.offline ?? false;
           final adminTop = adminMode.isActive;
           final deletionTop = !adminTop;
           final handoffTop = deletionTop && deletion == null;
-          final offlineTop = handoffTop && handoff == null;
-          final anyStrip =
-              adminTop || deletion != null || handoff != null || showsOffline;
+          final installTop = handoffTop && handoff == null;
+          final offlineTop = installTop && install == null;
+          final anyStrip = adminTop ||
+              deletion != null ||
+              handoff != null ||
+              install != null ||
+              showsOffline;
           final tab = AccountScope(
             identity: identity,
             onSignOut: onSignOut,
@@ -194,6 +223,8 @@ class HomeShell extends StatelessWidget {
               _deletionBanner(context, l, deletion, top: deletionTop),
             if (handoff != null)
               _handoffBanner(context, l, handoff, top: handoffTop),
+            if (install != null)
+              _installHintStrip(context, l, install, top: installTop),
             if (showsOffline)
               _offlineStrip(context, l, offline!, top: offlineTop),
             Expanded(
@@ -319,6 +350,54 @@ class HomeShell extends StatelessWidget {
                 icon: const Icon(Icons.close, size: 18),
                 color: tone.onContainer,
                 tooltip: l[KApp.handoffDismiss],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// U-51 — the same quiet shape as the T-65 offer: `info` tone, one line, a
+  /// way in and a way out. The steps do not fit a strip, so the line is the
+  /// invitation and the sheet is the guide. The Share glyph is the one thing
+  /// the reader will look for next.
+  Widget _installHintStrip(
+      BuildContext context, Localization l, InstallHintBanner hint,
+      {required bool top}) {
+    final tone = context.tokens.info;
+    return Material(
+      key: const Key('install-hint-strip'),
+      color: tone.container,
+      child: SafeArea(
+        top: top,
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+          child: Row(
+            children: [
+              Icon(Icons.ios_share, size: 16, color: tone.onContainer),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l[KApp.installHintBanner],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: tone.onContainer, fontSize: 13),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  hint.onOpen();
+                  showInstallHintSheet(context);
+                },
+                child: Text(l[KApp.installHintHow]),
+              ),
+              IconButton(
+                onPressed: hint.onDismiss,
+                icon: const Icon(Icons.close, size: 18),
+                color: tone.onContainer,
+                tooltip: l[KApp.installHintDismiss],
               ),
             ],
           ),

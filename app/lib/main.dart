@@ -44,6 +44,7 @@ import 'services/connectivity_status.dart';
 import 'services/auth_providers.dart';
 import 'services/crash_reporter.dart';
 import 'services/custody_data_source.dart';
+import 'services/install_hint.dart';
 import 'services/installed_app.dart';
 import 'services/notification_badge.dart';
 import 'services/offline_cache.dart';
@@ -355,6 +356,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
             onOpenProfile: () => _router.go('/family/profile'),
             deletionBanner: _deletionBanner,
             appHandoff: _appHandoff,
+            installHint: _installHint,
             connectivity: appConnectivity,
             tourKeys: _tourKeys),
         branches: [
@@ -538,6 +540,16 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// test.
   static const String _handoffDismissedKey = 'app.handoff.dismissed';
 
+  /// U-51: the iPhone install hint, or null — the answer on every native
+  /// build, on Android, on desktop, in every browser but Safari, and in an app
+  /// already on the Home Screen. A notifier for the reason [_deletionBanner]
+  /// gives.
+  final _installHint = ValueNotifier<InstallHintBanner?>(null);
+
+  /// Where a dismissal of the hint is remembered — per BROWSER, like the
+  /// handoff's: it is that Safari that keeps the app as a tab.
+  static const String _installHintDismissedKey = 'app.installHint.dismissed';
+
   /// U-23 — the checklist/tour state and the shared registry of tour targets
   /// (they live in two different subtrees: the tab bar and the calendar).
   late final OnboardingService _onboarding;
@@ -661,6 +673,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _refresh.dispose();
     _deletionBanner.dispose();
     _appHandoff.dispose();
+    _installHint.dispose();
     super.dispose();
   }
 
@@ -710,6 +723,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       // rather than at boot because the banner lives in the authenticated
       // shell, and because a question nobody will act on is not worth asking.
       unawaited(_resolveAppHandoff());
+      // U-51: asks the browser whether this is Safari on an iPhone still in
+      // a tab. Same place, same reason: the strip lives in the authenticated
+      // shell, and a stranger evaluating the app is not asked to install it.
+      _resolveInstallHint();
     } else {
       _badge.stop();
       unawaited(_push.stop());
@@ -775,6 +792,36 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   void _dismissAppHandoff() {
     _appHandoff.value = null;
     unawaited(widget.prefs.setBool(_handoffDismissedKey, true));
+  }
+
+  /// U-51 — whether to invite the reader to put the app on the Home Screen.
+  ///
+  /// Synchronous, unlike the handoff: the four facts are properties the
+  /// browser already holds. It still lands in a notifier and not in a
+  /// `setState`, for the go_router reason [_deletionBanner] gives — and so
+  /// that the T-65 widget test's order (shell first, answer second) stays the
+  /// order this code can be exercised in.
+  ///
+  /// Once per authenticated session and never after a dismissal. The
+  /// impression is counted so T-75 can read how many iPhone readers were
+  /// shown the door before it measures who walked through it.
+  void _resolveInstallHint() {
+    if (!kIsWeb || _installHint.value != null) return;
+    final facts = readBrowserInstallFacts();
+    if (facts == null) return;
+    final dismissed = widget.prefs.getBool(_installHintDismissedKey) ?? false;
+    if (!InstallHintRules.shouldHint(facts, dismissed: dismissed)) return;
+    _installHint.value = InstallHintBanner(
+      onOpen: () => unawaited(_analytics.trackEvent('install-hint-open')),
+      onDismiss: _dismissInstallHint,
+    );
+    unawaited(_analytics.trackEvent('install-hint-view'));
+  }
+
+  void _dismissInstallHint() {
+    _installHint.value = null;
+    unawaited(widget.prefs.setBool(_installHintDismissedKey, true));
+    unawaited(_analytics.trackEvent('install-hint-dismiss'));
   }
 
   /// F-09 — needs the profile id, which the phase transition does not carry.
