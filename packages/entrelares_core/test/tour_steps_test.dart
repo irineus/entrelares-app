@@ -19,7 +19,7 @@ void main() {
     expect(TourSteps.all.map((s) => s.target), [
       TourTarget.todayCard,
       TourTarget.calendarLegend,
-      TourTarget.wizardButton,
+      TourTarget.actionsMenu,
       TourTarget.notificationsTab,
     ]);
   });

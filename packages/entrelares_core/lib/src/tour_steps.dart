@@ -18,7 +18,13 @@ import 'localization/k.dart';
 enum TourTarget {
   todayCard,
   calendarLegend,
-  wizardButton,
+
+  /// U-36: the wizard no longer has an icon of its own — it is an item of the
+  /// calendar's ⋮ actions menu, so the stop spotlights the MENU button and the
+  /// copy says which item to pick. Named after the widget it lights, not the
+  /// feature it explains, so a future item added to the menu does not inherit
+  /// a lying name.
+  actionsMenu,
   notificationsTab,
 }
 
@@ -34,7 +40,7 @@ abstract final class TourSteps {
   static const List<TourStep> all = [
     TourStep(TourTarget.todayCard, K.tourTodayTitle, K.tourTodayBody),
     TourStep(TourTarget.calendarLegend, K.tourColoursTitle, K.tourColoursBody),
-    TourStep(TourTarget.wizardButton, K.tourWizardTitle, K.tourWizardBody),
+    TourStep(TourTarget.actionsMenu, K.tourWizardTitle, K.tourWizardBody),
     TourStep(TourTarget.notificationsTab, K.tourNotificationsTitle,
         K.tourNotificationsBody),
   ];

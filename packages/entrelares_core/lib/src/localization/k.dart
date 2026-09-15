@@ -187,6 +187,7 @@ abstract final class K {
   static const String calNextMonth = 'cal.nextMonth';
   static const String calSelectDays = 'cal.selectDays';
   static const String calWizard = 'cal.wizard';
+  static const String calActionsMenu = 'cal.actionsMenu';
   static const String calAriaCalendarOf = 'cal.ariaCalendarOf';
   static const String calMemberLeft = 'cal.memberLeft';
   static const String calSwapped = 'cal.swapped';
@@ -1250,6 +1251,7 @@ abstract final class K {
     calNextMonth,
     calSelectDays,
     calWizard,
+    calActionsMenu,
     calAriaCalendarOf,
     calMemberLeft,
     calSwapped,

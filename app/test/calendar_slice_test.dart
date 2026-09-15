@@ -1250,9 +1250,17 @@ void main() {
     // logout living only here is the defect U-28 closes.
     expect(find.byIcon(Icons.language), findsNothing);
     expect(find.byIcon(Icons.logout), findsNothing);
-    // The calendar's OWN actions stay with the calendar.
-    expect(find.byIcon(Icons.check_box_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.event_repeat), findsOneWidget);
+    // U-36: the calendar's OWN actions stay with the calendar, behind ONE ⋮
+    // menu with labelled items — no unlabelled action icon in the bar.
+    expect(find.byIcon(Icons.more_vert), findsOneWidget);
+    expect(find.byIcon(Icons.check_box_outlined), findsNothing);
+    expect(find.byIcon(Icons.event_repeat), findsNothing);
+    final l = Localization(AppLanguage.ptBr);
+    expect(find.text(l[K.calWizard]), findsNothing);
+    await tester.tap(find.byTooltip(l[K.calActionsMenu]));
+    await tester.pumpAndSettle();
+    expect(find.text(l[K.calWizard]), findsOneWidget);
+    expect(find.text(l[K.calSelectDays]), findsOneWidget);
   });
 
   testWidgets('U-28: every assigned cell prints the carer initial',

@@ -153,6 +153,7 @@ abstract final class StringsEn {
     K.calNextMonth: 'Next month',
     K.calSelectDays: 'Select several days',
     K.calWizard: 'Rotation wizard',
+    K.calActionsMenu: 'More calendar actions',
     K.calAriaCalendarOf: 'Calendar for {0}',
     K.calMemberLeft: '(left)',
     K.calSwapped: 'Swapped',
@@ -1032,7 +1033,7 @@ abstract final class StringsEn {
     K.tourColoursTitle: 'The calendar colours',
     K.tourColoursBody: 'Each caregiver has a fixed colour, and the legend says whose is whose. A swapped day gets a mark of its own, so the difference between what was planned and what happened is visible at a glance.',
     K.tourWizardTitle: 'The rotation wizard',
-    K.tourWizardBody: 'It fills a whole month from a pattern — every other week, alternating weekends, whatever your routine is. This is how you leave an empty calendar behind.',
+    K.tourWizardBody: 'It fills a whole month from a pattern — every other week, alternating weekends, whatever your routine is. This is how you leave an empty calendar behind. It lives in the calendar\'s ⋮ menu, under "Rotation wizard".',
     K.tourNotificationsTitle: 'Requests arrive here',
     K.tourNotificationsBody: 'When the other person asks for a swap, the notice shows up on this tab with a counter. It is also where your sent requests and the history live.',
   };

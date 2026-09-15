@@ -255,7 +255,7 @@ void main() {
       for (final target in [
         TourTarget.todayCard,
         TourTarget.calendarLegend,
-        TourTarget.wizardButton,
+        TourTarget.actionsMenu,
       ]) {
         expect(keys.isMounted(target), isTrue,
             reason: '$target has no widget registered on the calendar');

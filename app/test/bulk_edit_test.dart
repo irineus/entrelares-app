@@ -50,18 +50,29 @@ void main() {
     await longPressDay(tester, days.$2);
     expect(find.text(pt.format(K.selectionEdit, [2])), findsOneWidget);
     expect(find.text('✓'), findsNWidgets(2));
+    // U-36: the app bar is CONTEXTUAL while selecting — the count is the
+    // title and "Calendário" is gone, so the state is announced at the top,
+    // where the eye is, and not only in the strip at the bottom.
+    expect(find.text(pt.format(K.navGuardSelectedMany, [2])), findsOneWidget);
+    expect(find.text(pt[K.navCalendar]), findsNothing);
+    expect(find.byIcon(Icons.more_vert), findsNothing);
 
     // In selection mode a TAP toggles instead of opening the editor.
     await tester.tap(find.text('${days.$2}').last);
     await tester.pumpAndSettle();
     expect(find.text(pt.format(K.selectionEdit, [1])), findsOneWidget);
+    expect(find.text(pt.format(K.navGuardSelectedOne, [1])), findsOneWidget);
 
+    // ✕ lives in the contextual bar now, and ONLY there.
     await tester.tap(find.byTooltip(pt[K.selectionCancel]));
     await tester.pumpAndSettle();
     expect(find.textContaining('✏️'), findsNothing);
+    expect(find.text(pt[K.navCalendar]), findsOneWidget);
+    expect(find.byIcon(Icons.more_vert), findsOneWidget);
   });
 
-  testWidgets('U-11: the ☑️ button arms selection without a long-press',
+  testWidgets('U-36: "Selecionar vários dias" in the ⋮ menu arms selection '
+      'without a long-press, and the bar says what to do until a day is picked',
       (tester) async {
     final days = twoFutureDays;
     if (days == null) return;
@@ -69,14 +80,40 @@ void main() {
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip(pt[K.calSelectDays]));
+    await tester.tap(find.byTooltip(pt[K.calActionsMenu]));
     await tester.pumpAndSettle();
+    await tester.tap(find.text(pt[K.calSelectDays]));
+    await tester.pumpAndSettle();
+    // Armed, nothing picked: the contextual title is the instruction itself.
+    expect(find.text(pt[K.calSelectDays]), findsOneWidget);
+    expect(find.text(pt[K.navCalendar]), findsNothing);
+
     final dayFinder = find.text('${days.$1}').last;
     await tester.ensureVisible(dayFinder);
     await tester.pumpAndSettle();
     await tester.tap(dayFinder);
     await tester.pumpAndSettle();
     expect(find.text(pt.format(K.selectionEdit, [1])), findsOneWidget);
+    expect(find.text(pt.format(K.navGuardSelectedOne, [1])), findsOneWidget);
+  });
+
+  testWidgets('U-36: the admin shield stays reachable while selecting — the '
+      'bulk edit of a past day is exactly where the mode is needed',
+      (tester) async {
+    final days = twoFutureDays;
+    if (days == null) return;
+    final adminMode = AdminMode();
+    final ds = FakeCustodyDataSource(members: [anaAdmin, bruno], days: []);
+    await tester.pumpWidget(app(ds, adminMode: adminMode));
+    await tester.pumpAndSettle();
+
+    await longPressDay(tester, days.$1);
+    expect(find.byIcon(Icons.shield_outlined), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.shield_outlined));
+    await tester.pumpAndSettle();
+    expect(adminMode.isActive, isTrue);
+    // Still selecting: the count did not move.
+    expect(find.text(pt.format(K.navGuardSelectedOne, [1])), findsOneWidget);
   });
 
   testWidgets('bulk direct save: unassigned days take the chosen parent and '
