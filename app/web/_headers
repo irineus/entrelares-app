@@ -37,7 +37,19 @@
 #     reports NOTHING, silently, because a reporter that may never break the app
 #     swallows its own transport failure. `web_channel_test` reads the host out
 #     of `Env.sentryDsn` and fails the build if the two ever drift.
+#   * L-29 — `X-Robots-Tag: noindex`, on EVERY path. `_redirects` answers 200
+#     with the same `index.html` for any address, so to a crawler this host is
+#     an endless set of identical pages titled "Entrelares" with no text (the
+#     app draws on a canvas) — and it was already in Bing's index beside the
+#     landing, competing for the brand name. The landing (`entrelares.app`) is
+#     the one search result this product wants. A HEADER rather than a meta
+#     tag: it covers the rewritten routes, the JSON and the workers alike, and
+#     it lives in the one block this file already applies to every path. It
+#     does not touch the App Link check — Android reads `assetlinks.json`, not
+#     the index. Its pair is `robots.txt`, which must keep ALLOWING the crawl: a
+#     crawler that may not fetch a page never sees the header that drops it.
 /*
+  X-Robots-Tag: noindex
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
