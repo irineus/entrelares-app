@@ -44,6 +44,7 @@ export 'src/report_rules.dart';
 export 'src/role_catalog.dart';
 export 'src/route_rules.dart';
 export 'src/save_errors.dart';
+export 'src/schedule_range_rules.dart';
 export 'src/settings_rules.dart';
 export 'src/sign_in_methods.dart';
 export 'src/store_billing_rules.dart';

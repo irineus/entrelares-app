@@ -8,7 +8,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 
+import 'package:entrelares_db_contracts/models/member.dart';
+import 'package:entrelares_app/services/admin_mode.dart';
+
 import 'calendar_slice_test.dart';
+
+/// The admin of the fake roster — the shield only shows for a real admin.
+const anaAdmin = Member(
+    id: 1, fullName: 'Ana Souza', colorSlot: 1, userId: 'u1', isAdmin: true);
 
 final pt = Localization(AppLanguage.ptBr);
 
@@ -119,5 +126,102 @@ void main() {
     expect(find.textContaining(pt[K.wizErrPickParentPerBlock]),
         findsOneWidget);
     expect(ds.inserted, isEmpty);
+  });
+
+  f51ReplaceTests();
+}
+
+// ── F-51: "substituir os dias já planejados" ────────────────────────────────
+
+Future<void> tapReplaceCheckbox(WidgetTester tester) async {
+  final box = find.byKey(const Key('wizReplaceExisting'));
+  await tester.ensureVisible(box);
+  await tester.pumpAndSettle();
+  await tester.tap(box);
+  await tester.pumpAndSettle();
+}
+
+void f51ReplaceTests() {
+  testWidgets('F-51: without admin mode the wizard offers no replace — the '
+      'additive path is untouched', (tester) async {
+    final ds = FakeCustodyDataSource(members: [anaAdmin, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    await openWizard(tester);
+    expect(find.byKey(const Key('wizReplaceExisting')), findsNothing);
+    await generate(tester);
+    expect(ds.replacedRanges, isEmpty);
+    expect(ds.inserted, hasLength(daysInThreeMonths()));
+  });
+
+  testWidgets('F-51: admin mode + the box ticked asks the S-09 question with '
+      'the planned count, then replaces the range in ONE call',
+      (tester) async {
+    final future = futureDay;
+    if (future == null) return;
+    final ds = FakeCustodyDataSource(
+        members: [anaAdmin, bruno], days: [row(7, dayOfMonth(future), 2)]);
+    await tester.pumpWidget(app(ds, adminMode: AdminMode()..toggle()));
+    await tester.pumpAndSettle();
+
+    await openWizard(tester);
+    await tapReplaceCheckbox(tester);
+    await generate(tester);
+
+    // The bulk edit's own warning, with the count the range holds NOW —
+    // and nothing written yet.
+    expect(find.text(pt.format(K.bulkOverwriteWarningOne, [1])),
+        findsOneWidget);
+    expect(ds.replacedRanges, isEmpty);
+    expect(ds.inserted, isEmpty);
+
+    await tapSheet(tester, find.text(pt[K.editorYesChange]));
+
+    final call = ds.replacedRanges.single;
+    expect(call.from, dateOnly(today));
+    // Exactly the generated span: [start, end) → the day before the end.
+    final end = addMonthsClamped(dateOnly(today), 3);
+    expect(call.to, DateTime(end.year, end.month, end.day - 1));
+    expect(call.days, hasLength(daysInThreeMonths()));
+    expect(call.days.first.scheduledParentId, 1);
+    // The additive write never ran — one transaction, not clear-then-insert.
+    expect(ds.inserted, isEmpty);
+    expect(find.textContaining('do plano anterior'), findsOneWidget);
+  });
+
+  testWidgets('F-51: "não, voltar" on the S-09 question writes nothing and '
+      'keeps the form', (tester) async {
+    final future = futureDay;
+    if (future == null) return;
+    final ds = FakeCustodyDataSource(
+        members: [anaAdmin, bruno], days: [row(7, dayOfMonth(future), 2)]);
+    await tester.pumpWidget(app(ds, adminMode: AdminMode()..toggle()));
+    await tester.pumpAndSettle();
+
+    await openWizard(tester);
+    await tapReplaceCheckbox(tester);
+    await generate(tester);
+    await tapSheet(tester, find.text(pt[K.editorNoGoBack]));
+
+    expect(ds.replacedRanges, isEmpty);
+    expect(ds.inserted, isEmpty);
+    expect(find.text(pt[K.wizGenerate]), findsOneWidget);
+  });
+
+  testWidgets('F-51: an empty range asks nothing and still goes through the '
+      'replace path', (tester) async {
+    final ds = FakeCustodyDataSource(members: [anaAdmin, bruno], days: []);
+    await tester.pumpWidget(app(ds, adminMode: AdminMode()..toggle()));
+    await tester.pumpAndSettle();
+
+    await openWizard(tester);
+    await tapReplaceCheckbox(tester);
+    await generate(tester);
+
+    expect(find.text(pt[K.editorYesChange]), findsNothing);
+    expect(ds.replacedRanges, hasLength(1));
+    expect(find.textContaining('dias criados'), findsOneWidget);
+    expect(find.textContaining('do plano anterior'), findsNothing);
   });
 }

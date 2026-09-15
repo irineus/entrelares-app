@@ -183,6 +183,12 @@ abstract final class K {
   static const String calSelectDays = 'cal.selectDays';
   static const String calWizard = 'cal.wizard';
   static const String calActionsMenu = 'cal.actionsMenu';
+  // F-51: "Limpar mês" — the calendar's one-tap clear of the displayed month.
+  static const String calClearMonth = 'cal.clearMonth';
+  static const String calClearMonthTitle = 'cal.clearMonth.title';
+  static const String calClearMonthBodyOne = 'cal.clearMonth.bodyOne';
+  static const String calClearMonthBodyMany = 'cal.clearMonth.bodyMany';
+  static const String calClearMonthNothing = 'cal.clearMonth.nothing';
   static const String calAriaCalendarOf = 'cal.ariaCalendarOf';
   static const String calMemberLeft = 'cal.memberLeft';
   static const String calSwapped = 'cal.swapped';
@@ -374,6 +380,11 @@ abstract final class K {
   static const String wizDoneKept = 'wiz.done.kept';
   static const String wizDoneClampedFree = 'wiz.done.clampedFree';
   static const String wizDoneClampedMax = 'wiz.done.clampedMax';
+  // F-51: the "substituir os dias já planejados" checkbox and its result.
+  static const String wizReplaceExisting = 'wiz.replaceExisting';
+  static const String wizReplaceHint = 'wiz.replaceHint';
+  static const String wizDoneReplacedOne = 'wiz.done.replacedOne';
+  static const String wizDoneReplacedMany = 'wiz.done.replacedMany';
 
   // ── Bulk summary (BulkSummary) ──
   static const String sumSwapRequestOne = 'sum.swapRequestOne';
@@ -397,6 +408,11 @@ abstract final class K {
   static const String sumCancelledMany = 'sum.cancelledMany';
   static const String sumDeletedOne = 'sum.deletedOne';
   static const String sumDeletedMany = 'sum.deletedMany';
+  // F-51: a range clear reports the days it kept, by reason.
+  static const String sumKeptFrozenOne = 'sum.keptFrozenOne';
+  static const String sumKeptFrozenMany = 'sum.keptFrozenMany';
+  static const String sumKeptSwapOne = 'sum.keptSwapOne';
+  static const String sumKeptSwapMany = 'sum.keptSwapMany';
   static const String bulkProgressDeleting = 'bulk.progress.deleting';
 
   // ── Toasts and save errors the ACTING user reads ──
@@ -1249,6 +1265,11 @@ abstract final class K {
     calSelectDays,
     calWizard,
     calActionsMenu,
+    calClearMonth,
+    calClearMonthTitle,
+    calClearMonthBodyOne,
+    calClearMonthBodyMany,
+    calClearMonthNothing,
     calAriaCalendarOf,
     calMemberLeft,
     calSwapped,
@@ -1419,6 +1440,10 @@ abstract final class K {
     wizDoneKept,
     wizDoneClampedFree,
     wizDoneClampedMax,
+    wizReplaceExisting,
+    wizReplaceHint,
+    wizDoneReplacedOne,
+    wizDoneReplacedMany,
     sumSwapRequestOne,
     sumSwapRequestMany,
     sumRevertOne,
@@ -1440,6 +1465,10 @@ abstract final class K {
     sumCancelledMany,
     sumDeletedOne,
     sumDeletedMany,
+    sumKeptFrozenOne,
+    sumKeptFrozenMany,
+    sumKeptSwapOne,
+    sumKeptSwapMany,
     bulkProgressDeleting,
     toastRevertRequested,
     toastSwapRequested,

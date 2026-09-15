@@ -28,6 +28,11 @@ class FakeCustodyDataSource implements CustodyDataSource {
   final List<CareSchedule> inserted = [];
   final List<CareSchedule> updated = [];
   final List<int> deleted = [];
+
+  /// F-51: the range calls, as the calendar and the wizard make them.
+  final List<({DateTime from, DateTime to})> clearedRanges = [];
+  final List<({DateTime from, DateTime to, List<CareSchedule> days})>
+      replacedRanges = [];
   Family? family;
   Object? throwOnFamily;
   Map<String, String> publicSettings = const {};
@@ -188,6 +193,41 @@ class FakeCustodyDataSource implements CustodyDataSource {
     if (throwOnWrite != null) throw throwOnWrite!;
     deleted.add(id);
     days = days.where((d) => d.id != id).toList();
+  }
+
+  /// The fake's own rule for a range: every row inside it goes (no frozen
+  /// or swapped seeds here), and the counts are what the server would say.
+  int _dropRange(DateTime from, DateTime to) {
+    final before = days.length;
+    days = days
+        .where((d) => d.scheduleDate.isBefore(from) || d.scheduleDate.isAfter(to))
+        .toList();
+    return before - days.length;
+  }
+
+  @override
+  Future<ScheduleRangeResult> clearScheduleRange(
+      DateTime from, DateTime to) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    clearedRanges.add((from: from, to: to));
+    final removed = _dropRange(from, to);
+    return ScheduleRangeResult(
+        deleted: removed, keptFrozen: 0, keptSwap: 0, batchId: 'fake-batch');
+  }
+
+  @override
+  Future<ScheduleRangeResult> replaceScheduleRange(
+      DateTime from, DateTime to, List<CareSchedule> newDays) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    replacedRanges.add((from: from, to: to, days: newDays));
+    final removed = _dropRange(from, to);
+    days = [...days, ...newDays];
+    return ScheduleRangeResult(
+        deleted: removed,
+        keptFrozen: 0,
+        keptSwap: 0,
+        inserted: newDays.length,
+        batchId: 'fake-batch');
   }
 
   @override
@@ -1168,8 +1208,28 @@ void main() {
     final before = ds.monthFetches;
 
     ds.realtimeCallback!();
+    // F-51: the event is coalesced — the reload lands after the quiet window.
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     expect(ds.monthFetches, greaterThan(before));
+  });
+
+  testWidgets('F-51: a burst of Realtime events — one per row of a range '
+      'operation — folds into ONE reload', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    final before = ds.monthFetches;
+
+    for (var i = 0; i < 30; i++) {
+      ds.realtimeCallback!();
+    }
+    // Inside the window nothing has reloaded yet; after it, exactly once.
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(ds.monthFetches, before);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(ds.monthFetches, before + 1);
   });
 
   // U-13/U-24 — the proof the pilot never gave: the SAME slice, English

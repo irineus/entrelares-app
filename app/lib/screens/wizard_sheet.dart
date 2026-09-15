@@ -18,6 +18,13 @@ import '../widgets/cycle_strip.dart';
 /// ("criados X, mantidos Y"). Pops with `true` after a successful generation
 /// (the caller reloads; the success text is shown inside the sheet, mirror of
 /// the web's `isCompleted` view).
+///
+/// F-51: under the admin bypass the sheet offers "substituir os dias já
+/// planejados" — the wizard then clears EXACTLY the range it is about to
+/// generate and inserts the plan in ONE server-side transaction
+/// (`replaceScheduleRange`), after the same S-09 confirmation the bulk edit
+/// asks before rewriting planned days. Without it, re-planning over an old
+/// plan answered "0 dias criados" and read as a bug.
 Future<bool?> showWizardSheet({
   required BuildContext context,
   required List<Member> activeMembers,
@@ -25,6 +32,7 @@ Future<bool?> showWizardSheet({
   required CustodyDataSource dataSource,
   DateTime? maxScheduleDate,
   required bool isFreeTier,
+  bool adminBypass = false,
   AnalyticsService? analytics,
 }) {
   return showAppSheet<bool>(
@@ -35,6 +43,7 @@ Future<bool?> showWizardSheet({
       dataSource: dataSource,
       maxScheduleDate: maxScheduleDate,
       isFreeTier: isFreeTier,
+      adminBypass: adminBypass,
       analytics: analytics,
     ),
   );
@@ -47,6 +56,11 @@ class _WizardSheet extends StatefulWidget {
   final DateTime? maxScheduleDate;
   final bool isFreeTier;
 
+  /// F-51: admin mode on AND a real admin — the only state that may offer
+  /// the replace. The database enforces it regardless (the RPC refuses a
+  /// non-admin); this only decides whether to ASK.
+  final bool adminBypass;
+
   /// T-37 — optional: the activation signal never gates the generation.
   final AnalyticsService? analytics;
 
@@ -56,6 +70,7 @@ class _WizardSheet extends StatefulWidget {
     required this.dataSource,
     required this.maxScheduleDate,
     required this.isFreeTier,
+    required this.adminBypass,
     this.analytics,
   });
 
@@ -81,6 +96,18 @@ class _WizardSheetState extends State<_WizardSheet> {
   String? _successMessage;
   String? _errorMessage;
   double _progress = 0;
+
+  /// F-51: the replace checkbox and its S-09 confirmation. The count is the
+  /// planned days the range holds NOW (one read, before the confirmation);
+  /// `_replaceConfirmed` is consumed by the generation that follows the yes.
+  bool _replaceExisting = false;
+  bool _showReplaceConfirm = false;
+  bool _replaceConfirmed = false;
+  int _replaceCount = 0;
+
+  /// The replace is one server round trip with no progress to report — the
+  /// bar runs indeterminate while it lasts.
+  bool _indeterminate = false;
 
   List<int> get _profileIds =>
       [for (final m in widget.activeMembers) m.id];
@@ -142,6 +169,7 @@ class _WizardSheetState extends State<_WizardSheet> {
       _generating = true;
       _errorMessage = null;
       _progress = 0;
+      _indeterminate = false;
     });
     try {
       // F-39: clamp the generated range to the family's planning horizon.
@@ -167,20 +195,63 @@ class _WizardSheetState extends State<_WizardSheet> {
           ),
       ];
 
-      final created = await widget.dataSource.bulkInsertNewDays(rows,
-          onProgress: (percent) =>
-              setState(() => _progress = percent / 100));
-      final kept = rows.length - created;
+      final replaceRange = widget.adminBypass && _replaceExisting
+          ? wizardReplaceRange(start: _startDate, end: clampResult.end)
+          : null;
 
-      var message = l.format(K.wizDoneCreated, [created]);
-      if (kept > 0) message += l.format(K.wizDoneKept, [kept]);
+      String message;
+      int created;
+      if (replaceRange != null) {
+        // F-51: the S-09 question, asked once, with the count of planned days
+        // the range holds — the same warning the bulk edit shows before it
+        // rewrites a planned parent. Nothing to overwrite → nothing to ask.
+        if (!_replaceConfirmed) {
+          final existing = await widget.dataSource.fetchUpcoming(
+              replaceRange.from,
+              replaceRange.to.difference(replaceRange.from).inDays);
+          // A day holding an approved swap is kept by the server, so it is
+          // not a day this call will rewrite. Frozen days are kept too, but
+          // the sheet has no frozen list for a range beyond the displayed
+          // month — the question may over-count by those, never under.
+          final count = plannedDaysInRange([
+            for (final d in existing)
+              if (d.actualParentId == null ||
+                  d.actualParentId == d.scheduledParentId)
+                d.scheduleDate,
+          ], replaceRange);
+          if (count > 0) {
+            if (!mounted) return;
+            setState(() {
+              _generating = false;
+              _replaceCount = count;
+              _showReplaceConfirm = true;
+            });
+            return;
+          }
+        }
+        _replaceConfirmed = false;
+        setState(() => _indeterminate = true);
+        final result = await widget.dataSource.replaceScheduleRange(
+            replaceRange.from, replaceRange.to, rows);
+        created = result.inserted;
+        message = wizardReplaceSummary(l, result);
+      } else {
+        created = await widget.dataSource.bulkInsertNewDays(rows,
+            onProgress: (percent) =>
+                setState(() => _progress = percent / 100));
+        final kept = rows.length - created;
+        message = l.format(K.wizDoneCreated, [created]);
+        if (kept > 0) message += l.format(K.wizDoneKept, [kept]);
+      }
       if (clampResult.clamped) {
         message += l[
             widget.isFreeTier ? K.wizDoneClampedFree : K.wizDoneClampedMax];
       }
       // T-37: the key activation moment — a family generated its base plan.
-      widget.analytics?.trackEvent('wizard_completed',
-          props: {'created': created > 0 ? 'yes' : 'none'});
+      widget.analytics?.trackEvent('wizard_completed', props: {
+        'created': created > 0 ? 'yes' : 'none',
+        'replaced': replaceRange != null ? 'yes' : 'no',
+      });
       setState(() {
         _generating = false;
         _completed = true;
@@ -213,16 +284,61 @@ class _WizardSheetState extends State<_WizardSheet> {
           ? null
           : Text('⚠️ $_errorMessage',
               style: TextStyle(color: Theme.of(context).colorScheme.error)),
-      primaryLabel: _completed ? l[K.wizClose] : l[K.wizGenerate],
+      // F-51: while the S-09 question is on screen it owns the action row,
+      // exactly as the bulk sheet does for its own confirmations.
+      primaryLabel: _showReplaceConfirm
+          ? null
+          : (_completed ? l[K.wizClose] : l[K.wizGenerate]),
       onPrimary: _completed
           ? () => Navigator.of(context).pop(true)
           : (_generating ? null : _generate),
-      secondaryLabel: _completed ? null : l[K.commonCancel],
+      secondaryLabel:
+          _showReplaceConfirm || _completed ? null : l[K.commonCancel],
       onSecondary: () => Navigator.of(context).pop(),
       busy: _generating,
       children: _completed ? _successView(l) : _form(l),
     );
   }
+
+  /// F-51: the S-09 warning, in the bulk sheet's own box — confirmation
+  /// first, the way out after it (U-27).
+  Widget _replaceConfirmBox(Localization l) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(Spacing.sm + Spacing.xs),
+        decoration: BoxDecoration(
+          color: context.tokens.danger.container,
+          border: Border.all(color: context.tokens.danger.border),
+          borderRadius: BorderRadius.circular(Radii.md),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+                l.format(
+                    _replaceCount == 1
+                        ? K.bulkOverwriteWarningOne
+                        : K.bulkOverwriteWarningMany,
+                    [_replaceCount]),
+                style: TextStyle(
+                    fontSize: 13, color: context.tokens.danger.onContainer)),
+            const SizedBox(height: Spacing.sm),
+            AppActionPair(
+              primaryLabel: l[K.editorYesChange],
+              destructive: true,
+              busy: _generating,
+              onPrimary: () {
+                setState(() {
+                  _showReplaceConfirm = false;
+                  _replaceConfirmed = true;
+                });
+                _generate();
+              },
+              secondaryLabel: l[K.editorNoGoBack],
+              onSecondary: () => setState(() => _showReplaceConfirm = false),
+            ),
+          ],
+        ),
+      );
 
   List<Widget> _successView(Localization l) => [
         Row(
@@ -252,6 +368,10 @@ class _WizardSheetState extends State<_WizardSheet> {
       handoffTime: _handoffTime,
     );
     return [
+      if (_showReplaceConfirm) ...[
+        _replaceConfirmBox(l),
+        const SizedBox(height: Spacing.sm),
+      ],
       // ── Preset shortcuts (the VALUES are pattern ids, never localized) ──
       //
       // U-28 QA: every control on this sheet was a bare `DropdownButton` — an
@@ -450,6 +570,43 @@ class _WizardSheetState extends State<_WizardSheet> {
       ),
       const SizedBox(height: Spacing.sm),
 
+      // ── F-51: replace the days already planned (admin mode only) ──
+      //
+      // The bulk sheet's own checkbox shape (label + hint), so the two places
+      // that rewrite planned days look like one feature. The hint says what
+      // is kept, because the server keeps it whatever the box says.
+      if (widget.adminBypass) ...[
+        AppCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                key: const Key('wizReplaceExisting'),
+                value: _replaceExisting,
+                onChanged: _generating
+                    ? null
+                    : (v) => setState(() => _replaceExisting = v ?? false),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(l[K.wizReplaceExisting]),
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(l[K.wizReplaceHint],
+                        style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: Spacing.sm),
+      ],
+
       // ── Preview ──
       //
       // U-28 QA: the cycle summary is the sheet's answer to "what will this
@@ -477,7 +634,7 @@ class _WizardSheetState extends State<_WizardSheet> {
 
       if (_generating) ...[
         const SizedBox(height: Spacing.sm),
-        LinearProgressIndicator(value: _progress),
+        LinearProgressIndicator(value: _indeterminate ? null : _progress),
       ],
     ];
   }

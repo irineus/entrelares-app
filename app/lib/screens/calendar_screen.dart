@@ -141,6 +141,10 @@ class _CalendarScreenState extends State<CalendarScreen>
   // (paint, guards, panel). Keyed alongside _daysByIso on every load.
   Map<String, SwapRequest> _frozenByIso = const {};
   bool _loading = true;
+
+  /// F-51: the Realtime burst of a range operation folds into one reload.
+  Timer? _changeDebounce;
+  static const _changeDebounceWindow = Duration(milliseconds: 300);
   String? _loadError;
 
   /// T-18: the month [_daysByIso] and [_frozenByIso] were last read for.
@@ -336,7 +340,15 @@ class _CalendarScreenState extends State<CalendarScreen>
     // drives the F-23 poll cadence.
     _unwatch = await widget.dataSource.watchChanges(
       () {
-        if (mounted) _load(silent: true);
+        // F-51: a range operation is ONE statement on the server but N
+        // Realtime events on every device — one per row, in a burst, and
+        // `_load` has no in-flight guard. The bulk paths already produced
+        // such bursts (one event per day saved); a year's re-plan makes it
+        // ~730. Coalesce the burst into one reload after it goes quiet.
+        _changeDebounce?.cancel();
+        _changeDebounce = Timer(_changeDebounceWindow, () {
+          if (mounted) _load(silent: true);
+        });
       },
       onStatus: (connected) {
         if (!mounted) return;
@@ -367,6 +379,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     _unwatch?.call();
     _unwatchWorkflow?.call();
     _pollTimer?.cancel();
+    _changeDebounce?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -832,9 +845,78 @@ class _CalendarScreenState extends State<CalendarScreen>
       // F-39: the wizard clamps to the same horizon as the paging.
       maxScheduleDate: _horizonDate,
       isFreeTier: !_isPremiumForPaging,
+      // F-51: the "substituir" checkbox is an admin-mode power, like every
+      // other clear of a planned day.
+      adminBypass: _adminBypass,
       analytics: widget.analytics,
     );
     if (generated == true) _load(silent: true);
+  }
+
+  /// F-51 "Limpar mês": ONE server-side statement over today → the end of
+  /// the displayed month (`monthClearRange`), never the past. The
+  /// confirmation spells the exact count and the exact range — the count is
+  /// the displayed month's own rows, which is exact because the range never
+  /// leaves that month — and says what is kept; the toast is the SERVER's
+  /// count, by reason, because only the server saw which rows the trigger's
+  /// rules spared. U-27: the confirming action first, the way out after it.
+  Future<void> _clearMonth() async {
+    if (_refuseWriteOffline()) return;
+    final l = AppL10n.of(context).l;
+    final range = monthClearRange(visibleMonth: _visibleMonth, today: _today);
+    if (range == null) return;
+    final fromText = l.formatDate(range.from);
+    final toText = l.formatDate(range.to);
+    // Only what the server will actually delete: a frozen day (pending
+    // request) and a day holding an approved swap are kept by the RPC's
+    // WHERE, so they must not be counted as "serão apagados" here either.
+    final count = plannedDaysInRange([
+      for (final d in _daysByIso.values)
+        if (!_frozenByIso.containsKey(CareSchedule.isoDate(d.scheduleDate)) &&
+            (d.actualParentId == null ||
+                d.actualParentId == d.scheduledParentId))
+          d.scheduleDate,
+    ], range);
+    if (count == 0) {
+      showAppSnack(
+          context, l.format(K.calClearMonthNothing, [fromText, toText]));
+      return;
+    }
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l[K.calClearMonthTitle]),
+        content: Text(l.format(
+            count == 1 ? K.calClearMonthBodyOne : K.calClearMonthBodyMany,
+            [count, fromText, toText])),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                  foregroundColor: context.tokens.danger.onContainer),
+              child: Text(l[K.bulkYesDelete])),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(l[K.commonCancel])),
+        ],
+      ),
+    );
+    if (proceed != true || !mounted) return;
+    try {
+      final result =
+          await widget.dataSource.clearScheduleRange(range.from, range.to);
+      if (!mounted) return;
+      _load(silent: true);
+      showAppSnack(context, clearRangeSummary(l, result));
+    } catch (e) {
+      if (!mounted) return;
+      final raw = e.toString();
+      showAppSnack(
+          context,
+          isSessionExpired(raw)
+              ? sessionExpiredMessage(l)
+              : translateSaveError(raw, l[K.errSaveFailed], l));
+    }
   }
 
   Future<void> _openDay(DateTime date) async {
@@ -1122,6 +1204,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               // long-press). Once armed, tapping a day toggles its selection.
               _CalendarAction.selectDays =>
                 setState(() => _selectionArmed = true),
+              _CalendarAction.clearMonth => _clearMonth(),
             },
             itemBuilder: (context) => [
               PopupMenuItem(
@@ -1142,8 +1225,31 @@ class _CalendarScreenState extends State<CalendarScreen>
                   title: Text(l[K.calSelectDays]),
                 ),
               ),
-              // F-51 ("Limpar mês") enters HERE as a third item, after a
-              // `PopupMenuDivider` — destructive, so last and set apart.
+              // F-51 "Limpar mês": the third item, after a divider —
+              // destructive, so last and set apart, in the danger tone. Only
+              // under the admin bypass (clearing a planned day is an admin
+              // power, and the shield is this product's override gesture —
+              // the same gate as "Limpar dia" and "Apagar dias"), and only
+              // while the displayed month still has days ahead: the past is
+              // never offered, not even to an admin.
+              if (_adminBypass &&
+                  monthClearRange(
+                          visibleMonth: _visibleMonth, today: _today) !=
+                      null) ...[
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: _CalendarAction.clearMonth,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.delete_sweep_outlined,
+                        color: context.tokens.danger.onContainer),
+                    title: Text(l[K.calClearMonth],
+                        style: TextStyle(
+                            color: context.tokens.danger.onContainer)),
+                  ),
+                ),
+              ],
             ],
           ),
       ];
@@ -1335,7 +1441,7 @@ class _CalendarScreenState extends State<CalendarScreen>
 }
 
 /// U-36 — the items of the calendar's ⋮ menu. F-51 adds `clearMonth` here.
-enum _CalendarAction { wizard, selectDays }
+enum _CalendarAction { wizard, selectDays, clearMonth }
 
 /// The today card's outline while it loads — the same card, the same two
 /// bands, the same heights, so nothing moves when the real one arrives.

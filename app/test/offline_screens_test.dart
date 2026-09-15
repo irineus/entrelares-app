@@ -232,6 +232,7 @@ void main() {
       ds.throwOnMembers = noNetwork;
       status.lostServer();
       ds.realtimeCallback!(); // the silent reload a change or the poll fires
+      await tester.pump(const Duration(milliseconds: 300)); // F-51 debounce
       await tester.pumpAndSettle();
 
       expect(find.text('A'), findsWidgets);
@@ -253,6 +254,7 @@ void main() {
       ds.throwOnMembers = Exception(
           'PostgrestException(message: boom, code: XX000, details: null, hint: null)');
       ds.realtimeCallback!();
+      await tester.pump(const Duration(milliseconds: 300)); // F-51 debounce
       await tester.pumpAndSettle();
 
       expect(find.textContaining(pt[KApp.errCalendarLoad]), findsOneWidget);
