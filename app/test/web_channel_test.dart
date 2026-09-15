@@ -956,6 +956,37 @@ void main() {
       expect(job, contains("github.ref_name == 'main'"));
       expect(job, contains('wrangler pages deploy build/web'));
     });
+
+    // 15/09/2026 (F-63, PR #187): a squash-merge produced no run at all, and
+    // with the publish gated on `push` alone nothing could republish `main`
+    // short of another merge. The manual dispatch is the way back — for the
+    // whole publish chain, or a dispatch would pass the gates, skip
+    // `db-prod`, and leave `deploy-web` waiting on a job that never ran.
+    test('a manual dispatch on main republishes through the same chain', () {
+      // Line-ending agnostic: a Windows checkout reads the file with CRLF.
+      final lines = workflow.split(RegExp(r'\r?\n'));
+      String jobIf(String name) {
+        final start = lines.indexOf('  $name:');
+        expect(start, isNot(-1), reason: 'job $name exists');
+        final ifLine =
+            lines.indexWhere((line) => line.startsWith('    if:'), start);
+        final condition = StringBuffer(lines[ifLine]);
+        for (var i = ifLine + 1; lines[i].startsWith('      '); i++) {
+          condition.write(' ${lines[i].trim()}');
+        }
+        return condition.toString();
+      }
+
+      for (final name in ['db-prod', 'deploy-web', 'ops-alert']) {
+        final condition = jobIf(name);
+        expect(condition, contains("github.event_name == 'push'"),
+            reason: name);
+        expect(condition, contains("github.event_name == 'workflow_dispatch'"),
+            reason: '$name must also run on a manual dispatch');
+        expect(condition, contains("github.ref_name == 'main'"),
+            reason: '$name must never publish from another ref');
+      }
+    });
   });
 
   // ── T-58 — the flow gate has to PROVE it ran ──────────────────────────────

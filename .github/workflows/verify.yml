@@ -32,6 +32,15 @@ name: verify
 # and any manual run are unaffected — that is also the escape hatch for forcing
 # a full run over a docs-only branch.
 #
+# A `workflow_dispatch` ON `main` also PUBLISHES (`db-prod`, `deploy-web` and
+# `ops-alert` accept it beside `push`), since 15/09/2026: the squash-merge of
+# PR #187 (F-63) produced NO run at all — no push event reached Actions, 16 min
+# of silence with GitHub reporting every system operational — and with the three
+# jobs gated on `push` alone the only way to publish that commit was another
+# merge. Dispatching `verify` on `main` is now the way to republish HEAD; it runs
+# the same three gates first, so nothing reaches a user unchecked. From any
+# other ref the publish jobs still skip (`ref_name == 'main'`).
+#
 # Note this repo has neither branch protection nor a ruleset (checked
 # 29/08/2026). If `verify` is ever made a REQUIRED check, revisit: a workflow
 # that never runs reports no status, and a docs-only PR would sit unmergeable.
@@ -506,7 +515,7 @@ jobs:
   # `main`, only after BOTH gates are green, and the credentials are three secrets
   # that exist nowhere else in the workflow.
   db-prod:
-    if: github.event_name == 'push' && github.ref_name == 'main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
     needs: [verify, db-gate]
     runs-on: ubuntu-latest
     # Queue, never cancel: a `db push` interrupted between two migrations leaves
@@ -567,7 +576,7 @@ jobs:
   #                               third-party host.
   #   --release                   the only build a user may ever receive.
   deploy-web:
-    if: github.event_name == 'push' && github.ref_name == 'main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
     # THREE gates and one deploy, in this order, and each edge was added the day
     # its absence would have cost something:
     #   · `verify`   — the Flutter suites (unit, widget, web compile);
@@ -747,7 +756,8 @@ jobs:
   # `contains(needs.*.result, 'failure')` rather than `failure()`.
   ops-alert:
     if: >-
-      always() && github.event_name == 'push' && github.ref_name == 'main'
+      always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref_name == 'main'
       && contains(needs.*.result, 'failure')
     needs: [verify, db-gate, web-e2e, db-prod, deploy-web]
     runs-on: ubuntu-latest
