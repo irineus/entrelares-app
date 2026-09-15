@@ -11,21 +11,32 @@ import 'package:flutter/material.dart';
 import 'tokens.dart';
 
 abstract final class AppTheme {
+  /// The app's typeface, as declared under `fonts:` in pubspec.yaml.
+  static const String fontFamily = 'Inter';
+
   static ThemeData get light => _build(AppTokens.light, Brightness.light);
   static ThemeData get dark => _build(AppTokens.dark, Brightness.dark);
 
   static ThemeData _build(AppTokens t, Brightness brightness) {
     final scheme = _scheme(t, brightness);
-    final textTheme = _textTheme(t);
+    // The family is stamped on the text theme ITSELF, not only passed to
+    // `ThemeData(fontFamily:)` below. That argument reaches the theme's merged
+    // text theme, but every component theme here is built from THIS value —
+    // and a button label, an app bar title or a dialog REPLACES the inherited
+    // text style with its own. A family-less style there painted in the
+    // platform font (Roboto, the web's system font) beside Inter body text.
+    // Found during F-65 (15/09/2026); gated by theme_font_family_test.
+    final textTheme = _textTheme(t).apply(fontFamily: fontFamily);
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
       extensions: [t],
-      // Inter, subset to the four weights the scale uses. `fontFamily` alone
-      // covers everything the app draws; Material's own surfaces inherit it.
-      fontFamily: 'Inter',
+      // Inter, subset to the four weights the scale uses. This covers the
+      // surfaces that inherit Material's defaults; the ones this file styles
+      // get the family from `textTheme` above.
+      fontFamily: fontFamily,
       scaffoldBackgroundColor: t.surface,
       canvasColor: t.surface,
       textTheme: textTheme,
