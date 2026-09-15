@@ -1208,8 +1208,28 @@ void main() {
     final before = ds.monthFetches;
 
     ds.realtimeCallback!();
+    // F-51: the event is coalesced — the reload lands after the quiet window.
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     expect(ds.monthFetches, greaterThan(before));
+  });
+
+  testWidgets('F-51: a burst of Realtime events — one per row of a range '
+      'operation — folds into ONE reload', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    final before = ds.monthFetches;
+
+    for (var i = 0; i < 30; i++) {
+      ds.realtimeCallback!();
+    }
+    // Inside the window nothing has reloaded yet; after it, exactly once.
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(ds.monthFetches, before);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(ds.monthFetches, before + 1);
   });
 
   // U-13/U-24 — the proof the pilot never gave: the SAME slice, English

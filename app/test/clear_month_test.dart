@@ -7,7 +7,9 @@
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
+import 'package:entrelares_db_contracts/models/swap_request.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
 
 import 'calendar_slice_test.dart';
@@ -76,6 +78,43 @@ void main() {
                 [planned])),
         findsOneWidget);
     await settleSnack(tester);
+  });
+
+  testWidgets('the count leaves out what the server keeps — a frozen day and '
+      'an approved swap', (tester) async {
+    final future = futureDay;
+    if (future == null || future + 2 > endOfMonth.day) return;
+    final ds = FakeCustodyDataSource(members: [anaAdmin, bruno], days: [
+      row(7, dayOfMonth(future), 1),
+      row(8, dayOfMonth(future + 1), 1, actual: 2), // approved swap: kept
+      row(9, dayOfMonth(future + 2), 1), // frozen below: kept
+    ])
+      ..frozenRequests = [
+        SwapRequest.fromJson({
+          'id': 1,
+          'schedule_date': CareSchedule.isoDate(dayOfMonth(future + 2)),
+          'schedule_id': 9,
+          'requesting_profile_id': 2,
+          'target_profile_id': 1,
+          'proposed_actual_parent_id': 2,
+          'status': 'pending',
+          'created_at': '2026-09-01T00:00:00Z',
+        }),
+      ];
+    await tester.pumpWidget(app(ds, adminMode: AdminMode()..toggle()));
+    await tester.pumpAndSettle();
+
+    await openMenu(tester);
+    await tester.tap(find.text(pt[K.calClearMonth]));
+    await tester.pumpAndSettle();
+
+    expect(
+        find.text(pt.format(K.calClearMonthBodyOne, [
+          1,
+          pt.formatDate(dateOnly(today)),
+          pt.formatDate(endOfMonth),
+        ])),
+        findsOneWidget);
   });
 
   testWidgets('cancelling the question writes nothing', (tester) async {

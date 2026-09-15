@@ -141,6 +141,10 @@ class _CalendarScreenState extends State<CalendarScreen>
   // (paint, guards, panel). Keyed alongside _daysByIso on every load.
   Map<String, SwapRequest> _frozenByIso = const {};
   bool _loading = true;
+
+  /// F-51: the Realtime burst of a range operation folds into one reload.
+  Timer? _changeDebounce;
+  static const _changeDebounceWindow = Duration(milliseconds: 300);
   String? _loadError;
 
   /// T-18: the month [_daysByIso] and [_frozenByIso] were last read for.
@@ -336,7 +340,15 @@ class _CalendarScreenState extends State<CalendarScreen>
     // drives the F-23 poll cadence.
     _unwatch = await widget.dataSource.watchChanges(
       () {
-        if (mounted) _load(silent: true);
+        // F-51: a range operation is ONE statement on the server but N
+        // Realtime events on every device — one per row, in a burst, and
+        // `_load` has no in-flight guard. The bulk paths already produced
+        // such bursts (one event per day saved); a year's re-plan makes it
+        // ~730. Coalesce the burst into one reload after it goes quiet.
+        _changeDebounce?.cancel();
+        _changeDebounce = Timer(_changeDebounceWindow, () {
+          if (mounted) _load(silent: true);
+        });
       },
       onStatus: (connected) {
         if (!mounted) return;
@@ -367,6 +379,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     _unwatch?.call();
     _unwatchWorkflow?.call();
     _pollTimer?.cancel();
+    _changeDebounce?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -854,8 +867,16 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (range == null) return;
     final fromText = l.formatDate(range.from);
     final toText = l.formatDate(range.to);
-    final count = plannedDaysInRange(
-        [for (final d in _daysByIso.values) d.scheduleDate], range);
+    // Only what the server will actually delete: a frozen day (pending
+    // request) and a day holding an approved swap are kept by the RPC's
+    // WHERE, so they must not be counted as "serão apagados" here either.
+    final count = plannedDaysInRange([
+      for (final d in _daysByIso.values)
+        if (!_frozenByIso.containsKey(CareSchedule.isoDate(d.scheduleDate)) &&
+            (d.actualParentId == null ||
+                d.actualParentId == d.scheduledParentId))
+          d.scheduleDate,
+    ], range);
     if (count == 0) {
       showAppSnack(
           context, l.format(K.calClearMonthNothing, [fromText, toText]));

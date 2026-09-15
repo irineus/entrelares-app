@@ -209,8 +209,16 @@ class _WizardSheetState extends State<_WizardSheet> {
           final existing = await widget.dataSource.fetchUpcoming(
               replaceRange.from,
               replaceRange.to.difference(replaceRange.from).inDays);
-          final count = plannedDaysInRange(
-              [for (final d in existing) d.scheduleDate], replaceRange);
+          // A day holding an approved swap is kept by the server, so it is
+          // not a day this call will rewrite. Frozen days are kept too, but
+          // the sheet has no frozen list for a range beyond the displayed
+          // month — the question may over-count by those, never under.
+          final count = plannedDaysInRange([
+            for (final d in existing)
+              if (d.actualParentId == null ||
+                  d.actualParentId == d.scheduledParentId)
+                d.scheduleDate,
+          ], replaceRange);
           if (count > 0) {
             if (!mounted) return;
             setState(() {
