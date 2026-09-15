@@ -116,8 +116,32 @@ class HomeShell extends StatelessWidget {
     final l = AppL10n.of(context).l;
     return Scaffold(
       body: ListenableBuilder(
-        listenable: adminMode,
-        builder: (context, _) => Column(
+        listenable: Listenable.merge(
+            [adminMode, deletionBanner, appHandoff, connectivity]),
+        builder: (context, _) {
+          // T-18 device measurement (14/09/2026): every strip here wrapped
+          // itself in a SafeArea, AND the tab below still received the status
+          // bar as top padding — so its app bar pushed down by the same inset a
+          // second time, a band of empty chrome under the strip. Only the FIRST
+          // visible strip takes the inset now, and the tab loses it whenever
+          // any strip is showing (two strips used to take it twice as well).
+          final deletion = deletionBanner?.value;
+          final handoff = appHandoff?.value;
+          final offline = connectivity?.value;
+          final showsOffline = offline?.offline ?? false;
+          final adminTop = adminMode.isActive;
+          final deletionTop = !adminTop;
+          final handoffTop = deletionTop && deletion == null;
+          final offlineTop = handoffTop && handoff == null;
+          final anyStrip =
+              adminTop || deletion != null || handoff != null || showsOffline;
+          final tab = AccountScope(
+            identity: identity,
+            onSignOut: onSignOut,
+            onOpenProfile: onOpenProfile,
+            child: shell,
+          );
+          return Column(
           children: [
             // F-14: the persistent, explicit banner while admin mode is on —
             // mirror of the web's MainLayout strip (shown on every tab).
@@ -133,6 +157,7 @@ class HomeShell extends StatelessWidget {
                   : Material(
                       color: context.tokens.dangerBar,
                       child: SafeArea(
+                        top: adminTop,
                         bottom: false,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -165,37 +190,21 @@ class HomeShell extends StatelessWidget {
                       ),
                     ),
             ),
-            if (deletionBanner != null)
-              ValueListenableBuilder<FamilyDeletionBanner?>(
-                valueListenable: deletionBanner!,
-                builder: (context, banner, _) => banner == null
-                    ? const SizedBox.shrink()
-                    : _deletionBanner(context, l, banner),
-              ),
-            if (appHandoff != null)
-              ValueListenableBuilder<AppHandoffBanner?>(
-                valueListenable: appHandoff!,
-                builder: (context, handoff, _) => handoff == null
-                    ? const SizedBox.shrink()
-                    : _handoffBanner(context, l, handoff),
-              ),
-            if (connectivity != null)
-              ValueListenableBuilder<ConnectivitySnapshot>(
-                valueListenable: connectivity!,
-                builder: (context, snapshot, _) => !snapshot.offline
-                    ? const SizedBox.shrink()
-                    : _offlineStrip(context, l, snapshot),
-              ),
+            if (deletion != null)
+              _deletionBanner(context, l, deletion, top: deletionTop),
+            if (handoff != null)
+              _handoffBanner(context, l, handoff, top: handoffTop),
+            if (showsOffline)
+              _offlineStrip(context, l, offline!, top: offlineTop),
             Expanded(
-              child: AccountScope(
-                identity: identity,
-                onSignOut: onSignOut,
-                onOpenProfile: onOpenProfile,
-                child: shell,
-              ),
+              child: anyStrip
+                  ? MediaQuery.removePadding(
+                      context: context, removeTop: true, child: tab)
+                  : tab,
             ),
           ],
-        ),
+        );
+        },
       ),
       bottomNavigationBar: ListenableBuilder(
         listenable: badge,
@@ -241,12 +250,14 @@ class HomeShell extends StatelessWidget {
   }
 
   Widget _deletionBanner(
-      BuildContext context, Localization l, FamilyDeletionBanner banner) {
+      BuildContext context, Localization l, FamilyDeletionBanner banner,
+      {required bool top}) {
     return Material(
       color: context.tokens.dangerBarDeep,
       child: InkWell(
         onTap: banner.onTap,
         child: SafeArea(
+          top: top,
           bottom: false,
           child: Padding(
             padding:
@@ -279,11 +290,13 @@ class HomeShell extends StatelessWidget {
   /// like the two banners above it, which report states the reader did not
   /// choose.
   Widget _handoffBanner(
-      BuildContext context, Localization l, AppHandoffBanner handoff) {
+      BuildContext context, Localization l, AppHandoffBanner handoff,
+      {required bool top}) {
     final tone = context.tokens.info;
     return Material(
       color: tone.container,
       child: SafeArea(
+        top: top,
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
@@ -321,12 +334,14 @@ class HomeShell extends StatelessWidget {
   /// the moment the server answers again, and a dismissed strip over an old
   /// plan is the exact mistake it exists to prevent.
   Widget _offlineStrip(
-      BuildContext context, Localization l, ConnectivitySnapshot snapshot) {
+      BuildContext context, Localization l, ConnectivitySnapshot snapshot,
+      {required bool top}) {
     final tone = context.tokens.warning;
     return Material(
       key: const Key('offline-strip'),
       color: tone.container,
       child: SafeArea(
+        top: top,
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
