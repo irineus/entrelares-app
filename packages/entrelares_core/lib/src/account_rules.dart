@@ -173,6 +173,14 @@ abstract final class InviteFormRules {
   static String inviteLink(String webOrigin, String token) =>
       '$webOrigin/register?invite=$token';
 
+  /// F-63 — what the share sheet sends: one sentence in the SENDER's language,
+  /// then the link alone on its own line. A bare URL from a co-parent reads as
+  /// an unexplained link on WhatsApp; the sentence says what it is. The link
+  /// stays last and untouched, so every messenger still detects it whole (and
+  /// previews it) instead of swallowing a trailing word into the query.
+  static String inviteShareMessage(String sentence, String link) =>
+      '${sentence.trim()}\n$link';
+
   /// The `invite` query parameter of an incoming deep link, or null when the
   /// URI is not an invitation. Kept here so the router and the register screen
   /// read the token the same way.

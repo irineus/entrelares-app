@@ -442,6 +442,7 @@ abstract final class K {
   static const String famCopyInviteLink = 'fam.copyInviteLink';
   static const String famCopyLink = 'fam.copyLink';
   static const String famInviteWhatsapp = 'fam.inviteWhatsapp';
+  static const String famInviteShareText = 'fam.inviteShareText';
   static const String famInviteExpiredHint = 'fam.inviteExpiredHint';
   static const String famSending = 'fam.sending';
   static const String famResendInvite = 'fam.resendInvite';
@@ -1480,6 +1481,7 @@ abstract final class K {
     famCopyInviteLink,
     famCopyLink,
     famInviteWhatsapp,
+    famInviteShareText,
     famInviteExpiredHint,
     famSending,
     famResendInvite,

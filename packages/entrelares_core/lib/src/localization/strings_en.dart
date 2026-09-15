@@ -392,6 +392,7 @@ abstract final class StringsEn {
     K.famCopyInviteLink: 'Copy invitation link',
     K.famCopyLink: 'Copy link',
     K.famInviteWhatsapp: 'You can also copy the link and send it over WhatsApp.',
+    K.famInviteShareText: "I'm using Entrelares to organize our shared custody calendar. Join our family through this link:",
     K.famInviteExpiredHint: 'The invitation expired. Resend it to generate a new link.',
     K.famSending: 'Sending...',
     K.famResendInvite: '🔄 Resend invitation',

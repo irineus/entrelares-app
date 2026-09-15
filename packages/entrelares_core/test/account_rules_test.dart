@@ -241,6 +241,24 @@ void main() {
       );
     });
 
+    // F-63: the share sheet sends a sentence, then the link alone on the last
+    // line — never glued to a word a messenger would read as part of the URL.
+    test('the share message is the sentence, then the untouched link', () {
+      const link = 'https://web.entrelares.app/register?invite='
+          '11111111-2222-3333-4444-555555555555';
+      for (final language in AppLanguage.values) {
+        final l = Localization(language);
+        final message =
+            InviteFormRules.inviteShareMessage(l[K.famInviteShareText], link);
+        final lines = message.split('\n');
+
+        expect(lines, hasLength(2), reason: '$language');
+        expect(lines.first, contains('Entrelares'), reason: '$language');
+        expect(lines.first, endsWith(':'), reason: '$language');
+        expect(lines.last, link, reason: '$language');
+      }
+    });
+
     test('reads the token back out of a deep link', () {
       expect(
         InviteFormRules.inviteTokenFrom(Uri.parse(
