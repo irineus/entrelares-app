@@ -1440,6 +1440,15 @@ NOT the plan.
 > unbranded consent screen there is a price worth paying for a free fix on the channels that
 > matter. Read that before "fixing" the web gap: the repo shows two channels built to the same
 > standard and says nothing about their rank, so the rank has to be written down.
+>
+> **Amended 15/09/2026 (owner):** the native iOS build (**T-40**) moved to the group *8 · Início
+> da monetização* and waits for revenue — the Apple Developer Program is recurring spend, and the
+> product has to fund its own expansion. Until it ships, an iPhone reader's **only** door is
+> `web.entrelares.app` added to the Home Screen, so for that audience the web is the MAIN channel,
+> not the alternative one. "Android/iOS product" above reads "Android product" until then; re-weigh
+> any "the web gap is acceptable" call against an iPhone reader who has no other way in. (The
+> consent-screen gap this paragraph accepted closed anyway: path A, T-61, 10/09/2026, brands the
+> OAuth client both channels use.)
 
 **9-quater.A — Brand verification. Free, no code, and — measured 10/09/2026 — no wait either.**
 
@@ -2107,9 +2116,14 @@ console for a CSP refusal (`connect-src` must cover `firebaseinstallations` and
 `fcmregistrations`, and NOTHING may be blocked in `script-src` — the SDK is vendored under
 `/firebasejs/<version>/` precisely so it is not); then the function's logs as in §11.4.
 
-> **iOS Safari buys almost nothing here, and that is expected.** Web push on iPhone requires
-> the site added to the Home Screen — the installed-PWA scope that died with the cutover. The
-> audience this section serves is desktop and Android browsers.
+> **iOS Safari: unmeasured, and no longer negligible (corrected 15/09/2026).** Web push on
+> iPhone requires the site added to the Home Screen. The earlier note said that installed scope
+> "died with the cutover" — it did not: `app/web/manifest.json` is `display: standalone`,
+> `index.html` carries the Apple meta tags, and the landing's L-19 guide teaches the gesture. With
+> the native build (T-40) deferred to the monetization group, that installed web app is the only
+> way an iPhone reader could get push at all. Whether this worker actually delivers there has
+> never been measured — nobody on the project has an iPhone — and that measurement is **T-75**.
+> Do not read "iPhone has no push" from the absence of reports.
 
 > **Upgrading the SDK is a re-vendoring, not a `pub upgrade`.** `firebase_core_web` fetches the
 > Firebase JS SDK from `www.gstatic.com` at runtime, which this channel's CSP forbids for
