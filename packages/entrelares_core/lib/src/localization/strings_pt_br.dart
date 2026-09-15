@@ -392,6 +392,7 @@ abstract final class StringsPtBr {
     K.famCopyInviteLink: 'Copiar link do convite',
     K.famCopyLink: 'Copiar link',
     K.famInviteWhatsapp: 'Você também pode copiar o link e enviar por WhatsApp.',
+    K.famInviteShareText: 'Estou usando o Entrelares para organizar o calendário da guarda compartilhada. Entre na nossa família por este link:',
     K.famInviteExpiredHint: 'O convite expirou. Reenvie para gerar um novo link.',
     K.famSending: 'Enviando...',
     K.famResendInvite: '🔄 Reenviar convite',

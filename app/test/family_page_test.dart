@@ -122,6 +122,7 @@ Future<void> pumpFamily(
   VoidCallback? onOpenAdminMode,
   VoidCallback? onOpenDeletion,
   AnalyticsService? analytics,
+  Future<void> Function(String message)? onShareInvite,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 2400));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -138,6 +139,7 @@ Future<void> pumpFamily(
         onOpenAdminMode: onOpenAdminMode,
         onOpenDeletion: onOpenDeletion,
         analytics: analytics,
+        onShareInvite: onShareInvite,
       ),
     ),
   ));
@@ -419,6 +421,35 @@ void main() {
       expect(find.text(l[KApp.commonShare]), findsOne);
       expect(find.text(l[K.famResendInvite]), findsOne);
       expect(find.text(l[K.famRevoke]), findsOne);
+    });
+
+    testWidgets('F-63: sharing sends the sentence with the link, in the '
+        "sender's language", (tester) async {
+      for (final language in AppLanguage.values) {
+        final shared = <String>[];
+        await pumpFamily(
+          tester,
+          source(
+              members: const [admin],
+              invitations: [pendingInvite()],
+              plan: 'premium'),
+          language: language,
+          onShareInvite: (message) async => shared.add(message),
+        );
+        final lang = Localization(language);
+
+        await tester.tap(find.text(lang[KApp.commonShare]));
+        await tester.pumpAndSettle();
+
+        expect(shared, hasLength(1), reason: '$language');
+        expect(shared.single, startsWith(lang[K.famInviteShareText]),
+            reason: '$language');
+        expect(
+            shared.single,
+            endsWith('/register?invite='
+                '11111111-2222-3333-4444-555555555555'),
+            reason: '$language');
+      }
     });
 
     testWidgets('an EXPIRED invitation drops the link and explains why',

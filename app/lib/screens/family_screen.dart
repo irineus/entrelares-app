@@ -73,6 +73,10 @@ class FamilyScreen extends StatefulWidget {
   final VoidCallback? onOpenAdminMode;
   final VoidCallback? onOpenDeletion;
 
+  /// F-63: hands the invitation message to the system share sheet. A seam so
+  /// a widget test can read what would be sent; null uses share_plus.
+  final Future<void> Function(String message)? onShareInvite;
+
   const FamilyScreen({
     super.key,
     required this.dataSource,
@@ -85,6 +89,7 @@ class FamilyScreen extends StatefulWidget {
     this.onOpenPlan,
     this.onOpenAdminMode,
     this.onOpenDeletion,
+    this.onShareInvite,
   });
 
   @override
@@ -412,10 +417,19 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
 
   /// The native improvement over the web's "copy it and send on WhatsApp"
   /// hint: the system share sheet already knows every app this person uses.
-  Future<void> _shareLink(FamilyInvitation invitation) async {
+  /// F-63: it sends a sentence with the link — a bare URL from a co-parent is
+  /// an unexplained link in the chat. "Copiar link" still copies the link only.
+  Future<void> _shareLink(FamilyInvitation invitation, Localization l) async {
     final link =
         InviteFormRules.inviteLink(DeepLinkUrls.webOrigin, invitation.token);
-    await Share.shareUri(Uri.parse(link));
+    final message =
+        InviteFormRules.inviteShareMessage(l[K.famInviteShareText], link);
+    final share = widget.onShareInvite;
+    if (share != null) {
+      await share(message);
+    } else {
+      await Share.share(message);
+    }
   }
 
   /// F-56: invite a placeholder that has no open invitation — the one moment
@@ -845,7 +859,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                   OutlinedButton.icon(
                     icon: const Icon(Icons.share_outlined, size: 18),
                     label: Text(l[KApp.commonShare]),
-                    onPressed: () => _shareLink(invitation),
+                    onPressed: () => _shareLink(invitation, l),
                   ),
                 ],
                 TextButton(
