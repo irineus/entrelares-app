@@ -12,9 +12,11 @@ import 'package:http/http.dart' as http;
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_app/screens/calendar_screen.dart';
+import 'package:entrelares_app/services/account_identity.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/services/connectivity_status.dart';
 import 'package:entrelares_app/services/offline_cache.dart';
+import 'package:entrelares_app/widgets/account_button.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'calendar_slice_test.dart'
     show FakeCustodyDataSource, ana, bruno, dayOfMonth, futureDay, row, today;
@@ -51,16 +53,21 @@ void main() {
       OfflineCache(store, userId: () => uid, enabled: true);
 
   Widget calendarApp(FakeCustodyDataSource ds, ConnectivityStatus status,
-          OfflineCache cache) =>
+          OfflineCache cache, {AccountIdentity? identity}) =>
       AppL10n(
         l: pt,
         setLanguage: (_) async {},
         child: MaterialApp(
-          home: CalendarScreen(
-              dataSource: ds,
-              adminMode: AdminMode(),
-              connectivity: status,
-              offlineCache: cache),
+          home: AccountScope(
+            identity: identity ?? AccountIdentity(),
+            onSignOut: () async {},
+            onOpenProfile: () {},
+            child: CalendarScreen(
+                dataSource: ds,
+                adminMode: AdminMode(),
+                connectivity: status,
+                offlineCache: cache),
+          ),
         ),
       );
 
@@ -119,6 +126,25 @@ void main() {
       expect(find.textContaining(pt[KApp.offlineMonthNotLoaded]), findsNothing);
       expect(find.textContaining(pt[KApp.errCalendarLoad]), findsNothing);
       expect(status.value.dataAsOf, savedAt);
+    });
+
+    testWidgets('the copy dresses the account button, not a "?"',
+        (tester) async {
+      // T-18 device measurement: an offline boot painted the whole month from
+      // the copy and left the app bar's account button on "?".
+      final cache = cacheFor('u1');
+      await seedCopy(cache);
+      final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+        ..throwOnMembers = noNetwork;
+      final identity = AccountIdentity();
+
+      await tester.pumpWidget(calendarApp(
+          ds, ConnectivityStatus()..lostServer(), cache,
+          identity: identity));
+      await tester.pumpAndSettle();
+
+      expect(identity.fullName, ana.fullName);
+      expect(identity.initial, 'A');
     });
 
     testWidgets('online, the copy is never shown in place of the server',

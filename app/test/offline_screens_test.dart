@@ -126,6 +126,62 @@ void main() {
       expect(find.byKey(const Key('offline-strip')), findsNothing);
     });
 
+    testWidgets('the status-bar inset is taken ONCE, by the strip',
+        (tester) async {
+      // T-18 device measurement (14/09/2026): the strip wrapped itself in a
+      // SafeArea and the tab below STILL received the status bar as top
+      // padding, so its app bar pushed down a second time — a band of empty
+      // chrome under the strip, on a real phone and in no test.
+      tester.view.devicePixelRatio = 1;
+      tester.view.padding = const FakeViewPadding(top: 40);
+      addTearDown(tester.view.reset);
+      double? tabTop;
+      final status = ConnectivityStatus()..loadedData(DateTime.now());
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: [
+          StatefulShellRoute.indexedStack(
+            builder: (_, _, shell) => HomeShell(
+                shell: shell,
+                adminMode: AdminMode(),
+                identity: AccountIdentity(),
+                onSignOut: () async {},
+                onOpenProfile: () {},
+                connectivity: status,
+                badge: NotificationBadge(
+                    FakeCustodyDataSource(members: const [], days: []))),
+            branches: [
+              StatefulShellBranch(routes: [
+                GoRoute(
+                    path: '/',
+                    builder: (_, _) => Scaffold(body: Builder(builder: (c) {
+                          tabTop = MediaQuery.paddingOf(c).top;
+                          return const Text('CALENDARIO');
+                        }))),
+              ]),
+            ],
+          ),
+        ],
+      );
+      await tester.pumpWidget(AppL10n(
+          l: pt,
+          setLanguage: (_) async {},
+          child: MaterialApp.router(routerConfig: router)));
+      await tester.pumpAndSettle();
+      expect(tabTop, 40, reason: 'no strip: the tab owns the status bar');
+
+      status.lostServer();
+      await tester.pumpAndSettle();
+      expect(tabTop, 0, reason: 'the strip took the inset; the tab must not');
+      final strip = tester.getRect(find.byKey(const Key('offline-strip')));
+      expect(strip.top, 0);
+      expect(strip.height, greaterThan(40));
+
+      status.reachedServer();
+      await tester.pumpAndSettle();
+      expect(tabTop, 40);
+    });
+
     testWidgets('nothing loaded yet names no time', (tester) async {
       final status = ConnectivityStatus()..lostServer();
       await tester.pumpWidget(shellApp(status));

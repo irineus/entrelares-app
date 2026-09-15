@@ -282,6 +282,14 @@ class _CalendarScreenState extends State<CalendarScreen>
         _loadError = null;
       }
     });
+    // U-28: the account button in every tab's app bar wears the profile — from
+    // the copy too, or an offline boot shows a "?" where the reader's initial
+    // belongs (T-18 device measurement, 14/09/2026).
+    final own = _ownProfile;
+    if (own != null) {
+      AccountScope.identityOf(context)
+          ?.adopt(fullName: own.fullName, colorSlot: own.colorSlot);
+    }
     // The strip dates what is on screen: the copy, unless a newer real read is
     // already there.
     if (widget.connectivity?.value.dataAsOf == null || fillsGrid) {
