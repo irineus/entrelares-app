@@ -280,6 +280,46 @@ void main() {
       expect(text, isNot(contains('<strong>')));
     });
 
+    test('F-63: every page footer and the closing paragraph name the report '
+        'page, as a link, in both languages', () async {
+      // Enough history to spill onto more pages: the footer must repeat, not
+      // only reach the first one.
+      final longHistory = [
+        for (var i = 0; i < 90; i++)
+          AuditLogView(
+            id: 1000 + i,
+            affectedDate: DateTime(2026, 8, 1 + i % 28),
+            createdAtLocal: DateTime(2026, 8, 1, 9, i % 60),
+            action: 'UPDATE',
+            performedById: 1,
+            oldData: const {'scheduled_parent_id': 1},
+            newData: const {'scheduled_parent_id': 2},
+          ),
+      ];
+
+      for (final language in AppLanguage.values) {
+        final loc = Localization(language);
+        final text = await render(
+            report(logs: longHistory, localization: loc), loc);
+
+        final pages = RegExp(r'/Type\s*/Page\b(?!s)').allMatches(text).length;
+        expect(pages, greaterThan(1),
+            reason: 'the fixture must span pages ($language)');
+
+        // The printed address: one per footer, plus the closing paragraph.
+        final printed = RegExp(r'\(entrelares\.app/relatorio\)')
+            .allMatches(text)
+            .length;
+        expect(printed, pages + 1, reason: '$language');
+
+        // And each one is a real link to the extensionless page.
+        final links = RegExp(r'/URI\s*\(https://entrelares\.app/relatorio\)')
+            .allMatches(text)
+            .length;
+        expect(links, pages + 1, reason: '$language');
+      }
+    });
+
     test('the child name appears only when it was typed', () async {
       expect(await render(report(childName: 'Lia'), l), contains('Lia'));
       expect(await render(report(childName: '  '), l),
