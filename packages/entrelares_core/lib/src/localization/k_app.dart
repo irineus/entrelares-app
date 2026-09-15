@@ -202,6 +202,22 @@ abstract final class KApp {
   static const String handoffOpen = 'app.handoff.open';
   static const String handoffDismiss = 'app.handoff.dismiss';
 
+  // ── U-51 iPhone install hint. Shown ONLY on the web channel, in Safari on
+  //    an iPhone or iPad that has not added the app to the Home Screen. The
+  //    two steps mirror the landing's L-19 guide, which was checked against
+  //    Apple's own iOS 26 guide on 11/09/2026
+  //    (support.apple.com/pt-br/guide/iphone/iph42ab2f3a7/ios): the Share
+  //    button is not always in view, the list must be SCROLLED, and the flow
+  //    ends on "Adicionar". Re-check there before changing a word. ──
+  static const String installHintBanner = 'app.installHint.banner';
+  static const String installHintHow = 'app.installHint.how';
+  static const String installHintDismiss = 'app.installHint.dismiss';
+  static const String installHintTitle = 'app.installHint.title';
+  static const String installHintSubtitle = 'app.installHint.subtitle';
+  static const String installHintStepShare = 'app.installHint.stepShare';
+  static const String installHintStepAdd = 'app.installHint.stepAdd';
+  static const String installHintNote = 'app.installHint.note';
+
   // ── T-18 offline strip. Says how OLD what is on screen is, never just
   //    "offline" — an undated old plan reads as the current one. ──
   static const String offlineStrip = 'app.offline.strip';
@@ -334,6 +350,14 @@ abstract final class KApp {
     handoffBanner,
     handoffOpen,
     handoffDismiss,
+    installHintBanner,
+    installHintHow,
+    installHintDismiss,
+    installHintTitle,
+    installHintSubtitle,
+    installHintStepShare,
+    installHintStepAdd,
+    installHintNote,
     offlineStrip,
     offlineStripNoData,
     offlineMonthNotLoaded,
@@ -517,6 +541,22 @@ abstract final class StringsAppPtBr {
     KApp.handoffBanner: 'Você já tem o app neste aparelho.',
     KApp.handoffOpen: 'Abrir no app',
     KApp.handoffDismiss: 'Agora não',
+    KApp.installHintBanner: 'Coloque o Entrelares na sua Tela de Início.',
+    KApp.installHintHow: 'Como fazer',
+    KApp.installHintDismiss: 'Agora não',
+    KApp.installHintTitle: 'Instalar no iPhone ou iPad',
+    KApp.installHintSubtitle:
+        'O Entrelares abre como um app, com ícone na sua tela, sem loja. '
+            'Dois toques no Safari:',
+    KApp.installHintStepShare:
+        'Toque no botão <strong>Compartilhar</strong> (quadrado com seta '
+            'para cima). Se ele não estiver à vista, toque em '
+            '<strong>⋯</strong> e escolha <strong>Compartilhar</strong>.',
+    KApp.installHintStepAdd:
+        '<strong>Role a lista</strong> até <strong>Adicionar à Tela de '
+            'Início</strong> e toque em <strong>Adicionar</strong>.',
+    KApp.installHintNote:
+        'Os nomes dos botões podem variar um pouco conforme a versão do iOS.',
     KApp.offlineStrip: 'Sem conexão · dados de {0}',
     KApp.offlineStripNoData: 'Sem conexão · nada carregado ainda',
     KApp.offlineMonthNotLoaded:
@@ -700,6 +740,22 @@ abstract final class StringsAppEn {
     KApp.handoffBanner: 'You already have the app on this device.',
     KApp.handoffOpen: 'Open in the app',
     KApp.handoffDismiss: 'Not now',
+    KApp.installHintBanner: 'Put Entrelares on your Home Screen.',
+    KApp.installHintHow: 'Show me how',
+    KApp.installHintDismiss: 'Not now',
+    KApp.installHintTitle: 'Install on iPhone or iPad',
+    KApp.installHintSubtitle:
+        'Entrelares opens like an app, with an icon on your screen and no '
+            'app store. Two taps in Safari:',
+    KApp.installHintStepShare:
+        'Tap the <strong>Share</strong> button (a square with an arrow '
+            'pointing up). If it is not in view, tap <strong>⋯</strong> and '
+            'choose <strong>Share</strong>.',
+    KApp.installHintStepAdd:
+        '<strong>Scroll the list</strong> to <strong>Add to Home '
+            'Screen</strong> and tap <strong>Add</strong>.',
+    KApp.installHintNote:
+        'Button names may vary slightly with your iOS version.',
     KApp.offlineStrip: 'Offline · data from {0}',
     KApp.offlineStripNoData: 'Offline · nothing loaded yet',
     KApp.offlineMonthNotLoaded:

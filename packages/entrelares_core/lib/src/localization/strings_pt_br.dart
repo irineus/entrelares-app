@@ -138,11 +138,6 @@ abstract final class StringsPtBr {
     K.layoutInstallHint: 'Acesse mais rápido direto da tela inicial',
     K.layoutInstallAction: 'Instalar',
     K.layoutInstallDismiss: 'Dispensar',
-    K.layoutInstallIosTitle: 'Instalar no iPhone / iPad',
-    K.layoutInstallIosTapOn: 'Toque em',
-    K.layoutInstallIosShare: 'Compartilhar',
-    K.layoutInstallIosThen: 'e depois em',
-    K.layoutInstallIosAddToHome: 'Adicionar à Tela de Início',
     // ── Calendar (Home) ──
     K.homeSystemAlert: 'Alerta do Sistema',
     K.homeBackToLogin: 'Voltar para o Login',

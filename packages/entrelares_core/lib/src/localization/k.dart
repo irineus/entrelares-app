@@ -168,11 +168,6 @@ abstract final class K {
   static const String layoutInstallHint = 'layout.install.hint';
   static const String layoutInstallAction = 'layout.install.action';
   static const String layoutInstallDismiss = 'layout.install.dismiss';
-  static const String layoutInstallIosTitle = 'layout.install.iosTitle';
-  static const String layoutInstallIosTapOn = 'layout.install.iosTapOn';
-  static const String layoutInstallIosShare = 'layout.install.iosShare';
-  static const String layoutInstallIosThen = 'layout.install.iosThen';
-  static const String layoutInstallIosAddToHome = 'layout.install.iosAddToHome';
 
   // ── Calendar (Home) ──
   static const String homeSystemAlert = 'home.systemAlert';
@@ -1244,11 +1239,6 @@ abstract final class K {
     layoutInstallHint,
     layoutInstallAction,
     layoutInstallDismiss,
-    layoutInstallIosTitle,
-    layoutInstallIosTapOn,
-    layoutInstallIosShare,
-    layoutInstallIosThen,
-    layoutInstallIosAddToHome,
     homeSystemAlert,
     homeBackToLogin,
     homeNotDefined,

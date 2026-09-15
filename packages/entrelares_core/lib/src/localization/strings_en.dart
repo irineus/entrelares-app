@@ -138,11 +138,6 @@ abstract final class StringsEn {
     K.layoutInstallHint: 'Open it faster straight from your home screen',
     K.layoutInstallAction: 'Install',
     K.layoutInstallDismiss: 'Dismiss',
-    K.layoutInstallIosTitle: 'Install on iPhone / iPad',
-    K.layoutInstallIosTapOn: 'Tap',
-    K.layoutInstallIosShare: 'Share',
-    K.layoutInstallIosThen: 'and then',
-    K.layoutInstallIosAddToHome: 'Add to Home Screen',
     // ── Calendar (Home) ──
     K.homeSystemAlert: 'System alert',
     K.homeBackToLogin: 'Back to sign in',

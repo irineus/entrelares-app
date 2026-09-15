@@ -585,6 +585,39 @@ void main() {
     });
   });
 
+  group('the iPhone install hint (U-51)', () {
+    // The hint tells a Safari reader the app "opens like an app, with an icon
+    // on your screen". That is a claim about what THIS channel serves (the
+    // S-19/L-27 family): it is true only while the manifest asks for a
+    // standalone window and the page carries the Apple tags Safari reads
+    // when it adds a site to the Home Screen. Drop either and the hint keeps
+    // showing over a bookmark that opens in a tab.
+    test('the manifest opens standalone', () {
+      final manifest =
+          jsonDecode(_web('manifest.json').readAsStringSync())
+              as Map<String, dynamic>;
+      expect(manifest['display'], 'standalone');
+    });
+
+    test('index.html carries the Apple Home Screen tags, and the icon ships',
+        () {
+      final html = _web('index.html').readAsStringSync();
+      expect(html,
+          contains('<meta name="apple-mobile-web-app-title" content="Entrelares">'));
+      expect(html, contains('name="apple-mobile-web-app-status-bar-style"'));
+      final icon = RegExp(r'<link rel="apple-touch-icon" href="([^"]+)">')
+          .firstMatch(html);
+      expect(icon, isNotNull,
+          reason: 'no apple-touch-icon: Safari would put a screenshot of the '
+              'page on the Home Screen instead of the brand mark');
+      // Same-origin is not enough (T-72): `_redirects` answers a missing
+      // file with index.html and a 200, which Safari then fails to decode.
+      expect(_web(icon!.group(1)!).existsSync(), isTrue,
+          reason: 'apple-touch-icon names ${icon.group(1)}, which is not in '
+              'app/web/');
+    });
+  });
+
   group('the web\u2192app handoff (T-65)', () {
     test('the app answers the host the web channel links to', () {
       // Two languages, one host. A rename on either side leaves the banner

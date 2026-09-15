@@ -2119,7 +2119,11 @@ console for a CSP refusal (`connect-src` must cover `firebaseinstallations` and
 > **iOS Safari: unmeasured, and no longer negligible (corrected 15/09/2026).** Web push on
 > iPhone requires the site added to the Home Screen. The earlier note said that installed scope
 > "died with the cutover" — it did not: `app/web/manifest.json` is `display: standalone`,
-> `index.html` carries the Apple meta tags, and the landing's L-19 guide teaches the gesture. With
+> `index.html` carries the Apple meta tags, the landing's L-19 guide teaches the gesture and,
+> since **U-51**, so does the app itself — a dismissible strip in the authenticated shell, shown
+> only to Safari on an iPhone or iPad still living in a tab (`InstallHintRules`), with the L-19
+> steps in a sheet; the Umami events `install-hint-view/open/dismiss` count who was shown the
+> door, the denominator T-75 will need. With
 > the native build (T-40) deferred to the monetization group, that installed web app is the only
 > way an iPhone reader could get push at all. Whether this worker actually delivers there has
 > never been measured — nobody on the project has an iPhone — and that measurement is **T-75**.
