@@ -1,5 +1,11 @@
 import 'package:entrelares_core/entrelares_core.dart'
-    show AppLanguage, PreEditNotes, SignInIdentity, SwapOrigin, auditPageSize;
+    show
+        AppLanguage,
+        PreEditNotes,
+        ScheduleRangeResult,
+        SignInIdentity,
+        SwapOrigin,
+        auditPageSize;
 
 import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
@@ -123,6 +129,21 @@ abstract class CustodyDataSource {
   /// caller derives the "kept" count. [onProgress] reports 0–100.
   Future<int> bulkInsertNewDays(List<CareSchedule> days,
       {void Function(int percent)? onProgress});
+
+  /// F-51 — "Limpar mês": deletes the family's planned days in [from, to] in
+  /// ONE server-side statement, as the caller (`clear_schedule_range`,
+  /// SECURITY INVOKER). The server floors [from] to today and keeps frozen
+  /// and approved-swap days; the counts it answers are the toast. Admin-only
+  /// by DB rule — the UI offers it only under the admin bypass.
+  Future<ScheduleRangeResult> clearScheduleRange(DateTime from, DateTime to);
+
+  /// F-51 — the wizard's "substituir os dias já planejados": clears
+  /// [from, to] and inserts [days] in the SAME transaction
+  /// (`replace_schedule_range`). Every day must fall inside the range — the
+  /// server refuses otherwise. An insert that fails leaves the old plan
+  /// untouched: the whole call rolls back.
+  Future<ScheduleRangeResult> replaceScheduleRange(
+      DateTime from, DateTime to, List<CareSchedule> days);
 
   /// Starts listening for care_schedules changes; [onChange] fires on any
   /// insert/update/delete visible to this session. [onStatus] reports socket

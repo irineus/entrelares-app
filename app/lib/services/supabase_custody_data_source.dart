@@ -242,6 +242,30 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<ScheduleRangeResult> clearScheduleRange(
+      DateTime from, DateTime to) async {
+    final result = await _client.rpc<dynamic>('clear_schedule_range', params: {
+      'p_from': CareSchedule.isoDate(from),
+      'p_to': CareSchedule.isoDate(to),
+    });
+    return ScheduleRangeResult.fromJson(Map<String, dynamic>.from(result as Map));
+  }
+
+  @override
+  Future<ScheduleRangeResult> replaceScheduleRange(
+      DateTime from, DateTime to, List<CareSchedule> days) async {
+    final result =
+        await _client.rpc<dynamic>('replace_schedule_range', params: {
+      'p_from': CareSchedule.isoDate(from),
+      'p_to': CareSchedule.isoDate(to),
+      // The same wire shape as a plain insert (actual_parent_id travels
+      // null: the wizard never plans a swap).
+      'p_days': [for (final d in days) d.toInsertJson()],
+    });
+    return ScheduleRangeResult.fromJson(Map<String, dynamic>.from(result as Map));
+  }
+
+  @override
   Future<int> bulkInsertNewDays(List<CareSchedule> days,
       {void Function(int percent)? onProgress}) async {
     if (days.isEmpty) return 0;

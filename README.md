@@ -366,7 +366,8 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   desligado enquanto não houver website id — o flavor **dev vem vazio de propósito**. O
   contrato no-PII é espelho puro (`sanitizeAnalyticsPath`): query e fragmento caem sempre,
   GUID e id numérico viram `:id`. Eventos portados: `signup_started`, `family_created`,
-  `invitee_joined`, `invite_sent`, `wizard_completed`, `swap_requested`. Os
+  `invitee_joined`, `invite_sent`, `wizard_completed` (desde o F-51 com a prop
+  `replaced: yes|no` — o assistente substituiu o plano ou só acrescentou), `swap_requested`. Os
   `premium-gate-click` chegaram no lote 5, junto das CTAs que eles medem.
 - **Alvo web:** habilitado (tensão 1 — Flutter Web substitui o PWA). `flutter build web`
   entra no `verify.yml` e o run imprime o peso gzip do first-load; a medição de aceite do
@@ -450,7 +451,8 @@ regras e ~0% do visual — por um sistema de tokens. O que ela estabelece:
   listas de Notificações e de auditoria, os cartões do resumo, Família, Perfil, papéis
   personalizados e o histórico premium. Ficam spinner de propósito: botão em ação (o giro é
   sobre AQUELE toque), barra determinada (o lote e o assistente sabem o progresso — trocar
-  por shimmer jogaria informação fora) e espera sem forma conhecida (splash, retorno do
+  por shimmer jogaria informação fora; a substituição do F-51 é UMA ida ao servidor, então
+  ali a barra corre indeterminada) e espera sem forma conhecida (splash, retorno do
   pagamento). O shimmer é translação horizontal pura, 1500 ms `easeInOutSine`.
 - **Tipografia Inter** (SIL OFL, de `google/fonts`), instanciada nos quatro pesos estáticos
   da escala e subsetada para o range `latin` — 438 glifos, ~57 KB cada, ~96 KB gzip no

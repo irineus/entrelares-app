@@ -28,6 +28,11 @@ class FakeCustodyDataSource implements CustodyDataSource {
   final List<CareSchedule> inserted = [];
   final List<CareSchedule> updated = [];
   final List<int> deleted = [];
+
+  /// F-51: the range calls, as the calendar and the wizard make them.
+  final List<({DateTime from, DateTime to})> clearedRanges = [];
+  final List<({DateTime from, DateTime to, List<CareSchedule> days})>
+      replacedRanges = [];
   Family? family;
   Object? throwOnFamily;
   Map<String, String> publicSettings = const {};
@@ -188,6 +193,41 @@ class FakeCustodyDataSource implements CustodyDataSource {
     if (throwOnWrite != null) throw throwOnWrite!;
     deleted.add(id);
     days = days.where((d) => d.id != id).toList();
+  }
+
+  /// The fake's own rule for a range: every row inside it goes (no frozen
+  /// or swapped seeds here), and the counts are what the server would say.
+  int _dropRange(DateTime from, DateTime to) {
+    final before = days.length;
+    days = days
+        .where((d) => d.scheduleDate.isBefore(from) || d.scheduleDate.isAfter(to))
+        .toList();
+    return before - days.length;
+  }
+
+  @override
+  Future<ScheduleRangeResult> clearScheduleRange(
+      DateTime from, DateTime to) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    clearedRanges.add((from: from, to: to));
+    final removed = _dropRange(from, to);
+    return ScheduleRangeResult(
+        deleted: removed, keptFrozen: 0, keptSwap: 0, batchId: 'fake-batch');
+  }
+
+  @override
+  Future<ScheduleRangeResult> replaceScheduleRange(
+      DateTime from, DateTime to, List<CareSchedule> newDays) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    replacedRanges.add((from: from, to: to, days: newDays));
+    final removed = _dropRange(from, to);
+    days = [...days, ...newDays];
+    return ScheduleRangeResult(
+        deleted: removed,
+        keptFrozen: 0,
+        keptSwap: 0,
+        inserted: newDays.length,
+        batchId: 'fake-batch');
   }
 
   @override
