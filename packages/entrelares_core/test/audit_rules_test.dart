@@ -335,6 +335,26 @@ void main() {
       expect(AuditContext.parse(const []), isNull);
     });
 
+    test('AuditContext.parse reads the F-51 batch stamp, absent on a lone edit',
+        () {
+      final batch = AuditContext.parse({
+        'actor_is_admin': true,
+        'batch_id': 'a2f0c1d4-1111-4222-8333-444455556666',
+        'batch_kind': 'replace_range',
+      })!;
+      expect(batch.batchId, 'a2f0c1d4-1111-4222-8333-444455556666');
+      expect(batch.batchKind, 'replace_range');
+
+      final lone = AuditContext.parse({'actor_is_admin': true})!;
+      expect(lone.batchId, isNull);
+      expect(lone.batchKind, isNull);
+
+      // A stamp that is not text — or an empty one — is no stamp.
+      final junk = AuditContext.parse({'batch_id': 7, 'batch_kind': ''})!;
+      expect(junk.batchId, isNull);
+      expect(junk.batchKind, isNull);
+    });
+
     test('a row older than F-61 says nothing — no context, no guessing', () {
       expect(
         authorshipLines(

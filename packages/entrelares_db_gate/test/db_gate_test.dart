@@ -50,6 +50,7 @@ import 'suites/register_invitee.dart';
 import 'suites/resolution_log_link.dart';
 import 'suites/revert_notes.dart';
 import 'suites/rls_hardening.dart';
+import 'suites/schedule_range.dart';
 import 'suites/sudo_elevation.dart';
 import 'suites/swap_message.dart';
 import 'suites/test_recipient_suppression.dart';
@@ -91,6 +92,7 @@ void main() {
   caregiverGateTests(fx);
   dayProtectionTests(fx);
   handoffTransitionTests(fx);
+  scheduleRangeTests(fx);
   planningHorizonGateTests(fx);
   optimisticConcurrencyTests(fx);
   autoApprovalTests(fx);

@@ -66,17 +66,28 @@ class AuditLogView {
 /// no actor), and rows older than F-61 have no context at all. The renderer
 /// says nothing for `null`: "unknown" and "no" are different answers on a
 /// record.
+///
+/// F-51: a row written by a range operation (`clear_schedule_range` /
+/// `replace_schedule_range`) also carries the batch it belongs to — the same
+/// [batchId] on every row of one call, and a [batchKind] naming the operation
+/// (`clear_range` / `replace_range`). A single-day write carries neither, so
+/// the history can fold a batch into one entry without ever folding a lone
+/// edit.
 class AuditContext {
   final bool? scheduledParentHasAccount;
   final bool? actualParentHasAccount;
   final bool? actorIsAdmin;
   final bool? adminOverride;
+  final String? batchId;
+  final String? batchKind;
 
   const AuditContext({
     this.scheduledParentHasAccount,
     this.actualParentHasAccount,
     this.actorIsAdmin,
     this.adminOverride,
+    this.batchId,
+    this.batchKind,
   });
 
   /// [raw] as PostgREST hands it over — a decoded JSON object, or null.
@@ -88,11 +99,18 @@ class AuditContext {
       return value is bool ? value : null;
     }
 
+    String? text(String key) {
+      final value = raw[key];
+      return value is String && value.isNotEmpty ? value : null;
+    }
+
     return AuditContext(
       scheduledParentHasAccount: flag('scheduled_parent_has_account'),
       actualParentHasAccount: flag('actual_parent_has_account'),
       actorIsAdmin: flag('actor_is_admin'),
       adminOverride: flag('admin_override'),
+      batchId: text('batch_id'),
+      batchKind: text('batch_kind'),
     );
   }
 }
