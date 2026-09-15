@@ -10,11 +10,13 @@ import 'dart:io';
 
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:entrelares_app/screens/login_screen.dart';
 import 'package:entrelares_app/screens/register_screen.dart';
+import 'package:entrelares_app/theme/app_theme.dart';
 import 'package:entrelares_app/theme/tokens.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/google_sign_in_button.dart';
@@ -30,12 +32,13 @@ Future<void> pumpButton(
   Future<void> Function()? onPressed,
   Brightness brightness = Brightness.light,
   AppLanguage language = AppLanguage.ptBr,
+  ThemeData? theme,
 }) async {
   await tester.pumpWidget(AppL10n(
     l: Localization(language),
     setLanguage: (_) async {},
     child: MaterialApp(
-      theme: ThemeData(brightness: brightness),
+      theme: theme ?? ThemeData(brightness: brightness),
       home: Scaffold(
         body: Center(
           child: GoogleSignInButton(
@@ -134,12 +137,17 @@ void main() {
           BorderRadius.circular(GoogleBrand.radius));
     });
 
-    testWidgets('the sentence is medium 14/20', (tester) async {
+    testWidgets('the sentence is Inter medium 14/20', (tester) async {
       await pumpButton(tester, enabled: Future.value(true));
       final text = styleOf(tester).textStyle!.resolve(const <WidgetState>{})!;
       expect(text.fontSize, GoogleBrand.fontSize);
       expect(text.fontWeight, FontWeight.w500);
       expect(text.height, GoogleBrand.lineHeight / GoogleBrand.fontSize);
+      // Divergence (1) from the guideline: Google Sans Medium is replaced by
+      // OUR family, at the same metrics. The style must SAY so — see the
+      // painted-family group below for why naming it in the theme is not
+      // enough.
+      expect(text.fontFamily, AppTheme.fontFamily);
     });
 
     test('the mark ships as an image, at three densities', () {
@@ -152,6 +160,46 @@ void main() {
       ]) {
         expect(File(path).existsSync(), isTrue, reason: '$path is missing');
       }
+    });
+  });
+
+  // U-53 — the divergence the U-45 record claims ("Inter medium at the same
+  // 14/20") was true of the THEME and false of the screen. U-52 stamped the
+  // family on every component text style, and this button still painted in the
+  // platform font: a widget-level `ButtonStyle` wins over the theme property
+  // by property, and the label's `AnimatedDefaultTextStyle` REPLACES the
+  // inherited style with the resolved one. So the family has to be written at
+  // the call site, and the probe has to read what is PAINTED — the
+  // RenderParagraph's span — because every declaration in the theme was already
+  // correct while the sentence came out in Roboto.
+  group('the sentence is painted in Inter', () {
+    String? paintedFamily(WidgetTester tester) => tester
+        .renderObject<RenderParagraph>(find.text(pt[KApp.authGoogle]))
+        .text
+        .style
+        ?.fontFamily;
+
+    testWidgets('under the app theme, light', (tester) async {
+      await pumpButton(tester,
+          enabled: Future.value(true), theme: AppTheme.light);
+      expect(paintedFamily(tester), AppTheme.fontFamily);
+    });
+
+    testWidgets('under the app theme, dark', (tester) async {
+      await pumpButton(tester,
+          enabled: Future.value(true), theme: AppTheme.dark);
+      expect(paintedFamily(tester), AppTheme.fontFamily);
+    });
+
+    testWidgets('and under a theme that names no family at all',
+        (tester) async {
+      // The button carries its own family, so it cannot regress by way of a
+      // theme change: this is the same assertion with the theme's help
+      // removed.
+      await pumpButton(tester, enabled: Future.value(true));
+      expect(paintedFamily(tester), AppTheme.fontFamily,
+          reason: 'the label fell back to the platform font — the button sets '
+              'its own textStyle, so the family has to be written there');
     });
   });
 

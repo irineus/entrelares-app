@@ -1,6 +1,7 @@
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
 import 'app_l10n.dart';
 
@@ -64,7 +65,18 @@ class GoogleSignInButton extends StatelessWidget {
                         BorderRadius.all(Radius.circular(GoogleBrand.radius))),
                 padding:
                     const EdgeInsets.symmetric(horizontal: GoogleBrand.padding),
+                // The family is written HERE, not inherited. A widget-level
+                // `ButtonStyle` beats the theme property by property, and the
+                // label's `AnimatedDefaultTextStyle` replaces the inherited
+                // style with this one — so U-52's theme-wide Inter never
+                // reached this sentence, which painted in the platform font
+                // (Roboto on Android, the system font on the web) while every
+                // other button on the screen was Inter. Divergence (1) from
+                // the guideline — our family instead of Google Sans Medium,
+                // at the guideline's own 14/20 — only holds if it is spelled
+                // out at the call site (U-53).
                 textStyle: const TextStyle(
+                    fontFamily: AppTheme.fontFamily,
                     fontSize: GoogleBrand.fontSize,
                     fontWeight: FontWeight.w500,
                     height: GoogleBrand.lineHeight / GoogleBrand.fontSize),
