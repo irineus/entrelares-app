@@ -353,6 +353,11 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   se o responsável atribuído **ainda não tinha conta** naquele instante e se foi
   **alteração direta pela pessoa administradora** — fatos carimbados pelo trigger em
   `activity_logs.context` (`authorshipLines` em core); linha anterior ao F-61 não diz nada.
+  **F-51** (15/09/2026): as linhas de uma operação de faixa ("Limpar mês" e o "substituir"
+  do assistente) carregam o mesmo `context.batch_id`, e a timeline as dobra numa entrada só
+  (`groupAuditBatches` em core: quem, quais dias, quantos apagados/planejados), com os
+  registros por dia um toque abaixo — o registro continua uma linha por dia, só a leitura
+  dobra; o PDF segue imprimindo linha a linha, porque é evidência.
 - **Relatório em PDF (F-33) — o redesign:** o `print()` do navegador não existe, então o
   documento é montado no aparelho (`pdf`) e entregue pelo sistema (`printing`: share sheet
   ou impressão nativa). Gate F-32 com falha fechada e **upsell neutro** (T-38).

@@ -638,6 +638,14 @@ abstract final class K {
   static const String auditTrialEnded = 'audit.trialEnded';
   static const String auditDayLabel = 'audit.dayLabel';
   static const String auditScheduleChange = 'audit.scheduleChange';
+  // F-51: a range operation folded into one timeline entry.
+  static const String auditBatchClear = 'audit.batch.clear';
+  static const String auditBatchReplace = 'audit.batch.replace';
+  static const String auditBatchRange = 'audit.batch.range';
+  static const String auditBatchCreatedOne = 'audit.batch.createdOne';
+  static const String auditBatchCreatedMany = 'audit.batch.createdMany';
+  static const String auditBatchShow = 'audit.batch.show';
+  static const String auditBatchHide = 'audit.batch.hide';
   static const String auditOriginSwapManual = 'audit.origin.swapManual';
   static const String auditOriginSwapAuto = 'audit.origin.swapAuto';
   static const String auditOriginRevertManual = 'audit.origin.revertManual';
@@ -1684,6 +1692,13 @@ abstract final class K {
     auditTrialEnded,
     auditDayLabel,
     auditScheduleChange,
+    auditBatchClear,
+    auditBatchReplace,
+    auditBatchRange,
+    auditBatchCreatedOne,
+    auditBatchCreatedMany,
+    auditBatchShow,
+    auditBatchHide,
     auditOriginSwapManual,
     auditOriginSwapAuto,
     auditOriginRevertManual,
