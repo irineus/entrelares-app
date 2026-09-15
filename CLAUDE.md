@@ -57,7 +57,7 @@ URL with the ids already in it, never `https://<console>` with a placeholder.
 | Supabase **dev/QA** | https://supabase.com/dashboard/project/buroanotfjcgvbfmacuh | ref `buroanotfjcgvbfmacuh`. The DB gate and the E2E lane run against THIS one |
 | GitHub secrets (app) | https://github.com/irineus/entrelares-app/settings/secrets/actions | `SUPABASE_SERVICE_ROLE_DEV`, `CLOUDFLARE_API_TOKEN`, … |
 | GitHub variables (app) | https://github.com/irineus/entrelares-app/settings/variables/actions | public config (`UMAMI_APP_WEBSITE_ID` and friends) |
-| GitHub Actions (app) | https://github.com/irineus/entrelares-app/actions | `workflow_dispatch`: `run-e2e`, `build-apk`, full run on a docs-only branch |
+| GitHub Actions (app) | https://github.com/irineus/entrelares-app/actions | `workflow_dispatch`: `run-e2e`, `build-apk`, full run on a docs-only branch — and, ON `main`, **republish HEAD** through the same gates → `db-prod` → `deploy-web` (since 15/09/2026: the squash-merge of #187 created no run at all, and the publish jobs used to accept only `push`). A merge with no run in `gh run list --branch main` after ~5 min is that case: dispatch `verify` on `main` |
 | GitHub branches (app) | https://github.com/irineus/entrelares-app/branches | branch deletion — the cloud session CANNOT do it (403 by design) |
 | Landing repo | https://github.com/irineus/entrelares-site | `L-*` items, branch `preview` |
 | Cloudflare Pages | https://dash.cloudflare.com/1185ad84960bdaf12e52096fe8df0dc9/pages/view/entrelares-web | project `entrelares-web` serves `web.entrelares.app`. Same account as the landing's workers — confirmed by the owner opening this exact link on 12/09/2026 (L-26) |
