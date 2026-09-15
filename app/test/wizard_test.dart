@@ -12,8 +12,12 @@ import 'calendar_slice_test.dart';
 
 final pt = Localization(AppLanguage.ptBr);
 
+/// U-36: the wizard is an item of the calendar's ⋮ menu — two taps, both by
+/// the text a person reads, never by the icon.
 Future<void> openWizard(WidgetTester tester) async {
-  await tester.tap(find.byTooltip(pt[K.calWizard]));
+  await tester.tap(find.byTooltip(pt[K.calActionsMenu]));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(pt[K.calWizard]));
   await tester.pumpAndSettle();
 }
 

@@ -1081,25 +1081,22 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// bar: sharing that row with the month name is what truncated it to
   /// "agosto de 20…", and the app bar has room now that language and sign-out
   /// moved into the account menu.
+  ///
+  /// U-36: two of them — the wizard and "select several days" — used to be
+  /// unlabelled icons (`event_repeat` says "wizard" to nobody, and a tooltip
+  /// on Android is a long-press nobody performs). They are items of ONE ⋮
+  /// menu now, each with its text, which is also where F-51's "Limpar mês"
+  /// enters without pushing a fifth icon into the bar. The admin shield stays
+  /// an icon: it is a MODE, its state is the glyph, and the shell banner names
+  /// it. Order: shield, then the menu, then the account button the caller adds.
   List<Widget> _calendarActions(BuildContext context, Localization l) => [
-        // U-11: the accessible entry point to bulk selection (mirrors the
-        // long-press). Once armed, tapping a day toggles its selection.
-        if (!_isSelectionMode)
-          IconButton(
-            tooltip: l[K.calSelectDays],
-            icon: const Icon(Icons.check_box_outlined),
-            onPressed: () => setState(() => _selectionArmed = true),
-          ),
-        IconButton(
-          key: widget.tourKeys?.keyFor(TourTarget.wizardButton),
-          tooltip: l[K.calWizard],
-          icon: const Icon(Icons.event_repeat),
-          onPressed: _openWizard,
-        ),
         // F-14: the explicit admin-mode toggle — mirror of the web's NavMenu
         // button. Only a real admin sees it; the shell shows the persistent
         // banner while it is on. It stays with the calendar and not in the
-        // account menu because what it unlocks is a day on THIS grid.
+        // account menu because what it unlocks is a day on THIS grid — and it
+        // stays through selection mode (owner, 15/09/2026): an admin who
+        // selected past days and needs the mode to edit them would otherwise
+        // have to cancel the whole selection to reach it.
         if (_ownProfile?.isAdmin == true)
           IconButton(
             tooltip:
@@ -1110,6 +1107,44 @@ class _CalendarScreenState extends State<CalendarScreen>
                   widget.adminMode.isActive ? context.tokens.dangerBar : null,
             ),
             onPressed: widget.adminMode.toggle,
+          ),
+        if (!_isSelectionMode)
+          PopupMenuButton<_CalendarAction>(
+            // The tour's third stop spotlights this button and its copy names
+            // the item to pick, so the spotlight still has something to point
+            // at now that the wizard has no icon of its own.
+            key: widget.tourKeys?.keyFor(TourTarget.actionsMenu),
+            tooltip: l[K.calActionsMenu],
+            icon: const Icon(Icons.more_vert),
+            onSelected: (action) => switch (action) {
+              _CalendarAction.wizard => _openWizard(),
+              // The accessible entry point to bulk selection (mirrors the
+              // long-press). Once armed, tapping a day toggles its selection.
+              _CalendarAction.selectDays =>
+                setState(() => _selectionArmed = true),
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _CalendarAction.wizard,
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.event_repeat),
+                  title: Text(l[K.calWizard]),
+                ),
+              ),
+              PopupMenuItem(
+                value: _CalendarAction.selectDays,
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.check_box_outlined),
+                  title: Text(l[K.calSelectDays]),
+                ),
+              ),
+              // F-51 ("Limpar mês") enters HERE as a third item, after a
+              // `PopupMenuDivider` — destructive, so last and set apart.
+            ],
           ),
       ];
 
@@ -1130,19 +1165,47 @@ class _CalendarScreenState extends State<CalendarScreen>
       // U-28: the app bar names the TAB, like the other three do. The month
       // moved down to sit against the grid it labels — up here, competing with
       // five icon buttons, it truncated to "agosto de…" for any admin.
-      appBar: AppBar(
-        // U-28 QA: 48 instead of 56, and the title one step down the scale. The
-        // calendar is the one screen whose content is a fixed grid — every
-        // point spent on chrome is a point the month does not get, and the grid
-        // was scrolling.
-        toolbarHeight: 48,
-        title: Text(l[K.navCalendar],
-            style: Theme.of(context).textTheme.titleMedium),
-        actions: [
-          ..._calendarActions(context, l),
-          const AppAccountButton(),
-        ],
-      ),
+      // U-36: while days are being selected the app bar is CONTEXTUAL —
+      // Material's contextual action bar: ✕ on the left, the count as the
+      // title, the mode's own actions on the right. Before, entering selection
+      // changed only the strip at the bottom while the top kept saying
+      // "Calendário", so the state of the screen was announced at the far end
+      // from where the eye is. The two labelled actions stay in the bottom
+      // strip (owner, 15/09/2026): at 360 dp the count and both labels do not
+      // fit one bar, and turning them into icons would undo this very item.
+      appBar: _isSelectionMode
+          ? AppBar(
+              toolbarHeight: 48,
+              leading: IconButton(
+                tooltip: l[K.selectionCancel],
+                icon: const Icon(Icons.close),
+                onPressed: _cancelSelection,
+              ),
+              // Armed with nothing picked yet, the title says what to do; the
+              // same two keys the month-paging guard uses, so the count reads
+              // the same sentence in both places.
+              title: Text(
+                  switch (_selectedDays.length) {
+                    0 => l[K.calSelectDays],
+                    1 => l.format(K.navGuardSelectedOne, [1]),
+                    final n => l.format(K.navGuardSelectedMany, [n]),
+                  },
+                  style: Theme.of(context).textTheme.titleMedium),
+              actions: _calendarActions(context, l),
+            )
+          : AppBar(
+              // U-28 QA: 48 instead of 56, and the title one step down the
+              // scale. The calendar is the one screen whose content is a fixed
+              // grid — every point spent on chrome is a point the month does
+              // not get, and the grid was scrolling.
+              toolbarHeight: 48,
+              title: Text(l[K.navCalendar],
+                  style: Theme.of(context).textTheme.titleMedium),
+              actions: [
+                ..._calendarActions(context, l),
+                const AppAccountButton(),
+              ],
+            ),
       body: Column(
         children: [
           if (_showChecklist)
@@ -1258,11 +1321,8 @@ class _CalendarScreenState extends State<CalendarScreen>
                           ),
                         ),
                       ],
-                      IconButton(
-                        tooltip: l[K.selectionCancel],
-                        icon: const Icon(Icons.close),
-                        onPressed: _cancelSelection,
-                      ),
+                      // U-36: the ✕ moved to the contextual app bar — one
+                      // place to leave the mode, where Material puts it.
                     ],
                   ),
                 ),
@@ -1273,6 +1333,9 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 }
+
+/// U-36 — the items of the calendar's ⋮ menu. F-51 adds `clearMonth` here.
+enum _CalendarAction { wizard, selectDays }
 
 /// The today card's outline while it loads — the same card, the same two
 /// bands, the same heights, so nothing moves when the real one arrives.

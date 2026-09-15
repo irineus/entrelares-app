@@ -269,7 +269,10 @@ void main() {
         (tester) async {
       await loadedThenOffline(tester);
 
-      await tester.tap(find.byTooltip(pt[K.calWizard]));
+      // U-36: the wizard is an item of the ⋮ menu.
+      await tester.tap(find.byTooltip(pt[K.calActionsMenu]));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(pt[K.calWizard]));
       await tester.pumpAndSettle();
 
       expect(find.text(pt[KApp.offlineWriteBlocked]), findsOneWidget);

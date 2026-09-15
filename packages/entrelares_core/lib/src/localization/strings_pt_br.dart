@@ -153,6 +153,7 @@ abstract final class StringsPtBr {
     K.calNextMonth: 'Próximo mês',
     K.calSelectDays: 'Selecionar vários dias',
     K.calWizard: 'Assistente de rotação',
+    K.calActionsMenu: 'Mais ações do calendário',
     K.calAriaCalendarOf: 'Calendário de {0}',
     K.calMemberLeft: '(saiu)',
     K.calSwapped: 'Trocado',
@@ -1032,7 +1033,7 @@ abstract final class StringsPtBr {
     K.tourColoursTitle: 'As cores do calendário',
     K.tourColoursBody: 'Cada responsável tem uma cor fixa, e a legenda diz de quem é cada uma. Um dia trocado ganha marca própria, para a diferença entre o planejado e o real ficar visível de longe.',
     K.tourWizardTitle: 'O assistente de rotação',
-    K.tourWizardBody: 'Preenche um mês inteiro a partir de um padrão — semana sim, semana não; fins de semana alternados; o que a sua rotina for. É por aqui que se sai de um calendário vazio.',
+    K.tourWizardBody: 'Preenche um mês inteiro a partir de um padrão — semana sim, semana não; fins de semana alternados; o que a sua rotina for. É por aqui que se sai de um calendário vazio. Fica no menu ⋮ do calendário, em "Assistente de rotação".',
     K.tourNotificationsTitle: 'Os pedidos chegam aqui',
     K.tourNotificationsBody: 'Quando a outra pessoa pede uma troca, o aviso aparece nesta aba com um contador. É também onde ficam os seus pedidos enviados e o histórico.',
   };
