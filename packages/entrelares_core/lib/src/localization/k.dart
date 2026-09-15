@@ -211,6 +211,14 @@ abstract final class K {
   static const String selectionResolve = 'selection.resolve';
   static const String selectionEdit = 'selection.edit';
   static const String selectionCancel = 'selection.cancel';
+  /// F-65 — the quick swap from a selected pair of days: the bar's third
+  /// button and the confirmation sheet it opens.
+  static const String selectionSwap = 'selection.swap';
+  static const String quickSwapTitle = 'quickSwap.title';
+  static const String quickSwapYouTake = 'quickSwap.youTake';
+  static const String quickSwapTheyTake = 'quickSwap.theyTake';
+  static const String quickSwapRequests = 'quickSwap.requests';
+  static const String quickSwapConfirm = 'quickSwap.confirm';
   static const String navGuardSelectedOne = 'navGuard.selectedOne';
   static const String navGuardSelectedMany = 'navGuard.selectedMany';
   static const String navGuardBody = 'navGuard.body';
@@ -1300,6 +1308,12 @@ abstract final class K {
     selectionResolve,
     selectionEdit,
     selectionCancel,
+    selectionSwap,
+    quickSwapTitle,
+    quickSwapYouTake,
+    quickSwapTheyTake,
+    quickSwapRequests,
+    quickSwapConfirm,
     navGuardSelectedOne,
     navGuardSelectedMany,
     navGuardBody,

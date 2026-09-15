@@ -25,6 +25,7 @@ import '../widgets/today_card.dart';
 import 'bulk_sheet.dart';
 import 'day_sheet.dart';
 import 'frozen_day_sheet.dart';
+import 'quick_swap_sheet.dart';
 import 'resolve_sheet.dart';
 import '../services/onboarding_service.dart';
 import '../widgets/onboarding.dart';
@@ -813,6 +814,50 @@ class _CalendarScreenState extends State<CalendarScreen>
         revertable;
   }
 
+  /// F-65: the quick swap the current selection allows, or null when the
+  /// bar must not offer it (core decides — two planned parents, equal counts,
+  /// every day clean, the requester one of the two). Never non-null together
+  /// with [_workflowActionableCount] > 0: that count needs a frozen or an
+  /// already-swapped day, and either hides the plan.
+  QuickSwapPlan? get _quickSwapPlan => quickSwapPlan(
+        selected: [
+          for (final d in _selectedDays)
+            () {
+              final row = _daysByIso[CareSchedule.isoDate(d)];
+              return QuickSwapDay(
+                date: d,
+                scheduledParentId: row?.scheduledParentId ?? 0,
+                actualParentId: row?.actualParentId,
+              );
+            }(),
+        ],
+        requesterId: _ownProfile?.id,
+        today: _today,
+        frozenDates: [for (final r in _frozenByIso.values) r.scheduleDate],
+        members: _memberViews,
+      );
+
+  Future<void> _openQuickSwap(QuickSwapPlan plan) async {
+    if (_refuseWriteOffline()) return;
+    final my = _ownProfile;
+    if (my == null) return;
+    final summary = await showQuickSwapSheet(
+      context: context,
+      plan: plan,
+      daysByIso: _daysByIso,
+      dataSource: widget.dataSource,
+      myProfile: my,
+      allProfiles: _members,
+    );
+    if (summary != null) {
+      // Same exit as the bulk sheet: selection clears, month reloads, the
+      // summary is the toast.
+      setState(() => _selectedDays.clear());
+      _load(silent: true);
+      if (mounted) showAppSnack(context, summary);
+    }
+  }
+
   Future<void> _openResolveSheet() async {
     if (_refuseWriteOffline()) return;
     final summary = await showResolveSheet(
@@ -1267,6 +1312,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     final app = AppL10n.of(context);
     final l = app.l;
     final views = _memberViews;
+    final quickSwap = _isSelectionMode ? _quickSwapPlan : null;
     return Scaffold(
       // U-28: the app bar names the TAB, like the other three do. The month
       // moved down to sit against the grid it labels — up here, competing with
@@ -1424,6 +1470,20 @@ class _CalendarScreenState extends State<CalendarScreen>
                             onPressed: _openResolveSheet,
                             child: Text(l.format(K.selectionResolve,
                                 [_workflowActionableCount])),
+                          ),
+                        ),
+                      ],
+                      // F-65: ⇄ Trocar — only when the selection is a pair
+                      // of planned parents with equal days, all clean. It
+                      // and 🔔 Resolver never show together (see the getter),
+                      // so the bar holds at most two labelled actions.
+                      if (quickSwap != null) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _openQuickSwap(quickSwap),
+                            child: Text(l.format(
+                                K.selectionSwap, [quickSwap.dayCount])),
                           ),
                         ),
                       ],
