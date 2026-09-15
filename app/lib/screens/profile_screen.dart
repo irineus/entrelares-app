@@ -15,6 +15,8 @@ import '../services/file_delivery.dart';
 import '../services/sudo_service.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
+import '../widgets/profile_sheets.dart';
+import '../widgets/rich_label.dart';
 import '../widgets/sudo_sheet.dart';
 
 /// `/profile` and `/profile/{id}` — port of `ProfilePage.razor`.
@@ -24,6 +26,12 @@ import '../widgets/sudo_sheet.dart';
 /// export. **Everything that grants power or moves personal data is
 /// sudo-gated**, and each of those calls goes through [runWithSudo], which
 /// asks before acting AND retries once when the server disagrees.
+///
+/// U-21: the page is READ at rest. Dados, E-mail and Senha are summary cards
+/// with a pencil in the title, and the pencil opens a sheet
+/// (`profile_sheets.dart`) — no input sits open on the page for someone who
+/// only came to look. The gated call stays here, so the sudo prompt stacks
+/// over the sheet and a dismissed prompt keeps the draft.
 ///
 /// The U-23 reopen door lives here too: a first-run guide that cannot be
 /// reopened is a guide you can only read once, by accident.
@@ -75,22 +83,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<Role> _roles = const [];
   Family? _family;
 
-  final _nameDraft = TextEditingController();
-  int? _roleDraft;
-  String? _dataError;
-  bool _savingData = false;
-
-  final _newEmail = TextEditingController();
-  String? _emailError;
+  /// What the E-mail and Senha cards say after their sheet closed: GoTrue only
+  /// applies an e-mail change once the link is clicked, and a reset is a
+  /// mail, not a change — both outcomes are sentences on the card.
   bool _emailLinkSent = false;
-
-  final _newPassword = TextEditingController();
-  final _confirmPassword = TextEditingController();
-  String? _passwordError;
   bool _passwordLinkSent = false;
-
-  /// U-29 — U-19's eye toggle; one control drives the pair, as register does.
-  bool _passwordObscured = true;
 
   bool _exporting = false;
 
@@ -127,15 +124,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    _nameDraft.dispose();
-    _newEmail.dispose();
-    _newPassword.dispose();
-    _confirmPassword.dispose();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     setState(() => _loading = true);
     final results = await Future.wait([
@@ -164,8 +152,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _roles = results[2] as List<Role>;
       _family = results[3] as Family?;
       _pendingDeletion = results[4] as PendingFamilyDeletion?;
-      _nameDraft.text = target?.fullName ?? '';
-      _roleDraft = target?.roleId;
       _loading = false;
     });
   }
@@ -181,41 +167,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  Future<void> _saveData(Localization l) async {
-    final target = _target;
-    if (target == null) return;
-    final clean = _nameDraft.text.trim();
-    if (clean.length < 2) {
-      setState(() => _dataError = l[KApp.profErrNameTooShort]);
-      return;
-    }
-    setState(() {
-      _savingData = true;
-      _dataError = null;
-    });
-    try {
-      if (clean != target.fullName) {
-        if (_isOwn) {
-          await widget.dataSource.updateOwnName(target.id, clean);
-        } else {
-          await widget.dataSource.updateMemberName(target.id, clean);
-        }
-      }
+  /// U-21 — the Dados pencil. The sheet validates and shows a refusal; this
+  /// side only knows WHICH writer each field goes to.
+  Future<void> _editData(Localization l, Member target) async {
+    final saved = await showProfileDataSheet(
+      context: context,
+      initialName: target.fullName,
+      initialRoleId: target.roleId,
+      roles: _roles,
       // The role is an admin's to set — for anyone, including themselves.
-      if (_iAmAdmin && _roleDraft != null && _roleDraft != target.roleId) {
-        await widget.dataSource
-            .setMemberRole(profileId: target.id, roleId: _roleDraft!);
-      }
-      if (!mounted) return;
-      showAppSnack(context, l[K.profDataUpdated]);
-      await _reload();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() =>
-          _dataError = translateSaveError(e.toString(), l[K.errSaveFailed], l));
-    } finally {
-      if (mounted) setState(() => _savingData = false);
-    }
+      canEditRole: _iAmAdmin,
+      onSave: (name, roleId) async {
+        if (name != target.fullName) {
+          if (_isOwn) {
+            await widget.dataSource.updateOwnName(target.id, name);
+          } else {
+            await widget.dataSource.updateMemberName(target.id, name);
+          }
+        }
+        if (roleId != null && roleId != target.roleId) {
+          await widget.dataSource
+              .setMemberRole(profileId: target.id, roleId: roleId);
+        }
+      },
+    );
+    if (saved != true || !mounted) return;
+    showAppSnack(context, l[K.profDataUpdated]);
+    await _reload();
   }
 
   Future<void> _toggleAdmin(Localization l) async {
@@ -266,65 +244,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _changeEmail(Localization l) async {
-    final candidate = _newEmail.text.trim();
-    setState(() {
-      _emailError = null;
-      _emailLinkSent = false;
-    });
-    if (!candidate.contains('@')) {
-      setState(() => _emailError = l[K.profErrInvalidEmail]);
-      return;
-    }
-    if (candidate.toLowerCase() == (_target?.email ?? '').toLowerCase()) {
-      setState(() => _emailError = l[K.profErrSameEmail]);
-      return;
-    }
-    try {
-      final ran = await runWithSudo(
+  /// U-21 — the E-mail pencil. The sheet refuses a malformed or unchanged
+  /// address before any prompt; the gated call runs from HERE, so the sudo
+  /// sheet stacks over the editor and a dismissed prompt keeps the draft.
+  Future<void> _editEmail(Member target) async {
+    setState(() => _emailLinkSent = false);
+    final sent = await showProfileEmailSheet(
+      context: context,
+      currentEmail: target.email ?? '',
+      onSubmit: (candidate) => runWithSudo(
         context: context,
         sudo: widget.sudo,
         action: () => widget.dataSource.updateOwnEmail(candidate),
-      );
-      if (!mounted || !ran) return;
-      _newEmail.clear();
-      // GoTrue only APPLIES the change once the link is clicked — saying
-      // "changed" here would be a lie.
-      setState(() => _emailLinkSent = true);
-      await widget.dataSource.logAccountAction('email_change_requested');
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _emailError = e.toString());
-    }
+      ),
+    );
+    if (sent != true || !mounted) return;
+    // GoTrue only APPLIES the change once the link is clicked — saying
+    // "changed" here would be a lie.
+    setState(() => _emailLinkSent = true);
+    await widget.dataSource.logAccountAction('email_change_requested');
   }
 
-  Future<void> _changePassword(Localization l) async {
-    setState(() => _passwordError = null);
-    if (_newPassword.text.length < RegisterRules.minPasswordLength) {
-      setState(() => _passwordError = l[KApp.profErrPasswordShort]);
-      return;
-    }
-    if (_newPassword.text != _confirmPassword.text) {
-      setState(() => _passwordError = l[K.profErrPasswordMismatch]);
-      return;
-    }
-    try {
-      final ran = await runWithSudo(
+  /// U-21 — the Senha pencil. Two doors in one sheet: the change, gated by
+  /// S-10 (the CURRENT password is always demanded first — otherwise a
+  /// borrowed unlocked phone could take the account over), and the reset by
+  /// e-mail for whoever cannot answer that prompt.
+  Future<void> _editPassword(Localization l, Member target) async {
+    setState(() => _passwordLinkSent = false);
+    final outcome = await showProfilePasswordSheet(
+      context: context,
+      onChange: (newPassword) => runWithSudo(
         context: context,
         sudo: widget.sudo,
-        // S-10: the CURRENT password is always demanded first — otherwise a
-        // borrowed unlocked phone could take the account over.
-        action: () => widget.dataSource.updateOwnPassword(_newPassword.text),
-      );
-      if (!mounted || !ran) return;
-      _newPassword.clear();
-      _confirmPassword.clear();
-      await widget.dataSource.logAccountAction('password_changed');
-      if (mounted) showAppSnack(context, l[K.profPasswordChanged]);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _passwordError = e.toString());
-    }
+        action: () => widget.dataSource.updateOwnPassword(newPassword),
+      ),
+      onReset: () => _sendPasswordReset(l, target.email ?? '', own: true),
+    );
+    if (outcome != ProfilePasswordOutcome.changed || !mounted) return;
+    await widget.dataSource.logAccountAction('password_changed');
+    if (mounted) showAppSnack(context, l[K.profPasswordChanged]);
   }
 
   Future<void> _export(Localization l) async {
@@ -508,44 +466,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
 
-  Widget _dataSection(Localization l, Member target) => AppCard(
-        title: l[K.profSectionData],
-        child: Column(
+  /// U-21 — the pencil in a card's title. One shape for the three groups, so
+  /// a reader who found one knows the other two; the key is what the tests
+  /// and the E2E lane hold on to, never the glyph.
+  Widget _pencil({
+    required String keyName,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) =>
+      IconButton(
+        key: ValueKey(keyName),
+        tooltip: tooltip,
+        icon: const Icon(Icons.edit_outlined),
+        onPressed: onPressed,
+      );
+
+  /// U-21 — Dados at rest: the name and the role as label/value rows. The
+  /// role is READ by everyone (before, only an admin ever saw it, because it
+  /// only existed as the admin's dropdown); only the sheet knows who may
+  /// change it. A frozen member (S-11) gets no pencil: the banner above
+  /// already says nothing here can change, and an editor that the server
+  /// refuses would contradict it.
+  Widget _dataSection(Localization l, Member target) {
+    final theme = Theme.of(context).textTheme;
+    final role = _roles.where((r) => r.id == target.roleId).firstOrNull;
+    return AppCard(
+      title: l[K.profSectionData],
+      titleTrailing: target.leftAt == null
+          ? _pencil(
+              keyName: 'profile-edit-data',
+              tooltip: l[KApp.profEditData],
+              onPressed: () => _editData(l, target),
+            )
+          : null,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AppTextField(
-            label: l[K.registerFullName],
-            controller: _nameDraft,
-            maxLength: RegisterRules.maxNameLength,
-            errorText: _dataError,
-          ),
-          if (_iAmAdmin) ...[
-            const SizedBox(height: 12),
-            DropdownButtonFormField<int>(
-              initialValue: _roleDraft,
-              decoration: InputDecoration(labelText: l[K.famRoleInFamily]),
-              items: [
-                for (final role in _roles)
-                  DropdownMenuItem(
-                    value: role.id,
-                    child: Text(role.displayLabel(l.current)),
-                  ),
-              ],
-              onChanged: (value) => setState(() => _roleDraft = value),
-            ),
-          ] else ...[
-            const SizedBox(height: 8),
-            Text(l[K.profPersonalHint],
-                style: Theme.of(context).textTheme.bodySmall),
+          AppListRow(label: l[K.registerFullName], value: target.fullName),
+          if (role != null)
+            AppListRow(
+                label: l[K.famRoleInFamily],
+                value: role.displayLabel(l.current)),
+          if (!_iAmAdmin) ...[
+            const SizedBox(height: Spacing.sm),
+            Text(l[K.profPersonalHint], style: theme.bodySmall),
           ],
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _savingData ? null : () => _saveData(l),
-            icon: const Icon(Icons.save_outlined),
-            label: Text(l[K.profSaveData]),
-          ),
         ],
-      ));
+      ),
+    );
+  }
 
   Widget _adminSection(Localization l, Member target) => AppCard(
         title: l[K.profSectionAdmin],
@@ -575,37 +544,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ));
 
-  Widget _emailSection(Localization l, Member target) => AppCard(
-        title: l[K.profSectionEmail],
-        child: Column(
+  /// U-21 — E-mail at rest: the current address, and the "link sent" sentence
+  /// once the sheet has asked for a change.
+  Widget _emailSection(Localization l, Member target) {
+    final theme = Theme.of(context).textTheme;
+    return AppCard(
+      title: l[K.profSectionEmail],
+      titleTrailing: _pencil(
+        keyName: 'profile-edit-email',
+        tooltip: l[K.profChangeEmail],
+        onPressed: () => _editEmail(target),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // U-28 defect: the key is a FORMAT string ("E-mail atual: {0}"), and
           // interpolating it printed the placeholder verbatim next to the
           // address — "E-mail atual: {0} irineus@gmail.com".
           Text(l.format(K.profCurrentEmail, [target.email ?? '']),
-              style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 12),
-          AppTextField(
-            label: l[K.profNewEmail],
-            hint: l[K.profNewEmailPlaceholder],
-            controller: _newEmail,
-            keyboardType: TextInputType.emailAddress,
-            errorText: _emailError,
-          ),
+              style: theme.bodySmall),
           if (_emailLinkSent) ...[
-            const SizedBox(height: 8),
-            Text(l[K.profEmailLinkSent],
-                style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: Spacing.sm),
+            Text(l[K.profEmailLinkSent], style: theme.bodySmall),
           ],
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: () => _changeEmail(l),
-            icon: const Icon(Icons.alternate_email),
-            label: Text(l[K.profChangeEmail]),
-          ),
         ],
-      ));
+      ),
+    );
+  }
 
   /// U-30 — the doors this account has, read from the session (F-57 exposed
   /// the providers; this adds the identities, for the address each door opens
@@ -706,58 +671,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// e-mail a reset for a credential that does not exist. The caller keeps
   /// this card off such a session (`SignInMethodRules.hasPassword`); its door
   /// is listed in [_signInMethodsSection] instead (U-30).
+  ///
+  /// U-21 — at rest the card is one sentence; the two fields, the eye toggle
+  /// and the reset-by-e-mail door all live in the sheet.
   Widget _passwordSection(Localization l, Member target) {
+    final theme = Theme.of(context).textTheme;
     return AppCard(
-        title: l[K.profSectionPassword],
-        child: Column(
+      title: l[K.profSectionPassword],
+      titleTrailing: _pencil(
+        keyName: 'profile-edit-password',
+        tooltip: l[K.profChangePassword],
+        onPressed: () => _editPassword(l, target),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // U-29: the only two fields in the app that were raw `TextField`s —
-          // now the shared component, which also brings U-19's eye toggle back.
-          AppTextField(
-            label: l[K.updatePwdNewPassword],
-            hint: l[K.profNewPasswordPlaceholder],
-            controller: _newPassword,
-            obscureText: _passwordObscured,
-            errorText: _passwordError,
-            suffixIcon: IconButton(
-              tooltip: l[_passwordObscured
-                  ? K.commonShowPassword
-                  : K.commonHidePassword],
-              icon: Icon(_passwordObscured
-                  ? Icons.visibility
-                  : Icons.visibility_off),
-              onPressed: () =>
-                  setState(() => _passwordObscured = !_passwordObscured),
-            ),
-          ),
-          const SizedBox(height: 12),
-          AppTextField(
-            label: l[K.profConfirmNewPassword],
-            hint: l[K.profConfirmNewPasswordPlaceholder],
-            controller: _confirmPassword,
-            obscureText: _passwordObscured,
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: () => _changePassword(l),
-            icon: const Icon(Icons.key_outlined),
-            label: Text(l[K.profChangePassword]),
-          ),
-          const SizedBox(height: 8),
-          Text(l[K.profForgotCurrent],
-              style: Theme.of(context).textTheme.bodySmall),
-          if (_passwordLinkSent)
-            Text(l.format(K.profPasswordLinkSentTo, [target.email ?? '']),
-                style: Theme.of(context).textTheme.bodySmall),
-          OutlinedButton.icon(
-            onPressed: () =>
-                _sendPasswordReset(l, target.email ?? '', own: true),
-            icon: const Icon(Icons.mail_outline),
-            label: Text(l[K.profResetByEmail]),
-          ),
+          Text(l[KApp.profPasswordSummary], style: theme.bodySmall),
+          if (_passwordLinkSent) ...[
+            const SizedBox(height: Spacing.sm),
+            // The sentence carries `<strong>` around the address — RichLabel
+            // renders it; a plain Text printed the tag to the reader.
+            RichLabel.of(l, K.profPasswordLinkSentTo,
+                args: [target.email ?? ''], style: theme.bodySmall),
+          ],
         ],
-      ));
+      ),
+    );
   }
 
   Widget _lgpdSection(Localization l) => AppCard(
