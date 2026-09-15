@@ -1,0 +1,14 @@
+# L-29 — web.entrelares.app is the app, not a site: nothing here should be a
+# search result. That is said by `X-Robots-Tag: noindex` in `_headers`, on every
+# path. This file exists for two reasons, and neither is to block anything:
+#
+#   1. Without it `_redirects` answers /robots.txt with index.html (200, HTML),
+#      and a crawler has to guess what an HTML robots file means.
+#   2. It must ALLOW the crawl. A disallowed page is never fetched, so its
+#      noindex header is never read — and a page other sites link to (every
+#      landing CTA names /register) can then be indexed from the link alone.
+#
+# The landing's sitemap lives at https://entrelares.app/sitemap.xml; this host
+# has none on purpose.
+User-agent: *
+Allow: /

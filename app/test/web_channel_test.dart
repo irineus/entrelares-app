@@ -263,6 +263,42 @@ void main() {
     });
   });
 
+  // L-29 — the app is not a search result. `_redirects` makes every address on
+  // this host a 200 with the same canvas page, and Bing had already indexed it
+  // beside the landing. Two files say "drop it", and only together: the header
+  // says noindex, and robots.txt has to let the crawler in to READ the header.
+  // A well-meant `Disallow: /` would look stricter and do the opposite — the
+  // page is never fetched, the header never read, and a URL the landing links
+  // to (/register, sixteen times) gets indexed from the link alone.
+  group('search engines (L-29)', () {
+    test('every path is served with X-Robots-Tag: noindex', () {
+      final headers = _web('_headers').readAsStringSync();
+      final everyPath =
+          RegExp(r'^/\*\r?\n((?:[ \t]+.*\r?\n?)+)', multiLine: true)
+              .firstMatch(headers)
+              ?.group(1);
+      expect(everyPath, isNotNull, reason: '`_headers` has a `/*` block');
+      expect(everyPath, contains('X-Robots-Tag: noindex'),
+          reason: 'on the `/*` block, so the rewritten routes carry it too — '
+              'a rule on /index.html alone misses /register, which is served '
+              'by the SPA fallback, not by that path');
+    });
+
+    test('robots.txt is a real file, and it does not block the crawl', () {
+      final robots = _web('robots.txt');
+      expect(robots.existsSync(), isTrue,
+          reason: 'without it /robots.txt is index.html — an HTML robots file');
+      final rules = _withoutComments(robots.readAsStringSync());
+      expect(
+        RegExp(r'^\s*Disallow:\s*/\s*$', multiLine: true, caseSensitive: false)
+            .hasMatch(rules),
+        isFalse,
+        reason: 'a disallowed page is never fetched, so its noindex header is '
+            'never read — blocking the crawl un-hides the app from the index',
+      );
+    });
+  });
+
   group('service-worker.js (the Blazor tombstone)', () {
     late String worker;
 
