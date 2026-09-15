@@ -392,6 +392,21 @@ List<CaregiverTimeline> caregiverTimelines({
   ];
 }
 
+/// F-63 — where a report's reader finds out what the document is: the
+/// landing page L-30 built for it. Printed on every page footer and in the
+/// closing paragraph, in BOTH languages (one path, one measurement).
+///
+/// Extensionless, because the landing answers `/relatorio.html` with a 307
+/// (L-23); and never with a query, because the Umami sanitizer cuts it before
+/// the pageview leaves (L-27) — the path itself is the measurement.
+abstract final class ReportLanding {
+  /// What the page prints: short enough to type from paper.
+  static const String address = 'entrelares.app/relatorio';
+
+  /// What the link opens.
+  static const String url = 'https://$address';
+}
+
 /// The assembled consolidated history report (F-33). Pure data built by
 /// [buildCustodyReport] from the family's own RLS-scoped reads; the renderer
 /// only lays it out.

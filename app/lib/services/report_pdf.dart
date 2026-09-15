@@ -66,11 +66,24 @@ Future<Uint8List> buildReportPdf(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.fromLTRB(32, 32, 32, 40),
+      // F-63: every page carries its way back — the address on the left
+      // (a link on screen, typeable on paper), the page count on the right.
       footer: (context) => pw.Container(
-        alignment: pw.Alignment.centerRight,
         margin: const pw.EdgeInsets.only(top: 8),
-        child: pw.Text('${context.pageNumber}/${context.pagesCount}',
-            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.UrlLink(
+              destination: ReportLanding.url,
+              child: pw.Text(ReportLanding.address,
+                  style: const pw.TextStyle(
+                      fontSize: 8, color: PdfColors.grey700)),
+            ),
+            pw.Text('${context.pageNumber}/${context.pagesCount}',
+                style:
+                    const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+          ],
+        ),
       ),
       build: (context) => [
         ..._header(report, l),
@@ -88,6 +101,18 @@ Future<Uint8List> buildReportPdf(
               [report.appVersion, l.formatDateTime(report.generatedAtLocal)])),
           size: 7.5,
           color: PdfColors.grey700,
+        ),
+        // F-63: the closing paragraph names the page that explains the
+        // document — the reader who got this PDF from someone else is exactly
+        // who needs it.
+        pw.SizedBox(height: 4),
+        pw.UrlLink(
+          destination: ReportLanding.url,
+          child: _paragraph(
+            l.format(K.pdfDocLearnMore, [ReportLanding.address]),
+            size: 7.5,
+            color: PdfColors.grey700,
+          ),
         ),
       ],
     ),

@@ -48,6 +48,29 @@ CaregiverStat _statOf(List<CaregiverStat> stats, int id) =>
     stats.firstWhere((s) => s.profileId == id);
 
 void main() {
+  // F-63: the address the PDF prints is a claim about the landing. Two ways
+  // it silently goes wrong were already paid for there: a `.html` answers 307
+  // (L-23), and a query never reaches the pageview (L-27).
+  group('ReportLanding — the page the PDF points at', () {
+    test('is the extensionless L-30 path, with no query or fragment', () {
+      expect(ReportLanding.address, 'entrelares.app/relatorio');
+      expect(ReportLanding.url, 'https://${ReportLanding.address}');
+      final uri = Uri.parse(ReportLanding.url);
+      expect(uri.hasQuery, isFalse);
+      expect(uri.hasFragment, isFalse);
+      expect(uri.path, isNot(endsWith('.html')));
+    });
+
+    test('the closing sentence carries the address in both languages', () {
+      for (final language in AppLanguage.values) {
+        final l = Localization(language);
+        expect(l.format(K.pdfDocLearnMore, [ReportLanding.address]),
+            endsWith(': ${ReportLanding.address}'),
+            reason: '$language');
+      }
+    });
+  });
+
   group('caregiverStats — the default view (no projection)', () {
     final stats = caregiverStats(
       members: _members,
