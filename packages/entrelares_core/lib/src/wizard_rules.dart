@@ -157,3 +157,64 @@ List<GeneratedDay> generateRotation({
   }
   return result;
 }
+
+// ── U-41 · the preview strip ──────────────────────────────────────────────
+//
+// The wizard's preview used to be ONE sentence of arithmetic ("14 days per
+// cycle · repeats ~6× · 84 days"), which never answers the question a parent
+// actually has — who has the child on which weekday. The strip is the
+// calendar about to be born: [generateRotation]'s first N days, painted in
+// the carers' slot colours. Nothing here is a new rule; these two helpers
+// only decide how MANY days the strip shows and how a screen reader hears
+// them.
+
+/// The strip shows TWO cycles so the reader sees the pattern come round…
+const cycleStripMinDays = 14;
+
+/// …with a floor of two weeks (a 1/1 cycle is 2 days, and four cells say
+/// nothing about weekdays) and a ceiling of four weeks (the sheet is a
+/// phone-height surface; a 30/30 cycle shows its first month and the reader
+/// scrolls the real calendar for the rest).
+const cycleStripMaxDays = 28;
+
+/// How many days the preview strip renders for a cycle of [cycleDays].
+int cycleStripLength(int cycleDays) {
+  final twoCycles = cycleDays * 2;
+  if (twoCycles < cycleStripMinDays) return cycleStripMinDays;
+  if (twoCycles > cycleStripMaxDays) return cycleStripMaxDays;
+  return twoCycles;
+}
+
+/// One run of consecutive strip days with the same planned responsible —
+/// what a screen reader hears instead of N coloured squares ("Ana for 5 days,
+/// Bruno for 2 days, …").
+class CycleRun {
+  final int profileId;
+  final int days;
+
+  const CycleRun(this.profileId, this.days);
+
+  @override
+  bool operator ==(Object other) =>
+      other is CycleRun && other.profileId == profileId && other.days == days;
+
+  @override
+  int get hashCode => Object.hash(profileId, days);
+
+  @override
+  String toString() => 'CycleRun($profileId × $days)';
+}
+
+/// Collapses [days] into runs, in order. An empty strip has no runs.
+List<CycleRun> cycleStripRuns(List<GeneratedDay> days) {
+  final runs = <CycleRun>[];
+  for (final day in days) {
+    if (runs.isNotEmpty && runs.last.profileId == day.scheduledParentId) {
+      runs[runs.length - 1] =
+          CycleRun(day.scheduledParentId, runs.last.days + 1);
+    } else {
+      runs.add(CycleRun(day.scheduledParentId, 1));
+    }
+  }
+  return runs;
+}

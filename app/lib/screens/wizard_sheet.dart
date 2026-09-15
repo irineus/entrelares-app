@@ -9,6 +9,7 @@ import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/cycle_strip.dart';
 
 /// The Rotation Wizard — mirror of `ScheduleWizard.razor` over the pure rules
 /// in `entrelares_core/wizard_rules.dart`: presets, cycle blocks, start date
@@ -84,6 +85,14 @@ class _WizardSheetState extends State<_WizardSheet> {
   List<int> get _profileIds =>
       [for (final m in widget.activeMembers) m.id];
 
+  /// U-41: the strip paints with the grid's own rules (slot, initials), which
+  /// read the core's `MemberView` slice.
+  List<MemberView> get _views =>
+      [for (final m in widget.activeMembers) m.toView()];
+
+  ({int hour, int minute})? get _handoffTime =>
+      _handoff == null ? null : (hour: _handoff!.hour, minute: _handoff!.minute);
+
   @override
   void initState() {
     super.initState();
@@ -143,9 +152,7 @@ class _WizardSheetState extends State<_WizardSheet> {
         start: _startDate,
         end: clampResult.end,
         blocks: _cycleBlocks,
-        handoffTime: _handoff == null
-            ? null
-            : (hour: _handoff!.hour, minute: _handoff!.minute),
+        handoffTime: _handoffTime,
       );
       final rows = [
         for (final g in generated)
@@ -232,6 +239,17 @@ class _WizardSheetState extends State<_WizardSheet> {
       blocks: _cycleBlocks,
       start: _startDate,
       durationMonths: _durationMonths,
+    );
+    // U-41: the strip is the plan's own first days — the same expansion the
+    // generation runs, cut to two cycles — so what is previewed is what is
+    // written. It follows every setState the form already does.
+    final stripLength = cycleStripLength(summary.cycleDays);
+    final stripDays = generateRotation(
+      start: _startDate,
+      end: DateTime(
+          _startDate.year, _startDate.month, _startDate.day + stripLength),
+      blocks: _cycleBlocks,
+      handoffTime: _handoffTime,
     );
     return [
       // ── Preset shortcuts (the VALUES are pattern ids, never localized) ──
@@ -436,12 +454,24 @@ class _WizardSheetState extends State<_WizardSheet> {
       //
       // U-28 QA: the cycle summary is the sheet's answer to "what will this
       // actually do", and it was a loose grey sentence at the end of the form.
+      //
+      // U-41: the strip first — the calendar about to be born, in the grid's
+      // own language — and the arithmetic sentence under it.
       AppCard(
         title: l[K.wizCyclePreview],
-        child: Text(
-          l.format(K.wizCycleSummary,
-              [summary.cycleDays, summary.repetitions, summary.totalDays]),
-          style: Theme.of(context).textTheme.bodyMedium,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (stripDays.isNotEmpty) ...[
+              CycleStrip(days: stripDays, views: _views),
+              const SizedBox(height: Spacing.sm),
+            ],
+            Text(
+              l.format(K.wizCycleSummary,
+                  [summary.cycleDays, summary.repetitions, summary.totalDays]),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
         ),
       ),
 

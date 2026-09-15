@@ -202,4 +202,59 @@ void main() {
       ]);
     });
   });
+
+  group('U-41 · cycleStripLength', () {
+    test('two cycles, floored at two weeks and capped at four', () {
+      expect(cycleStripLength(7), 14); // 7/7
+      expect(cycleStripLength(28), 28); // 14/14
+      expect(cycleStripLength(2), 14); // 1/1 — four cells say nothing
+      expect(cycleStripLength(14), 28); // 5/2/2/5 and 2/2/3
+      expect(cycleStripLength(10), 20); // a custom 5/5
+      expect(cycleStripLength(60), 28); // 30/30 — a phone-height sheet
+      expect(cycleStripLength(0), 14); // no blocks: the floor, harmless
+    });
+
+    test('every preset renders whole cycles', () {
+      for (final preset in wizardPresetIds) {
+        final cycle = wizardPresetBlocks(preset, const [10, 20])
+            .fold(0, (sum, b) => sum + b.days);
+        expect(cycleStripLength(cycle) % cycle, 0, reason: preset);
+      }
+    });
+  });
+
+  group('U-41 · cycleStripRuns', () {
+    test('collapses consecutive days into runs, in order', () {
+      final days = generateRotation(
+        start: _today,
+        end: DateTime(2026, 9, 2), // 14 days
+        blocks: const [
+          CycleBlock(10, 5),
+          CycleBlock(20, 2),
+          CycleBlock(10, 2),
+          CycleBlock(20, 5),
+        ],
+      );
+      expect(cycleStripRuns(days), const [
+        CycleRun(10, 5),
+        CycleRun(20, 2),
+        CycleRun(10, 2),
+        CycleRun(20, 5),
+      ]);
+    });
+
+    test('adjacent blocks of the SAME carer merge — the reader hears one run',
+        () {
+      final days = generateRotation(
+        start: _today,
+        end: DateTime(2026, 8, 25),
+        blocks: const [CycleBlock(10, 2), CycleBlock(10, 2), CycleBlock(20, 2)],
+      );
+      expect(cycleStripRuns(days), const [CycleRun(10, 4), CycleRun(20, 2)]);
+    });
+
+    test('an empty strip has no runs', () {
+      expect(cycleStripRuns(const []), isEmpty);
+    });
+  });
 }
