@@ -845,6 +845,13 @@ abstract final class StringsEn {
     K.auditUpdatedSchedule: 'updated the schedule',
     K.auditDayLabel: 'Day: {0}',
     K.auditScheduleChange: '<strong>{0}</strong> {1} for this day.',
+    K.auditBatchClear: '<strong>{0}</strong> cleared the plan in one action.',
+    K.auditBatchReplace: '<strong>{0}</strong> replaced the plan in one action.',
+    K.auditBatchRange: 'Days: {0} to {1}',
+    K.auditBatchCreatedOne: '{0} day planned',
+    K.auditBatchCreatedMany: '{0} days planned',
+    K.auditBatchShow: 'Show the {0} records',
+    K.auditBatchHide: 'Hide the records',
     K.auditErrLoadMore: 'Error loading more records: {0}',
     K.sumErrProcess: 'Error processing the summary: {0}',
     // ── Profile page ──

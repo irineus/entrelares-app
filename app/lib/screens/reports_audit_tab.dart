@@ -63,6 +63,10 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   /// F-45: log id → the request whose resolution produced that log.
   Map<int, SwapOrigin> _origins = const {};
 
+  /// F-51: the batches the reader chose to unfold, by batch id. A fresh load
+  /// folds everything again — the folded view is the readable default.
+  final Set<String> _expandedBatches = {};
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +86,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
       _activity = const [];
       _account = const [];
       _origins = const {};
+      _expandedBatches.clear();
     });
     try {
       final members = await widget.dataSource.fetchMembers();
@@ -335,9 +340,62 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
     if (_activity.isEmpty) {
       return [_emptyState('🗂️', l[K.auditEmptyTitle], l[K.auditEmptyBody])];
     }
+    // F-51: one range operation is ONE entry, unfolded on demand. The rows
+    // themselves are untouched — the record is the record; only the reading
+    // folds. Grouped over the whole loaded list, so a batch that straddles a
+    // "Carregar mais" page joins up once the next page is appended.
+    final byId = {for (final log in _activity) log.id: log};
+    final entries = groupAuditBatches([for (final log in _activity) log.view]);
     return [
-      for (final log in _activity) _scheduleItem(log, l),
+      for (final entry in entries)
+        switch (entry) {
+          AuditSingleEntry(:final log) => _scheduleItem(byId[log.id]!, l),
+          AuditBatchEntry(:final batch) => _batchItem(batch, l),
+        },
+      for (final entry in entries)
+        if (entry is AuditBatchEntry &&
+            _expandedBatches.contains(entry.batch.batchId))
+          for (final log in entry.batch.logs) _scheduleItem(byId[log.id]!, l),
     ];
+  }
+
+  /// F-51: a range operation as one line — who, which operation, which
+  /// days, and the counts in the bulk summary's shape — with the per-day
+  /// rows one tap away. The rows stay below the fold on purpose: a year's
+  /// re-plan is ~730 of them, and the entry is what a reader scans for.
+  Widget _batchItem(AuditBatch batch, Localization l) {
+    final actor = _nameOf(batch.performedById, l[K.auditSystemTrigger]);
+    final expanded = _expandedBatches.contains(batch.batchId);
+    return _item(
+      badge: batch.isReplace ? AuditBadge.updated : AuditBadge.deleted,
+      icon: batch.isReplace ? '🔁' : '🗑️',
+      children: [
+        Text(
+            l.format(K.auditBatchRange,
+                [l.formatDate(batch.firstDate), l.formatDate(batch.lastDate)]),
+            style: Theme.of(context).textTheme.labelSmall),
+        RichLabel.of(
+            l, batch.isReplace ? K.auditBatchReplace : K.auditBatchClear,
+            args: [actor]),
+        Text(auditBatchCounts(batch, l),
+            style: Theme.of(context).textTheme.bodySmall),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            key: Key('auditBatch-${batch.batchId}'),
+            onPressed: () => setState(() {
+              if (!_expandedBatches.add(batch.batchId)) {
+                _expandedBatches.remove(batch.batchId);
+              }
+            }),
+            child: Text(expanded
+                ? l[K.auditBatchHide]
+                : l.format(K.auditBatchShow, [batch.logs.length])),
+          ),
+        ),
+      ],
+      timestamp: l.formatDateTime(batch.createdAtLocal),
+    );
   }
 
   Widget _scheduleItem(ActivityLog log, Localization l) {

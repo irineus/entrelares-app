@@ -845,6 +845,13 @@ abstract final class StringsPtBr {
     K.auditUpdatedSchedule: 'atualizou o agendamento',
     K.auditDayLabel: 'Dia: {0}',
     K.auditScheduleChange: '<strong>{0}</strong> {1} para este dia.',
+    K.auditBatchClear: '<strong>{0}</strong> limpou o plano numa ação só.',
+    K.auditBatchReplace: '<strong>{0}</strong> substituiu o plano numa ação só.',
+    K.auditBatchRange: 'Dias: {0} a {1}',
+    K.auditBatchCreatedOne: '{0} dia planejado',
+    K.auditBatchCreatedMany: '{0} dias planejados',
+    K.auditBatchShow: 'Ver os {0} registros',
+    K.auditBatchHide: 'Ocultar os registros',
     K.auditErrLoadMore: 'Erro ao carregar mais registros: {0}',
     K.sumErrProcess: 'Erro ao processar resumo: {0}',
     // ── Profile page ──

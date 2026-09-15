@@ -502,4 +502,77 @@ void main() {
       }
     });
   });
+
+  group('F-51 batches', () {
+    AuditLogView row(int id, int day, String action, {String? batch,
+            String kind = 'clear_range', int? by = 1, int minute = 0}) =>
+        AuditLogView(
+          id: id,
+          affectedDate: DateTime(2026, 9, day),
+          createdAtLocal: DateTime(2026, 9, 15, 10, minute),
+          action: action,
+          performedById: by,
+          context: batch == null
+              ? const AuditContext(actorIsAdmin: true)
+              : AuditContext(actorIsAdmin: true, batchId: batch, batchKind: kind),
+        );
+
+    test('consecutive rows of one batch fold into one entry; lone rows stay',
+        () {
+      final entries = groupAuditBatches([
+        row(9, 30, 'UPDATE'),
+        row(8, 22, 'DELETE', batch: 'b1', minute: 5),
+        row(7, 21, 'DELETE', batch: 'b1', minute: 5),
+        row(6, 20, 'DELETE', batch: 'b1', minute: 5),
+        row(5, 18, 'INSERT'),
+      ]);
+      expect(entries, hasLength(3));
+      expect(entries[0], isA<AuditSingleEntry>());
+      final batch = (entries[1] as AuditBatchEntry).batch;
+      expect(batch.batchId, 'b1');
+      expect(batch.kind, 'clear_range');
+      expect(batch.isReplace, isFalse);
+      expect(batch.logs, hasLength(3));
+      expect(batch.deleted, 3);
+      expect(batch.created, 0);
+      expect(batch.firstDate, DateTime(2026, 9, 20));
+      expect(batch.lastDate, DateTime(2026, 9, 22));
+      expect(batch.createdAtLocal, DateTime(2026, 9, 15, 10, 5));
+      expect(batch.performedById, 1);
+      expect(entries[2], isA<AuditSingleEntry>());
+    });
+
+    test('two batches over the same days stay two entries — a plan replaced '
+        'twice is two acts', () {
+      final entries = groupAuditBatches([
+        row(4, 21, 'INSERT', batch: 'b2', kind: 'replace_range'),
+        row(3, 21, 'DELETE', batch: 'b2', kind: 'replace_range'),
+        row(2, 21, 'INSERT', batch: 'b1', kind: 'replace_range'),
+        row(1, 21, 'DELETE', batch: 'b1', kind: 'replace_range'),
+      ]);
+      expect(entries, hasLength(2));
+      expect((entries[0] as AuditBatchEntry).batch.batchId, 'b2');
+      expect((entries[1] as AuditBatchEntry).batch.batchId, 'b1');
+    });
+
+    test('a single stamped row is still a batch — a one-day month clear is '
+        'still the one-action operation', () {
+      final entries = groupAuditBatches([row(1, 30, 'DELETE', batch: 'b1')]);
+      expect(entries.single, isA<AuditBatchEntry>());
+    });
+
+    test('the counts sentence names deleted, planned and adjusted days', () {
+      final batch = AuditBatch(batchId: 'b', kind: 'replace_range', logs: [
+        row(1, 21, 'INSERT', batch: 'b'),
+        row(2, 22, 'INSERT', batch: 'b'),
+        row(3, 21, 'DELETE', batch: 'b'),
+        row(4, 23, 'UPDATE', batch: 'b'), // the T-45 cascade on D+1
+      ]);
+      expect(batch.isReplace, isTrue);
+      expect(auditBatchCounts(batch, Localization(AppLanguage.ptBr)),
+          '1 dia apagado · 2 dias planejados · 1 dia atualizado');
+      expect(auditBatchCounts(batch, Localization(AppLanguage.en)),
+          '1 day cleared · 2 days planned · 1 day updated');
+    });
+  });
 }

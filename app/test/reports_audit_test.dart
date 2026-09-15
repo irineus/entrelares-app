@@ -227,6 +227,60 @@ void main() {
       );
     });
 
+    testWidgets('F-51: the rows of one range operation fold into one entry '
+        'that names who, which days and the counts, and unfold on demand',
+        (tester) async {
+      ActivityLog stamped(int id, int day, String action) => ActivityLog(
+            id: id,
+            affectedDate: DateTime(2026, 8, day),
+            createdAt: DateTime.utc(2026, 8, 18, 10),
+            action: action,
+            performedById: 1,
+            oldData: action == 'INSERT'
+                ? null
+                : {'scheduled_parent_id': 2, 'actual_parent_id': null},
+            newData: action == 'DELETE'
+                ? null
+                : {'scheduled_parent_id': 1, 'actual_parent_id': null},
+            context: const AuditContext(
+                actorIsAdmin: true,
+                batchId: 'b-1',
+                batchKind: 'replace_range'),
+          );
+      await pumpAudit(
+        tester,
+        source(logs: [
+          activity(id: 9, day: 25, newData: {'notes': 'x'}),
+          stamped(8, 22, 'INSERT'),
+          stamped(7, 21, 'INSERT'),
+          stamped(6, 22, 'DELETE'),
+          stamped(5, 21, 'DELETE'),
+        ]),
+      );
+
+      // One entry for the batch, folded: the per-day rows are not on screen.
+      expect(find.text(l.format(K.auditBatchRange, ['21/08/2026', '22/08/2026'])),
+          findsOneWidget);
+      expect(find.textContaining('substituiu o plano'), findsOneWidget);
+      expect(find.text('2 dias apagados · 2 dias planejados'), findsOneWidget);
+      expect(find.text(l.format(K.auditDayLabel, ['21/08/2026'])),
+          findsNothing);
+      // The lone row beside it is untouched.
+      expect(find.text(l.format(K.auditDayLabel, ['25/08/2026'])),
+          findsOneWidget);
+
+      await tester.tap(find.text(l.format(K.auditBatchShow, [4])));
+      await tester.pumpAndSettle();
+      expect(find.text(l.format(K.auditDayLabel, ['21/08/2026'])),
+          findsNWidgets(2));
+      expect(find.text(l[K.auditBatchHide]), findsOneWidget);
+
+      await tester.tap(find.text(l[K.auditBatchHide]));
+      await tester.pumpAndSettle();
+      expect(find.text(l.format(K.auditDayLabel, ['21/08/2026'])),
+          findsNothing);
+    });
+
     testWidgets('a row without context (older than F-61) says nothing',
         (tester) async {
       await pumpAudit(

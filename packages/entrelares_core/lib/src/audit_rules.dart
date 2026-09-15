@@ -440,3 +440,111 @@ DateTime? trialEndedEntry({
   if (trialEndsAtUtc == null) return null;
   return trialEndsAtUtc.isAfter(nowUtc) ? null : trialEndsAtUtc;
 }
+
+// ── F-51: a range operation is ONE entry of the timeline ────────────────────
+
+/// The rows one range call (`clear_schedule_range` / `replace_schedule_range`)
+/// wrote, folded into one timeline entry. The rows stay in the record exactly
+/// as written — one per day, trigger-written, append-only; only the
+/// RENDERING folds them, because a year's re-plan is ~730 rows and a screen
+/// that shows them one by one stops being readable at the first real use.
+class AuditBatch {
+  final String batchId;
+
+  /// `clear_range` / `replace_range`, as the RPC stamped it.
+  final String? kind;
+
+  /// The rows, in the order the timeline holds them (newest first).
+  final List<AuditLogView> logs;
+
+  const AuditBatch({
+    required this.batchId,
+    required this.kind,
+    required this.logs,
+  });
+
+  bool get isReplace => kind == 'replace_range';
+
+  int get deleted => logs.where((l) => l.action == 'DELETE').length;
+  int get created => logs.where((l) => l.action == 'INSERT').length;
+
+  /// The T-45 cascade on the day after the range rides the same transaction,
+  /// so a batch can carry an UPDATE row too.
+  int get updated => logs.where((l) => l.action == 'UPDATE').length;
+
+  DateTime get firstDate =>
+      logs.map((l) => l.affectedDate).reduce((a, b) => a.isBefore(b) ? a : b);
+  DateTime get lastDate =>
+      logs.map((l) => l.affectedDate).reduce((a, b) => a.isAfter(b) ? a : b);
+
+  /// The batch happened at one instant; the newest row's stamp stands for it.
+  DateTime get createdAtLocal =>
+      logs.map((l) => l.createdAtLocal).reduce((a, b) => a.isAfter(b) ? a : b);
+
+  int? get performedById => logs.first.performedById;
+}
+
+/// One item of the folded timeline: a lone row, or a whole batch.
+sealed class AuditEntry {
+  const AuditEntry();
+}
+
+class AuditSingleEntry extends AuditEntry {
+  final AuditLogView log;
+  const AuditSingleEntry(this.log);
+}
+
+class AuditBatchEntry extends AuditEntry {
+  final AuditBatch batch;
+  const AuditBatchEntry(this.batch);
+}
+
+/// Folds CONSECUTIVE rows that share a `context.batch_id` into one
+/// [AuditBatchEntry]; every other row stays an [AuditSingleEntry]. Consecutive
+/// on purpose: a batch is written in one transaction, so its rows are
+/// adjacent in a `created_at` order, and two batches over the same range
+/// (a plan replaced twice) must stay two entries. A row without a stamp is
+/// never folded — a single-day edit is not a batch of one.
+List<AuditEntry> groupAuditBatches(List<AuditLogView> logs) {
+  final entries = <AuditEntry>[];
+  var i = 0;
+  while (i < logs.length) {
+    final id = logs[i].context?.batchId;
+    if (id == null) {
+      entries.add(AuditSingleEntry(logs[i]));
+      i++;
+      continue;
+    }
+    var j = i;
+    while (j < logs.length && logs[j].context?.batchId == id) {
+      j++;
+    }
+    entries.add(AuditBatchEntry(AuditBatch(
+      batchId: id,
+      kind: logs[i].context?.batchKind,
+      logs: logs.sublist(i, j),
+    )));
+    i = j;
+  }
+  return entries;
+}
+
+/// The batch's counts, in the bulk summary's shape: "88 dias apagados · 90
+/// dias planejados · 1 dia atualizado".
+String auditBatchCounts(AuditBatch batch, Localization l) {
+  final parts = <String>[
+    if (batch.deleted > 0)
+      l.format(batch.deleted == 1 ? K.sumDeletedOne : K.sumDeletedMany,
+          [batch.deleted]),
+    if (batch.created > 0)
+      l.format(
+          batch.created == 1
+              ? K.auditBatchCreatedOne
+              : K.auditBatchCreatedMany,
+          [batch.created]),
+    if (batch.updated > 0)
+      l.format(batch.updated == 1 ? K.sumUpdatedOne : K.sumUpdatedMany,
+          [batch.updated]),
+  ];
+  return parts.join(' · ');
+}
