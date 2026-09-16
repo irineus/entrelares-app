@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretKey } from "../_shared/keys.ts";
 import { hasValidUserSession, isSecretKeyCaller } from "../_shared/auth.ts";
 import { isTestRecipient } from "../_shared/mail.ts";
+import { banner, button, emailDocument, heading, link, linkRow, paragraph, rawUrl, small, smallLink } from "../_shared/email_layout.ts";
 import { common, formatDateIn, formatTimeIn, type Lang, resolveLang, roleLabel, swap as swapText, type SwapStrings } from "../_shared/i18n.ts";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
@@ -339,7 +340,7 @@ async function handleInvitationEmail(
   // exactly as the family typed it — user data is never translated.
   const roleName    = roleLabel(lang, data.roles?.role, data.roles?.label_pt)
     || (data.roles?.role ?? "");
-  const link        = `${appUrl}/register?invite=${data.token}`;
+  const inviteLink  = `${appUrl}/register?invite=${data.token}`;
   const expiresBr   = formatDateIn(lang, String(data.expires_at).slice(0, 10));
 
   // S-13: don't log the invitee's e-mail (PII) — the family is enough context.
@@ -357,7 +358,7 @@ async function handleInvitationEmail(
     subject: t.subjInvitation(inviterName),
     // F-56: an invitation FOR a pending member states what stays (the admin's
     // name/role, as family data) and what is purged (the e-mail).
-    html: templateInvitation(lang, inviterName, familyName, roleName, link, expiresBr, data.profile_id != null),
+    html: templateInvitation(lang, inviterName, familyName, roleName, inviteLink, expiresBr, data.profile_id != null),
   });
 
   // F-38: admin heads-up when this invitation crossed the 80% / último milestone.
@@ -561,22 +562,22 @@ function buildEmails(
 function templateEmailCap80(lang: Lang, appUrl: string): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.cap80Title,
-    `<h2 ${h2("#212529")}>${t.cap80Heading}</h2>
-     <p ${P}>${t.cap80Body}</p>
-     <p ${P}>${t.cap80Note}</p>
-     <p ${P_LAST}>${t.cap80Upsell}</p>
-     <a href="${appUrl}/family" ${btn("#212529")}>${t.capButton}</a>`
+    `${heading(t.cap80Heading)}
+     ${paragraph(t.cap80Body)}
+     ${paragraph(t.cap80Note)}
+     ${paragraph(t.cap80Upsell, "last")}
+     ${button(`${appUrl}/family`, t.capButton)}`
   );
 }
 
 function templateEmailCapLast(lang: Lang, appUrl: string): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.capLastTitle,
-    `<h2 ${h2("#212529")}>${t.capLastHeading}</h2>
-     <p ${P}>${t.capLastBody}</p>
-     <p ${P}>${t.capLastNote}</p>
-     <p ${P_LAST}>${t.capLastUpsell}</p>
-     <a href="${appUrl}/family" ${btn("#212529")}>${t.capButton}</a>`
+    `${heading(t.capLastHeading)}
+     ${paragraph(t.capLastBody)}
+     ${paragraph(t.capLastNote)}
+     ${paragraph(t.capLastUpsell, "last")}
+     ${button(`${appUrl}/family`, t.capButton)}`
   );
 }
 
@@ -624,51 +625,20 @@ async function sendEmail(
 // The markup is written ONCE and shared by both languages; only the text comes
 // from _shared/i18n.ts, keyed by the RECIPIENT's language. Duplicating these
 // shells per language would guarantee that a style fix lands in only one of them.
-
-const P = 'style="margin:0 0 12px;color:#374151;line-height:1.6;"';
-const P_LAST = 'style="margin:0 0 20px;color:#374151;line-height:1.6;"';
-const LINK = 'style="font-size:13px;color:#6b7280;"';
-const btn = (color: string) =>
-  `style="display:inline-block;background:${color};color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;"`;
-const h2 = (color: string) => `style="margin:0 0 16px;font-size:20px;color:${color};"`;
+//
+// U-26: and no style lives here at all. Every element comes from
+// _shared/email_layout.ts, the one layer all three senders share, so a dark-mode
+// fix cannot land in one sender and miss the other two.
 
 function baseTemplate(lang: Lang, title: string, body: string): string {
   const c = common(lang);
-  return `<!DOCTYPE html>
-<html lang="${c.htmlLang}">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${title}</title>
-</head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0">
-    <tr><td align="center" style="padding:32px 16px;">
-      <table width="100%" style="max-width:480px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        <tr><td style="background:#212529;padding:20px 24px;">
-          <p style="margin:0;color:#ffffff;font-size:18px;font-weight:700;">👨‍👩‍👧 Entrelares</p>
-        </td></tr>
-        <tr><td style="padding:28px 24px;">
-          ${body}
-          <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">
-            ${c.automaticNote}
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  return emailDocument({ htmlLang: c.htmlLang, title, body, footer: [c.automaticNote] });
 }
 
 function priorityBanner(lang: Lang, tag: PriorityTag): string {
   const t = swapText(lang);
-  if (tag === "overdue") {
-    return `<div style="background:#fef2f2;border:1px solid #f87171;border-radius:8px;padding:10px 14px;margin:0 0 16px;font-size:13px;font-weight:700;color:#b91c1c;text-align:center;">${t.bannerOverdue}</div>`;
-  }
-  if (tag === "urgent") {
-    return `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 14px;margin:0 0 16px;font-size:13px;font-weight:700;color:#856404;text-align:center;">${t.bannerUrgent}</div>`;
-  }
+  if (tag === "overdue") return banner(t.bannerOverdue, "danger");
+  if (tag === "urgent") return banner(t.bannerUrgent, "warning");
   return "";
 }
 
@@ -677,19 +647,19 @@ function priorityBanner(lang: Lang, tag: PriorityTag): string {
 // QA terminology round every workflow text carries the same "Message" label.
 function detailLine(lang: Lang, text: string | null): string {
   return text
-    ? `<p ${P}><strong>${common(lang).messageLabel}:</strong> ${text}</p>`
+    ? paragraph(`<strong>${common(lang).messageLabel}:</strong> ${text}`)
     : "";
 }
 
 function handoffLine(lang: Lang, handoffTime: string | null): string {
   return handoffTime
-    ? `<p ${P}>${swapText(lang).handoffLine(handoffTime)}</p>`
+    ? paragraph(swapText(lang).handoffLine(handoffTime))
     : "";
 }
 
 function reasonLine(lang: Lang, reason: string | null): string {
   return reason
-    ? `<p style="margin:12px 0 0;color:#374151;line-height:1.6;"><strong>${common(lang).messageLabel}:</strong> ${reason}</p>`
+    ? paragraph(`<strong>${common(lang).messageLabel}:</strong> ${reason}`, "after")
     : "";
 }
 
@@ -697,48 +667,48 @@ function templateRequested(lang: Lang, requesterName: string, date: string, hand
   const t = swapText(lang);
   const requestLine = targetIsProposed ? t.requestedTarget(requesterName, date) : t.requestedRequester(requesterName, date);
   return baseTemplate(lang, t.requestedTitle,
-    `${priorityBanner(lang, priorityTag)}<h2 ${h2("#212529")}>${t.requestedHeading}</h2>
-     <p ${P}>${requestLine}</p>
-     ${detailLine(lang, requestMessage)}${handoffLine(lang, handoffTime)}<p ${P_LAST}>${t.requestedCta}</p>
-     <a href="${appUrl}/notifications" ${btn("#212529")}>${t.requestedButton}</a>`
+    `${priorityBanner(lang, priorityTag)}${heading(t.requestedHeading)}
+     ${paragraph(requestLine)}
+     ${detailLine(lang, requestMessage)}${handoffLine(lang, handoffTime)}${paragraph(t.requestedCta, "last")}
+     ${button(`${appUrl}/notifications`, t.requestedButton)}`
   );
 }
 
 function templateRevertRequested(lang: Lang, requesterName: string, date: string, handoffTime: string | null, appUrl: string, priorityTag: PriorityTag = null, requestMessage: string | null = null): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.revertRequestedTitle,
-    `${priorityBanner(lang, priorityTag)}<h2 ${h2("#5b21b6")}>${t.revertRequestedHeading}</h2>
-     <p ${P}>${t.revertRequestedBody(requesterName, date)}</p>
-     ${detailLine(lang, requestMessage)}${handoffLine(lang, handoffTime)}<p ${P_LAST}>${t.revertRequestedCta}</p>
-     <a href="${appUrl}/notifications" ${btn("#5b21b6")}>${t.revertRequestedButton}</a>`
+    `${priorityBanner(lang, priorityTag)}${heading(t.revertRequestedHeading, "revert")}
+     ${paragraph(t.revertRequestedBody(requesterName, date))}
+     ${detailLine(lang, requestMessage)}${handoffLine(lang, handoffTime)}${paragraph(t.revertRequestedCta, "last")}
+     ${button(`${appUrl}/notifications`, t.revertRequestedButton)}`
   );
 }
 
 function templateRevertApproved(lang: Lang, targetName: string, date: string, appUrl: string, approvalNote: string | null = null): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.revertApprovedTitle,
-    `<h2 ${h2("#16a34a")}>${t.revertApprovedHeading}</h2>
-     <p ${P}>${t.revertApprovedBody(targetName, date)}</p>
-     ${detailLine(lang, approvalNote)}<a href="${appUrl}" ${LINK}>${common(lang).openCalendar}</a>`
+    `${heading(t.revertApprovedHeading, "success")}
+     ${paragraph(t.revertApprovedBody(targetName, date))}
+     ${detailLine(lang, approvalNote)}${link(appUrl, common(lang).openCalendar)}`
   );
 }
 
 function templateRevertRejected(lang: Lang, targetName: string, date: string, reason: string | null, appUrl: string): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.revertRejectedTitle,
-    `<h2 ${h2("#dc2626")}>${t.revertRejectedHeading}</h2>
-     <p ${P}>${t.revertRejectedBody(targetName, date)}</p>
+    `${heading(t.revertRejectedHeading, "danger")}
+     ${paragraph(t.revertRejectedBody(targetName, date))}
      ${reasonLine(lang, reason)}
-     <p style="margin:20px 0 0;"><a href="${appUrl}/notifications" ${LINK}>${t.seeHistory}</a></p>`
+     ${linkRow(`${appUrl}/notifications`, t.seeHistory)}`
   );
 }
 
 function templateRevertCancelled(lang: Lang, requesterName: string, date: string, appUrl: string): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.revertCancelledTitle,
-    `<h2 ${h2("#d97706")}>${t.revertCancelledHeading}</h2>
-     <p ${P_LAST}>${t.revertCancelledBody(requesterName, date)}</p>
-     <a href="${appUrl}" ${LINK}>${common(lang).openCalendar}</a>`
+    `${heading(t.revertCancelledHeading, "warning")}
+     ${paragraph(t.revertCancelledBody(requesterName, date), "last")}
+     ${link(appUrl, common(lang).openCalendar)}`
   );
 }
 
@@ -746,64 +716,64 @@ function templateApprovedForRequester(lang: Lang, targetName: string, date: stri
   const t = swapText(lang);
   const approvalLine = targetIsProposed ? t.approvedTarget(targetName, date) : t.approvedRequester(targetName, date);
   return baseTemplate(lang, t.approvedTitle,
-    `<h2 ${h2("#16a34a")}>${t.approvedHeading}</h2>
-     <p ${P}>${approvalLine}</p>
-     ${detailLine(lang, approvalNote)}${handoffLine(lang, handoffTime)}<p ${P_LAST}>${t.approvedCalendarNote}</p>
-     <a href="${appUrl}" ${LINK}>${common(lang).openCalendar}</a>`
+    `${heading(t.approvedHeading, "success")}
+     ${paragraph(approvalLine)}
+     ${detailLine(lang, approvalNote)}${handoffLine(lang, handoffTime)}${paragraph(t.approvedCalendarNote, "last")}
+     ${link(appUrl, common(lang).openCalendar)}`
   );
 }
 
 function templateRejected(lang: Lang, targetName: string, date: string, reason: string | null, appUrl: string): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.rejectedTitle,
-    `<h2 ${h2("#dc2626")}>${t.rejectedHeading}</h2>
-     <p ${P}>${t.rejectedBody(targetName, date)}</p>
+    `${heading(t.rejectedHeading, "danger")}
+     ${paragraph(t.rejectedBody(targetName, date))}
      ${reasonLine(lang, reason)}
-     <p style="margin:20px 0 0;"><a href="${appUrl}/notifications" ${LINK}>${t.seeRequestHistory}</a></p>`
+     ${linkRow(`${appUrl}/notifications`, t.seeRequestHistory)}`
   );
 }
 
 function templateCancelled(lang: Lang, requesterName: string, date: string, appUrl: string): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.cancelledTitle,
-    `<h2 ${h2("#d97706")}>${t.cancelledHeading}</h2>
-     <p ${P_LAST}>${t.cancelledBody(requesterName, date)}</p>
-     <a href="${appUrl}" ${LINK}>${common(lang).openCalendar}</a>`
+    `${heading(t.cancelledHeading, "warning")}
+     ${paragraph(t.cancelledBody(requesterName, date), "last")}
+     ${link(appUrl, common(lang).openCalendar)}`
   );
 }
 
 function templateReverted(lang: Lang, date: string, appUrl: string): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.revertedTitle,
-    `<h2 ${h2("#7c3aed")}>${t.revertedHeading}</h2>
-     <p ${P_LAST}>${t.revertedBody(date)}</p>
-     <a href="${appUrl}" ${LINK}>${common(lang).openCalendar}</a>`
+    `${heading(t.revertedHeading, "revert")}
+     ${paragraph(t.revertedBody(date), "last")}
+     ${link(appUrl, common(lang).openCalendar)}`
   );
 }
 
 function templateReminder(lang: Lang, date: string, handoffTime: string | null, isRevert: boolean, appUrl: string, requestMessage: string | null, deadlineDate: string, deadlineTime: string): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.reminderTitle,
-    `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 14px;margin:0 0 16px;font-size:13px;font-weight:700;color:#856404;text-align:center;">${t.reminderBanner(deadlineDate, deadlineTime)}</div>
-     <h2 ${h2("#212529")}>${t.reminderHeading(deadlineDate, deadlineTime)}</h2>
-     <p ${P}>${t.reminderBody(date, isRevert, deadlineDate, deadlineTime)}</p>
-     ${detailLine(lang, requestMessage)}${handoffLine(lang, handoffTime)}<p ${P_LAST}>${t.reminderCta}</p>
-     <a href="${appUrl}/notifications" ${btn("#212529")}>${t.reminderButton}</a>`
+    `${banner(t.reminderBanner(deadlineDate, deadlineTime), "warning")}
+     ${heading(t.reminderHeading(deadlineDate, deadlineTime))}
+     ${paragraph(t.reminderBody(date, isRevert, deadlineDate, deadlineTime))}
+     ${detailLine(lang, requestMessage)}${handoffLine(lang, handoffTime)}${paragraph(t.reminderCta, "last")}
+     ${button(`${appUrl}/notifications`, t.reminderButton)}`
   );
 }
 
-function templateInvitation(lang: Lang, inviterName: string, familyName: string, roleName: string, link: string, expiresBr: string, forPlaceholder = false): string {
+function templateInvitation(lang: Lang, inviterName: string, familyName: string, roleName: string, inviteLink: string, expiresBr: string, forPlaceholder = false): string {
   const t = swapText(lang);
-  const roleLine = roleName ? `<p ${P}>${t.invitationRole(roleName)}</p>` : "";
+  const roleLine = roleName ? paragraph(t.invitationRole(roleName)) : "";
   const privacy = forPlaceholder ? t.invitationPrivacyPlaceholder : t.invitationPrivacy;
   return baseTemplate(lang, t.invitationTitle,
-    `<h2 ${h2("#212529")}>${t.invitationHeading}</h2>
-     <p ${P}>${t.invitationBody(inviterName, familyName)}</p>
+    `${heading(t.invitationHeading)}
+     ${paragraph(t.invitationBody(inviterName, familyName))}
      ${roleLine}
-     <p ${P_LAST}>${t.invitationExpiry(expiresBr)}</p>
-     <a href="${link}" ${btn("#212529")}>${t.invitationButton}</a>
-     <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">${t.invitationLinkFallback}<br/><span style="word-break:break-all;color:#6b7280;">${link}</span></p>
-     <p style="margin:20px 0 0;font-size:12px;color:#6b7280;line-height:1.6;">${privacy} <a href="https://entrelares.app/privacidade" style="color:#6b7280;">${t.invitationPrivacyLink}</a>.</p>`
+     ${paragraph(t.invitationExpiry(expiresBr), "last")}
+     ${button(inviteLink, t.invitationButton)}
+     ${small(`${t.invitationLinkFallback}<br/>${rawUrl(inviteLink)}`)}
+     ${small(`${privacy} ${smallLink("https://entrelares.app/privacidade", t.invitationPrivacyLink)}.`, true)}`
   );
 }
 
@@ -811,8 +781,8 @@ function templateAutoApproved(lang: Lang, date: string, isRevert: boolean, forAp
   const t = swapText(lang);
   const reason = forApprover ? t.autoApprovedApprover(date, isRevert) : t.autoApprovedRequester(date, isRevert);
   return baseTemplate(lang, t.autoApprovedTitle,
-    `<h2 ${h2("#16a34a")}>${t.autoApprovedHeading}</h2>
-     <p ${P_LAST}>${reason} ${t.autoApprovedCalendarNote}</p>
-     <a href="${appUrl}" ${LINK}>${common(lang).openCalendar}</a>`
+    `${heading(t.autoApprovedHeading, "success")}
+     ${paragraph(`${reason} ${t.autoApprovedCalendarNote}`, "last")}
+     ${link(appUrl, common(lang).openCalendar)}`
   );
 }

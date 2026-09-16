@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 import { secretKey } from "../_shared/keys.ts";
 import { isTestRecipient } from "../_shared/mail.ts";
+import { button, code as codeBlock, emailDocument, heading, paragraph } from "../_shared/email_layout.ts";
 import { authMail, authMailKind, common, langFromRedirect, type Lang, resolveLang } from "../_shared/i18n.ts";
 
 // U-13 (pre-production round) — the GoTrue auth e-mails, in the reader's language.
@@ -252,36 +253,35 @@ function confirmationUrl(data: HookPayload["email_data"], tokenHash: string): st
 // Same shell as send-swap-email / send-account-email: an auth e-mail arriving in
 // a different visual language from the rest is one more reason for a person who
 // is already locked out to wonder whether it is a phishing attempt.
+//
+// U-26: that sentence was a promise, not a fact — this file wrote its own bare
+// <div> and a #212529 button, the exact one that vanished in a dark client. The
+// shell is now the shared layer's, literally the same one.
 
-const shell = (body: string, lang: Lang) => `
-    <div style="font-family: system-ui, sans-serif; color: #212529; max-width: 480px;">
-      ${body}
-      <p style="color: #868e96; font-size: 13px;">${common(lang).automaticNote}</p>
-      <p style="color: #868e96; font-size: 13px;">${common(lang).signature}</p>
-    </div>`;
+const shell = (lang: Lang, title: string, body: string) =>
+  emailDocument({
+    htmlLang: common(lang).htmlLang,
+    title,
+    body: `${heading(title)}${body}`,
+    footer: [common(lang).automaticNote, common(lang).signature],
+  });
 
 function linkHtml(
-  lang: Lang, heading: string, intro: string, action: string, url: string, ignore: string,
+  lang: Lang, title: string, intro: string, action: string, url: string, ignore: string,
 ): string {
-  return shell(`
-      <h2>${heading}</h2>
-      <p>${intro}</p>
-      <p>
-        <a href="${escapeHtml(url)}"
-           style="display: inline-block; background: #212529; color: #ffffff; text-decoration: none;
-                  padding: 12px 20px; border-radius: 8px; font-weight: 600;">${action}</a>
-      </p>
-      ${ignore ? `<p>${ignore}</p>` : ""}`, lang);
+  return shell(lang, title, `
+      ${paragraph(intro, "last")}
+      ${button(escapeHtml(url), action)}
+      ${ignore ? paragraph(ignore, "after") : ""}`);
 }
 
 // Reauthentication is a CODE, not a link — the person is already on the screen
 // that asks for it, so a button would send them somewhere they do not need to go.
-function codeHtml(lang: Lang, heading: string, intro: string, code: string, ignore: string): string {
-  return shell(`
-      <h2>${heading}</h2>
-      <p>${intro}</p>
-      <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">${escapeHtml(code)}</p>
-      ${ignore ? `<p>${ignore}</p>` : ""}`, lang);
+function codeHtml(lang: Lang, title: string, intro: string, code: string, ignore: string): string {
+  return shell(lang, title, `
+      ${paragraph(intro)}
+      ${codeBlock(escapeHtml(code))}
+      ${ignore ? paragraph(ignore) : ""}`);
 }
 
 /** Returns true when the message was handed to Resend, false when suppressed (T-49). */

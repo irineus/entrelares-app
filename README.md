@@ -424,6 +424,11 @@ regras e ~0% do visual — por um sistema de tokens. O que ela estabelece:
   (`accent`/`neutral`/`success`/`warning`/`danger`/`info`, cada um com solid, container,
   onContainer e border). O gate `no_color_literal_test` quebra o build se um literal
   aparecer fora desse arquivo — sem ele, os literais voltam a crescer.
+  Os e-mails (Deno, fora do `lib/`) têm o equivalente desde o **U-26**:
+  `supabase/functions/_shared/email_layout.ts` é o único lugar onde um e-mail escreve cor, os
+  três remetentes só compõem a partir dele, e `email_layout_guard_test` (lane core) exige
+  `color` e `background-color` explícitos, contraste AA e nenhuma superfície escura — a faixa
+  e o botão `#212529` do convite sumiam em cliente de e-mail no tema escuro.
 - **Modo escuro entrou JUNTO com os tokens**, seguindo o sistema
   (`themeMode: ThemeMode.system`). Uma chave visível para o usuário é a U-12, não este
   item. O único desvio da tabela de tokens do registro: no escuro o indigo da marca clareia
