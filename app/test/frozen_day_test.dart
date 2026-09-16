@@ -1,4 +1,4 @@
-// F-12 frozen days on the calendar (lote 3): the 🔔/⏳ cell badges, the
+// F-12 frozen days on the calendar (lote 3): the bell/hourglass cell badges, the
 // frozen-day panel replacing the editor on tap, and the three role views —
 // target (approve/reject with the F-44 dual note), requester (cancel),
 // observer. The DB enforces every transition; these test the mirror UI
@@ -37,7 +37,7 @@ SwapRequest swapReq(
     });
 
 void main() {
-  testWidgets('a pending request awaiting ME paints 🔔 on the cell',
+  testWidgets('a pending request awaiting ME paints the bell on the cell',
       (tester) async {
     final day = futureDay;
     if (day == null) return;
@@ -45,11 +45,11 @@ void main() {
       ..frozenRequests = [swapReq(10, dayOfMonth(day))];
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
-    expect(find.text('🔔'), findsOneWidget);
-    expect(find.text('⏳'), findsNothing);
+    expect(find.byIcon(Icons.notifications_active), findsOneWidget);
+    expect(find.byIcon(Icons.hourglass_top), findsNothing);
   });
 
-  testWidgets('a pending request awaiting the OTHER paints ⏳', (tester) async {
+  testWidgets('a pending request awaiting the OTHER paints the hourglass', (tester) async {
     final day = futureDay;
     if (day == null) return;
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
@@ -58,8 +58,8 @@ void main() {
       ];
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
-    expect(find.text('⏳'), findsOneWidget);
-    expect(find.text('🔔'), findsNothing);
+    expect(find.byIcon(Icons.hourglass_top), findsOneWidget);
+    expect(find.byIcon(Icons.notifications_active), findsNothing);
   });
 
   testWidgets('tapping a frozen day opens the panel, not the editor',
@@ -228,11 +228,11 @@ void main() {
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
-    expect(find.text('🔔'), findsNothing);
+    expect(find.byIcon(Icons.notifications_active), findsNothing);
 
     ds.frozenRequests = [swapReq(10, dayOfMonth(day))];
     ds.workflowCallback!();
     await tester.pumpAndSettle();
-    expect(find.text('🔔'), findsOneWidget);
+    expect(find.byIcon(Icons.notifications_active), findsOneWidget);
   });
 }

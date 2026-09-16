@@ -26,8 +26,6 @@ class RoleDefinition {
   /// English label. Lives only here: the DB has no English column.
   final String labelEn;
 
-  final String emoji;
-
   /// Every accepted spelling, lowercase and including the canonical name.
   /// Aliases are globally unique across the catalog — two roles claiming one
   /// spelling would make resolution order-dependent.
@@ -37,7 +35,6 @@ class RoleDefinition {
     this.canonicalName,
     this.label,
     this.labelEn,
-    this.emoji,
     this.aliases,
   );
 
@@ -49,45 +46,45 @@ abstract final class RoleCatalog {
   /// The 21 built-ins, in the order the sign-up chip grid renders them.
   ///
   /// The English labels of the three gendered pairs carry "(m)"/"(f)" on
-  /// purpose: the PDF report, the CSV/LGPD export and the calendar legend all
-  /// print the label WITHOUT the emoji, so the emoji cannot disambiguate them
-  /// (rationale kept verbatim from `RoleCatalog.cs`).
+  /// purpose: the label is the ONLY thing that tells them apart. The built-ins
+  /// carried an emoji until U-31 (16/09/2026) took it out of the sign-up
+  /// picker, where the closed alpha read the app as homemade.
   static const List<RoleDefinition> all = [
-    RoleDefinition('father', 'Pai', 'Father', '👨', ['father', 'pai']),
-    RoleDefinition('mother', 'Mãe', 'Mother', '👩', ['mother', 'mãe', 'mae']),
-    RoleDefinition('grandfather', 'Avô', 'Grandfather', '👴',
+    RoleDefinition('father', 'Pai', 'Father', ['father', 'pai']),
+    RoleDefinition('mother', 'Mãe', 'Mother', ['mother', 'mãe', 'mae']),
+    RoleDefinition('grandfather', 'Avô', 'Grandfather',
         ['grandfather', 'avô', 'avo']),
     RoleDefinition(
-        'grandmother', 'Avó', 'Grandmother', '👵', ['grandmother', 'avó']),
-    RoleDefinition('great_grandfather', 'Bisavô', 'Great-grandfather', '🧓',
+        'grandmother', 'Avó', 'Grandmother', ['grandmother', 'avó']),
+    RoleDefinition('great_grandfather', 'Bisavô', 'Great-grandfather',
         ['great_grandfather', 'bisavô', 'bisavo']),
-    RoleDefinition('great_grandmother', 'Bisavó', 'Great-grandmother', '👒',
+    RoleDefinition('great_grandmother', 'Bisavó', 'Great-grandmother',
         ['great_grandmother', 'bisavó']),
     RoleDefinition(
-        'stepfather', 'Padrasto', 'Stepfather', '🧔', ['stepfather', 'padrasto']),
-    RoleDefinition('stepmother', 'Madrasta', 'Stepmother', '👩‍🦰',
+        'stepfather', 'Padrasto', 'Stepfather', ['stepfather', 'padrasto']),
+    RoleDefinition('stepmother', 'Madrasta', 'Stepmother',
         ['stepmother', 'madrasta']),
-    RoleDefinition('uncle', 'Tio', 'Uncle', '🕺', ['uncle', 'tio']),
-    RoleDefinition('aunt', 'Tia', 'Aunt', '💃', ['aunt', 'tia']),
+    RoleDefinition('uncle', 'Tio', 'Uncle', ['uncle', 'tio']),
+    RoleDefinition('aunt', 'Tia', 'Aunt', ['aunt', 'tia']),
     RoleDefinition(
-        'godfather', 'Padrinho', 'Godfather', '🤵', ['godfather', 'padrinho']),
+        'godfather', 'Padrinho', 'Godfather', ['godfather', 'padrinho']),
     RoleDefinition(
-        'godmother', 'Madrinha', 'Godmother', '👰', ['godmother', 'madrinha']),
+        'godmother', 'Madrinha', 'Godmother', ['godmother', 'madrinha']),
     RoleDefinition(
-        'brother', 'Irmão', 'Brother', '👱', ['brother', 'irmão', 'irmao']),
+        'brother', 'Irmão', 'Brother', ['brother', 'irmão', 'irmao']),
     RoleDefinition(
-        'sister', 'Irmã', 'Sister', '👱‍♀️', ['sister', 'irmã', 'irma']),
-    RoleDefinition('cousin_m', 'Primo', 'Cousin (m)', '🙋‍♂️',
+        'sister', 'Irmã', 'Sister', ['sister', 'irmã', 'irma']),
+    RoleDefinition('cousin_m', 'Primo', 'Cousin (m)',
         ['cousin_m', 'primo']),
-    RoleDefinition('cousin_f', 'Prima', 'Cousin (f)', '🙋‍♀️',
+    RoleDefinition('cousin_f', 'Prima', 'Cousin (f)',
         ['cousin_f', 'prima']),
-    RoleDefinition('friend_m', 'Amigo', 'Friend (m)', '🤝', ['friend_m', 'amigo']),
-    RoleDefinition('friend_f', 'Amiga', 'Friend (f)', '🤗', ['friend_f', 'amiga']),
-    RoleDefinition('guardian_m', 'Tutor', 'Guardian (m)', '👨‍💼',
+    RoleDefinition('friend_m', 'Amigo', 'Friend (m)', ['friend_m', 'amigo']),
+    RoleDefinition('friend_f', 'Amiga', 'Friend (f)', ['friend_f', 'amiga']),
+    RoleDefinition('guardian_m', 'Tutor', 'Guardian (m)',
         ['guardian_m', 'tutor']),
-    RoleDefinition('guardian_f', 'Tutora', 'Guardian (f)', '👩‍💼',
+    RoleDefinition('guardian_f', 'Tutora', 'Guardian (f)',
         ['guardian_f', 'tutora']),
-    RoleDefinition('nanny', 'Babá', 'Nanny', '🍼', ['nanny', 'babá', 'baba']),
+    RoleDefinition('nanny', 'Babá', 'Nanny', ['nanny', 'babá', 'baba']),
   ];
 
   /// Resolves any stored spelling to its definition, or null when the value is

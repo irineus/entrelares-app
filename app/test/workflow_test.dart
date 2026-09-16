@@ -216,7 +216,7 @@ void main() {
     expect(ds.revertRequests.single['restoreNotes'], false);
   });
 
-  testWidgets('🔔 Resolver: the bar counts actionable days and the sheet '
+  testWidgets('Resolver: the bar counts actionable days and the sheet '
       'batches the approval', (tester) async {
     final days = twoFutureDays;
     if (days == null) return;
@@ -247,10 +247,10 @@ void main() {
     expect(ds.approvedSwaps, [(id: 10, note: null)]);
     // Summary toast: "1 aprovada" — selection cleared.
     expect(find.text(pt.format(K.sumApprovedOne, [1])), findsOneWidget);
-    expect(find.text('✓'), findsNothing);
+    expect(find.byIcon(Icons.check), findsNothing);
   });
 
-  testWidgets('🔔 Resolver: approved-swap days offer the batch revert',
+  testWidgets('Resolver: approved-swap days offer the batch revert',
       (tester) async {
     final day = futureDay;
     if (day == null) return;

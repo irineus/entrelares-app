@@ -194,7 +194,8 @@ class TodayCard extends StatelessWidget {
 
   Widget _inviteNudge(BuildContext context, Localization l) => Row(
         children: [
-          const Text('👋', style: TextStyle(fontSize: 24)),
+          Icon(Icons.person_add_alt_1_outlined,
+              size: 24, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -239,7 +240,7 @@ class TodayCard extends StatelessWidget {
                   style: textTheme.titleSmall?.copyWith(color: on),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis),
-              // Web: both badges can appear — swapped and the ⏰ time are
+              // Web: both badges can appear — swapped and the handoff time are
               // independent. U-28 adds the ROLE, which the port had dropped.
               if (responsibleRole != null ||
                   glance.isSwapped ||
@@ -254,12 +255,14 @@ class TodayCard extends StatelessWidget {
                         _pill(context, responsibleRole!, responsible),
                       if (glance.isSwapped)
                         _pill(context, l[K.cardSwappedBadge],
-                            context.tokens.swapped),
+                            context.tokens.swapped,
+                            icon: Icons.swap_horiz),
                       if (glance.handoffTime != null)
                         _pill(
                             context,
-                            '⏰ ${l.formatTimeString(glance.handoffTime!)}',
-                            responsible),
+                            l.formatTimeString(glance.handoffTime!),
+                            responsible,
+                            icon: Icons.schedule),
                     ],
                   ),
                 ),
@@ -275,7 +278,9 @@ class TodayCard extends StatelessWidget {
   /// tone's own container, which here would be the same colour as the band it
   /// sits on. This one uses the solid at low opacity, so it reads as raised out
   /// of the band rather than as a hole in it.
-  Widget _pill(BuildContext context, String text, SlotColors slot) => Container(
+  Widget _pill(BuildContext context, String text, SlotColors slot,
+          {IconData? icon}) =>
+      Container(
         padding: const EdgeInsets.symmetric(
             horizontal: Spacing.sm, vertical: Spacing.xs / 2),
         decoration: BoxDecoration(
@@ -283,16 +288,26 @@ class TodayCard extends StatelessWidget {
           border: Border.all(color: slot.tone.border),
           borderRadius: BorderRadius.circular(Radii.lg),
         ),
-        child: Text(text,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: slot.tone.onContainer)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 12, color: slot.tone.onContainer),
+              const SizedBox(width: Spacing.xs / 2),
+            ],
+            Text(text,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: slot.tone.onContainer)),
+          ],
+        ),
       );
 
   Widget _noResponsibleRow(BuildContext context, Localization l) => Row(
         children: [
-          const Text('📭', style: TextStyle(fontSize: 24)),
+          Icon(Icons.event_busy_outlined,
+              size: 24, color: context.tokens.textMuted),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

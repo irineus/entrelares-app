@@ -146,8 +146,11 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # no_color_literal_test só lê o lib/ do Flutter; sem esta, um #212529 voltaria calado.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
 cd app && fvm flutter analyze && fvm flutter test
-# The three source gates live in that suite: no_literal_snack_test (catalog strings),
-# no_color_literal_test (U-27 — colours only in lib/theme/tokens.dart) e o
+# The four source gates live in that suite: no_literal_snack_test (catalog strings),
+# no_color_literal_test (U-27 — colours only in lib/theme/tokens.dart),
+# no_emoji_in_ui_test (U-31 — nenhum emoji em lib/, nos dois catálogos nem no
+# push.ts; marca é Icon vetorial no call site, e o emoji de papel personalizado,
+# dado da família, fica de fora por não morar em nenhum desses caminhos) e o
 # web_channel_test, que prova como FONTE o que só se manifestaria SERVIDO — a CSP,
 # o _redirects, o assetlinks, a config Firebase Web e, desde o T-66, o host do
 # Sentry dentro de connect-src (sem ele o navegador bloqueia o POST e o canal web

@@ -142,7 +142,7 @@ List<NotificationDraft> composeSwapApproved({
       NotificationDraft(
         recipientProfileId: requestingProfileId,
         type: 'swap_approved',
-        title: '${environmentPrefix}Troca aprovada! ✅',
+        title: '${environmentPrefix}Troca aprovada!',
         message: (targetIsProposed
                 ? '${targetName ?? 'O outro responsável'} aceitou ficar com a criança no dia $date.'
                 : '${targetName ?? 'O outro responsável'} aceitou que você fique com a criança no dia $date.') +
@@ -206,7 +206,7 @@ List<NotificationDraft> composeSwapRejected({
       NotificationDraft(
         recipientProfileId: requestingProfileId,
         type: 'swap_rejected',
-        title: '${environmentPrefix}Troca recusada ❌',
+        title: '${environmentPrefix}Troca recusada',
         message:
             '${targetName ?? 'O outro responsável'} recusou a troca de guarda para o dia $date.${messageSuffix(reason)}',
         params: _params([
@@ -324,7 +324,7 @@ List<NotificationDraft> composeRevertApproved({
       NotificationDraft(
         recipientProfileId: requestingProfileId,
         type: 'revert_approved',
-        title: '${environmentPrefix}Reversão confirmada ✅',
+        title: '${environmentPrefix}Reversão confirmada',
         message:
             '${targetName ?? 'O outro responsável'} confirmou a reversão da troca do dia $date. O calendário voltou ao normal.${messageSuffix(note)}',
         params: _params([
@@ -376,7 +376,7 @@ List<NotificationDraft> composeRevertRejected({
       NotificationDraft(
         recipientProfileId: requestingProfileId,
         type: 'revert_rejected',
-        title: '${environmentPrefix}Reversão recusada ❌',
+        title: '${environmentPrefix}Reversão recusada',
         message:
             '${targetName ?? 'O outro responsável'} recusou reverter a troca do dia $date.${messageSuffix(reason)} A troca permanece ativa.',
         params: _params([

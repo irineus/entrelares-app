@@ -13,27 +13,41 @@ Widget _host(Widget child, {ThemeData? theme}) => MaterialApp(
 
 void main() {
   group('AppBanner', () {
-    testWidgets('renders title and message, and prefixes the leading mark',
+    testWidgets('renders title and message, with the icon in front',
         (tester) async {
       await tester.pumpWidget(_host(AppBanner(
         tone: AppTokens.light.danger,
-        leading: '⚠️',
+        icon: Icons.error_outline,
         title: 'Falhou',
         message: 'Tente de novo',
       )));
-      expect(find.text('⚠️ Falhou'), findsOneWidget);
+      // U-31: the words stay the catalog's alone; the mark is a vector icon.
+      expect(find.text('Falhou'), findsOneWidget);
       expect(find.text('Tente de novo'), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
 
-    testWidgets('with no title the mark rides the message instead',
+    testWidgets('with no title the icon still stands before the message',
         (tester) async {
       await tester.pumpWidget(_host(AppBanner(
         tone: AppTokens.light.warning,
-        leading: '⚠️',
+        icon: Icons.warning_amber_rounded,
         message: 'Atrasado',
       )));
       // The mark must not be dropped just because there is nothing to title.
-      expect(find.text('⚠️ Atrasado'), findsOneWidget);
+      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+      expect(find.text('Atrasado'), findsOneWidget);
+      expect(
+          tester.getTopLeft(find.byIcon(Icons.warning_amber_rounded)).dx,
+          lessThan(tester.getTopLeft(find.text('Atrasado')).dx));
+    });
+
+    testWidgets('an icon-less banner draws no icon', (tester) async {
+      await tester.pumpWidget(_host(AppBanner(
+        tone: AppTokens.light.info,
+        message: 'Só texto',
+      )));
+      expect(find.byType(Icon), findsNothing);
     });
   });
 
@@ -69,8 +83,9 @@ void main() {
   group('AppEmptyState', () {
     testWidgets('the body is optional', (tester) async {
       await tester.pumpWidget(
-          _host(const AppEmptyState(icon: '📭', title: 'Nada aqui')));
-      expect(find.text('📭'), findsOneWidget);
+          _host(const AppEmptyState(
+              icon: Icons.event_busy_outlined, title: 'Nada aqui')));
+      expect(find.byIcon(Icons.event_busy_outlined), findsOneWidget);
       expect(find.text('Nada aqui'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
@@ -319,7 +334,8 @@ void main() {
         Column(children: [
           AppBanner(tone: AppTokens.dark.danger, message: 'erro'),
           AppBadge(text: 'novo', tone: AppTokens.dark.accent),
-          const AppEmptyState(icon: '📭', title: 'vazio', body: 'nada aqui'),
+          const AppEmptyState(
+              icon: Icons.event_busy_outlined, title: 'vazio', body: 'nada aqui'),
           const AppListRow(label: 'a', value: 'b'),
           const AppSectionHeader(title: 'Seção'),
           AppCard(title: 'Cartão', child: const Text('conteúdo')),

@@ -86,7 +86,7 @@ void main() {
     testWidgets('a non-admin gets no form at all', (tester) async {
       await pumpRoles(tester, source(members: const [plain, admin]));
 
-      expect(find.text(l[K.rolesCreate]), findsNothing);
+      expect(find.widgetWithText(FilledButton, l[K.rolesCreate]), findsNothing);
       expect(find.byType(TextField), findsNothing);
     });
 
@@ -95,7 +95,7 @@ void main() {
       await pumpRoles(tester, source(plan: 'free'));
 
       expect(find.text(l[K.rolesPremiumGate]), findsOne);
-      expect(find.text(l[K.rolesCreate]), findsNothing);
+      expect(find.widgetWithText(FilledButton, l[K.rolesCreate]), findsNothing);
     });
 
     testWidgets('a free family can still DELETE — a lapsed plan must not trap '
@@ -116,7 +116,7 @@ void main() {
       await tester.enterText(find.byType(TextField), 'Tia do interior');
       await tester.tap(find.widgetWithText(ChoiceChip, '🦋'));
       await tester.pump();
-      await tester.tap(find.text(l[K.rolesCreate]));
+      await tester.tap(find.widgetWithText(FilledButton, l[K.rolesCreate]));
       await tester.pumpAndSettle();
 
       expect(ds.customRoleWrites,
@@ -130,7 +130,7 @@ void main() {
       await tester.enterText(find.byType(TextField), 'Sem carinha');
       await tester.tap(find.widgetWithText(ChoiceChip, l[KApp.rolesNoEmoji]));
       await tester.pump();
-      await tester.tap(find.text(l[K.rolesCreate]));
+      await tester.tap(find.widgetWithText(FilledButton, l[K.rolesCreate]));
       await tester.pumpAndSettle();
 
       expect(ds.customRoleWrites.single['emoji'], isNull);
@@ -141,7 +141,7 @@ void main() {
       final ds = source();
       await pumpRoles(tester, ds);
 
-      await tester.tap(find.text(l[K.rolesCreate]));
+      await tester.tap(find.widgetWithText(FilledButton, l[K.rolesCreate]));
       await tester.pumpAndSettle();
 
       expect(find.text('Informe o nome do papel.'), findsOne);
@@ -156,7 +156,7 @@ void main() {
       await pumpRoles(tester, ds);
 
       await tester.enterText(find.byType(TextField), 'Vovó Coruja');
-      await tester.tap(find.text(l[K.rolesCreate]));
+      await tester.tap(find.widgetWithText(FilledButton, l[K.rolesCreate]));
       await tester.pumpAndSettle();
 
       expect(find.text('Já existe um papel com esse nome.'), findsOne);
@@ -199,7 +199,10 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, l[K.commonCancel]));
       await tester.pumpAndSettle();
 
-      expect(find.text(l[KApp.rolesCreateTitle]), findsOne);
+      // U-31: the create button lost its "＋" and now reads exactly like the
+      // form's title, so the create form is recognised by its button.
+      expect(find.text(l[KApp.rolesEditTitle]), findsNothing);
+      expect(find.widgetWithText(FilledButton, l[K.rolesCreate]), findsOne);
     });
   });
 

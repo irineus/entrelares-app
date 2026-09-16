@@ -46,11 +46,10 @@ void main() {
       }
     });
 
-    test('every role has both labels and an emoji', () {
+    test('every role has both labels', () {
       for (final definition in RoleCatalog.all) {
         expect(definition.label.trim(), isNotEmpty);
         expect(definition.labelEn.trim(), isNotEmpty);
-        expect(definition.emoji.trim(), isNotEmpty);
       }
     });
 

@@ -387,7 +387,7 @@ class _ReportsSummaryTabState extends State<ReportsSummaryTab> {
       );
 
   Widget _emptyState(Localization l) => AppEmptyState(
-        icon: '📅',
+        icon: Icons.event_busy_outlined,
         title: l[K.sumEmptyTitle],
         body: l[K.sumEmptyBody],
       );
@@ -400,7 +400,7 @@ class _ReportsSummaryTabState extends State<ReportsSummaryTab> {
 
   Widget _errorBanner(Localization l) => AppBanner(
         tone: context.tokens.danger,
-        leading: '⚠️',
+        icon: Icons.error_outline,
         title: l[K.repErrorTitle],
         message: _errorMessage(l),
       );

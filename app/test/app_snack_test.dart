@@ -30,17 +30,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('mensagem de teste'), findsOneWidget);
-    expect(find.text('✅'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
     await flushSnackTimers(tester);
   });
 
-  testWidgets('error type carries the ❌ icon', (tester) async {
+  testWidgets('error type carries the error icon', (tester) async {
     await tester.pumpWidget(host((context) =>
         showAppSnack(context, 'algo falhou', type: AppSnackType.error)));
     await tester.tap(find.text('go'));
     await tester.pumpAndSettle();
 
-    expect(find.text('❌'), findsOneWidget);
+    expect(find.byIcon(Icons.error_outline), findsOneWidget);
     await flushSnackTimers(tester);
   });
 

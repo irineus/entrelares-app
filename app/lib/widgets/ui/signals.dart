@@ -22,9 +22,9 @@ class AppBanner extends StatelessWidget {
   final String message;
   final String? title;
 
-  /// Rendered before the text. The app writes these as emoji, not icons, and
-  /// they travel in the string on purpose (the catalog owns the wording).
-  final String? leading;
+  /// The vector mark before the text, in the tone's own ink. U-31: never an
+  /// emoji — the catalog owns the WORDS, the call site owns the mark.
+  final IconData? icon;
 
   /// Whether the banner draws its border. Off inside an already-bordered card.
   final bool bordered;
@@ -34,13 +34,28 @@ class AppBanner extends StatelessWidget {
     required this.tone,
     required this.message,
     this.title,
-    this.leading,
+    this.icon,
     this.bordered = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (title != null)
+          Text(
+            title!,
+            style: textTheme.titleSmall?.copyWith(color: tone.onContainer),
+          ),
+        if (title != null) const SizedBox(height: Spacing.xs),
+        Text(
+          message,
+          style: textTheme.bodyMedium?.copyWith(color: tone.onContainer),
+        ),
+      ],
+    );
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(Spacing.sm + Spacing.xs),
@@ -49,21 +64,20 @@ class AppBanner extends StatelessWidget {
         border: bordered ? Border.all(color: tone.border) : null,
         borderRadius: BorderRadius.circular(Radii.md),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (title != null)
-            Text(
-              leading == null ? title! : '$leading $title',
-              style: textTheme.titleSmall?.copyWith(color: tone.onContainer),
+      child: icon == null
+          ? text
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  // Sits on the first line's x-height, not the block's top.
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(icon, size: 20, color: tone.onContainer),
+                ),
+                const SizedBox(width: Spacing.sm),
+                Expanded(child: text),
+              ],
             ),
-          if (title != null) const SizedBox(height: Spacing.xs),
-          Text(
-            title == null && leading != null ? '$leading $message' : message,
-            style: textTheme.bodyMedium?.copyWith(color: tone.onContainer),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -115,8 +129,9 @@ class AppBadge extends StatelessWidget {
 /// Nothing to show, said properly: what is empty, and — when there is one — the
 /// reason it is empty. Three screens had their own copy of this.
 class AppEmptyState extends StatelessWidget {
-  /// The app's convention is an emoji, sized up.
-  final String icon;
+  /// A vector icon, sized up and muted — the words carry the meaning, the
+  /// icon only says which kind of nothing this is (U-31: never an emoji).
+  final IconData icon;
   final String title;
   final String? body;
 
@@ -134,7 +149,7 @@ class AppEmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
       child: Column(
         children: [
-          Text(icon, style: const TextStyle(fontSize: 40)),
+          Icon(icon, size: 40, color: context.tokens.textMuted),
           const SizedBox(height: Spacing.sm),
           Text(title,
               textAlign: TextAlign.center, style: textTheme.titleMedium),

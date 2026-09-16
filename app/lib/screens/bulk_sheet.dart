@@ -130,7 +130,7 @@ class _BulkSheetState extends State<_BulkSheet> {
   }
 
   /// S-09: assigned days in the selection — the bulk choice will not touch
-  /// their planned parent for non-admins (🔒 hint).
+  /// their planned parent for non-admins (the lock hint).
   int get _assignedCount => widget.selectedDays
       .where((d) => (_existingFor(d)?.scheduledParentId ?? 0) != 0)
       .length;
@@ -595,7 +595,7 @@ class _BulkSheetState extends State<_BulkSheet> {
                                       l[K.editorScheduledParentHint])),
                           // QA: clearing assigned days is admin-only (S-09).
                           if (widget.adminBypass)
-                            TextButton(
+                            TextButton.icon(
                               onPressed: _saving
                                   ? null
                                   : () => setState(
@@ -604,7 +604,8 @@ class _BulkSheetState extends State<_BulkSheet> {
                                   foregroundColor:
                                       Theme.of(context).colorScheme.error,
                                   visualDensity: VisualDensity.compact),
-                              child: Text(l[K.bulkClearDaysAction]),
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              label: Text(l[K.bulkClearDaysAction]),
                             ),
                         ],
                       ),
@@ -629,13 +630,24 @@ class _BulkSheetState extends State<_BulkSheet> {
                       if (!widget.adminBypass && _assignedCount > 0)
                         Padding(
                           padding: const EdgeInsets.only(top: Spacing.xs),
-                          child: Text(
-                            l.format(
-                                _assignedCount == 1
-                                    ? K.bulkKeptScheduledOne
-                                    : K.bulkKeptScheduledMany,
-                                [_assignedCount]),
-                            style: Theme.of(context).textTheme.bodySmall,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.lock_outline,
+                                  size: 16, color: context.tokens.textMuted),
+                              const SizedBox(width: Spacing.xs),
+                              Expanded(
+                                child: Text(
+                                  l.format(
+                                      _assignedCount == 1
+                                          ? K.bulkKeptScheduledOne
+                                          : K.bulkKeptScheduledMany,
+                                      [_assignedCount]),
+                                  style:
+                                      Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                     ],
@@ -786,9 +798,10 @@ class _BulkSheetState extends State<_BulkSheet> {
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Text('⚠️ $_error',
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.error)),
+                    child: AppBanner(
+                        tone: context.tokens.danger,
+                        icon: Icons.error_outline,
+                        message: _error!),
                   ),
                 if (_showOverwriteConfirm)
                   _confirmBox(
@@ -850,9 +863,20 @@ class _BulkSheetState extends State<_BulkSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(warning,
-              style: TextStyle(
-                  fontSize: 13, color: context.tokens.danger.onContainer)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  size: 20, color: context.tokens.danger.onContainer),
+              const SizedBox(width: Spacing.sm),
+              Expanded(
+                child: Text(warning,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: context.tokens.danger.onContainer)),
+              ),
+            ],
+          ),
           const SizedBox(height: Spacing.sm),
           AppActionPair(
             primaryLabel: yesLabel,

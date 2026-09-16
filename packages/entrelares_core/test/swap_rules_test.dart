@@ -165,8 +165,8 @@ void main() {
   group('priorityTagPrefix', () {
     test('maps the tag to the stored notification prefix', () {
       expect(priorityTagPrefix(SwapPriorityTag.none), '');
-      expect(priorityTagPrefix(SwapPriorityTag.urgent), '⚠️ URGENTE: ');
-      expect(priorityTagPrefix(SwapPriorityTag.overdue), '⏰ ATRASADO: ');
+      expect(priorityTagPrefix(SwapPriorityTag.urgent), 'URGENTE: ');
+      expect(priorityTagPrefix(SwapPriorityTag.overdue), 'ATRASADO: ');
     });
   });
 

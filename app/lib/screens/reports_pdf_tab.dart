@@ -303,8 +303,15 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(l[K.pdfUpsellBadge],
-                  style: Theme.of(context).textTheme.labelMedium),
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome,
+                      size: 16, color: context.tokens.accent.solid),
+                  const SizedBox(width: Spacing.xs),
+                  Text(l[K.pdfUpsellBadge],
+                      style: Theme.of(context).textTheme.labelMedium),
+                ],
+              ),
               const SizedBox(height: 4),
               Text(l[K.pdfUpsellTitle],
                   style: Theme.of(context).textTheme.titleMedium),
@@ -392,9 +399,10 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               ),
               if (_errorText != null) ...[
                 const SizedBox(height: 4),
-                Text('⚠️ $_errorText',
-                    style: TextStyle(
-                        color: context.tokens.danger.onContainer)),
+                AppBanner(
+                    tone: context.tokens.danger,
+                    icon: Icons.error_outline,
+                    message: _errorText!),
               ],
               const SizedBox(height: 8),
               FilledButton(
@@ -477,9 +485,10 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               label: Text(l[KApp.commonShare]),
             ),
             const SizedBox(height: 8),
-            OutlinedButton(
+            OutlinedButton.icon(
               onPressed: _print,
-              child: Text(l[K.pdfPrintButton]),
+              icon: const Icon(Icons.print_outlined),
+              label: Text(l[K.pdfPrintButton]),
             ),
           ],
         ),
@@ -489,7 +498,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
 
   Widget _banner(String message) => AppBanner(
         tone: context.tokens.danger,
-        leading: '⚠️',
+        icon: Icons.error_outline,
         message: message,
       );
 }

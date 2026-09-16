@@ -209,7 +209,7 @@ void main() {
         findsOneWidget);
   });
 
-  testWidgets('the sent tab shows status, the 🤖 auto badge and the F-44 '
+  testWidgets('the sent tab shows status, the auto badge and the F-44 '
       'messages; a resolved row is read-only, a pending one cancels from the '
       'sheet', (tester) async {
     final autoApproved = SwapRequest.fromJson({
@@ -275,7 +275,7 @@ void main() {
           'id': 1,
           'recipient_profile_id': 1,
           'type': 'swap_approved',
-          'title': 'Troca aprovada! ✅',
+          'title': 'Troca aprovada!',
           'message':
               'Bruno Lima aceitou ficar com a criança no dia 05/09/2026.',
           'params': {
@@ -294,7 +294,7 @@ void main() {
     await tester.tap(find.text('History'));
     await tester.pumpAndSettle();
 
-    expect(find.text('✅'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
     expect(find.textContaining('Bruno Lima'), findsOneWidget);
     expect(find.textContaining('05/09/2026'), findsNothing,
         reason: 'an English reader never sees the Brazilian numeric date');
@@ -354,7 +354,7 @@ void _landingTests() {
           id: 1,
           recipientProfileId: ana.id,
           type: 'swap_approved',
-          title: 'Troca aprovada! ✅',
+          title: 'Troca aprovada!',
           message: 'Bruno Lima aceitou ficar com a criança no dia 31/08/2026.',
           createdAt: DateTime.now().toIso8601String(),
         ),
@@ -392,7 +392,7 @@ void _landingTests() {
           id: 7,
           recipientProfileId: ana.id,
           type: 'swap_approved',
-          title: 'Troca aprovada! ✅',
+          title: 'Troca aprovada!',
           message: 'Bruno Lima aceitou ficar com a criança no dia 31/08/2026.',
           createdAt: DateTime.now().toIso8601String(),
         ),

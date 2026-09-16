@@ -558,8 +558,9 @@ class _DaySheetState extends State<_DaySheet> {
 
   /// U-29: the shared [AppBanner] — this sheet carried a private copy of it,
   /// which is exactly the drift U-27 argued a component exists to prevent.
-  Widget _banner(String text, {ToneColors? tone}) =>
-      AppBanner(tone: tone ?? context.tokens.warning, message: text);
+  Widget _banner(String text, {required IconData icon, ToneColors? tone}) =>
+      AppBanner(
+          tone: tone ?? context.tokens.warning, icon: icon, message: text);
 
   @override
   Widget build(BuildContext context) {
@@ -751,11 +752,12 @@ class _DaySheetState extends State<_DaySheet> {
   List<Widget> _guardBanners(Localization l, DayAssignment? assignment) {
     final widgets = <Widget>[];
     if (widget.offline) {
-      widgets.add(_banner(l[KApp.offlineWriteBlocked]));
+      widgets.add(_banner(l[KApp.offlineWriteBlocked],
+          icon: Icons.cloud_off_outlined));
     }
     if (widget.adminBypass && (_isPast || isApprovedSwapDay(assignment))) {
       widgets.add(_banner(l[K.editorAdminOverride],
-          tone: context.tokens.danger));
+          icon: Icons.shield_outlined, tone: context.tokens.danger));
       if (_beyondRetroReach) {
         widgets.add(_banner(
             widget.isPremium!
@@ -765,12 +767,15 @@ class _DaySheetState extends State<_DaySheet> {
                     widget.settings.overrideFreeDays,
                     widget.settings.overridePremiumMonths,
                   ]),
+            icon: Icons.error_outline,
             tone: context.tokens.danger));
       }
     } else if (_isPast) {
-      widgets.add(_banner(l[K.editorPastReadonly]));
+      widgets.add(
+          _banner(l[K.editorPastReadonly], icon: Icons.lock_outline));
     } else if (_isFrozen) {
-      widgets.add(_banner(l[K.editorFrozenReadonly]));
+      widgets.add(
+          _banner(l[K.editorFrozenReadonly], icon: Icons.lock_outline));
     }
     return widgets;
   }
@@ -822,9 +827,11 @@ class _DaySheetState extends State<_DaySheet> {
       // F-56: on a pending member's day there is nobody to approve, so the
       // question is replaced by the reason (the DB refuses the swap anyway).
       if (_swapUnavailableForPending)
-        _banner(l.format(KApp.sheetSwapUnavailablePending, [
-          _nameOf(_scheduledParentId),
-        ]))
+        _banner(
+            l.format(KApp.sheetSwapUnavailablePending, [
+              _nameOf(_scheduledParentId),
+            ]),
+            icon: Icons.person_off_outlined)
       else
       AppCard(
         child: Column(
@@ -919,8 +926,18 @@ class _DaySheetState extends State<_DaySheet> {
                       !isTransitionDay(snapshot.data, _effectiveBeingSaved)
                   ? Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Text(l[K.editorNoTransitionHint],
-                          style: Theme.of(context).textTheme.bodySmall),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline,
+                              size: 16, color: context.tokens.textMuted),
+                          const SizedBox(width: Spacing.xs),
+                          Expanded(
+                            child: Text(l[K.editorNoTransitionHint],
+                                style: Theme.of(context).textTheme.bodySmall),
+                          ),
+                        ],
+                      ),
                     )
                   : const SizedBox.shrink(),
         ),
@@ -965,10 +982,20 @@ class _DaySheetState extends State<_DaySheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(l[K.editorAdminChangeWarning],
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: context.tokens.danger.onContainer)),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      size: 20, color: context.tokens.danger.onContainer),
+                  const SizedBox(width: Spacing.sm),
+                  Expanded(
+                    child: Text(l[K.editorAdminChangeWarning],
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: context.tokens.danger.onContainer)),
+                  ),
+                ],
+              ),
               const SizedBox(height: Spacing.sm),
               AppActionPair(
                 primaryLabel: l[K.editorYesChange],
@@ -1002,10 +1029,20 @@ class _DaySheetState extends State<_DaySheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(l[K.editorRevertNotesQuestion],
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: context.tokens.warning.onContainer)),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.edit_note,
+                      size: 20, color: context.tokens.warning.onContainer),
+                  const SizedBox(width: Spacing.sm),
+                  Expanded(
+                    child: Text(l[K.editorRevertNotesQuestion],
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: context.tokens.warning.onContainer)),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               for (final (labelKey, value) in [
                 (K.editorRevertNotesCurrent, _revertCurrentText),

@@ -776,9 +776,10 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                   children: [
                     Text(l[K.famFreeCapNotice]),
                     if (widget.onOpenPlan != null)
-                      TextButton(
+                      TextButton.icon(
                         onPressed: () => _goToPremium('extra-caregiver'),
-                        child: Text(l[K.famSeePremium]),
+                        icon: const Icon(Icons.auto_awesome, size: 18),
+                        label: Text(l[K.famSeePremium]),
                       ),
                   ],
                 ),
@@ -862,9 +863,10 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                     onPressed: () => _shareLink(invitation, l),
                   ),
                 ],
-                TextButton(
+                TextButton.icon(
                   onPressed: () => _resendInvite(invitation, l),
-                  child: Text(l[K.famResendInvite]),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: Text(l[K.famResendInvite]),
                 ),
                 TextButton(
                   onPressed: () => _revokeInvite(invitation, l),
@@ -929,9 +931,10 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         if (widget.onOpenCustomRoles != null)
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton(
+            child: TextButton.icon(
               onPressed: widget.onOpenCustomRoles,
-              child: Text(l[K.famCustomRolesLink]),
+              icon: const Icon(Icons.auto_awesome, size: 18),
+              label: Text(l[K.famCustomRolesLink]),
             ),
           ),
         if (_inviteErrorKey != null) ...[
@@ -1256,9 +1259,10 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             isAdmin: _isAdmin, allAgreed: allAgreed)) ...[
           const SizedBox(height: 12),
           if (!_confirmingExecute)
-            OutlinedButton(
+            OutlinedButton.icon(
               onPressed: () => setState(() => _confirmingExecute = true),
-              child: Text(l[K.famDelExecuteNowOpen]),
+              icon: const Icon(Icons.delete_outline),
+              label: Text(l[K.famDelExecuteNowOpen]),
             )
           else ...[
             Text(l[K.famDelExecuteConfirmText],

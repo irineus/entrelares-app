@@ -395,7 +395,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Theme.of(context).colorScheme.errorContainer,
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Text(l[K.profFrozenBanner]),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lock_outline,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.onErrorContainer),
+                    const SizedBox(width: Spacing.sm),
+                    Expanded(child: Text(l[K.profFrozenBanner])),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -565,7 +574,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: theme.bodySmall),
           if (_emailLinkSent) ...[
             const SizedBox(height: Spacing.sm),
-            Text(l[K.profEmailLinkSent], style: theme.bodySmall),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.mark_email_read_outlined,
+                    size: 16, color: context.tokens.textMuted),
+                const SizedBox(width: Spacing.xs),
+                Expanded(
+                    child: Text(l[K.profEmailLinkSent], style: theme.bodySmall)),
+              ],
+            ),
           ],
         ],
       ),
@@ -691,8 +709,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: Spacing.sm),
             // The sentence carries `<strong>` around the address — RichLabel
             // renders it; a plain Text printed the tag to the reader.
-            RichLabel.of(l, K.profPasswordLinkSentTo,
-                args: [target.email ?? ''], style: theme.bodySmall),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.mark_email_read_outlined,
+                    size: 16, color: context.tokens.textMuted),
+                const SizedBox(width: Spacing.xs),
+                Expanded(
+                  child: RichLabel.of(l, K.profPasswordLinkSentTo,
+                      args: [target.email ?? ''], style: theme.bodySmall),
+                ),
+              ],
+            ),
           ],
         ],
       ),
@@ -766,7 +794,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _sectionTitle(l[last ? K.profLeaveTitleLast : K.profLeaveTitle]),
           const SizedBox(height: 8),
-          Text(l[K.profLeaveBlocked], style: theme.textTheme.bodySmall),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.lock_outline,
+                  size: 16, color: context.tokens.textMuted),
+              const SizedBox(width: Spacing.xs),
+              Expanded(
+                child: Text(l[K.profLeaveBlocked],
+                    style: theme.textTheme.bodySmall),
+              ),
+            ],
+          ),
           TextButton(
             onPressed: widget.onOpenFamily,
             child: Text(l[K.profFamilyPageLink]),

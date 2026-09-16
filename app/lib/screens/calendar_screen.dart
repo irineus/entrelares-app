@@ -1412,7 +1412,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                             child: Column(children: [
                               AppBanner(
                                   tone: context.tokens.danger,
-                                  leading: '⚠️',
+                                  icon: Icons.error_outline,
                                   message: _loadError!),
                               const SizedBox(height: Spacing.sm),
                               OutlinedButton(
@@ -1454,36 +1454,39 @@ class _CalendarScreenState extends State<CalendarScreen>
                   child: Row(
                     children: [
                       Expanded(
-                        child: FilledButton(
+                        child: FilledButton.icon(
                           onPressed: _selectedDays.isEmpty
                               ? null
                               : _openBulkSheet,
-                          child: Text(l.format(
+                          icon: const Icon(Icons.edit_outlined),
+                          label: Text(l.format(
                               K.selectionEdit, [_selectedDays.length])),
                         ),
                       ),
-                      // 🔔 Resolver — only when the selection carries open
+                      // Resolver — only when the selection carries open
                       // requests / revertable days (WorkflowActionableCount).
                       if (_workflowActionableCount > 0) ...[
                         const SizedBox(width: 8),
                         Expanded(
-                          child: OutlinedButton(
+                          child: OutlinedButton.icon(
                             onPressed: _openResolveSheet,
-                            child: Text(l.format(K.selectionResolve,
+                            icon: const Icon(Icons.pending_actions),
+                            label: Text(l.format(K.selectionResolve,
                                 [_workflowActionableCount])),
                           ),
                         ),
                       ],
-                      // F-65: ⇄ Trocar — only when the selection is a pair
+                      // F-65: Trocar — only when the selection is a pair
                       // of planned parents with equal days, all clean. It
-                      // and 🔔 Resolver never show together (see the getter),
+                      // and Resolver never show together (see the getter),
                       // so the bar holds at most two labelled actions.
                       if (quickSwap != null) ...[
                         const SizedBox(width: 8),
                         Expanded(
-                          child: OutlinedButton(
+                          child: OutlinedButton.icon(
                             onPressed: () => _openQuickSwap(quickSwap),
-                            child: Text(l.format(
+                            icon: const Icon(Icons.swap_horiz),
+                            label: Text(l.format(
                                 K.selectionSwap, [quickSwap.dayCount])),
                           ),
                         ),
@@ -1688,9 +1691,9 @@ class _MonthGrid extends StatelessWidget {
     required this.availableHeight,
   });
 
-  /// The F-12 cell badge — mirror of Home.razor's day-frozen markup: 🔔 when
-  /// the request awaits MY response (overdue gets the red variant), ⏳ when it
-  /// awaits someone else; the semantics label carries the web's title text.
+  /// The F-12 cell badge — mirror of Home.razor's day-frozen markup: a bell
+  /// when the request awaits MY response (overdue gets the red variant), an
+  /// hourglass when it awaits someone else; the semantics label carries the web's title text.
   _FrozenMark? _markFor(SwapRequest? frozen, Localization l) {
     if (frozen == null) return null;
     final awaitingMe = frozen.targetProfileId == ownProfileId;
@@ -1698,7 +1701,7 @@ class _MonthGrid extends StatelessWidget {
         frozen.toView().priorityTag(DateTime.now()) == SwapPriorityTag.overdue;
     if (awaitingMe) {
       return _FrozenMark(
-        badge: '🔔',
+        badge: Icons.notifications_active,
         overdue: overdue,
         label: l[overdue ? K.calOverdueAwaitingYou : K.calAwaitingYou],
       );
@@ -1711,7 +1714,7 @@ class _MonthGrid extends StatelessWidget {
       }
     }
     return _FrozenMark(
-      badge: '⏳',
+      badge: Icons.hourglass_top,
       overdue: false,
       label: l
           .format(K.calAwaitingFrom, [targetName ?? l[K.calOtherCaregiver]]),
@@ -1815,7 +1818,7 @@ class _MonthGrid extends StatelessWidget {
 
 /// What a frozen day paints on its cell (computed in [_MonthGrid._markFor]).
 class _FrozenMark {
-  final String badge; // 🔔 (mine) · ⏳ (theirs)
+  final IconData badge; // bell (mine) · hourglass (theirs)
   final bool overdue;
   final String label; // semantics — the web's badge title
   const _FrozenMark(
@@ -1968,8 +1971,14 @@ class _DayCell extends StatelessWidget {
                               borderRadius: BorderRadius.circular(6),
                             )
                           : null,
-                      child: Text(frozenMark!.badge,
-                          style: const TextStyle(fontSize: 9)),
+                      child: Icon(frozenMark!.badge,
+                          size: 11,
+                          color: frozenMark!.overdue
+                              ? tokens.danger.onContainer
+                              : frozenMark!.badge ==
+                                      Icons.notifications_active
+                                  ? tokens.warning.solid
+                                  : tokens.textMuted),
                     )
                   else if (day?.handoffTime != null)
                     // U-28: the TIME, not an anonymous swap arrow. The web
@@ -2005,11 +2014,7 @@ class _DayCell extends StatelessWidget {
             Positioned(
               top: 2,
               right: 2,
-              child: Text('✓',
-                  style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: primary)),
+              child: Icon(Icons.check, size: 12, color: primary),
             ),
         ],
       ),

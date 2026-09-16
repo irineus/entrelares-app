@@ -450,7 +450,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               for (final role in RoleCatalog.all)
                 ChoiceChip(
-                  label: Text('${role.emoji} ${role.labelFor(l.current)}'),
+                  // U-31: words only — the closed alpha read the emoji
+                  // grid here as homemade.
+                  label: Text(role.labelFor(l.current)),
                   selected: _role == role.canonicalName,
                   onSelected: (_) =>
                       setState(() => _role = role.canonicalName),

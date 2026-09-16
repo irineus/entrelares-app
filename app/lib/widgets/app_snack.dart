@@ -23,9 +23,9 @@ void showAppSnack(BuildContext context, String message,
   // light values, and a dark set that exists because the tokens carry one.
   final t = context.tokens;
   final (tone, icon) = switch (type) {
-    AppSnackType.success => (t.success, '✅'),
-    AppSnackType.error => (t.danger, '❌'),
-    AppSnackType.info => (t.info, 'ℹ️'),
+    AppSnackType.success => (t.success, Icons.check_circle_outline),
+    AppSnackType.error => (t.danger, Icons.error_outline),
+    AppSnackType.info => (t.info, Icons.info_outline),
   };
 
   messenger.showSnackBar(SnackBar(
@@ -43,7 +43,7 @@ void showAppSnack(BuildContext context, String message,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(icon),
+          Icon(icon, size: 20, color: tone.onContainer),
           const SizedBox(width: Spacing.sm),
           Expanded(
             child: Text(

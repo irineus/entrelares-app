@@ -49,7 +49,7 @@ void main() {
     await longPressDay(tester, days.$1);
     await longPressDay(tester, days.$2);
     expect(find.text(pt.format(K.selectionEdit, [2])), findsOneWidget);
-    expect(find.text('✓'), findsNWidgets(2));
+    expect(find.byIcon(Icons.check), findsNWidgets(2));
     // U-36: the app bar is CONTEXTUAL while selecting — the count is the
     // title and "Calendário" is gone, so the state is announced at the top,
     // where the eye is, and not only in the strip at the bottom.
@@ -66,7 +66,7 @@ void main() {
     // ✕ lives in the contextual bar now, and ONLY there.
     await tester.tap(find.byTooltip(pt[K.selectionCancel]));
     await tester.pumpAndSettle();
-    expect(find.textContaining('✏️'), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
     expect(find.text(pt[K.navCalendar]), findsOneWidget);
     expect(find.byIcon(Icons.more_vert), findsOneWidget);
   });
@@ -137,12 +137,12 @@ void main() {
     expect(ds.inserted.every((r) => r.scheduledParentId == 2), isTrue);
     expect(find.text('2 dias atualizados'), findsOneWidget);
     // The selection cleared (FinishBulkSave mirror).
-    expect(find.textContaining('✏️'), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
     await settleSnack(tester);
   });
 
   testWidgets('S-09: assigned days keep their planned parent for non-admins '
-      '(no-op day reported, 🔒 hint shown)', (tester) async {
+      '(no-op day reported, lock hint shown)', (tester) async {
     final days = twoFutureDays;
     if (days == null) return;
     final ds = FakeCustodyDataSource(
@@ -260,6 +260,6 @@ void main() {
     final next = DateTime(today.year, today.month + 1, 1);
     expect(find.text(monthHeading(pt, next)),
         findsOneWidget);
-    expect(find.textContaining('✏️'), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
   });
 }

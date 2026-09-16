@@ -145,7 +145,7 @@ void main() {
       expect(find.text(l[K.onbStepInviteTitle]), findsOne);
       expect(find.text(l[K.onbStepPlanTitle]), findsOne);
       expect(find.text(l[K.onbStepSwapTitle]), findsOne);
-      expect(find.text('⬜'), findsNWidgets(3));
+      expect(find.byIcon(Icons.radio_button_unchecked), findsNWidgets(3));
     });
 
     testWidgets('the invite step navigates to the family page', (tester) async {

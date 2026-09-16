@@ -223,8 +223,8 @@ class AppTimelineEntry extends StatelessWidget {
   /// the reader should stop at.
   final ToneColors tone;
 
-  /// What the dot carries. The app writes these as emoji, in the catalog.
-  final String marker;
+  /// What the dot carries: a vector icon in the tone's ink (U-31).
+  final IconData marker;
 
   /// The small line above the title ("Dia: 21/08/2026").
   final String? overline;
@@ -275,8 +275,7 @@ class AppTimelineEntry extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: tone.border),
                   ),
-                  child: Text(marker,
-                      style: const TextStyle(fontSize: TypeScale.label)),
+                  child: Icon(marker, size: 14, color: tone.onContainer),
                 ),
                 if (!isLast)
                   Expanded(
