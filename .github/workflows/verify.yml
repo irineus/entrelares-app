@@ -306,6 +306,27 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      # The AVD's userdata partition is created under ~/.android, on the root
+      # disk, and asks for ~7.4 GB. The same image version (ubuntu-24.04
+      # 20260907.300.1) with the same caches left 5.8 GB free on 15 and
+      # 16/09/2026 and plenty on 14/09: the emulator died in 0.1 s with
+      # "FATAL | Not enough space to create userdata partition" and the action
+      # then polled `adb` for the whole 600 s boot timeout, naming nothing. So
+      # the job frees toolchains it never uses (the Android SDK, Java and the
+      # Flutter cache stay) and refuses to start an emulator without the room,
+      # with the reason in the log instead of a wall of "device not found".
+      - name: Free runner disk for the emulator
+        run: |
+          df -h / | sed 's/^/before: /'
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift \
+            /usr/local/share/powershell /usr/local/lib/node_modules
+          df -h / | sed 's/^/after:  /'
+          avail_mb=$(df --output=avail -BM "$HOME" | tail -1 | tr -dc '0-9')
+          if [ "$avail_mb" -lt 10000 ]; then
+            echo "::error::Only ${avail_mb} MB free on the root disk; the AVD needs ~7.4 GB at boot plus the Gradle build."
+            exit 1
+          fi
       # The service_role key never enters the repo: it arrives as a secret and
       # reaches the fixture through --dart-define only.
       - name: E2E — two-user swap flow on an emulator
