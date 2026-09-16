@@ -37,7 +37,7 @@ Future<void> longPressDay(WidgetTester tester, int day) async {
 Finder swapButton(int count) => find.text(pt.format(K.selectionSwap, [count]));
 
 void main() {
-  testWidgets('1+1: the bar offers ⇄ Trocar, the sheet says who takes what, '
+  testWidgets('1+1: the bar offers Trocar, the sheet says who takes what, '
       'confirming opens two inverted requests with the message',
       (tester) async {
     final days = futureDays(2);
@@ -57,8 +57,8 @@ void main() {
 
     await longPressDay(tester, days[1]);
     expect(swapButton(2), findsOneWidget);
-    // Never beside 🔔 Resolver: a clean pair has nothing to resolve.
-    expect(find.textContaining('🔔'), findsNothing);
+    // Never beside Resolver: a clean pair has nothing to resolve.
+    expect(find.byIcon(Icons.pending_actions), findsNothing);
 
     await tester.tap(swapButton(2));
     await tester.pumpAndSettle();
@@ -97,7 +97,7 @@ void main() {
 
     // The toast reports the requests and the selection cleared.
     expect(find.text('2 solicitações de troca'), findsOneWidget);
-    expect(find.textContaining('✏️'), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
     await settleSnack(tester);
   });
 
@@ -119,7 +119,7 @@ void main() {
     expect(swapButton(2), findsOneWidget);
 
     await longPressDay(tester, days[1]);
-    expect(find.textContaining('⇄'), findsNothing);
+    expect(find.byIcon(Icons.swap_horiz), findsNothing);
     expect(find.text(pt.format(K.selectionEdit, [3])), findsOneWidget);
 
     await longPressDay(tester, days[3]);
@@ -140,11 +140,11 @@ void main() {
 
     await longPressDay(tester, days[0]);
     await longPressDay(tester, days[1]);
-    expect(find.textContaining('⇄'), findsNothing);
+    expect(find.byIcon(Icons.swap_horiz), findsNothing);
     expect(find.text(pt.format(K.selectionEdit, [2])), findsOneWidget);
   });
 
-  testWidgets('a day already swapped hides the button and 🔔 Resolver takes '
+  testWidgets('a day already swapped hides the button and Resolver takes '
       'its place', (tester) async {
     final days = futureDays(2);
     if (days == null) return;
@@ -157,7 +157,7 @@ void main() {
 
     await longPressDay(tester, days[0]);
     await longPressDay(tester, days[1]);
-    expect(find.textContaining('⇄'), findsNothing);
+    expect(find.byIcon(Icons.swap_horiz), findsNothing);
     expect(find.text(pt.format(K.selectionResolve, [1])), findsOneWidget);
   });
 }

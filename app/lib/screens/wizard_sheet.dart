@@ -282,8 +282,10 @@ class _WizardSheetState extends State<_WizardSheet> {
       subtitle: l[K.wizSubtitle],
       pinnedNotice: _errorMessage == null
           ? null
-          : Text('⚠️ $_errorMessage',
-              style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          : AppBanner(
+              tone: context.tokens.danger,
+              icon: Icons.error_outline,
+              message: _errorMessage!),
       // F-51: while the S-09 question is on screen it owns the action row,
       // exactly as the bulk sheet does for its own confirmations.
       primaryLabel: _showReplaceConfirm
@@ -313,14 +315,25 @@ class _WizardSheetState extends State<_WizardSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-                l.format(
-                    _replaceCount == 1
-                        ? K.bulkOverwriteWarningOne
-                        : K.bulkOverwriteWarningMany,
-                    [_replaceCount]),
-                style: TextStyle(
-                    fontSize: 13, color: context.tokens.danger.onContainer)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    size: 20, color: context.tokens.danger.onContainer),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: Text(
+                      l.format(
+                          _replaceCount == 1
+                              ? K.bulkOverwriteWarningOne
+                              : K.bulkOverwriteWarningMany,
+                          [_replaceCount]),
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: context.tokens.danger.onContainer)),
+                ),
+              ],
+            ),
             const SizedBox(height: Spacing.sm),
             AppActionPair(
               primaryLabel: l[K.editorYesChange],
@@ -343,7 +356,8 @@ class _WizardSheetState extends State<_WizardSheet> {
   List<Widget> _successView(Localization l) => [
         Row(
           children: [
-            const Text('✅', style: TextStyle(fontSize: 20)),
+            Icon(Icons.check_circle_outline,
+                size: 24, color: context.tokens.success.solid),
             const SizedBox(width: 8),
             Expanded(child: Text(_successMessage ?? '')),
           ],

@@ -239,8 +239,10 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text('⚠️ $_error',
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: AppBanner(
+                tone: context.tokens.danger,
+                icon: Icons.error_outline,
+                message: _error!),
           ),
       ],
     );

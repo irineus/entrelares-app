@@ -86,8 +86,8 @@ SwapPriorityTag swapRequestPriorityTag({
 /// PT-BR fallback sentence; the reader-language copy comes from `params.tag`
 /// via the NotificationRenderer.
 String priorityTagPrefix(SwapPriorityTag tag) => switch (tag) {
-      SwapPriorityTag.urgent => '⚠️ URGENTE: ',
-      SwapPriorityTag.overdue => '⏰ ATRASADO: ',
+      SwapPriorityTag.urgent => 'URGENTE: ',
+      SwapPriorityTag.overdue => 'ATRASADO: ',
       SwapPriorityTag.none => '',
     };
 

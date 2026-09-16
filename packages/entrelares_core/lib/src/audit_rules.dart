@@ -384,32 +384,46 @@ String accountActionLabel(String action, Localization l) {
   return key == null ? action : l[key];
 }
 
-/// The icon the account timeline puts on a row — mirror of the badge switch
-/// in `ReportsAudit.razor`.
-(AuditBadge, String) accountActionBadge(String action) => switch (action) {
+/// What the account timeline's dot SAYS about a row — a meaning, never a
+/// glyph: core cannot name a Flutter icon, and U-31 took out the emoji that
+/// used to stand here. The app maps each value to its vector icon.
+enum AuditMarker {
+  added,
+  removed,
+  admin,
+  credentials,
+  export,
+  gift,
+  billing,
+  edited,
+}
+
+/// The tone and the marker of an account timeline row — mirror of the badge
+/// switch in `ReportsAudit.razor`.
+(AuditBadge, AuditMarker) accountActionBadge(String action) => switch (action) {
       'invitation_created' ||
       'pending_member_added' ||
       'pending_member_claimed' =>
-        (AuditBadge.created, '＋'),
+        (AuditBadge.created, AuditMarker.added),
       'invitation_revoked' ||
       'pending_member_removed' =>
-        (AuditBadge.deleted, '✕'),
-      'admin_granted' || 'admin_revoked' => (AuditBadge.updated, '🛡️'),
+        (AuditBadge.deleted, AuditMarker.removed),
+      'admin_granted' || 'admin_revoked' => (AuditBadge.updated, AuditMarker.admin),
       'password_changed' ||
       'email_change_requested' =>
-        (AuditBadge.updated, '🔐'),
-      'data_exported' => (AuditBadge.updated, '📦'),
-      'comp_premium_granted' => (AuditBadge.created, '🎁'),
-      'comp_premium_revoked' => (AuditBadge.deleted, '🎁'),
+        (AuditBadge.updated, AuditMarker.credentials),
+      'data_exported' => (AuditBadge.updated, AuditMarker.export),
+      'comp_premium_granted' => (AuditBadge.created, AuditMarker.gift),
+      'comp_premium_revoked' => (AuditBadge.deleted, AuditMarker.gift),
       'plan_premium_payment' ||
       'plan_premium_avulso' ||
       'plan_premium_set' =>
-        (AuditBadge.created, '💳'),
+        (AuditBadge.created, AuditMarker.billing),
       'plan_free_overdue' ||
       'plan_free_canceled' ||
       'plan_free_set' =>
-        (AuditBadge.deleted, '💳'),
-      _ => (AuditBadge.updated, '✏️'),
+        (AuditBadge.deleted, AuditMarker.billing),
+      _ => (AuditBadge.updated, AuditMarker.edited),
     };
 
 /// A `role_changed` row stores ROLE NAMES; the timeline translates them like

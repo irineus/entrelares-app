@@ -103,7 +103,7 @@ void main() {
       expect(
           find.widgetWithText(TextField, l[K.registerFamilyName]), findsOne);
       expect(find.byType(ChoiceChip), findsNWidgets(RoleCatalog.all.length));
-      expect(find.widgetWithText(ChoiceChip, '👩 Mãe'), findsOne);
+      expect(find.widgetWithText(ChoiceChip, 'Mãe'), findsOne);
     });
 
     testWidgets('shows the A-1.1 awareness declaration', (tester) async {
@@ -153,7 +153,7 @@ void main() {
           find.widgetWithText(TextField, l[K.commonEmail]), 'ana@example.com');
       await tester.enterText(
           find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
-      await tapVisible(tester, find.widgetWithText(ChoiceChip, '👩 Mãe'));
+      await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
       await acceptTerms(tester);
 
       await tapVisible(tester, submitButton(l));
@@ -176,7 +176,7 @@ void main() {
           find.widgetWithText(TextField, l[K.commonEmail]), 'ana@example.com');
       await tester.enterText(
           find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
-      await tapVisible(tester, find.widgetWithText(ChoiceChip, '👩 Mãe'));
+      await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
       await acceptTerms(tester);
 
       await tapVisible(tester, submitButton(l));
@@ -349,7 +349,7 @@ void main() {
           dataSource: source(), language: AppLanguage.en);
 
       expect(find.text(ConsentDeclarations.creatorEn), findsOne);
-      expect(find.widgetWithText(ChoiceChip, '👩 Mother'), findsOne);
+      expect(find.widgetWithText(ChoiceChip, 'Mother'), findsOne);
       // The courtesy notice only exists for the English reader — the binding
       // text is the Portuguese one.
       expect(find.text(Localization(AppLanguage.en)[K.registerConsentBindingNotice]),

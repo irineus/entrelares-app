@@ -99,9 +99,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   ],
                 ],
                 const SizedBox(height: 16),
-                TextButton(
+                TextButton.icon(
                   onPressed: widget.onBackToLogin,
-                  child: Text(l[K.resetBackToLogin]),
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: Text(l[K.resetBackToLogin]),
                 ),
               ],
             ),

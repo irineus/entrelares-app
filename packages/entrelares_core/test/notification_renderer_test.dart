@@ -243,23 +243,23 @@ void main() {
       final title = NotificationRenderer.title(
           'auto_approved', '{"date":"04/08"}', storedTitle, ptBr);
       expect(title, isNot(contains('[DEV]')));
-      expect(title, '✅ Solicitação aprovada automaticamente');
+      expect(title, 'Solicitação aprovada automaticamente');
     });
 
     test('rendered title follows the reader language', () {
       expect(
           NotificationRenderer.title(
               'auto_approved', '{"date":"04/08"}', storedTitle, en),
-          '✅ Request approved automatically');
+          'Request approved automatically');
     });
 
     // The urgency tag is content, travels in params, and is translated —
     // dropping it would leave the English reader with less information.
     for (final (tag, pt, enTitle) in [
-      ('urgent', '⚠️ URGENTE: Nova solicitação de troca',
-          '⚠️ URGENT: New swap request'),
-      ('overdue', '⏰ ATRASADO: Nova solicitação de troca',
-          '⏰ OVERDUE: New swap request'),
+      ('urgent', 'URGENTE: Nova solicitação de troca',
+          'URGENT: New swap request'),
+      ('overdue', 'ATRASADO: Nova solicitação de troca',
+          'OVERDUE: New swap request'),
     ]) {
       test('urgency tag "$tag" is rendered and translated', () {
         final json = '{"date":"04/08/2026","name":"Ana","tag":"$tag"}';

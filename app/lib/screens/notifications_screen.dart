@@ -68,29 +68,26 @@ class NotificationsScreen extends StatefulWidget {
 
 enum _Tab { incoming, sent, history }
 
-/// Mirror of `GetNotifIcon`.
-String notifIcon(String type) => switch (type) {
-      'swap_requested' => '🔄',
-      'swap_sent' => '📤',
-      'swap_approved' => '✅',
-      'swap_approved_self' => '✅',
-      'swap_rejected' => '❌',
-      'swap_cancelled' => '🚫',
-      'swap_reverted' => '↩️',
-      'revert_requested' => '↩️',
-      'revert_sent' => '📤',
-      'revert_approved' => '✅',
-      'revert_approved_self' => '✅',
-      'revert_rejected' => '❌',
-      'revert_cancelled' => '🚫',
-      'auto_reminder' => '⏰',
-      'auto_approved' => '🤖',
-      'swap_family_info' => '👪',
-      'email_cap_80' => '⚠️',
-      'email_cap_last' => '✉️',
-      'email_cap_reached' => '✉️',
-      'billing' => '💳',
-      _ => '🔔',
+/// Mirror of `GetNotifIcon` — a vector icon per type since U-31, one family
+/// of outlined Material glyphs so the rail reads as one voice.
+IconData notifIcon(String type) => switch (type) {
+      'swap_requested' => Icons.swap_horiz,
+      'swap_sent' || 'revert_sent' => Icons.outbox_outlined,
+      'swap_approved' ||
+      'swap_approved_self' ||
+      'revert_approved' ||
+      'revert_approved_self' =>
+        Icons.check_circle_outline,
+      'swap_rejected' || 'revert_rejected' => Icons.highlight_off,
+      'swap_cancelled' || 'revert_cancelled' => Icons.block,
+      'swap_reverted' || 'revert_requested' => Icons.undo,
+      'auto_reminder' => Icons.alarm,
+      'auto_approved' => Icons.smart_toy_outlined,
+      'swap_family_info' => Icons.groups_outlined,
+      'email_cap_80' => Icons.warning_amber_rounded,
+      'email_cap_last' || 'email_cap_reached' => Icons.mail_outline,
+      'billing' => Icons.credit_card,
+      _ => Icons.notifications_none,
     };
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
@@ -250,7 +247,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             child: Column(children: [
                               AppBanner(
                                   tone: context.tokens.danger,
-                                  leading: '⚠️',
+                                  icon: Icons.error_outline,
                                   message: _loadError!),
                               const SizedBox(height: Spacing.sm),
                               OutlinedButton(
@@ -353,7 +350,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   // Still a ListView: the empty tab has to stay pull-to-refreshable, which is
   // the one thing the shared component cannot know about.
-  Widget _empty(String icon, String textKey, Localization l) => ListView(
+  Widget _empty(IconData icon, String textKey, Localization l) => ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           const SizedBox(height: Spacing.md),
@@ -376,7 +373,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.event_outlined,
+                  size: 18, color: context.tokens.textMuted),
+              const SizedBox(width: Spacing.xs),
+              Text(title, style: Theme.of(context).textTheme.titleSmall),
+            ],
+          ),
           Wrap(spacing: Spacing.xs, runSpacing: Spacing.xs, children: badges),
         ],
       );
@@ -452,7 +457,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // ── "Para você" ────────────────────────────────────────────────────────────
 
   Widget _incomingTab(Localization l) {
-    if (_incoming.isEmpty) return _empty('✅', K.notifEmptyIncoming, l);
+    if (_incoming.isEmpty) return _empty(Icons.task_alt, K.notifEmptyIncoming, l);
     final now = DateTime.now();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -468,7 +473,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final tag = req.toView().priorityTag(now); // F-20: pending → clock
     return _requestRow(
       req: req,
-      title: '📅 ${l.formatDate(req.scheduleDate)}',
+      title: l.formatDate(req.scheduleDate),
       badges: [
         _statusBadge(
           l[isRevert ? K.notifRevertPendingBadge : K.notifPendingBadge],
@@ -492,7 +497,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // ── "Enviadas" ─────────────────────────────────────────────────────────────
 
   Widget _sentTab(Localization l) {
-    if (_sent.isEmpty) return _empty('📤', K.notifEmptySent, l);
+    if (_sent.isEmpty) return _empty(Icons.outbox_outlined, K.notifEmptySent, l);
     final now = DateTime.now();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -511,7 +516,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return _requestRow(
       req: req,
-      title: '📅 ${l.formatDate(req.scheduleDate)}',
+      title: l.formatDate(req.scheduleDate),
       badges: [
         // The state the request had AT RESOLUTION, kept forever (F-20).
         if (!isPending && tag != SwapPriorityTag.none)
@@ -561,7 +566,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // ── "Histórico" ────────────────────────────────────────────────────────────
 
   Widget _historyTab(Localization l) {
-    if (_history.isEmpty) return _empty('🔔', K.notifEmptyHistory, l);
+    if (_history.isEmpty) return _empty(Icons.notifications_none, K.notifEmptyHistory, l);
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [

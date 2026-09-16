@@ -180,7 +180,7 @@ void main() {
       await tester.enterText(
           find.widgetWithText(TextField, pt[K.registerFamilyName]),
           'Família Teste');
-      await tester.tap(find.text('👩 Mãe'));
+      await tester.tap(find.text('Mãe'));
       await tester.tap(find.byType(Checkbox));
       await tester.pumpAndSettle();
 
@@ -227,7 +227,7 @@ void main() {
       await tester.enterText(
           find.widgetWithText(TextField, pt[K.registerFamilyName]),
           'Família Teste');
-      await tester.tap(find.text('👩 Mãe'));
+      await tester.tap(find.text('Mãe'));
       await tester.tap(find.byType(Checkbox));
       await tester.pumpAndSettle();
       await tester

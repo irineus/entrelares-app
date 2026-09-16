@@ -193,12 +193,15 @@ class HomeShell extends StatelessWidget {
                               horizontal: 12, vertical: 6),
                           child: Row(
                             children: [
+                              const Icon(Icons.shield_outlined,
+                                  size: 16, color: Colors.white),
+                              const SizedBox(width: 6),
                               Expanded(
                                 // U-28 QA: one line with an ellipsis, exactly
                                 // as the web draws it. Wrapped to two it was
                                 // costing the calendar below a whole row.
                                 child: Text(
-                                  '🛡️ ${l[K.layoutAdminActive]} — '
+                                  '${l[K.layoutAdminActive]} — '
                                   '${l[K.layoutAdminHint]}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -293,22 +296,35 @@ class HomeShell extends StatelessWidget {
           child: Padding(
             padding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              // Unanimity already reached reads differently from a request
-              // still collecting answers — the deadline means something else
-              // in each case.
-              banner.allAgreed
-                  ? '🗑️ ${l[K.layoutFamilyDeletionConfirmed]} '
-                      '${l.format(K.layoutFamilyDeletionConfirmedUntil, [
-                        l.formatDate(banner.scheduledFor.toLocal())
-                      ])}'
-                  : '🗑️ ${l[K.layoutFamilyDeletionRequested]} — '
-                      '${l.format(banner.iAmRequester ? K.layoutFamilyDeletionRequester : K.layoutFamilyDeletionOther, [
-                        l.formatDateShort(banner.scheduledFor.toLocal())
-                      ])}',
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 1),
+                  child: Icon(Icons.delete_outline,
+                      size: 16, color: Colors.white),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    // Unanimity already reached reads differently from a
+                    // request still collecting answers — the deadline means
+                    // something else in each case.
+                    banner.allAgreed
+                        ? '${l[K.layoutFamilyDeletionConfirmed]} '
+                            '${l.format(K.layoutFamilyDeletionConfirmedUntil, [
+                              l.formatDate(banner.scheduledFor.toLocal())
+                            ])}'
+                        : '${l[K.layoutFamilyDeletionRequested]} — '
+                            '${l.format(banner.iAmRequester ? K.layoutFamilyDeletionRequester : K.layoutFamilyDeletionOther, [
+                              l.formatDateShort(banner.scheduledFor.toLocal())
+                            ])}',
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

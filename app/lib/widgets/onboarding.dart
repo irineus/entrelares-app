@@ -78,7 +78,8 @@ class OnboardingLauncher extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              const Text('🚀'),
+              Icon(Icons.checklist,
+                  size: 20, color: theme.colorScheme.onSecondaryContainer),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(l[K.onbChecklistTitle],
@@ -175,8 +176,15 @@ class _StepTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // The mark is decorative; the state is announced in text, so a
-          // screen reader never has to interpret an emoji.
-          ExcludeSemantics(child: Text(done ? '✅' : '⬜')),
+          // screen reader never has to interpret a glyph.
+          ExcludeSemantics(
+            child: Icon(
+                done ? Icons.check_circle : Icons.radio_button_unchecked,
+                size: 20,
+                color: done
+                    ? context.tokens.success.solid
+                    : context.tokens.textMuted),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(

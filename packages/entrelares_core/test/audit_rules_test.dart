@@ -223,10 +223,10 @@ void main() {
     test('the badge vocabulary maps the money and the shield rows', () {
       expect(accountActionBadge('invitation_created').$1, AuditBadge.created);
       expect(accountActionBadge('invitation_revoked').$1, AuditBadge.deleted);
-      expect(accountActionBadge('admin_revoked').$2, '🛡️');
+      expect(accountActionBadge('admin_revoked').$2, AuditMarker.admin);
       expect(accountActionBadge('plan_free_overdue').$1, AuditBadge.deleted);
-      expect(accountActionBadge('plan_premium_avulso').$2, '💳');
-      expect(accountActionBadge('mystery').$2, '✏️');
+      expect(accountActionBadge('plan_premium_avulso').$2, AuditMarker.billing);
+      expect(accountActionBadge('mystery').$2, AuditMarker.edited);
     });
 
     test('only role_changed translates its stored value', () {

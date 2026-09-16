@@ -9,7 +9,7 @@ import '../services/custody_data_source.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
 
-/// The "🔔 Resolver" sheet — port of `Home.razor`'s bulk-workflow sheet. Three
+/// The "Resolver" sheet — port of `Home.razor`'s bulk-workflow sheet. Three
 /// subsets of the SELECTED days, each with its batch action: requests awaiting
 /// my response (approve/reject, one shared F-44 reason), requests I sent
 /// (cancel) and approved swaps (request revert — F-47 by decision: a batch
@@ -366,9 +366,10 @@ class _ResolveSheetState extends State<_ResolveSheet> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: Spacing.sm),
-                  child: Text('⚠️ $_error',
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error)),
+                  child: AppBanner(
+                      tone: context.tokens.danger,
+                      icon: Icons.error_outline,
+                      message: _error!),
                 ),
       ],
     );

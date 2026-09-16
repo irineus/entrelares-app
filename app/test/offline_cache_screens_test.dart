@@ -257,7 +257,7 @@ void main() {
       status.lostServer();
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('🔔'));
+      await tester.tap(find.byIcon(Icons.notifications_active));
       await tester.pumpAndSettle();
 
       expect(find.textContaining(pt[KApp.offlineWriteBlocked]), findsOneWidget);

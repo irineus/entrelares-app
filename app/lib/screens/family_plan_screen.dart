@@ -390,20 +390,22 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       final until = trialEnd == null
           ? ''
           : l.format(K.premBadgeTrialUntil, [l.formatDate(trialEnd.toLocal())]);
-      return Text(
+      return _premiumMark(Text(
         l.format(
             plan.trialDaysLeft == 1 ? K.premBadgeTrialOne : K.premBadgeTrialMany,
             [plan.trialDaysLeft, until]),
         style: theme.textTheme.titleSmall,
-      );
+      ));
     }
     if (_billingUi == BillingUi.premiumForever) {
       // U-22: grandfathered premium has no date BY DESIGN — say so instead of
       // leaving a bare badge that looks like an omission.
-      return Text(l[K.premBadgeForever], style: theme.textTheme.titleSmall);
+      return _premiumMark(
+          Text(l[K.premBadgeForever], style: theme.textTheme.titleSmall));
     }
     if (plan.isPremium) {
-      return Text(l[K.premBadgeActive], style: theme.textTheme.titleSmall);
+      return _premiumMark(
+          Text(l[K.premBadgeActive], style: theme.textTheme.titleSmall));
     }
 
     final expired = describeExpiredPremium(
@@ -504,6 +506,25 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     }
   }
 
+  /// U-31: a status line's mark is a vector icon in front of the sentence —
+  /// it used to be an emoji INSIDE the catalog string.
+  Widget _marked(IconData icon, Color color, Widget label) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(child: label),
+        ],
+      );
+
+  /// The Premium mark beside a plan badge — the sparkle the catalog used to
+  /// carry as "✨", drawn as the app's own icon.
+  Widget _premiumMark(Widget label) =>
+      _marked(Icons.auto_awesome, context.tokens.accent.solid, label);
+
   Widget _premiumSection(Localization l) {
     final theme = Theme.of(context);
     final ui = _billingUi;
@@ -511,7 +532,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // The block keeps its own heading under the page's app bar: the page
-        // is "Plano e pagamento", the thing on sale is still "✨ Premium".
+        // is "Plano e pagamento", the thing on sale is still "Premium".
         AppSectionHeader(title: l[K.premTitle], topSpacing: 0),
         Card(
           child: Padding(
@@ -574,7 +595,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   List<Widget> _premiumStateBlock(Localization l, BillingUi ui) {
     switch (ui) {
       case BillingUi.premiumForever:
-        return [RichLabel.of(l, K.premForeverNote)];
+        return [
+          _marked(Icons.auto_awesome, context.tokens.accent.solid,
+              RichLabel.of(l, K.premForeverNote))
+        ];
       case BillingUi.manageActive:
         return _activePanel(l);
       case BillingUi.manageOverdue:
@@ -592,10 +616,13 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     final subscription = _subscription!;
     final renews = subscription.currentPeriodEnd;
     return [
-      RichLabel.of(l, K.premActiveStatus, args: [
-        _cycleLabel(l, subscription.cycle),
-        formatPriceBrl(subscription.priceCents),
-      ]),
+      _marked(
+          Icons.check_circle_outline,
+          context.tokens.success.solid,
+          RichLabel.of(l, K.premActiveStatus, args: [
+            _cycleLabel(l, subscription.cycle),
+            formatPriceBrl(subscription.priceCents),
+          ])),
       if (renews != null)
         RichLabel.of(l, K.premActiveRenews,
             args: [l.formatDate(renews.toLocal())]),
@@ -613,15 +640,21 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         graceDeadline(_subscription?.overdueSince, _settings.graceDays);
     if (deadline != null && !deadline.isAfter(DateTime.now().toUtc())) {
       return [
-        RichLabel.of(l, K.premOverdueGraceEnded,
-            args: [l.formatDate(deadline.toLocal())])
+        _marked(
+            Icons.warning_amber_rounded,
+            context.tokens.danger.solid,
+            RichLabel.of(l, K.premOverdueGraceEnded,
+                args: [l.formatDate(deadline.toLocal())]))
       ];
     }
     return [
-      deadline == null
-          ? RichLabel.of(l, K.premOverdueInGraceNoDate)
-          : RichLabel.of(l, K.premOverdueInGrace,
-              args: [l.formatDate(deadline.toLocal())]),
+      _marked(
+          Icons.warning_amber_rounded,
+          context.tokens.warning.solid,
+          deadline == null
+              ? RichLabel.of(l, K.premOverdueInGraceNoDate)
+              : RichLabel.of(l, K.premOverdueInGrace,
+                  args: [l.formatDate(deadline.toLocal())])),
     ];
   }
 
@@ -635,7 +668,8 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     final cycle = _cycleLabel(l, subscription.cycle);
     final price = formatPriceBrl(subscription.priceCents);
     return [
-      RichLabel.of(l, K.premScheduledStatus),
+      _marked(Icons.event_repeat, context.tokens.info.solid,
+          RichLabel.of(l, K.premScheduledStatus)),
       if (dueAt != null)
         RichLabel.of(
           l,
@@ -714,16 +748,22 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       // sale.
       final status = [
         if (stillPaid != null)
-          RichLabel.of(
-            l,
-            subscription?.singleCharge == true
-                ? K.premStorePaidUntilAvulso
-                : K.premStorePaidUntilPeriod,
-            args: [l.formatDate(stillPaid.toLocal())],
-          )
+          _marked(
+              Icons.check_circle_outline,
+              context.tokens.success.solid,
+              RichLabel.of(
+                l,
+                subscription?.singleCharge == true
+                    ? K.premStorePaidUntilAvulso
+                    : K.premStorePaidUntilPeriod,
+                args: [l.formatDate(stillPaid.toLocal())],
+              ))
         else if (_planStatus.onTrial && trialEnd != null)
-          RichLabel.of(l, K.premStoreTrialUntil,
-              args: [l.formatDate(trialEnd.toLocal())]),
+          _marked(
+              Icons.auto_awesome,
+              context.tokens.accent.solid,
+              RichLabel.of(l, K.premStoreTrialUntil,
+                  args: [l.formatDate(trialEnd.toLocal())])),
         const SizedBox(height: 4),
       ];
       return [...status, ..._storeBranch(l)];
@@ -735,25 +775,34 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         // the period end — say so, and that re-subscribing ADDS to that date
         // (the webhook extends from the later of period-end/payment), so
         // nobody waits for the lapse.
-        RichLabel.of(
-          l,
-          subscription?.singleCharge == true
-              ? K.premPaidUntilAvulso
-              : K.premPaidUntilPeriod,
-          args: [l.formatDate(stillPaid.toLocal())],
-        ),
-        if (expiringDaysLeft(stillPaid, now) case final daysLeft?)
-          RichLabel.of(
+        _marked(
+            Icons.check_circle_outline,
+            context.tokens.success.solid,
+            RichLabel.of(
               l,
-              daysLeft == 1 ? K.premExpiringSoonOne : K.premExpiringSoonMany,
-              args: [daysLeft]),
+              subscription?.singleCharge == true
+                  ? K.premPaidUntilAvulso
+                  : K.premPaidUntilPeriod,
+              args: [l.formatDate(stillPaid.toLocal())],
+            )),
+        if (expiringDaysLeft(stillPaid, now) case final daysLeft?)
+          _marked(
+              Icons.hourglass_bottom,
+              context.tokens.warning.solid,
+              RichLabel.of(l,
+                  daysLeft == 1 ? K.premExpiringSoonOne : K.premExpiringSoonMany,
+                  args: [daysLeft])),
       ] else if (_planStatus.onTrial && trialEnd != null)
         // F-46: a family paying DURING its trial starts the paid cycle at the
         // trial end — say it before any checkout button.
-        RichLabel.of(l, K.premTrialAdditive,
-            args: [l.formatDate(trialEnd.toLocal())]),
+        _marked(
+            Icons.auto_awesome,
+            context.tokens.accent.solid,
+            RichLabel.of(l, K.premTrialAdditive,
+                args: [l.formatDate(trialEnd.toLocal())])),
       if (!_isAdmin)
-        RichLabel.of(l, K.premAdminOnly)
+        _marked(Icons.info_outline, context.tokens.textMuted,
+            RichLabel.of(l, K.premAdminOnly))
       else ...[
         if (canReactivate(
           subscriptionStatus: subscription?.status,
@@ -882,7 +931,12 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   }
 
   List<Widget> _storeOffer(Localization l) {
-    if (!_isAdmin) return [RichLabel.of(l, K.premAdminOnly)];
+    if (!_isAdmin) {
+      return [
+        _marked(Icons.info_outline, context.tokens.textMuted,
+            RichLabel.of(l, K.premAdminOnly))
+      ];
+    }
     // The cycles Play answered for, in the picker's order. A selected cycle
     // the store did not answer for falls back to whatever it did — the card
     // never shows a price for a product that does not exist.
@@ -1022,8 +1076,11 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       // commitment, so no PolicyVersions bump.
       RichLabel.of(l, K.premPaymentHint,
           style: Theme.of(context).textTheme.bodySmall),
-      RichLabel.of(l, K.premGuarantee,
-          style: Theme.of(context).textTheme.bodySmall),
+      _marked(
+          Icons.verified_user_outlined,
+          context.tokens.success.solid,
+          RichLabel.of(l, K.premGuarantee,
+              style: Theme.of(context).textTheme.bodySmall)),
     ];
   }
 
@@ -1150,7 +1207,12 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   }
 
   List<Widget> _waitlistPanel(Localization l) {
-    if (_hasPremiumInterest) return [Text(l[K.premInterestDone])];
+    if (_hasPremiumInterest) {
+      return [
+        _marked(Icons.check_circle_outline, context.tokens.success.solid,
+            Text(l[K.premInterestDone]))
+      ];
+    }
     return [
       FilledButton(
         onPressed:

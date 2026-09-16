@@ -154,12 +154,6 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
     final targetName = _nameOf(request.targetProfileId);
     final proposedName = _nameOf(request.proposedActualParentId);
 
-    final headerIcon = switch (tag) {
-      SwapPriorityTag.overdue => '⏰',
-      SwapPriorityTag.urgent => '⚠️',
-      SwapPriorityTag.none => isRevert ? '↩️' : '⏳',
-    };
-
     final handoff = parseTimeOfDay(request.proposedHandoffTime);
     final createdAtLocal = request.createdAt == null
         ? null
@@ -218,10 +212,9 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
         : context.tokens.warning;
 
     return AppSheetFrame(
-      // The emoji rides in the title string, which is where this app keeps
-      // emoji: inside the sentences it writes, never as structural chrome.
-      title: '$headerIcon '
-          '${l[isRevert ? K.frozenRevertTitle : K.frozenSwapTitle]}',
+      // U-31: the title is words only. The urgency it used to carry as an
+      // emoji is the pinned notice below, which says it in a sentence.
+      title: l[isRevert ? K.frozenRevertTitle : K.frozenSwapTitle],
       // U-25: a tap on a day opens this sheet or the day sheet, and both carry
       // the same visible way out — the reader cannot tell in advance which one
       // a day will open.
@@ -241,14 +234,28 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                 border: Border.all(color: urgencyTone.border),
                 borderRadius: BorderRadius.circular(Radii.md),
               ),
-              child: Text(
-                l[tag == SwapPriorityTag.overdue
-                    ? K.frozenOverdue
-                    : K.frozenUrgent],
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: urgencyTone.onContainer,
-                    fontWeight: FontWeight.w700),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                      tag == SwapPriorityTag.overdue
+                          ? Icons.alarm
+                          : Icons.warning_amber_rounded,
+                      size: 20,
+                      color: urgencyTone.onContainer),
+                  const SizedBox(width: Spacing.sm),
+                  Flexible(
+                    child: Text(
+                      l[tag == SwapPriorityTag.overdue
+                          ? K.frozenOverdue
+                          : K.frozenUrgent],
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: urgencyTone.onContainer,
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
               ),
             ),
       extraAction: widget.offline
@@ -309,14 +316,16 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: Spacing.sm),
-                Text('⚠️ $_error',
-                    style: TextStyle(
-                        color: context.tokens.danger.onContainer)),
+                AppBanner(
+                    tone: context.tokens.danger,
+                    icon: Icons.error_outline,
+                    message: _error!),
               ],
               const SizedBox(height: Spacing.sm),
               if (widget.offline)
                 AppBanner(
                     tone: context.tokens.warning,
+                    icon: Icons.cloud_off_outlined,
                     message: l[KApp.offlineWriteBlocked]),
               if (iAmTarget && !widget.offline) ...[
                 // U-27: the label used to float above the field as its own

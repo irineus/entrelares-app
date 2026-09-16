@@ -93,8 +93,8 @@ void main() {
         creationTag: SwapPriorityTag.urgent,
         environmentPrefix: '',
       );
-      expect(drafts[0].title, '⚠️ URGENTE: Solicitação de troca enviada');
-      expect(drafts[1].title, '⚠️ URGENTE: Nova solicitação de troca');
+      expect(drafts[0].title, 'URGENTE: Solicitação de troca enviada');
+      expect(drafts[1].title, 'URGENTE: Nova solicitação de troca');
       expect(drafts[0].params['tag'], 'urgent');
       expect(drafts[1].params['tag'], 'urgent');
     });
@@ -110,7 +110,7 @@ void main() {
         creationTag: SwapPriorityTag.overdue,
         environmentPrefix: '[Dev] ',
       );
-      expect(drafts[0].title, '[Dev] ⏰ ATRASADO: Solicitação de troca enviada');
+      expect(drafts[0].title, '[Dev] ATRASADO: Solicitação de troca enviada');
       expect(drafts[1].params.values.any((v) => v.contains('[Dev]')), isFalse);
     });
 
@@ -147,7 +147,7 @@ void main() {
 
       expect(drafts[0].recipientProfileId, 1);
       expect(drafts[0].type, 'swap_approved');
-      expect(drafts[0].title, 'Troca aprovada! ✅');
+      expect(drafts[0].title, 'Troca aprovada!');
       expect(drafts[0].message,
           'Bruno Prado aceitou ficar com a criança no dia 05/09/2026. Mensagem: Busco às 18h');
       expect(drafts[0].params, {
@@ -263,7 +263,7 @@ void main() {
       expect(drafts, hasLength(1));
       expect(drafts[0].recipientProfileId, 1);
       expect(drafts[0].type, 'swap_rejected');
-      expect(drafts[0].title, 'Troca recusada ❌');
+      expect(drafts[0].title, 'Troca recusada');
       expect(drafts[0].message,
           'Bruno Prado recusou a troca de guarda para o dia 05/09/2026. Mensagem: Já tenho compromisso');
       expect(drafts[0].params['msg'], 'Já tenho compromisso');
@@ -322,7 +322,7 @@ void main() {
 
       expect(drafts[0].recipientProfileId, 1);
       expect(drafts[0].type, 'revert_sent');
-      expect(drafts[0].title, '⚠️ URGENTE: Reversão de troca solicitada');
+      expect(drafts[0].title, 'URGENTE: Reversão de troca solicitada');
       expect(drafts[0].message,
           'Você solicitou reverter a troca de guarda do dia 05/09/2026. Aguardando confirmação de Bruno Prado.');
       expect(drafts[0].params,
@@ -330,7 +330,7 @@ void main() {
 
       expect(drafts[1].recipientProfileId, 2);
       expect(drafts[1].type, 'revert_requested');
-      expect(drafts[1].title, '⚠️ URGENTE: Pedido de reversão de troca');
+      expect(drafts[1].title, 'URGENTE: Pedido de reversão de troca');
       expect(drafts[1].message,
           'Ana Prado quer reverter a troca de guarda do dia 05/09/2026. Você precisa confirmar. Mensagem: Plano mudou');
       expect(drafts[1].params, {
@@ -358,7 +358,7 @@ void main() {
       expect(drafts, hasLength(4));
 
       expect(drafts[0].type, 'revert_approved');
-      expect(drafts[0].title, 'Reversão confirmada ✅');
+      expect(drafts[0].title, 'Reversão confirmada');
       expect(drafts[0].message,
           'Bruno Prado confirmou a reversão da troca do dia 05/09/2026. O calendário voltou ao normal. Mensagem: Combinado');
       expect(drafts[0].params,
@@ -391,7 +391,7 @@ void main() {
       );
       expect(drafts, hasLength(1));
       expect(drafts[0].type, 'revert_rejected');
-      expect(drafts[0].title, 'Reversão recusada ❌');
+      expect(drafts[0].title, 'Reversão recusada');
       expect(drafts[0].message,
           'Bruno Prado recusou reverter a troca do dia 05/09/2026. Mensagem: Prefiro manter A troca permanece ativa.');
       expect(drafts[0].params['msg'], 'Prefiro manter');

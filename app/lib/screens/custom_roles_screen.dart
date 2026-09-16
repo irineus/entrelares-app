@@ -206,7 +206,7 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                             children: [
                               Text(l[K.rolesPremiumGate]),
                               if (widget.onSeePremium != null)
-                                TextButton(
+                                TextButton.icon(
                                   // F-41: same funnel family as the other
                                   // gates (T-37), told apart by `gate`.
                                   onPressed: () {
@@ -215,7 +215,9 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                                         props: {'gate': 'custom-roles'});
                                     widget.onSeePremium!();
                                   },
-                                  child: Text(l[K.famSeePremium]),
+                                  icon: const Icon(Icons.auto_awesome,
+                                      size: 18),
+                                  label: Text(l[K.famSeePremium]),
                                 ),
                             ],
                           ),

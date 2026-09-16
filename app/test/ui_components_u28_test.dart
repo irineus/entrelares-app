@@ -106,13 +106,13 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_host(AppTimelineEntry(
         tone: AppTokens.light.neutral,
-        marker: '✏️',
+        marker: Icons.edit_outlined,
         overline: 'Dia: 21/08/2026',
         title: const Text('Fernanda atualizou o agendamento'),
         detail: const Text('Horário da troca: 18:00'),
         timestamp: '19/08/2026 18:06',
       )));
-      expect(find.text('✏️'), findsOneWidget);
+      expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
       expect(find.text('Dia: 21/08/2026'), findsOneWidget);
       expect(find.text('Horário da troca: 18:00'), findsOneWidget);
       expect(find.text('19/08/2026 18:06'), findsOneWidget);
@@ -125,7 +125,7 @@ void main() {
           for (var i = 0; i < 3; i++)
             AppTimelineEntry(
               tone: AppTokens.light.neutral,
-              marker: '✏️',
+              marker: Icons.edit_outlined,
               title: Text('Entrada $i'),
               timestamp: '00:0$i',
               isLast: i == 2,
@@ -153,7 +153,7 @@ void main() {
           alignment: WrapAlignment.spaceBetween,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            const Text('📅 10/07/2026'),
+            const Text('10/07/2026'),
             Wrap(children: [
               AppBadge(text: 'ATRASADO', tone: AppTokens.light.danger),
               AppBadge(text: 'Reversão confirmada', tone: AppTokens.light.success),
@@ -165,7 +165,7 @@ void main() {
       ));
       expect(tester.takeException(), isNull);
       // The date survives as ONE string, not as a column of characters.
-      expect(find.text('📅 10/07/2026'), findsOneWidget);
+      expect(find.text('10/07/2026'), findsOneWidget);
     });
 
     testWidgets('the calendar skeleton honours the caller aspect ratio',

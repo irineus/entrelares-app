@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
+import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
 
 /// `/premium/retorno` — port of `PremiumReturn.razor`.
@@ -116,7 +117,8 @@ class _PremiumReturnScreenState extends State<PremiumReturnScreen> {
     final theme = Theme.of(context);
     if (_confirmed) {
       return [
-        Text('🎉', style: theme.textTheme.displaySmall),
+        Icon(Icons.check_circle_outline,
+            size: 48, color: context.tokens.success.solid),
         const SizedBox(height: 8),
         Text(l[K.payActiveTitle], style: theme.textTheme.titleLarge),
         const SizedBox(height: 8),
@@ -135,7 +137,7 @@ class _PremiumReturnScreenState extends State<PremiumReturnScreen> {
     }
     if (_timedOut) {
       return [
-        Text('⏳', style: theme.textTheme.displaySmall),
+        Icon(Icons.hourglass_top, size: 48, color: context.tokens.textMuted),
         const SizedBox(height: 8),
         Text(l[K.payAlmostTitle], style: theme.textTheme.titleLarge),
         const SizedBox(height: 8),

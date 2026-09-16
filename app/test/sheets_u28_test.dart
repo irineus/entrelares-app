@@ -79,7 +79,7 @@ void main() {
     testWidgets('the pinned notice never scrolls', (tester) async {
       await tester.pumpWidget(_host(AppSheetFrame(
         title: 'Dia bloqueado',
-        pinnedNotice: const Text('🔒 Dia passado'),
+        pinnedNotice: const Text('Dia passado'),
         primaryLabel: 'Salvar',
         onPrimary: () {},
         children: [
@@ -87,10 +87,10 @@ void main() {
             SizedBox(height: 40, child: Text('linha $i')),
         ],
       )));
-      final before = tester.getRect(find.text('🔒 Dia passado'));
+      final before = tester.getRect(find.text('Dia passado'));
       await tester.drag(find.text('linha 2'), const Offset(0, -400));
       await tester.pumpAndSettle();
-      expect(tester.getRect(find.text('🔒 Dia passado')), before);
+      expect(tester.getRect(find.text('Dia passado')), before);
     });
 
     testWidgets('busy blocks both buttons, not just the primary',

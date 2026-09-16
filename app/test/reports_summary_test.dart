@@ -184,9 +184,10 @@ void main() {
       await pumpSummary(tester, ds);
 
       expect(find.text(l[KApp.sessionExpired]), findsOne);
-      expect(find.text(l[K.repErrorTitle]), findsNothing);
-      expect(find.textContaining(l[K.repErrorTitle], skipOffstage: false),
-          findsOne);
+      // U-31: the title is words alone now — the danger icon stands beside
+      // it instead of riding in front of it inside the same string.
+      expect(find.text(l[K.repErrorTitle]), findsOne);
+      expect(find.byIcon(Icons.error_outline), findsOne);
     });
 
     testWidgets('any other failure propagates the server text', (tester) async {

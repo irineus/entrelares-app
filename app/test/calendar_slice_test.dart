@@ -1205,7 +1205,8 @@ void main() {
     await tester.pumpAndSettle();
     // The amber readonly banner (web: .readonly-banner / K.editorPastReadonly).
     expect(
-        find.text('🔒 Dia passado — apenas visualização'), findsOneWidget);
+        find.text('Dia passado — apenas visualização'), findsOneWidget);
+    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
     expect(find.text('Salvar'), findsNothing);
   });
 

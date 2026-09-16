@@ -97,7 +97,7 @@ void main() {
         reason: 'and it never overlaps the greeting');
   });
 
-  testWidgets('swapped day shows both badges — 🔄 and the ⏰ time',
+  testWidgets('swapped day shows both badges — swapped and the time',
       (tester) async {
     final glance = todayGlance(
       userProfileId: 1,
@@ -108,11 +108,13 @@ void main() {
     );
     await tester.pumpWidget(wrap(card(glance: glance)));
 
-    expect(find.text('🔄 Trocado'), findsOneWidget);
-    expect(find.text('⏰ 18:30'), findsOneWidget);
+    expect(find.text('Trocado'), findsOneWidget);
+    expect(find.text('18:30'), findsOneWidget);
+    expect(find.byIcon(Icons.swap_horiz), findsOneWidget);
+    expect(find.byIcon(Icons.schedule), findsOneWidget);
   });
 
-  testWidgets('no schedule: the 📭 hint, and no handoff line', (tester) async {
+  testWidgets('no schedule: the empty hint, and no handoff line', (tester) async {
     await tester.pumpWidget(wrap(card()));
 
     expect(find.text('Dia sem responsável'), findsOneWidget);

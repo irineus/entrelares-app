@@ -338,7 +338,9 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
 
   List<Widget> _scheduleTimeline(Localization l) {
     if (_activity.isEmpty) {
-      return [_emptyState('🗂️', l[K.auditEmptyTitle], l[K.auditEmptyBody])];
+      return [
+        _emptyState(Icons.history, l[K.auditEmptyTitle], l[K.auditEmptyBody])
+      ];
     }
     // F-51: one range operation is ONE entry, unfolded on demand. The rows
     // themselves are untouched — the record is the record; only the reading
@@ -368,7 +370,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
     final expanded = _expandedBatches.contains(batch.batchId);
     return _item(
       badge: batch.isReplace ? AuditBadge.updated : AuditBadge.deleted,
-      icon: batch.isReplace ? '🔁' : '🗑️',
+      icon: batch.isReplace ? Icons.autorenew : Icons.delete_outline,
       children: [
         Text(
             l.format(K.auditBatchRange,
@@ -409,9 +411,9 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
     return _item(
       badge: badge,
       icon: switch (badge) {
-        AuditBadge.created => '＋',
-        AuditBadge.deleted => '✕',
-        AuditBadge.updated => '✏️',
+        AuditBadge.created => Icons.add,
+        AuditBadge.deleted => Icons.close,
+        AuditBadge.updated => Icons.edit_outlined,
       },
       children: [
         Text(l.format(K.auditDayLabel, [l.formatDate(view.affectedDate)]),
@@ -443,8 +445,10 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (final line in lines)
-              Text('👤 $line',
-                  style: Theme.of(context)
+              _markedLine(
+                  Icons.person_outline,
+                  line,
+                  Theme.of(context)
                       .textTheme
                       .bodySmall
                       ?.copyWith(fontWeight: FontWeight.bold)),
@@ -465,8 +469,8 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('🔁 ${resolutionOriginText(origin, _views, l)}',
-                style: Theme.of(context).textTheme.bodySmall),
+            _markedLine(Icons.swap_horiz, resolutionOriginText(origin, _views, l),
+                Theme.of(context).textTheme.bodySmall),
             if ((origin.requestMessage ?? '').isNotEmpty)
               _originDetail(l[K.auditRequesterMessage], origin.requestMessage!),
             if ((origin.approvalNote ?? '').isNotEmpty)
@@ -493,7 +497,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   List<Widget> _accountTimeline(Localization l) {
     if (_account.isEmpty) {
       return [
-        _emptyState('🗂️', l[K.auditEmptyAccountTitle],
+        _emptyState(Icons.history, l[K.auditEmptyAccountTitle],
             l[K.auditEmptyAccountBody])
       ];
     }
@@ -526,7 +530,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   }
 
   Widget _accountItem(AccountLog log, Localization l) {
-    final (badge, icon) = accountActionBadge(log.action);
+    final (badge, marker) = accountActionBadge(log.action);
     final actor = _nameOf(log.actorProfileId, l[K.auditSystemActor]);
     final target = log.targetProfileId != null &&
             log.targetProfileId != log.actorProfileId
@@ -537,7 +541,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
 
     return _item(
       badge: badge,
-      icon: icon,
+      icon: _accountMarkerIcon(marker),
       children: [
         Text.rich(
           TextSpan(children: [
@@ -558,7 +562,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
 
   Widget _trialEndedItem(DateTime endedAtUtc, Localization l) => _item(
         badge: AuditBadge.updated,
-        icon: '⏳',
+        icon: Icons.hourglass_bottom,
         children: [
           Text.rich(
             TextSpan(children: [
@@ -577,7 +581,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
 
   Widget _item({
     required AuditBadge badge,
-    required String icon,
+    required IconData icon,
     required List<Widget> children,
     String timestamp = '',
     bool isLast = false,
@@ -651,12 +655,38 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
         ),
       );
 
-  Widget _emptyState(String icon, String title, String body) =>
+  /// A line of an inset block with its mark in front — the mark is a vector
+  /// icon since U-31, so it cannot ride inside the string any more.
+  Widget _markedLine(IconData icon, String text, TextStyle? style) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(icon, size: 14, color: style?.color),
+          ),
+          const SizedBox(width: Spacing.xs),
+          Expanded(child: Text(text, style: style)),
+        ],
+      );
+
+  /// U-31: core names what the account row MEANS; the glyph is decided here.
+  static IconData _accountMarkerIcon(AuditMarker marker) => switch (marker) {
+        AuditMarker.added => Icons.add,
+        AuditMarker.removed => Icons.close,
+        AuditMarker.admin => Icons.shield_outlined,
+        AuditMarker.credentials => Icons.key_outlined,
+        AuditMarker.export => Icons.download_outlined,
+        AuditMarker.gift => Icons.card_giftcard,
+        AuditMarker.billing => Icons.credit_card,
+        AuditMarker.edited => Icons.edit_outlined,
+      };
+
+  Widget _emptyState(IconData icon, String title, String body) =>
       AppEmptyState(icon: icon, title: title, body: body);
 
   Widget _banner(String title, String message) => AppBanner(
         tone: context.tokens.danger,
-        leading: '⚠️',
+        icon: Icons.error_outline,
         title: title,
         message: message,
       );

@@ -33,7 +33,7 @@ class NotFoundScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AppEmptyState(
-                  icon: '🧭',
+                  icon: Icons.explore_outlined,
                   title: l[K.notFoundTitle],
                   body: l[K.notFoundBody],
                 ),
@@ -41,8 +41,10 @@ class NotFoundScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: Spacing.lg),
-                FilledButton(
-                    onPressed: onBackToStart, child: Text(l[K.notFoundBack])),
+                FilledButton.icon(
+                    onPressed: onBackToStart,
+                    icon: const Icon(Icons.arrow_back),
+                    label: Text(l[K.notFoundBack])),
               ],
             ),
           ),
