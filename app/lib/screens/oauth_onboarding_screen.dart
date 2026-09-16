@@ -9,6 +9,7 @@ import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/role_picker.dart';
 import '../widgets/ui/ui.dart';
 
 /// `/onboarding` (F-57) — where a deferred (social-login) session becomes a
@@ -382,20 +383,11 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
                 style: Theme.of(context).textTheme.titleSmall),
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final role in RoleCatalog.all)
-                ChoiceChip(
-                  // U-31: words only — the closed alpha read the emoji
-                  // grid here as homemade.
-                  label: Text(role.labelFor(l.current)),
-                  selected: _role == role.canonicalName,
-                  onSelected: (_) =>
-                      setState(() => _role = role.canonicalName),
-                ),
-            ],
+          // U-44: the register form's own picker — the two doors into a new
+          // family ask "who are you" the same way.
+          RolePicker(
+            selected: _role,
+            onSelected: (role) => setState(() => _role = role),
           ),
         ],
         const SizedBox(height: 20),

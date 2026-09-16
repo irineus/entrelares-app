@@ -43,7 +43,8 @@ class RoleDefinition {
 }
 
 abstract final class RoleCatalog {
-  /// The 21 built-ins, in the order the sign-up chip grid renders them.
+  /// The 21 built-ins, in catalog order — the order the sign-up's "Outro…"
+  /// sheet lists the ones outside [signUpShortlist] (U-44).
   ///
   /// The English labels of the three gendered pairs carry "(m)"/"(f)" on
   /// purpose: the label is the ONLY thing that tells them apart. The built-ins
@@ -86,6 +87,31 @@ abstract final class RoleCatalog {
         ['guardian_f', 'tutora']),
     RoleDefinition('nanny', 'Babá', 'Nanny', ['nanny', 'babá', 'baba']),
   ];
+
+  /// U-44 — the roles the sign-up picker shows as chips, in this order (owner,
+  /// 16/09/2026). Everything else sits one tap further, behind "Outro…": 21
+  /// chips in a wrap were a wall, and these six answer almost every founder —
+  /// the step-parents included, because recomposed families are the people
+  /// shared custody is for.
+  static const List<String> signUpShortlist = [
+    'father',
+    'mother',
+    'grandfather',
+    'grandmother',
+    'stepfather',
+    'stepmother',
+  ];
+
+  /// The shortlist as definitions, in [signUpShortlist]'s order.
+  static List<RoleDefinition> get shortlist =>
+      [for (final name in signUpShortlist) find(name)!];
+
+  /// The built-ins NOT in the shortlist, in catalog order — what the
+  /// "Outro…" sheet lists.
+  static List<RoleDefinition> get others => [
+        for (final definition in all)
+          if (!signUpShortlist.contains(definition.canonicalName)) definition,
+      ];
 
   /// Resolves any stored spelling to its definition, or null when the value is
   /// not a built-in (every F-41 custom role lands here). Case- and

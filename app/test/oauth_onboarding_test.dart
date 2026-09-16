@@ -19,6 +19,7 @@ import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/theme/tokens.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
+import 'package:entrelares_app/widgets/role_picker.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource;
 
@@ -96,7 +97,7 @@ void main() {
     double dyOf(WidgetTester tester, Finder f) =>
         tester.getTopLeft(f).dy;
 
-    testWidgets('register: Google sits ABOVE the password fields',
+    testWidgets('register (founder): Google OPENS the account step (U-44)',
         (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 2000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -111,16 +112,52 @@ void main() {
       await tester.pumpAndSettle();
 
       final google = dyOf(tester, find.text(pt[KApp.authGoogle]));
+      final name = dyOf(
+          tester, find.widgetWithText(TextField, pt[K.registerFullName]));
+      final password = dyOf(
+          tester, find.widgetWithText(TextField, pt[K.commonPassword]));
+
+      // F-57 put it above the password; U-44 carried the same reasoning to
+      // its end — on a step that only asks for the account, the button is
+      // the first way to answer it.
+      expect(google, lessThan(name),
+          reason: 'the button comes before anything is typed');
+      expect(google, lessThan(password),
+          reason: 'a password offered first is a password already invented — '
+              'everything below the button is the secondary path');
+    });
+
+    testWidgets('register (invitee): Google still sits ABOVE the password',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 2000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final ds = FakeCustodyDataSource(members: const [], days: const [])
+        ..inviteInfo = const InviteInfo(
+          familyName: 'Souza',
+          inviterName: 'Ana Souza',
+          invitedEmail: 'bruno@example.com',
+          roleName: 'father',
+        );
+      await tester.pumpWidget(wrap(RegisterScreen(
+        dataSource: ds,
+        inviteToken: '11111111-2222-3333-4444-555555555555',
+        onSignIn: (_, _) async {},
+        onBackToLogin: () {},
+        googleEnabled: Future.value(true),
+        onSignInWithGoogle: ({String? inviteToken}) async {},
+      )));
+      await tester.pumpAndSettle();
+
+      final google = dyOf(tester, find.text(pt[KApp.authGoogle]));
       final email = dyOf(
           tester, find.widgetWithText(TextField, pt[K.commonEmail]));
       final password = dyOf(
           tester, find.widgetWithText(TextField, pt[K.commonPassword]));
 
       expect(google, greaterThan(email),
-          reason: 'the button follows the e-mail field');
-      expect(google, lessThan(password),
-          reason: 'a password offered first is a password already invented — '
-              'everything below the button is the secondary path');
+          reason: 'the invitee page is unchanged: the button follows the '
+              'address the invitation names');
+      expect(google, lessThan(password));
     });
 
     testWidgets('onboarding: account identity and the way out, under the name',
@@ -160,6 +197,18 @@ void main() {
   });
 
   group('OauthOnboardingScreen — founder', () {
+    testWidgets('asks the role with the register form\'s own picker (U-44)',
+        (tester) async {
+      final ds = FakeCustodyDataSource(members: const [], days: const []);
+      final prefs = await prefsWith({});
+      await pumpOnboarding(tester, ds, prefs);
+
+      expect(find.byType(RolePicker), findsOneWidget);
+      expect(find.byType(ChoiceChip),
+          findsNWidgets(RoleCatalog.signUpShortlist.length));
+      expect(find.byKey(RolePicker.otherKey), findsOneWidget);
+    });
+
     testWidgets('creates the family through the RPC, consent-gated',
         (tester) async {
       var completed = false;

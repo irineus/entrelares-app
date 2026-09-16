@@ -155,4 +155,30 @@ void main() {
       expect(RoleCatalog.translate(''), '');
     });
   });
+
+  group('sign-up shortlist (U-44)', () {
+    test("six built-ins, in the owner's order", () {
+      expect(RoleCatalog.shortlist.map((d) => d.label),
+          ['Pai', 'Mãe', 'Avô', 'Avó', 'Padrasto', 'Madrasta']);
+    });
+
+    test('shortlist and "Outro…" together are the whole catalog, once each',
+        () {
+      final names = [
+        ...RoleCatalog.shortlist.map((d) => d.canonicalName),
+        ...RoleCatalog.others.map((d) => d.canonicalName),
+      ];
+      expect(names, hasLength(RoleCatalog.all.length));
+      expect(names.toSet(),
+          RoleCatalog.all.map((d) => d.canonicalName).toSet());
+    });
+
+    test('the others keep catalog order', () {
+      final order = RoleCatalog.all.map((d) => d.canonicalName).toList();
+      final indexes = [
+        for (final d in RoleCatalog.others) order.indexOf(d.canonicalName)
+      ];
+      expect(indexes, [...indexes]..sort());
+    });
+  });
 }

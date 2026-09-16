@@ -50,6 +50,40 @@ abstract final class RegisterRules {
     return null;
   }
 
+  /// U-44 — the founder's first step (the account) alone: the same checks,
+  /// in the same order, that [validationErrorKey] runs on these four fields.
+  /// No new rule — with a valid second step the two answer identically, and a
+  /// core test holds them to it.
+  static String? accountStepErrorKey({
+    required String fullName,
+    required String email,
+    required String password,
+    required String confirmPassword,
+  }) {
+    if (fullName.trim().isEmpty) return K.registerErrorNameRequired;
+    if (email.trim().isEmpty) return K.registerErrorEmailRequired;
+    if (password.length < minPasswordLength) {
+      return K.registerErrorPasswordShort;
+    }
+    if (password != confirmPassword) return K.registerErrorPasswordMismatch;
+    return null;
+  }
+
+  /// U-44 — every error the founder can only fix on the FIRST step: the local
+  /// checks of [accountStepErrorKey] plus the GoTrue refusals about the
+  /// address or the password ([signUpErrorKey]). Those arrive after the
+  /// submit on the second step, and the screen takes the person back to the
+  /// field instead of showing a sentence about a field they cannot see.
+  static const Set<String> accountStepErrorKeys = {
+    K.registerErrorNameRequired,
+    K.registerErrorEmailRequired,
+    K.registerErrorPasswordShort,
+    K.registerErrorPasswordMismatch,
+    K.authErrAlreadyRegistered,
+    K.authErrPasswordWeak,
+    K.authErrEmailFormat,
+  };
+
   /// The founder's family name when they leave the field to the trigger's
   /// default. `handle_new_user` builds `'Família ' || meta_name` from the
   /// person's own name — mirrored here only to render the hint, never sent.

@@ -95,6 +95,88 @@ void main() {
     });
   });
 
+  group("sign-up — the founder's two steps (U-44)", () {
+    // The partition adds no rule: with a valid family step, the account step
+    // and the whole form must pick the SAME first error, for every mix of
+    // broken account fields.
+    const names = ['Ana Souza', '  '];
+    const emails = ['ana@example.com', ''];
+    const passwords = ['segredo123', 'curta'];
+    const confirms = ['segredo123', 'outra-senha'];
+
+    test('the account step answers exactly what the whole form answers', () {
+      for (final name in names) {
+        for (final email in emails) {
+          for (final password in passwords) {
+            for (final confirm in confirms) {
+              final step = RegisterRules.accountStepErrorKey(
+                fullName: name,
+                email: email,
+                password: password,
+                confirmPassword: confirm,
+              );
+              expect(
+                step,
+                founder(
+                    fullName: name,
+                    email: email,
+                    password: password,
+                    confirmPassword: confirm),
+                reason: '($name, $email, $password, $confirm)',
+              );
+            }
+          }
+        }
+      }
+    });
+
+    test('every account-step refusal is filed under the account step', () {
+      for (final key in [
+        founder(fullName: ''),
+        founder(email: ''),
+        founder(password: 'curta'),
+        founder(confirmPassword: 'outra-senha'),
+      ]) {
+        expect(RegisterRules.accountStepErrorKeys, contains(key));
+      }
+    });
+
+    test("the family step's refusals never send the person back", () {
+      for (final key in [
+        founder(familyName: ' '),
+        founder(role: null),
+        founder(acceptedTerms: false),
+      ]) {
+        expect(key, isNotNull);
+        expect(RegisterRules.accountStepErrorKeys, isNot(contains(key)));
+      }
+    });
+
+    test("GoTrue's refusals about the address or the password go back too",
+        () {
+      expect(
+          RegisterRules.accountStepErrorKeys,
+          containsAll([
+            RegisterRules.signUpErrorKey('User already registered'),
+            RegisterRules.signUpErrorKey(
+                'Password should be at least 8 characters'),
+            RegisterRules.signUpErrorKey(
+                'Unable to validate email address: invalid format'),
+          ]));
+    });
+
+    test('a rate limit, a trigger refusal or no network stays on step 2', () {
+      for (final key in [
+        K.authErrRateLimited,
+        K.authErrDatabaseSignUp,
+        K.authErrConnection,
+        K.authErrSignUpGeneric,
+      ]) {
+        expect(RegisterRules.accountStepErrorKeys, isNot(contains(key)));
+      }
+    });
+  });
+
   group('sign-up — invited branch', () {
     test('a complete form passes without family or role', () {
       expect(invited(), isNull);

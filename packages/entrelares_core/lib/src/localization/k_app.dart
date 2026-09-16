@@ -130,6 +130,16 @@ abstract final class KApp {
   static const String onbSwitchAccount = 'app.onb.switchAccount';
   static const String onbSignedInAs = 'app.onb.signedInAs';
   static const String onbErrGeneric = 'app.onb.errGeneric';
+
+  // ── U-44 — the founder's sign-up in two steps, and the role picker both
+  //    sign-up screens share: a shortlist of chips plus "Outro…" ──
+  static const String signupStep = 'app.signup.step';
+  static const String signupStepAccount = 'app.signup.stepAccount';
+  static const String signupStepFamily = 'app.signup.stepFamily';
+  static const String signupContinue = 'app.signup.continue';
+  static const String signupBack = 'app.signup.back';
+  static const String roleOther = 'app.role.other';
+  static const String roleOtherTitle = 'app.role.otherTitle';
   static const String profLoginMethod = 'app.prof.loginMethod';
   static const String profLoginMethodGoogle = 'app.prof.loginMethodGoogle';
   static const String profLoginMethodNote = 'app.prof.loginMethodNote';
@@ -298,6 +308,13 @@ abstract final class KApp {
     onbSwitchAccount,
     onbSignedInAs,
     onbErrGeneric,
+    signupStep,
+    signupStepAccount,
+    signupStepFamily,
+    signupContinue,
+    signupBack,
+    roleOther,
+    roleOtherTitle,
     profLoginMethod,
     profLoginMethodGoogle,
     profLoginMethodNote,
@@ -454,6 +471,13 @@ abstract final class StringsAppPtBr {
     KApp.onbSwitchAccount: 'Entrar com outra conta',
     KApp.onbSignedInAs: 'Conectado como {0}',
     KApp.onbErrGeneric: 'Não foi possível concluir o cadastro. Tente novamente.',
+    KApp.signupStep: 'Passo {0} de {1} · {2}',
+    KApp.signupStepAccount: 'Sua conta',
+    KApp.signupStepFamily: 'Sua família',
+    KApp.signupContinue: 'Continuar',
+    KApp.signupBack: 'Voltar',
+    KApp.roleOther: 'Outro…',
+    KApp.roleOtherTitle: 'Qual é o seu papel na família?',
     KApp.profLoginMethod: 'Como você entra',
     KApp.profLoginMethodGoogle: 'Conta Google',
     KApp.profLoginMethodNote:
@@ -651,6 +675,13 @@ abstract final class StringsAppEn {
     KApp.onbSwitchAccount: 'Sign in with another account',
     KApp.onbSignedInAs: 'Signed in as {0}',
     KApp.onbErrGeneric: 'Could not finish the sign-up. Try again.',
+    KApp.signupStep: 'Step {0} of {1} · {2}',
+    KApp.signupStepAccount: 'Your account',
+    KApp.signupStepFamily: 'Your family',
+    KApp.signupContinue: 'Continue',
+    KApp.signupBack: 'Back',
+    KApp.roleOther: 'Other…',
+    KApp.roleOtherTitle: 'What is your role in the family?',
     KApp.profLoginMethod: 'How you sign in',
     KApp.profLoginMethodGoogle: 'Google account',
     KApp.profLoginMethodNote:
