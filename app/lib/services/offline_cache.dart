@@ -80,23 +80,29 @@ class OfflineCache {
   OfflineCache(this._store, {required this.userId, required this.enabled});
 
   /// Keeps [snapshot] for the signed-in account, replacing the previous copy.
+  ///
+  /// Never throws: the calendar fires it unawaited, where a failure is an
+  /// uncaught error (T-77), and a copy that could not be written costs only
+  /// the next offline boot — the online calendar already has the data.
   Future<void> save(OfflineCalendarSnapshot snapshot) async {
     if (!enabled) return;
     final uid = userId();
     if (uid == null) return;
-    await _store.write(
-        uid,
-        jsonEncode({
-          'v': formatVersion,
-          'savedAt': snapshot.savedAt.toUtc().toIso8601String(),
-          'month': CareSchedule.isoDate(snapshot.month),
-          'members': [for (final m in snapshot.members) m.toRowJson()],
-          'roles': [for (final r in snapshot.roles) r.toRowJson()],
-          'days': [for (final d in snapshot.days) d.toRowJson()],
-          'frozen': [for (final r in snapshot.frozen) r.toRowJson()],
-          'ownProfile': snapshot.ownProfile?.toRowJson(),
-          'upcoming': [for (final d in snapshot.upcoming) d.toRowJson()],
-        }));
+    try {
+      await _store.write(
+          uid,
+          jsonEncode({
+            'v': formatVersion,
+            'savedAt': snapshot.savedAt.toUtc().toIso8601String(),
+            'month': CareSchedule.isoDate(snapshot.month),
+            'members': [for (final m in snapshot.members) m.toRowJson()],
+            'roles': [for (final r in snapshot.roles) r.toRowJson()],
+            'days': [for (final d in snapshot.days) d.toRowJson()],
+            'frozen': [for (final r in snapshot.frozen) r.toRowJson()],
+            'ownProfile': snapshot.ownProfile?.toRowJson(),
+            'upcoming': [for (final d in snapshot.upcoming) d.toRowJson()],
+          }));
+    } catch (_) {/* see above: no copy this time */}
   }
 
   /// The signed-in account's copy, or null — disabled, nobody signed in,

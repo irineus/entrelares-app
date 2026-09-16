@@ -306,10 +306,62 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      # The AVD's userdata partition is created under ~/.android, on the root
+      # disk, and asks for ~7.4 GB. The same image version (ubuntu-24.04
+      # 20260907.300.1) with the same caches left 5.8 GB free on 15 and
+      # 16/09/2026 and plenty on 14/09: the emulator died in 0.1 s with
+      # "FATAL | Not enough space to create userdata partition" and the action
+      # then polled `adb` for the whole 600 s boot timeout, naming nothing. So
+      # the job frees toolchains it never uses (the Android SDK, Java and the
+      # Flutter cache stay) and refuses to start an emulator without the room,
+      # with the reason in the log instead of a wall of "device not found".
+      - name: Free runner disk for the emulator
+        run: |
+          df -h / | sed 's/^/before: /'
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift \
+            /usr/local/share/powershell /usr/local/lib/node_modules
+          df -h / | sed 's/^/after:  /'
+          avail_mb=$(df --output=avail -BM "$HOME" | tail -1 | tr -dc '0-9')
+          if [ "$avail_mb" -lt 10000 ]; then
+            echo "::error::Only ${avail_mb} MB free on the root disk; the AVD needs ~7.4 GB at boot plus the Gradle build."
+            exit 1
+          fi
+          echo "cores: $(nproc)"; free -h
+      # With the disk freed (16/09/2026), the emulator booted and then the VM
+      # itself went down in the middle of `assembleDevDebug`: "detected a
+      # hanging thread 'QEMU2 CPU0 thread'" for 15-19 s at a time, then "The
+      # runner has received a shutdown signal". Gradle with the repo's
+      # -Xmx8G/-XX:MaxMetaspaceSize=4G, its Kotlin daemon and a 2.5 GB guest
+      # were all competing on a runner that also warned "4 CPU cores
+      # (currently using 2)"; the green run of 14/09 landed on a host where
+      # that check said Ok. So the Android build happens BEFORE any emulator
+      # exists, with a heap cap valid only for this job (GRADLE_USER_HOME's
+      # gradle.properties outranks the project's), and its daemons are
+      # stopped so the emulator steps only pay an up-to-date assemble.
+      - name: Build the dev APK before any emulator boots
+        working-directory: app
+        run: |
+          mkdir -p ~/.gradle
+          printf '%s\n' \
+            'org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g' \
+            'kotlin.daemon.jvmargs=-Xmx1g' >> ~/.gradle/gradle.properties
+          flutter build apk --debug --flavor dev
+          pkill -f GradleDaemon || true
+          pkill -f KotlinCompileDaemon || true
+          free -h
       # The service_role key never enters the repo: it arrives as a secret and
-      # reaches the fixture through --dart-define only.
+      # reaches the fixture through --dart-define only (e2e_emulator_run.sh
+      # reads it from the step env). The script bounds each suite, streams its
+      # progress and, on a red, takes the screenshot and the logcat before the
+      # action kills the emulator (T-77) — the per-step ceiling is there so a
+      # hang outside the script still fails THIS step, not the whole job.
       - name: E2E — two-user swap flow on an emulator
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 22
+        env:
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
+          E2E_PACK: ${{ inputs.e2e-pack || 'p0' }}
         with:
           api-level: 34
           target: google_apis
@@ -317,17 +369,17 @@ jobs:
           profile: pixel_6
           disable-animations: true
           working-directory: app
-          script: >-
-            flutter test integration_test/swap_workflow_test.dart
-            --flavor dev
-            --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
-            --dart-define=E2E_PACK=${{ inputs.e2e-pack || 'p0' }}
+          script: bash ../.github/e2e_emulator_run.sh integration_test/swap_workflow_test.dart
 
       # Lote 4 — the account/family pack. A separate emulator step rather than
       # one file with both, so a failure names which surface broke and the two
       # families never share a run id.
       - name: E2E — account and family flows on an emulator
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 22
+        env:
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
+          E2E_PACK: ${{ inputs.e2e-pack || 'p0' }}
         with:
           api-level: 34
           target: google_apis
@@ -335,11 +387,18 @@ jobs:
           profile: pixel_6
           disable-animations: true
           working-directory: app
-          script: >-
-            flutter test integration_test/account_flows_test.dart
-            --flavor dev
-            --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
-            --dart-define=E2E_PACK=${{ inputs.e2e-pack || 'p0' }}
+          script: bash ../.github/e2e_emulator_run.sh integration_test/account_flows_test.dart
+
+      # Only the screenshots: the repo is public, and the logcat already went
+      # to the masked job log.
+      - name: Upload the emulator screenshot of a red suite
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-emulator-diag
+          path: app/build/e2e-diag/*.png
+          if-no-files-found: ignore
+          retention-days: 7
 
   apk:
     if: github.event_name == 'workflow_dispatch' && inputs.build-apk

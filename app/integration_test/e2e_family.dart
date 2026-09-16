@@ -18,6 +18,7 @@
 // file only reads it from the environment via --dart-define.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -97,9 +98,37 @@ class E2eFamily {
     }
   }
 
-  static Future<Map<String, dynamic>> _post(String path, Object body) async {
-    final res = await http.post(Uri.parse('$_url$path'),
-        headers: _headers, body: jsonEncode(body));
+  /// T-77 (16/09/2026): no fixture request may wait forever. The Android lane
+  /// sat 14 minutes in `setUpAll` with nothing in logcat — a connection to the
+  /// dev project that never answered (the db-gate got a 522 from it in the
+  /// same half hour), and `package:http` has no timeout of its own, so the
+  /// only bound was the job's. Each request now fails in [_requestTimeout]
+  /// naming WHICH call hung; the idempotent ones get one more attempt first,
+  /// because a stalled connection is the common case and a second one usually
+  /// answers. A POST that creates something is never repeated.
+  static const _requestTimeout = Duration(seconds: 45);
+
+  static Future<http.Response> _bounded(
+      String what, Future<http.Response> Function() send,
+      {bool idempotent = false}) async {
+    for (var attempt = 1;; attempt++) {
+      try {
+        return await send().timeout(_requestTimeout);
+      } on TimeoutException {
+        if (idempotent && attempt < 2) continue;
+        throw TimeoutException('$what: the dev project did not answer '
+            '(attempt $attempt)', _requestTimeout);
+      }
+    }
+  }
+
+  static Future<Map<String, dynamic>> _post(String path, Object body,
+      {bool idempotent = false}) async {
+    final res = await _bounded(
+        'POST $path',
+        () => http.post(Uri.parse('$_url$path'),
+            headers: _headers, body: jsonEncode(body)),
+        idempotent: idempotent);
     if (res.statusCode >= 300) {
       throw StateError('POST $path → ${res.statusCode}: ${res.body}');
     }
@@ -108,7 +137,9 @@ class E2eFamily {
   }
 
   static Future<List<dynamic>> _get(String path) async {
-    final res = await http.get(Uri.parse('$_url$path'), headers: _headers);
+    final res = await _bounded(
+        'GET $path', () => http.get(Uri.parse('$_url$path'), headers: _headers),
+        idempotent: true);
     if (res.statusCode >= 300) {
       throw StateError('GET $path → ${res.statusCode}: ${res.body}');
     }
@@ -132,8 +163,11 @@ class E2eFamily {
 
   static Future<void> _deleteUser(String userId) async {
     try {
-      await http.delete(Uri.parse('$_url/auth/v1/admin/users/$userId'),
-          headers: _headers);
+      await _bounded(
+          'DELETE admin user',
+          () => http.delete(Uri.parse('$_url/auth/v1/admin/users/$userId'),
+              headers: _headers),
+          idempotent: true);
     } catch (_) {/* best effort */}
   }
 
@@ -142,14 +176,17 @@ class E2eFamily {
   /// 429 instead of flaking the run.
   static Future<String> _accessToken(String email, String password) async {
     for (var attempt = 0;; attempt++) {
-      final res = await http.post(
-        Uri.parse('$_url/auth/v1/token?grant_type=password'),
-        headers: {
-          'apikey': Env.dev.supabaseKey,
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'email': email, 'password': password}),
-      );
+      final res = await _bounded(
+          'POST /auth/v1/token',
+          () => http.post(
+                Uri.parse('$_url/auth/v1/token?grant_type=password'),
+                headers: {
+                  'apikey': Env.dev.supabaseKey,
+                  'Content-Type': 'application/json',
+                },
+                body: jsonEncode({'email': email, 'password': password}),
+              ),
+          idempotent: true);
       if (res.statusCode < 300) {
         return jsonDecode(res.body)['access_token'] as String;
       }
@@ -164,15 +201,17 @@ class E2eFamily {
   /// `auth.uid()`, so the service role cannot stand in for the inviter.
   static Future<dynamic> _rpcAs(
       String accessToken, String name, Map<String, dynamic> args) async {
-    final res = await http.post(
-      Uri.parse('$_url/rest/v1/rpc/$name'),
-      headers: {
-        'apikey': Env.dev.supabaseKey,
-        'Authorization': 'Bearer $accessToken',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(args),
-    );
+    final res = await _bounded(
+        'RPC $name',
+        () => http.post(
+              Uri.parse('$_url/rest/v1/rpc/$name'),
+              headers: {
+                'apikey': Env.dev.supabaseKey,
+                'Authorization': 'Bearer $accessToken',
+                'Content-Type': 'application/json',
+              },
+              body: jsonEncode(args),
+            ));
     if (res.statusCode >= 300) {
       throw StateError('RPC $name → ${res.statusCode}: ${res.body}');
     }
@@ -275,15 +314,18 @@ class E2eFamily {
   Future<void> _markOnboarded() async {
     final seenAt = DateTime.now().toUtc().toIso8601String();
     for (final id in [founder.profileId, member.profileId]) {
-      await http.patch(
-        Uri.parse('$_url/rest/v1/profiles?id=eq.$id'),
-        headers: _headers,
-        body: jsonEncode({
-          'onboarding_tour_seen_at': seenAt,
-          'onboarding_swap_explained_at': seenAt,
-          'onboarding_dismissed_at': seenAt,
-        }),
-      );
+      await _bounded(
+          'PATCH profiles (onboarded)',
+          () => http.patch(
+                Uri.parse('$_url/rest/v1/profiles?id=eq.$id'),
+                headers: _headers,
+                body: jsonEncode({
+                  'onboarding_tour_seen_at': seenAt,
+                  'onboarding_swap_explained_at': seenAt,
+                  'onboarding_dismissed_at': seenAt,
+                }),
+              ),
+          idempotent: true);
     }
   }
 
@@ -362,17 +404,21 @@ class E2eFamily {
   /// cap itself is the DB's business and has its own server-side tests; this
   /// lane is here to exercise the screen behind it.
   Future<void> setPlan(String plan) async {
-    await http.patch(
-      Uri.parse('$_url/rest/v1/families?id=eq.$familyId'),
-      headers: {..._headers, 'Content-Type': 'application/json'},
-      body: jsonEncode({'plan': plan}),
-    );
+    await _bounded(
+        'PATCH families (plan)',
+        () => http.patch(
+              Uri.parse('$_url/rest/v1/families?id=eq.$familyId'),
+              headers: {..._headers, 'Content-Type': 'application/json'},
+              body: jsonEncode({'plan': plan}),
+            ),
+        idempotent: true);
   }
 
   Future<void> purge() async {
     try {
       final result =
-          await _post('/rest/v1/rpc/purge_e2e_family', {'p_family_id': familyId});
+          await _post('/rest/v1/rpc/purge_e2e_family', {'p_family_id': familyId},
+              idempotent: true);
       final data = result['data'];
       if (data is List) {
         for (final id in data) {
@@ -399,7 +445,8 @@ class E2eFamily {
       for (final row in rows) {
         try {
           await _post('/rest/v1/rpc/purge_e2e_family',
-              {'p_family_id': (row as Map)['id']});
+              {'p_family_id': (row as Map)['id']},
+              idempotent: true);
         } catch (_) {/* leave for manual inspection */}
       }
     } catch (_) {/* the sweep must never fail a run */}

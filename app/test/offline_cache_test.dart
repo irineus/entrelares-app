@@ -217,9 +217,48 @@ void main() {
 
     test('an account id that is not a UUID never becomes a path', () async {
       signedIn = '../../escape';
-      // save throws inside the store; read swallows it into "no copy".
-      await expectLater(cache().save(snapshot()), throwsArgumentError);
+      // The store refuses it; save and read both turn that into "no copy".
+      await cache().save(snapshot());
       expect(await cache().read(), isNull);
+      expect(Directory('${root.path}/escape').existsSync(), isFalse);
+    });
+
+    // T-77 (16/09/2026): the Android E2E lane died with `PathNotFoundException:
+    // Cannot rename file to …/<account>.json, path = …/<account>.json.partial`.
+    // The calendar fires `save` unawaited on every load of the current month,
+    // and two loads close together (the reload after approving a swap) put two
+    // writes on the SAME `.partial`: the first rename took it, the second found
+    // nothing. Unawaited, that is an uncaught error in the app's zone.
+    test('saves fired together never race — no throw, the last one wins',
+        () async {
+      final c = cache();
+      await Future.wait([
+        for (var i = 0; i < 6; i++) c.save(snapshot(notes: 'n$i')),
+      ]);
+      expect((await c.read())!.days.single.notes, 'n5');
+      expect(File('${copies().path}/u-ana.json.partial').existsSync(), isFalse);
+    });
+
+    test('a clear that arrives during a save leaves no copy behind', () async {
+      // Sign-out wipes the copies; a save already in flight must not write the
+      // family's plan back afterwards.
+      final c = cache();
+      final saving = c.save(snapshot());
+      await c.clear();
+      await saving;
+      expect(copies().existsSync(), isFalse);
+    });
+
+    test('save never throws — it is fired unawaited from the calendar',
+        () async {
+      // A root that cannot hold a directory: every file operation fails.
+      final blocker = File('${root.path}/not-a-dir')..writeAsStringSync('');
+      final broken = OfflineCache(
+          FileOfflineCacheStore(root: () async => Directory(blocker.path)),
+          userId: () => signedIn,
+          enabled: true);
+      await broken.save(snapshot());
+      expect(await broken.read(), isNull);
     });
   });
 
