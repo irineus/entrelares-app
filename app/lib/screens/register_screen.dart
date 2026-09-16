@@ -9,6 +9,7 @@ import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/google_sign_in_button.dart';
+import '../widgets/role_picker.dart';
 
 /// `/register` — port of `Register.razor`.
 ///
@@ -18,7 +19,8 @@ import '../widgets/google_sign_in_button.dart';
 /// * **Founder** — names the family, picks a role, and ends on "confirm your
 ///   e-mail": GoTrue will not let them in until the link is clicked. The family
 ///   and the profile are created by the `handle_new_user` trigger in a single
-///   transaction, so there is no half-created account to clean up.
+///   transaction, so there is no half-created account to clean up. Since U-44
+///   in two steps — the account first, then the family and the role.
 /// * **Invitee** (U-17) — auto-confirmed by the `register-invitee` Edge
 ///   Function, so the screen signs them in and lands them on the calendar. The
 ///   e-mail is read-only (the invitation names it, and the trigger refuses a
@@ -97,7 +99,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _migrationWarning = false;
   String? _migrationFamilyName;
 
+  /// U-44 — the founder answers in two steps: 0 is the account (who you are),
+  /// 1 is the family (what you are creating). The invitee has no second step
+  /// — the invitation carries family and role — and never reads this.
+  int _step = 0;
+  static const int _stepCount = 2;
+
+  /// The step change is counted once per visit: going back and forth is the
+  /// same person reaching the family step, not two.
+  bool _familyStepTracked = false;
+
   bool get _isInvited => _invite != null;
+
+  bool get _onFamilyStep => !_isInvited && _step == 1;
 
   @override
   void initState() {
@@ -158,6 +172,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         _errorKey = errorKey;
         _errorText = null;
+        _returnToAccountStepFor(errorKey);
       });
       return;
     }
@@ -203,7 +218,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         _busy = false;
         _errorKey = e.errorKey;
+        _returnToAccountStepFor(e.errorKey);
       });
+    }
+  }
+
+  /// U-44 — "Continuar": the account step's own checks, and only those.
+  void _continueToFamily() {
+    final errorKey = RegisterRules.accountStepErrorKey(
+      fullName: _fullName.text,
+      email: _email.text,
+      password: _password.text,
+      confirmPassword: _confirmPassword.text,
+    );
+    setState(() {
+      _errorKey = errorKey;
+      _errorText = null;
+      if (errorKey == null) _step = 1;
+    });
+    if (errorKey == null && !_familyStepTracked) {
+      _familyStepTracked = true;
+      // T-37: where the founder funnel loses people between the two steps —
+      // the step's NAME, nothing typed on it.
+      widget.analytics
+          ?.trackEvent('signup_step', props: {'step': 'family'});
+    }
+  }
+
+  void _backToAccount() => setState(() {
+        _step = 0;
+        _errorKey = null;
+        _errorText = null;
+      });
+
+  /// U-44 — an error about the address or the password (a local check, or
+  /// GoTrue refusing it after the submit) is fixed on the first step, so the
+  /// person is taken to it with the sentence, instead of being shown a
+  /// sentence about a field that is not on screen. Called inside `setState`.
+  void _returnToAccountStepFor(String errorKey) {
+    if (!_isInvited && RegisterRules.accountStepErrorKeys.contains(errorKey)) {
+      _step = 0;
     }
   }
 
@@ -253,14 +307,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: _body(l),
+    final showsForm = !_loadingInvite &&
+        !_inviteInvalid &&
+        !_signUpDone &&
+        !_migrationWarning;
+    // U-44: the system back on the family step returns to the account step
+    // instead of leaving the form and everything typed on it. The step is
+    // not a URL on purpose — the browser's own back leaves /register, as it
+    // always did.
+    return PopScope(
+      canPop: !(showsForm && _onFamilyStep),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_busy) _backToAccount();
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: _body(l),
+              ),
             ),
           ),
         ),
@@ -368,99 +436,184 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _form(Localization l) {
     final invite = _invite;
+    if (invite != null) return _inviteForm(l, invite);
+    return _step == 0 ? _accountStep(l) : _familyStep(l);
+  }
+
+  /// The invitee's single page (U-44 left it as it was): no family to name,
+  /// no role to pick, so there is nothing a second step would hold.
+  Widget _inviteForm(Localization l, InviteInfo invite) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (invite != null) ...[
-          Text(l[K.registerInvitedTitle],
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(
-            // Family and inviter names are free text: rendered as TEXT, never
-            // as markup (U-13 rule inherited from the web).
-            l.format(K.registerInvitedBody, [
-              invite.inviterName,
-              invite.familyName,
-              RoleCatalog.translate(invite.roleName, l.current),
-            ]),
+        Text(l[K.registerInvitedTitle],
             textAlign: TextAlign.center,
-          ),
-        ] else ...[
-          Text(l[K.registerCreateTitle],
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 4),
-          Text(l[K.registerCreateSubtitle],
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall),
-        ],
+            style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 8),
+        Text(
+          // Family and inviter names are free text: rendered as TEXT, never
+          // as markup (U-13 rule inherited from the web).
+          l.format(K.registerInvitedBody, [
+            invite.inviterName,
+            invite.familyName,
+            RoleCatalog.translate(invite.roleName, l.current),
+          ]),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 24),
-        AppTextField(
-          label: l[K.registerFullName],
-          hint: l[K.registerFullNamePlaceholder],
-          controller: _fullName,
-          maxLength: RegisterRules.maxNameLength,
-          textCapitalization: TextCapitalization.words,
-          autofillHints: const [AutofillHints.name],
-        ),
+        _nameField(l),
         const SizedBox(height: 12),
-        AppTextField(
-          label: l[K.commonEmail],
-          hint: l[K.commonEmailPlaceholder],
-          controller: _email,
-          // The invitation names the address — the trigger refuses any other.
-          readOnly: invite != null,
-          keyboardType: TextInputType.emailAddress,
-          autofillHints: const [AutofillHints.email],
-        ),
+        _emailField(l, readOnly: true),
         // F-57: ABOVE the password fields, deliberately. This button exists so
         // the person never has to invent a password, so offering it after the
         // form has already been filled defeats it — by then the cost it saves
-        // is already paid. Everything below is the secondary path: what you
-        // fill in only if you would rather not use Google. Same reason it sits
-        // above the founder's family/role fields, which the OAuth path
-        // re-collects on the onboarding screen anyway.
-        if (widget.googleEnabled != null && widget.onSignInWithGoogle != null)
-          GoogleSignInButton(
-            enabled: widget.googleEnabled!,
-            onPressed: () =>
-                widget.onSignInWithGoogle!(inviteToken: widget.inviteToken),
-          ),
-        if (invite == null) ...[
-          const SizedBox(height: 12),
-          AppTextField(
-            label: l[K.registerFamilyName],
-            hint: l[K.registerFamilyNamePlaceholder],
-            helper: l[K.registerFamilyNameHint],
-            controller: _familyName,
-            maxLength: RegisterRules.maxNameLength,
-          ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(l[K.registerYouAre],
-                style: Theme.of(context).textTheme.titleSmall),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final role in RoleCatalog.all)
-                ChoiceChip(
-                  // U-31: words only — the closed alpha read the emoji
-                  // grid here as homemade.
-                  label: Text(role.labelFor(l.current)),
-                  selected: _role == role.canonicalName,
-                  onSelected: (_) =>
-                      setState(() => _role = role.canonicalName),
-                ),
-            ],
-          ),
-        ],
+        // is already paid.
+        _googleButton(),
         const SizedBox(height: 16),
+        ..._passwordFields(l),
+        const SizedBox(height: 20),
+        _consentBlock(l, isInvited: true),
+        const SizedBox(height: 20),
+        _submitButton(l),
+        _errorLine(l),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: widget.onBackToLogin,
+          child: Text(l[K.registerHaveAccount]),
+        ),
+        const LanguagePickerRow(),
+      ],
+    );
+  }
+
+  /// U-44, step 1 of the founder — who you are. Google comes FIRST: F-57's
+  /// reasoning (the button saves inventing a password, so it goes before the
+  /// password) carried to its end — on this step there is nothing else it
+  /// could save, and the OAuth path asks the family step on the onboarding
+  /// screen anyway.
+  Widget _accountStep(Localization l) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ..._founderHeading(l, step: 1, stepKey: KApp.signupStepAccount),
+        const SizedBox(height: 12),
+        _googleButton(),
+        const SizedBox(height: 16),
+        _nameField(l),
+        const SizedBox(height: 12),
+        _emailField(l, readOnly: false),
+        const SizedBox(height: 16),
+        ..._passwordFields(l),
+        const SizedBox(height: 20),
+        FilledButton(
+          onPressed: _continueToFamily,
+          child: Text(l[KApp.signupContinue]),
+        ),
+        _errorLine(l),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: widget.onBackToLogin,
+          child: Text(l[K.registerHaveAccount]),
+        ),
+        const LanguagePickerRow(),
+      ],
+    );
+  }
+
+  /// U-44, step 2 of the founder — what you are creating: the family, your
+  /// role in it, and the consent that signs for both.
+  Widget _familyStep(Localization l) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ..._founderHeading(l, step: 2, stepKey: KApp.signupStepFamily),
+        const SizedBox(height: 24),
+        AppTextField(
+          label: l[K.registerFamilyName],
+          hint: l[K.registerFamilyNamePlaceholder],
+          helper: l[K.registerFamilyNameHint],
+          controller: _familyName,
+          maxLength: RegisterRules.maxNameLength,
+        ),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(l[K.registerYouAre],
+              style: Theme.of(context).textTheme.titleSmall),
+        ),
+        const SizedBox(height: 8),
+        RolePicker(
+          selected: _role,
+          onSelected: (role) => setState(() => _role = role),
+        ),
+        const SizedBox(height: 20),
+        _consentBlock(l, isInvited: false),
+        const SizedBox(height: 20),
+        _submitButton(l),
+        _errorLine(l),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: _busy ? null : _backToAccount,
+          child: Text(l[KApp.signupBack]),
+        ),
+        const LanguagePickerRow(),
+      ],
+    );
+  }
+
+  List<Widget> _founderHeading(Localization l,
+          {required int step, required String stepKey}) =>
+      [
+        Text(l[K.registerCreateTitle],
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 4),
+        Text(l[K.registerCreateSubtitle],
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 12),
+        Text(
+          l.format(KApp.signupStep, [step, _stepCount, l[stepKey]]),
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+      ];
+
+  Widget _nameField(Localization l) => AppTextField(
+        label: l[K.registerFullName],
+        hint: l[K.registerFullNamePlaceholder],
+        controller: _fullName,
+        maxLength: RegisterRules.maxNameLength,
+        textCapitalization: TextCapitalization.words,
+        autofillHints: const [AutofillHints.name],
+      );
+
+  Widget _emailField(Localization l, {required bool readOnly}) =>
+      AppTextField(
+        label: l[K.commonEmail],
+        hint: l[K.commonEmailPlaceholder],
+        controller: _email,
+        // The invitation names the address — the trigger refuses any other.
+        readOnly: readOnly,
+        keyboardType: TextInputType.emailAddress,
+        autofillHints: const [AutofillHints.email],
+      );
+
+  Widget _googleButton() {
+    if (widget.googleEnabled == null || widget.onSignInWithGoogle == null) {
+      return const SizedBox.shrink();
+    }
+    return GoogleSignInButton(
+      enabled: widget.googleEnabled!,
+      onPressed: () =>
+          widget.onSignInWithGoogle!(inviteToken: widget.inviteToken),
+    );
+  }
+
+  List<Widget> _passwordFields(Localization l) => [
         AppTextField(
           label: l[K.commonPassword],
           hint: l[K.registerPasswordPlaceholder],
@@ -481,29 +634,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
           controller: _confirmPassword,
           obscureText: _obscured,
         ),
-        const SizedBox(height: 20),
-        _consentBlock(l, isInvited: invite != null),
-        const SizedBox(height: 20),
-        FilledButton(
-          // F-18: the gate is the checkbox, not a validation message.
-          onPressed: _busy || !_acceptedTerms ? null : _submit,
-          child: Text(_busy ? l[K.registerSubmitting] : l[K.registerSubmit]),
-        ),
-        if (_errorKey != null || _errorText != null) ...[
-          const SizedBox(height: 12),
-          Text(
-            _errorText ?? l[_errorKey!],
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        ],
-        const SizedBox(height: 8),
-        TextButton(
-          onPressed: widget.onBackToLogin,
-          child: Text(l[K.registerHaveAccount]),
-        ),
-        const LanguagePickerRow(),
-      ],
+      ];
+
+  Widget _submitButton(Localization l) => FilledButton(
+        // F-18: the gate is the checkbox, not a validation message.
+        onPressed: _busy || !_acceptedTerms ? null : _submit,
+        child: Text(_busy ? l[K.registerSubmitting] : l[K.registerSubmit]),
+      );
+
+  Widget _errorLine(Localization l) {
+    if (_errorKey == null && _errorText == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Text(
+        _errorText ?? l[_errorKey!],
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Theme.of(context).colorScheme.error),
+      ),
     );
   }
 

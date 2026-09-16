@@ -8,14 +8,20 @@
 // The consent block is asserted per branch on purpose — the S-15 declaration
 // differs, and showing the founder's text to an invitee would be a legal
 // defect, not a cosmetic one.
+import 'dart:convert';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:entrelares_db_contracts/models/invite_info.dart';
 import 'package:entrelares_app/screens/register_screen.dart';
+import 'package:entrelares_app/services/analytics_service.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
+import 'package:entrelares_app/widgets/role_picker.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource, ana, bruno;
 
@@ -38,6 +44,7 @@ Future<void> pumpRegister(
   AppLanguage language = AppLanguage.ptBr,
   List<String>? signIns,
   VoidCallback? onBackToLogin,
+  AnalyticsService? analytics,
 }) async {
   // The founder form (21 role chips + consent block) is far taller than the
   // 800px default surface. Giving the test a tall viewport keeps every control
@@ -51,6 +58,7 @@ Future<void> pumpRegister(
     child: MaterialApp(
       home: RegisterScreen(
         dataSource: dataSource,
+        analytics: analytics,
         inviteToken: inviteToken,
         onSignIn: (email, password) async => signIns?.add(email),
         onBackToLogin: onBackToLogin ?? () {},
@@ -73,8 +81,9 @@ Future<void> fillCommonFields(
   WidgetTester tester, {
   String name = 'Bruno Souza',
   String password = 'segredo123',
+  AppLanguage language = AppLanguage.ptBr,
 }) async {
-  final l = Localization(AppLanguage.ptBr);
+  final l = Localization(language);
   await tester.enterText(
       find.widgetWithText(TextField, l[K.registerFullName]), name);
   await tester.enterText(
@@ -83,6 +92,27 @@ Future<void> fillCommonFields(
       find.widgetWithText(TextField, l[K.commonConfirmPassword]), password);
   await tester.pump();
 }
+
+/// U-44 — the founder's first step, filled and left: what every family-step
+/// test starts from.
+Future<void> goToFamilyStep(
+  WidgetTester tester, {
+  String name = 'Ana Souza',
+  String email = 'ana@example.com',
+  AppLanguage language = AppLanguage.ptBr,
+}) async {
+  final l = Localization(language);
+  await fillCommonFields(tester, name: name, language: language);
+  await tester.enterText(find.widgetWithText(TextField, l[K.commonEmail]), email);
+  await tapVisible(tester, continueButton(l));
+  await tester.pumpAndSettle();
+}
+
+Finder continueButton(Localization l) =>
+    find.widgetWithText(FilledButton, l[KApp.signupContinue]);
+
+Finder backButton(Localization l) =>
+    find.widgetWithText(TextButton, l[KApp.signupBack]);
 
 Future<void> acceptTerms(WidgetTester tester) =>
     tapVisible(tester, find.byType(Checkbox));
@@ -95,19 +125,100 @@ Finder submitButton(Localization l) =>
 void main() {
   final l = Localization(AppLanguage.ptBr);
 
-  group('founder branch', () {
-    testWidgets('offers the family name and the 21-role grid', (tester) async {
+  group('founder branch — step 1, the account (U-44)', () {
+    testWidgets('asks who you are, and nothing about the family yet',
+        (tester) async {
       await pumpRegister(tester, dataSource: source());
 
       expect(find.text(l[K.registerCreateSubtitle]), findsOne);
+      expect(find.text('Passo 1 de 2 · Sua conta'), findsOne);
+      expect(find.widgetWithText(TextField, l[K.registerFullName]), findsOne);
+      expect(find.widgetWithText(TextField, l[K.commonEmail]), findsOne);
+      expect(find.widgetWithText(TextField, l[K.commonPassword]), findsOne);
       expect(
-          find.widgetWithText(TextField, l[K.registerFamilyName]), findsOne);
-      expect(find.byType(ChoiceChip), findsNWidgets(RoleCatalog.all.length));
-      expect(find.widgetWithText(ChoiceChip, 'Mãe'), findsOne);
+          find.widgetWithText(TextField, l[K.registerFamilyName]), findsNothing);
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.byType(Checkbox), findsNothing,
+          reason: 'consent is signed on the step that creates the family');
+      expect(continueButton(l), findsOne);
+    });
+
+    testWidgets('Continuar refuses the account step in the form\'s own order',
+        (tester) async {
+      final ds = source();
+      await pumpRegister(tester, dataSource: ds);
+      await fillCommonFields(tester, password: 'curta');
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.commonEmail]), 'ana@example.com');
+
+      await tapVisible(tester, continueButton(l));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[K.registerErrorPasswordShort]), findsOne);
+      expect(
+          find.widgetWithText(TextField, l[K.registerFamilyName]), findsNothing);
+      expect(ds.signUps, isEmpty);
+    });
+
+    testWidgets('a valid account moves on without touching the server',
+        (tester) async {
+      final ds = source();
+      await pumpRegister(tester, dataSource: ds);
+      await goToFamilyStep(tester);
+
+      expect(find.text('Passo 2 de 2 · Sua família'), findsOne);
+      expect(find.widgetWithText(TextField, l[K.registerFamilyName]), findsOne);
+      expect(ds.signUps, isEmpty);
+    });
+
+    testWidgets('reaching the family step is counted once, by name only',
+        (tester) async {
+      final sent = <http.Request>[];
+      final analytics = AnalyticsService(
+        websiteId: 'site-1',
+        host: 'https://cloud.umami.is',
+        hostname: 'app.entrelares.app',
+        client: MockClient((request) async {
+          sent.add(request);
+          return http.Response('', 200);
+        }),
+      );
+      await pumpRegister(tester, dataSource: source(), analytics: analytics);
+
+      await goToFamilyStep(tester);
+      await tapVisible(tester, backButton(l));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, continueButton(l));
+      await tester.pumpAndSettle();
+
+      final events = [
+        for (final request in sent)
+          (jsonDecode(request.body) as Map<String, dynamic>)['payload']
+              as Map<String, dynamic>
+      ].where((p) => p['name'] == 'signup_step').toList();
+      expect(events, hasLength(1));
+      expect(events.single['data'], {'step': 'family'});
+    });
+  });
+
+  group('founder branch — step 2, the family (U-44)', () {
+    testWidgets('offers the family name, six roles and "Outro…"',
+        (tester) async {
+      await pumpRegister(tester, dataSource: source());
+      await goToFamilyStep(tester);
+
+      expect(find.byType(ChoiceChip),
+          findsNWidgets(RoleCatalog.signUpShortlist.length));
+      for (final label in ['Pai', 'Mãe', 'Avô', 'Avó', 'Padrasto', 'Madrasta']) {
+        expect(find.widgetWithText(ChoiceChip, label), findsOne);
+      }
+      expect(find.widgetWithText(ChoiceChip, 'Tio'), findsNothing);
+      expect(find.byKey(RolePicker.otherKey), findsOne);
     });
 
     testWidgets('shows the A-1.1 awareness declaration', (tester) async {
       await pumpRegister(tester, dataSource: source());
+      await goToFamilyStep(tester);
 
       expect(find.text(ConsentDeclarations.creator), findsOne);
       expect(find.text(ConsentDeclarations.invitee), findsNothing);
@@ -116,6 +227,7 @@ void main() {
     testWidgets('the submit button is dead until consent is given',
         (tester) async {
       await pumpRegister(tester, dataSource: source());
+      await goToFamilyStep(tester);
 
       final button = tester.widget<FilledButton>(submitButton(l));
       expect(button.onPressed, isNull);
@@ -126,13 +238,11 @@ void main() {
       expect(enabled.onPressed, isNotNull);
     });
 
-    testWidgets('refuses a form with no role, in the web\'s order',
+    testWidgets('refuses a form with no role, and stays on the family step',
         (tester) async {
       final ds = source();
       await pumpRegister(tester, dataSource: ds);
-      await fillCommonFields(tester);
-      await tester.enterText(
-          find.widgetWithText(TextField, l[K.commonEmail]), 'ana@example.com');
+      await goToFamilyStep(tester);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
       await acceptTerms(tester);
@@ -141,6 +251,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(l[K.registerErrorRoleRequired]), findsOne);
+      expect(find.widgetWithText(TextField, l[K.registerFamilyName]), findsOne);
       expect(ds.signUps, isEmpty, reason: 'nothing may reach the server');
     });
 
@@ -148,9 +259,7 @@ void main() {
         (tester) async {
       final ds = source();
       await pumpRegister(tester, dataSource: ds);
-      await fillCommonFields(tester, name: 'Ana Souza');
-      await tester.enterText(
-          find.widgetWithText(TextField, l[K.commonEmail]), 'ana@example.com');
+      await goToFamilyStep(tester);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
       await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
@@ -167,13 +276,38 @@ void main() {
       expect(find.textContaining('ana@example.com'), findsOne);
     });
 
-    testWidgets('a refusal is translated and the form stays put',
+    testWidgets('a role behind "Outro…" is two taps and stays on screen',
         (tester) async {
+      final ds = source();
+      await pumpRegister(tester, dataSource: ds);
+      await goToFamilyStep(tester);
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
+
+      await tapVisible(tester, find.byKey(RolePicker.otherKey));
+      await tester.pumpAndSettle();
+      expect(find.text(Localization(AppLanguage.ptBr)[KApp.roleOtherTitle]),
+          findsOne);
+      expect(find.byType(ListTile), findsNWidgets(RoleCatalog.others.length));
+      await tester.tap(find.widgetWithText(ListTile, 'Tio'));
+      await tester.pumpAndSettle();
+
+      final picked =
+          tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Tio'));
+      expect(picked.selected, isTrue);
+
+      await acceptTerms(tester);
+      await tapVisible(tester, submitButton(l));
+      await tester.pumpAndSettle();
+
+      expect(ds.signUps.single['role'], 'uncle');
+    });
+
+    testWidgets('an address GoTrue refuses sends the person back to step 1, '
+        'with the answers of step 2 kept', (tester) async {
       final ds = source()..signUpFailureKey = K.authErrAlreadyRegistered;
       await pumpRegister(tester, dataSource: ds);
-      await fillCommonFields(tester, name: 'Ana Souza');
-      await tester.enterText(
-          find.widgetWithText(TextField, l[K.commonEmail]), 'ana@example.com');
+      await goToFamilyStep(tester);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
       await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
@@ -183,7 +317,59 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(l[K.authErrAlreadyRegistered]), findsOne);
+      expect(find.text('Passo 1 de 2 · Sua conta'), findsOne);
       expect(find.text(l[K.registerConfirmEmailTitle]), findsNothing);
+
+      await tapVisible(tester, continueButton(l));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Souza'), findsOne);
+      expect(
+          tester
+              .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Mãe'))
+              .selected,
+          isTrue);
+    });
+
+    testWidgets('a refusal that is not about the account keeps step 2',
+        (tester) async {
+      final ds = source()..signUpFailureKey = K.authErrRateLimited;
+      await pumpRegister(tester, dataSource: ds);
+      await goToFamilyStep(tester);
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
+      await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
+      await acceptTerms(tester);
+
+      await tapVisible(tester, submitButton(l));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[K.authErrRateLimited]), findsOne);
+      expect(find.text('Passo 2 de 2 · Sua família'), findsOne);
+    });
+
+    testWidgets('Voltar returns to the account with everything typed kept',
+        (tester) async {
+      await pumpRegister(tester, dataSource: source());
+      await goToFamilyStep(tester);
+
+      await tapVisible(tester, backButton(l));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Passo 1 de 2 · Sua conta'), findsOne);
+      expect(find.text('ana@example.com'), findsOne);
+    });
+
+    testWidgets('the system back on step 2 goes to step 1, not out of the form',
+        (tester) async {
+      await pumpRegister(tester, dataSource: source());
+      await goToFamilyStep(tester);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Passo 1 de 2 · Sua conta'), findsOne);
+      expect(find.text('ana@example.com'), findsOne);
     });
   });
 
@@ -347,7 +533,9 @@ void main() {
         (tester) async {
       await pumpRegister(tester,
           dataSource: source(), language: AppLanguage.en);
+      await goToFamilyStep(tester, language: AppLanguage.en);
 
+      expect(find.text('Step 2 of 2 · Your family'), findsOne);
       expect(find.text(ConsentDeclarations.creatorEn), findsOne);
       expect(find.widgetWithText(ChoiceChip, 'Mother'), findsOne);
       // The courtesy notice only exists for the English reader — the binding
