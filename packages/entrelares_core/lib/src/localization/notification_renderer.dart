@@ -68,8 +68,18 @@ abstract final class NotificationRenderer {
 
     switch (type) {
       // ── Automatic resolution ──
+      // F-60: the deadline is an INSTANT, not a window. `params.deadline` is
+      // the `YYYY-MM-DDTHH:MM` wall clock of `America/Sao_Paulo` the RPC
+      // already computes (`expiry + 48h`); the sentence places its own
+      // preposition around the two halves, so no formatter has to know how a
+      // language joins a day to an hour. A row written before this item has
+      // no `deadline` and renders the window-free sentence — still in the
+      // READER's language, which a fallback to the stored PT-BR would not be.
       case 'auto_reminder' when date != null:
-        return l.format(K.notifRenderAutoReminder, [date]);
+        final deadline = _parseDeadline(p['deadline']);
+        if (deadline == null) return l.format(K.notifRenderAutoReminder, [date]);
+        return l.format(K.notifRenderAutoReminderDeadline,
+            [date, l.formatDate(deadline), l.formatTime(deadline)]);
 
       case 'auto_approved' when date != null:
         return l.format(
@@ -217,6 +227,31 @@ abstract final class NotificationRenderer {
       default:
         return storedMessage;
     }
+  }
+
+  /// F-60: `params.deadline` as the instant it claims to be, or null.
+  ///
+  /// The shape is `YYYY-MM-DDTHH:MM` — the wall clock of
+  /// `America/Sao_Paulo`, which is where the F-24 clock runs. Every component
+  /// must ROUND-TRIP: `DateTime` rolls a bad one over (`T24:99` becomes 01:39
+  /// of the next day), and a deadline the reader could act on is exactly the
+  /// wrong place to silently invent an hour. Null falls the caller back to the
+  /// sentence with no instant in it, which is always true.
+  static DateTime? _parseDeadline(String? value) {
+    if (value == null) return null;
+    final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?$')
+        .firstMatch(value);
+    if (m == null) return null;
+    final parts = [for (var i = 1; i <= 5; i++) int.parse(m.group(i)!)];
+    final parsed = DateTime(parts[0], parts[1], parts[2], parts[3], parts[4]);
+    if (parsed.year != parts[0] ||
+        parsed.month != parts[1] ||
+        parsed.day != parts[2] ||
+        parsed.hour != parts[3] ||
+        parsed.minute != parts[4]) {
+      return null;
+    }
+    return parsed;
   }
 
   /// The notification's title in the reader's language, or the stored one.

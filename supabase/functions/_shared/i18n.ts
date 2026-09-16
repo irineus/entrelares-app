@@ -175,7 +175,10 @@ export interface SwapStrings {
   subjRevertApproved: (date: string) => string;
   subjRevertRejected: (date: string) => string;
   subjRevertCancelled: (date: string) => string;
-  subjReminder: (date: string, isRevert: boolean) => string;
+  // F-60: the reminder states the INSTANT the request auto-approves —
+  // `deadlineDate`/`deadlineTime` in the recipient's own format, joined by
+  // the preposition each language wants.
+  subjReminder: (date: string, isRevert: boolean, deadlineDate: string, deadlineTime: string) => string;
   subjAutoApproved: (date: string, isRevert: boolean) => string;
   subjInvitation: (inviter: string) => string;
   subjCap80: string;
@@ -227,9 +230,9 @@ export interface SwapStrings {
   revertedBody: (date: string) => string;
 
   reminderTitle: string;
-  reminderBanner: string;
-  reminderHeading: string;
-  reminderBody: (date: string, isRevert: boolean) => string;
+  reminderBanner: (deadlineDate: string, deadlineTime: string) => string;
+  reminderHeading: (deadlineDate: string, deadlineTime: string) => string;
+  reminderBody: (date: string, isRevert: boolean, deadlineDate: string, deadlineTime: string) => string;
   reminderCta: string;
   reminderButton: string;
 
@@ -286,7 +289,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     subjRevertApproved: (d) => `Reversão confirmada — ${d} ✅`,
     subjRevertRejected: (d) => `Reversão recusada — ${d}`,
     subjRevertCancelled: (d) => `Pedido de reversão cancelado — ${d}`,
-    subjReminder: (d, r) => `[Auto-aprovação em 24h] ${r ? "Reversão" : "Troca"} do dia ${d}`,
+    subjReminder: (d, r, dd, dt) => `[Auto-aprovação em ${dd} às ${dt}] ${r ? "Reversão" : "Troca"} do dia ${d}`,
     subjAutoApproved: (d, r) => `${r ? "Reversão" : "Troca"} do dia ${d} aprovada automaticamente ✅`,
     subjInvitation: (i) => `${i} convidou você para o Entrelares 👨‍👩‍👧`,
     subjCap80: "Vocês já usaram 80% dos e-mails do mês ✉️",
@@ -337,17 +340,17 @@ const SWAP: Record<Lang, SwapStrings> = {
     revertedHeading: "Troca desfeita",
     revertedBody: (d) => `A troca de guarda que você havia aceitado para o dia <strong>${d}</strong> foi desfeita pelo responsável planejado. O calendário voltou ao estado original.`,
 
-    reminderTitle: "Solicitação pendente expira em 24h",
-    reminderBanner: "⏰ Aprovação automática em 24h",
-    reminderHeading: "Você tem 24h para responder",
-    reminderBody: (d, r) => `A solicitação de ${r ? "reversão" : "troca"} do dia <strong>${d}</strong> será <strong>aprovada automaticamente em 24 horas</strong> se você não responder.`,
+    reminderTitle: "Solicitação pendente aguardando resposta",
+    reminderBanner: (dd, dt) => `⏰ Aprovação automática em ${dd} às ${dt}`,
+    reminderHeading: (dd, dt) => `Você tem até ${dd} às ${dt} para responder`,
+    reminderBody: (d, r, dd, dt) => `A solicitação de ${r ? "reversão" : "troca"} do dia <strong>${d}</strong> será <strong>aprovada automaticamente em ${dd} às ${dt}</strong> se você não responder.`,
     reminderCta: "Abra o aplicativo para aprovar ou recusar agora.",
     reminderButton: "Responder solicitação",
 
     autoApprovedTitle: "Aprovada automaticamente",
     autoApprovedHeading: "Aprovada automaticamente ✅",
-    autoApprovedApprover: (d, r) => `A solicitação de ${r ? "reversão" : "troca"} do dia <strong>${d}</strong> foi aprovada automaticamente. Você não respondeu dentro do prazo de 48 horas.`,
-    autoApprovedRequester: (d, r) => `A solicitação de ${r ? "reversão" : "troca"} do dia <strong>${d}</strong> foi aprovada automaticamente após 48h sem resposta.`,
+    autoApprovedApprover: (d, r) => `A solicitação de ${r ? "reversão" : "troca"} do dia <strong>${d}</strong> foi aprovada automaticamente. Você não respondeu dentro do prazo.`,
+    autoApprovedRequester: (d, r) => `A solicitação de ${r ? "reversão" : "troca"} do dia <strong>${d}</strong> foi aprovada automaticamente por falta de resposta.`,
     autoApprovedCalendarNote: "O calendário foi atualizado.",
 
     invitationTitle: "Convite para o Entrelares",
@@ -393,7 +396,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     subjRevertApproved: (d) => `Revert confirmed — ${d} ✅`,
     subjRevertRejected: (d) => `Revert declined — ${d}`,
     subjRevertCancelled: (d) => `Revert request cancelled — ${d}`,
-    subjReminder: (d, r) => `[Auto-approval in 24h] ${r ? "Revert" : "Swap"} for ${d}`,
+    subjReminder: (d, r, dd, dt) => `[Auto-approval on ${dd} at ${dt}] ${r ? "Revert" : "Swap"} for ${d}`,
     subjAutoApproved: (d, r) => `${r ? "Revert" : "Swap"} for ${d} approved automatically ✅`,
     subjInvitation: (i) => `${i} invited you to Entrelares 👨‍👩‍👧`,
     subjCap80: "You have used 80% of this month's e-mails ✉️",
@@ -444,17 +447,17 @@ const SWAP: Record<Lang, SwapStrings> = {
     revertedHeading: "Swap undone",
     revertedBody: (d) => `The custody swap you had accepted for <strong>${d}</strong> was undone by the scheduled caregiver. The calendar is back to its original state.`,
 
-    reminderTitle: "Pending request expires in 24h",
-    reminderBanner: "⏰ Automatic approval in 24h",
-    reminderHeading: "You have 24h to reply",
-    reminderBody: (d, r) => `The ${r ? "revert" : "swap"} request for <strong>${d}</strong> will be <strong>approved automatically in 24 hours</strong> if you do not reply.`,
+    reminderTitle: "Pending request awaiting your reply",
+    reminderBanner: (dd, dt) => `⏰ Automatic approval on ${dd} at ${dt}`,
+    reminderHeading: (dd, dt) => `You have until ${dd} at ${dt} to reply`,
+    reminderBody: (d, r, dd, dt) => `The ${r ? "revert" : "swap"} request for <strong>${d}</strong> will be <strong>approved automatically on ${dd} at ${dt}</strong> if you do not reply.`,
     reminderCta: "Open the app to approve or decline now.",
     reminderButton: "Reply to request",
 
     autoApprovedTitle: "Approved automatically",
     autoApprovedHeading: "Approved automatically ✅",
-    autoApprovedApprover: (d, r) => `The ${r ? "revert" : "swap"} request for <strong>${d}</strong> was approved automatically. You did not reply within the 48-hour window.`,
-    autoApprovedRequester: (d, r) => `The ${r ? "revert" : "swap"} request for <strong>${d}</strong> was approved automatically after 48h with no reply.`,
+    autoApprovedApprover: (d, r) => `The ${r ? "revert" : "swap"} request for <strong>${d}</strong> was approved automatically. You did not reply before the deadline.`,
+    autoApprovedRequester: (d, r) => `The ${r ? "revert" : "swap"} request for <strong>${d}</strong> was approved automatically for lack of a reply.`,
     autoApprovedCalendarNote: "The calendar was updated.",
 
     invitationTitle: "Invitation to Entrelares",

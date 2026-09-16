@@ -86,6 +86,44 @@ void main() {
     expect(find.text(l[K.frozenRejectAction]), findsOneWidget);
   });
 
+  testWidgets('F-60: the panel names the instant the request auto-approves',
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    final date = dayOfMonth(day);
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..frozenRequests = [swapReq(10, date, handoff: '18:00')];
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openDay(tester, day);
+
+    // The DAY's clock plus 48 h — never a window measured from the request,
+    // which is what the old "expira em 24h" copy described and no request
+    // ever had (production #32 got ~31 h and was promised 48).
+    final deadline = DateTime(date.year, date.month, date.day, 18)
+        .add(const Duration(hours: 48));
+    expect(find.text(l[K.frozenAutoApproval]), findsOneWidget);
+    expect(find.text(l.formatDateTime(deadline)), findsOneWidget);
+  });
+
+  testWidgets('F-60: no handoff time means midnight, two days on',
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    final date = dayOfMonth(day);
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..frozenRequests = [swapReq(10, date)];
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openDay(tester, day);
+
+    expect(
+        find.text(l.formatDateTime(
+            DateTime(date.year, date.month, date.day)
+                .add(const Duration(hours: 48)))),
+        findsOneWidget);
+  });
+
   testWidgets('target approves with the F-44 note; toast + reload',
       (tester) async {
     final day = futureDay;

@@ -177,6 +177,38 @@ void main() {
         reason: 'the hand-made padLeft copy of the 24 h format is gone');
   });
 
+  testWidgets('F-60: a pending row says when the request stops waiting, on '
+      'both sides', (tester) async {
+    final date = dayOfMonth(today.day);
+    final deadline = DateTime(date.year, date.month, date.day, 18)
+        .add(const Duration(hours: 48));
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..pendingForMe = [swapReq(12, date, handoff: '18:00')]
+      ..sentRequests = [
+        swapReq(13, date.add(const Duration(days: 1)), requesting: 1,
+            target: 2, proposed: 2, handoff: '18:00'),
+      ];
+    final badge = NotificationBadge(ds);
+    await tester.pumpWidget(notifApp(ds, badge));
+    await tester.pumpAndSettle();
+
+    // "Para você": the person who has to answer sees the deadline without
+    // opening anything.
+    expect(
+        find.textContaining(
+            '${pt[K.frozenAutoApproval]}: ${pt.formatDateTime(deadline)}'),
+        findsOneWidget);
+
+    // "Enviadas": so does the one who asked — same clock, no arithmetic.
+    await tester.tap(find.text(pt[K.notifTabSent]));
+    await tester.pumpAndSettle();
+    final sentDeadline = deadline.add(const Duration(days: 1));
+    expect(
+        find.textContaining(
+            '${pt[K.frozenAutoApproval]}: ${pt.formatDateTime(sentDeadline)}'),
+        findsOneWidget);
+  });
+
   testWidgets('the sent tab shows status, the 🤖 auto badge and the F-44 '
       'messages; a resolved row is read-only, a pending one cancels from the '
       'sheet', (tester) async {

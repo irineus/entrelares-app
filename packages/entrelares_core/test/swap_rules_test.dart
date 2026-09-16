@@ -13,6 +13,59 @@ final _today = DateTime(2026, 8, 19);
 final _future = DateTime(2026, 8, 22);
 
 void main() {
+  // ── F-24/F-60: the auto-approval clock ──
+  //
+  // The anchor is the DAY, and F-60 did not move it — it made the copy say the
+  // instant that anchor produces. These pin the arithmetic the sentence, the
+  // push, the e-mail and the SQL all have to agree on.
+  group('autoApprovalDeadline (F-24/F-60)', () {
+    test('a day with a handoff time: that hour, plus 48 h', () {
+      expect(autoApprovalDeadline(_day, _noon), DateTime(2026, 7, 22, 12));
+    });
+
+    test('no handoff time means midnight — the case that found the defect', () {
+      // Production request #32: 31/08/2026 with no handoff, so expiry was
+      // 00:00 of that day and the auto-approval fell at 00:00 of 02/09. A
+      // request created at 16:20 that day had ~31 h, and the copy said 48.
+      expect(autoApprovalDeadline(DateTime(2026, 8, 31), null),
+          DateTime(2026, 9, 2));
+    });
+
+    test('an unparseable handoff falls back to midnight, like the tag does',
+        () {
+      expect(autoApprovalDeadline(_day, 'nonsense'),
+          autoApprovalDeadline(_day, null));
+    });
+
+    test('the seconds the wire carries do not move it', () {
+      expect(autoApprovalDeadline(_day, '12:00:00'),
+          autoApprovalDeadline(_day, _noon));
+    });
+
+    test('it crosses the month boundary by the calendar, not by 31 days', () {
+      expect(autoApprovalDeadline(DateTime(2026, 7, 31), _noon),
+          DateTime(2026, 8, 2, 12));
+    });
+
+    test('the deadline is exactly 24 h after the reminder is due', () {
+      final expiry = swapExpiry(_day, _noon);
+      expect(expiry.add(autoApprovalReminderAfter).add(autoApprovalReminderAfter),
+          autoApprovalDeadline(_day, _noon));
+      expect(autoApprovalAfter, const Duration(hours: 48));
+    });
+
+    test('expiry is the same instant the urgency tag turns on', () {
+      // One anchor, two readings — if these ever diverge, a day would be
+      // "overdue" while its deadline was computed from another hour.
+      final expiry = swapExpiry(_day, _noon);
+      expect(computePriorityTag(_day, _noon, expiry), SwapPriorityTag.overdue);
+      expect(
+          computePriorityTag(
+              _day, _noon, expiry.subtract(const Duration(minutes: 1))),
+          isNot(SwapPriorityTag.overdue));
+    });
+  });
+
   group('computePriorityTag — formula boundaries (F-20/F-22)', () {
     // handoff = schedule_date + (handoff_time ?? 00:00)
     // reference >= handoff        → overdue

@@ -17,7 +17,7 @@ void main() {
   final en = Localization(AppLanguage.en);
 
   const storedMessage =
-      'A solicitação do dia 04/08 foi aprovada automaticamente após 48h sem resposta.';
+      'A solicitação do dia 04/08 foi aprovada automaticamente por falta de resposta.';
   const storedTitle = '[DEV] ✅ Solicitação aprovada automaticamente';
   const sentinel = '«stored»';
 
@@ -27,11 +27,11 @@ void main() {
       expect(
           NotificationRenderer.message(
               'auto_approved', json, storedMessage, ptBr),
-          'A solicitação do dia 04/08 foi aprovada automaticamente após 48h sem resposta.');
+          'A solicitação do dia 04/08 foi aprovada automaticamente por falta de resposta.');
       expect(
           NotificationRenderer.message(
               'auto_approved', json, storedMessage, en),
-          'The request for 04/08 was approved automatically after 48h with no reply.');
+          'The request for 04/08 was approved automatically for lack of a reply.');
     });
 
     // Same type, two different sentences — without the role discriminator
@@ -58,6 +58,80 @@ void main() {
           contains('12/09'));
       expect(NotificationRenderer.message('auto_reminder', json, 'x', en),
           contains('will be approved automatically'));
+    });
+
+    // ── F-60 ──
+    //
+    // The nudge used to promise "24h", a window measured from the request that
+    // no request ever had: the clock is anchored on the DAY. The instant comes
+    // in `params.deadline`, and each language positions its own preposition
+    // around the two halves.
+    test('auto_reminder states the instant when params carry the deadline', () {
+      const json = '{"date":"2026-08-31","deadline":"2026-09-02T00:00"}';
+      expect(
+          NotificationRenderer.message('auto_reminder', json, 'x', ptBr),
+          'A solicitação do dia 31/08/2026 será aprovada automaticamente em '
+              '02/09/2026 às 00:00 se não houver resposta.');
+      expect(
+          NotificationRenderer.message('auto_reminder', json, 'x', en),
+          'The request for 31 Aug 2026 will be approved automatically on '
+              '02 Sep 2026 at 12:00 AM if nobody replies.');
+    });
+
+    test('no deadline: the window-free sentence, still in the reader language',
+        () {
+      // A row written before F-60. Falling back to the STORED sentence here
+      // would hand an English reader Portuguese — and the stored sentence is
+      // exactly the one whose number was wrong.
+      const json = '{"date":"2026-08-31"}';
+      final ptText =
+          NotificationRenderer.message('auto_reminder', json, 'stored', ptBr);
+      final enText =
+          NotificationRenderer.message('auto_reminder', json, 'stored', en);
+      expect(ptText, 'A solicitação do dia 31/08/2026 será aprovada '
+          'automaticamente se não houver resposta.');
+      expect(enText,
+          'The request for 31 Aug 2026 will be approved automatically if '
+              'nobody replies.');
+      for (final text in [ptText, enText]) {
+        expect(text, isNot(contains('24')));
+        expect(text, isNot(contains('48')));
+      }
+    });
+
+    test('a deadline that is not an instant falls back instead of rendering '
+        'a hole', () {
+      for (final bad in ['2026-09-02', 'amanhã', '2026-09-02T24:99', '']) {
+        final text = NotificationRenderer.message('auto_reminder',
+            '{"date":"2026-08-31","deadline":"$bad"}', 'stored', ptBr);
+        expect(text, 'A solicitação do dia 31/08/2026 será aprovada '
+            'automaticamente se não houver resposta.',
+            reason: 'deadline `$bad` must not reach the sentence');
+      }
+    });
+
+    test('no sentence about the automatic resolution quotes a window', () {
+      // The number is the defect: it was wrong in both directions. Any of
+      // these keys regaining a "24h"/"48h" puts it back.
+      for (final l in [ptBr, en]) {
+        for (final key in [
+          K.notifRenderTitleAutoReminder,
+          K.notifRenderAutoReminder,
+          K.notifRenderAutoReminderDeadline,
+          K.notifRenderAutoApprovedRequester,
+          K.notifRenderAutoApprovedApprover,
+          K.notifRenderFamilyAutoSwap,
+          K.auditOriginSwapAuto,
+          K.auditOriginRevertAuto,
+          K.notifAutoBadgeTitle,
+        ]) {
+          expect(l[key], isNot(contains('24h')), reason: key);
+          expect(l[key], isNot(contains('48h')), reason: key);
+          expect(l[key], isNot(contains('48 h')), reason: key);
+          expect(l[key], isNot(contains('24 h')), reason: key);
+          expect(l[key], isNot(contains('48-hour')), reason: key);
+        }
+      }
     });
 
     // The family fan-out puts the SAME two values in a different order per
@@ -262,9 +336,14 @@ void main() {
         '{"kind":"revert","date":"04/08/2026","name":"Ana"}',
         'A troca do dia 04/08/2026 foi revertida — Ana volta a ficar com a criança.'),
     // written by the DB triggers
+    // F-60: the reminder's stored sentence names the instant, and the
+    // catalog rebuilds it character for character from `params`.
+    ('auto_reminder', '{"date":"04/08","deadline":"2026-08-06T00:00"}',
+        'A solicitação do dia 04/08 será aprovada automaticamente em '
+            '06/08/2026 às 00:00 se não houver resposta.'),
     ('swap_family_info',
         '{"date":"04/08","kind":"auto_swap","name":"Ana"}',
-        'Ana ficará com a criança no dia 04/08 (troca aprovada automaticamente após 48h sem resposta).'),
+        'Ana ficará com a criança no dia 04/08 (troca aprovada automaticamente por falta de resposta).'),
     ('swap_family_info',
         '{"date":"04/08","kind":"auto_revert","name":"Ana"}',
         'A troca do dia 04/08 foi revertida automaticamente — Ana volta a ficar com a criança.'),

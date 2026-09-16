@@ -481,6 +481,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             '${_nameOf(req.requestingProfileId) ?? '—'} · '
             '${l[isRevert ? K.notifLabelRevertTo : K.notifLabelProposed]}: '
             '${_nameOf(req.proposedActualParentId) ?? '—'}',
+        // F-60: a request waiting on YOU says when it stops waiting.
+        '${l[K.frozenAutoApproval]}: '
+            '${l.formatDateTime(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
       ],
       onTap: () => _openRequest(req),
     );
@@ -533,6 +536,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         '${l[K.notifLabelTo]}: ${_nameOf(req.targetProfileId) ?? '—'} · '
             '${l[K.notifLabelProposed]}: '
             '${_nameOf(req.proposedActualParentId) ?? '—'}',
+        // F-60: the same deadline the approver sees, so neither side has to
+        // do arithmetic on a window that was never measured from here.
+        if (isPending)
+          '${l[K.frozenAutoApproval]}: '
+              '${l.formatDateTime(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
         // F-44 on a RESOLVED request: the sheet never opens for it again, so
         // the two messages live on the row — the sender's own and the
         // approver's note or rejection reason. A pending one shows them in

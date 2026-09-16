@@ -25,7 +25,7 @@
 // trigger filters first, and `renderPush` refuses a second time, because a
 // trigger shipped ahead of a function is exactly how a silent gap opens.
 
-import { formatDateIn, type Lang } from "./i18n.ts";
+import { formatDateIn, formatTimeIn, type Lang } from "./i18n.ts";
 
 /// The notification types that earn a push. Kept in sync with the database
 /// trigger's own list by `push_notification_mirror_test.dart` — the trigger is
@@ -59,6 +59,7 @@ const K = {
 	titleRevertCancelled: "notifRender.title.revertCancelled",
 
 	autoReminder: "notifRender.autoReminder",
+	autoReminderDeadline: "notifRender.autoReminder.deadline",
 	autoApprovedRequester: "notifRender.autoApproved.requester",
 	autoApprovedApprover: "notifRender.autoApproved.approver",
 	swapRequestedTarget: "notifRender.swapRequested.target",
@@ -86,7 +87,7 @@ const K = {
 /// Portuguese reader's history must never appear to change retroactively.
 const STRINGS: Record<Lang, Record<string, string>> = {
 	"pt-BR": {
-		"notifRender.title.autoReminder": "⏰ Solicitação pendente expira em 24h",
+		"notifRender.title.autoReminder": "⏰ Solicitação pendente aguardando resposta",
 		"notifRender.title.autoApproved": "✅ Solicitação aprovada automaticamente",
 		"notifRender.title.swapRequested": "Nova solicitação de troca",
 		"notifRender.title.swapApproved": "Troca aprovada! ✅",
@@ -96,8 +97,9 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.revertApproved": "Reversão confirmada ✅",
 		"notifRender.title.revertRejected": "Reversão recusada ❌",
 		"notifRender.title.revertCancelled": "Pedido de reversão cancelado",
-		"notifRender.autoReminder": "A solicitação do dia {0} será aprovada automaticamente em 24h se não houver resposta.",
-		"notifRender.autoApproved.requester": "A solicitação do dia {0} foi aprovada automaticamente após 48h sem resposta.",
+		"notifRender.autoReminder": "A solicitação do dia {0} será aprovada automaticamente se não houver resposta.",
+		"notifRender.autoReminder.deadline": "A solicitação do dia {0} será aprovada automaticamente em {1} às {2} se não houver resposta.",
+		"notifRender.autoApproved.requester": "A solicitação do dia {0} foi aprovada automaticamente por falta de resposta.",
 		"notifRender.autoApproved.approver": "A solicitação do dia {0} foi aprovada automaticamente. Você não respondeu dentro do prazo.",
 		"notifRender.swapRequested.target": "{0} solicitou que você fique responsável pela criança no dia {1}.{2}",
 		"notifRender.swapRequested.requester": "{0} solicitou ficar responsável pela criança no dia {1} no seu lugar.{2}",
@@ -117,7 +119,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.fb.otherThe": "O outro responsável",
 	},
 	"en": {
-		"notifRender.title.autoReminder": "⏰ Pending request expires in 24h",
+		"notifRender.title.autoReminder": "⏰ Pending request awaiting your reply",
 		"notifRender.title.autoApproved": "✅ Request approved automatically",
 		"notifRender.title.swapRequested": "New swap request",
 		"notifRender.title.swapApproved": "Swap approved! ✅",
@@ -127,9 +129,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.revertApproved": "Revert confirmed ✅",
 		"notifRender.title.revertRejected": "Revert declined ❌",
 		"notifRender.title.revertCancelled": "Revert request cancelled",
-		"notifRender.autoReminder": "The request for {0} will be approved automatically in 24h if nobody replies.",
-		"notifRender.autoApproved.requester": "The request for {0} was approved automatically after 48h with no reply.",
-		"notifRender.autoApproved.approver": "The request for {0} was approved automatically. You did not reply in time.",
+		"notifRender.autoReminder": "The request for {0} will be approved automatically if nobody replies.",
+		"notifRender.autoReminder.deadline": "The request for {0} will be approved automatically on {1} at {2} if nobody replies.",
+		"notifRender.autoApproved.requester": "The request for {0} was approved automatically for lack of a reply.",
+		"notifRender.autoApproved.approver": "The request for {0} was approved automatically. You did not reply before the deadline.",
 		"notifRender.swapRequested.target": "{0} asked you to be responsible for the child on {1}.{2}",
 		"notifRender.swapRequested.requester": "{0} asked to be responsible for the child on {1} in your place.{2}",
 		"notifRender.swapApproved.target": "{0} agreed to have the child on {1}.{2}",
@@ -151,6 +154,28 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 
 /// `{0}`-style substitution — the same placeholder shape the Dart catalog uses,
 /// so a string can be copied between the two without editing.
+/// F-60: `params.deadline` is the `YYYY-MM-DDTHH:MM` wall clock of
+/// `America/Sao_Paulo` that `auto_approve_expired()` computes. Split here so
+/// each language positions its own preposition around the two halves.
+///
+/// Every component is RANGE-CHECKED, because neither `formatDateIn` nor
+/// `formatTimeIn` validates: they would happily print `40/13/2026` or turn
+/// `24:99` into `12:99 PM`. A deadline the reader plans around is the wrong
+/// place to print whatever arrived, so anything off-shape returns null and the
+/// caller sends the sentence with no instant in it.
+function splitDeadline(value: string | undefined): { date: string; time: string } | null {
+	if (!value) return null;
+	const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?$/.exec(value);
+	if (match === null) return null;
+	const [y, mo, d, h, mi] = match.slice(1, 6).map(Number) as [number, number, number, number, number];
+	const at = new Date(Date.UTC(y, mo - 1, d, h, mi));
+	if (
+		at.getUTCFullYear() !== y || at.getUTCMonth() !== mo - 1 || at.getUTCDate() !== d ||
+		at.getUTCHours() !== h || at.getUTCMinutes() !== mi
+	) return null;
+	return { date: `${match[1]}-${match[2]}-${match[3]}`, time: `${match[4]}:${match[5]}` };
+}
+
 function fmt(lang: Lang, key: string, args: string[] = []): string {
 	const template = STRINGS[lang][key] ?? STRINGS["pt-BR"][key] ?? "";
 	return template.replace(/\{(\d+)\}/g, (whole, index) => args[Number(index)] ?? whole);
@@ -200,10 +225,23 @@ export function renderPush(
 	let body: string;
 
 	switch (type) {
-		case "auto_reminder":
+		case "auto_reminder": {
 			titleKey = K.titleAutoReminder;
-			body = fmt(lang, K.autoReminder, [date]);
+			// F-60: the push says the INSTANT the request stops waiting, the
+			// same one the in-app sentence and the e-mail say. A row written
+			// before the item carries no `deadline` and falls back to the
+			// window-free sentence — never to a number that was wrong in both
+			// directions.
+			const deadline = splitDeadline(params["deadline"]);
+			body = deadline === null
+				? fmt(lang, K.autoReminder, [date])
+				: fmt(lang, K.autoReminderDeadline, [
+					date,
+					formatDateIn(lang, deadline.date),
+					formatTimeIn(lang, deadline.time) ?? deadline.time,
+				]);
 			break;
+		}
 
 		case "auto_approved":
 			titleKey = K.titleAutoApproved;

@@ -338,6 +338,9 @@ abstract final class K {
   static const String frozenProposedTime = 'frozen.proposedTime';
   static const String frozenRequesterMessage = 'frozen.requesterMessage';
   static const String frozenRequestedAt = 'frozen.requestedAt';
+  // F-60: the instant the request stops waiting, said out loud where the
+  // reader is when they hesitate — the panel and the pending rows.
+  static const String frozenAutoApproval = 'frozen.autoApproval';
   static const String frozenNoteLabel = 'frozen.noteLabel';
   static const String frozenNoteHint = 'frozen.noteHint';
   static const String frozenNotePlaceholder = 'frozen.notePlaceholder';
@@ -744,6 +747,12 @@ abstract final class K {
   static const String notifRenderTitleAutoApproved = 'notifRender.title.autoApproved';
   static const String notifRenderTitleCalendarUpdated = 'notifRender.title.calendarUpdated';
   static const String notifRenderAutoReminder = 'notifRender.autoReminder';
+  // F-60: the reminder that STATES the instant. A row written before the
+  // item carries no `params.deadline`, so it keeps rendering through the
+  // key above — in the reader's own language, which a fallback to the
+  // stored PT-BR sentence would have taken away from an English reader.
+  static const String notifRenderAutoReminderDeadline =
+      'notifRender.autoReminder.deadline';
   static const String notifRenderAutoApprovedRequester = 'notifRender.autoApproved.requester';
   static const String notifRenderAutoApprovedApprover = 'notifRender.autoApproved.approver';
   static const String notifRenderFamilyAutoSwap = 'notifRender.family.autoSwap';
@@ -1415,6 +1424,7 @@ abstract final class K {
     frozenProposedTime,
     frozenRequesterMessage,
     frozenRequestedAt,
+    frozenAutoApproval,
     frozenNoteLabel,
     frozenNoteHint,
     frozenNotePlaceholder,
@@ -1794,6 +1804,7 @@ abstract final class K {
     notifRenderTitleAutoApproved,
     notifRenderTitleCalendarUpdated,
     notifRenderAutoReminder,
+    notifRenderAutoReminderDeadline,
     notifRenderAutoApprovedRequester,
     notifRenderAutoApprovedApprover,
     notifRenderFamilyAutoSwap,

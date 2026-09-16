@@ -35,14 +35,39 @@ enum SwapPriorityTag {
 /// values fall back to midnight, like the C# `?? TimeOnly.MinValue`.
 SwapPriorityTag computePriorityTag(
     DateTime scheduleDate, String? handoffTime, DateTime reference) {
-  final t = parseTimeOfDay(handoffTime);
-  final handoff = DateTime(scheduleDate.year, scheduleDate.month,
-      scheduleDate.day, t?.hour ?? 0, t?.minute ?? 0);
+  final handoff = swapExpiry(scheduleDate, handoffTime);
   if (!reference.isBefore(handoff)) return SwapPriorityTag.overdue;
   return handoff.difference(reference) < const Duration(hours: 24)
       ? SwapPriorityTag.urgent
       : SwapPriorityTag.none;
 }
+
+// ── F-24/F-60: the auto-approval clock ───────────────────────────────────────
+
+/// The moment a pending request stops waiting, in the family's own clock:
+///   `scheduleDate + (handoffTime ?? 00:00)`
+/// — the DAY being decided, never the moment someone happened to ask. This is
+/// the same expression `auto_approve_expired()` evaluates in
+/// `America/Sao_Paulo`, and the anchor the urgency tag already uses.
+DateTime swapExpiry(DateTime scheduleDate, String? handoffTime) {
+  final t = parseTimeOfDay(handoffTime);
+  return DateTime(scheduleDate.year, scheduleDate.month, scheduleDate.day,
+      t?.hour ?? 0, t?.minute ?? 0);
+}
+
+/// F-24: the reminder goes out 24 h after the expiry, the auto-approval lands
+/// 24 h after that. They are OFFSETS FROM THE DAY, which is exactly why no
+/// sentence may describe them as a window measured from the request: a request
+/// opened on its own day, after the handoff hour, is legal and gets less than
+/// 48 h (F-60 — production request #32 had ~31 h and was told 48).
+const Duration autoApprovalReminderAfter = Duration(hours: 24);
+const Duration autoApprovalAfter = Duration(hours: 48);
+
+/// The instant a pending request is approved with nobody's answer (F-60).
+/// Stated, never approximated: the reader gets a date to act on instead of
+/// arithmetic they cannot check.
+DateTime autoApprovalDeadline(DateTime scheduleDate, String? handoffTime) =>
+    swapExpiry(scheduleDate, handoffTime).add(autoApprovalAfter);
 
 /// History semantics (mirror of the `SwapRequest` overload): a resolved
 /// request is measured against its `resolved_at` (already converted to local
