@@ -58,7 +58,7 @@ void main() {
         members: [ana, bruno], days: [row(1, dayOfMonth(day), 1)]);
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
-    await openDay(tester, day);
+    await openDayEditor(tester, day);
 
     // Before picking an actual there is no F-44 field.
     expect(find.text(pt[K.editorMessagePlaceholder]), findsNothing);
@@ -100,7 +100,7 @@ void main() {
       ..preEditNotes = const PreEditNotes('Consulta às 15h');
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
-    await openDay(tester, day);
+    await openDayEditor(tester, day);
 
     // Set the actual back to "same as planned" → revert scenario.
     await tapChip(tester, pt[K.editorSameAsPlanned]);
@@ -133,7 +133,7 @@ void main() {
     // preEditNotes stays null — nothing to restore from, no question.
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
-    await openDay(tester, day);
+    await openDayEditor(tester, day);
 
     await tapChip(tester, pt[K.editorSameAsPlanned]);
     await tapSave(tester);

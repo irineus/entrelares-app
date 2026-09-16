@@ -7,11 +7,16 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import '../services/custody_data_source.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/slot_pill.dart';
 
 /// What the sheet did — the caller picks the toast, mirroring the web's four
 /// success paths (`toastSaved` · `toastDayCleared` · `toastSwapRequested` ·
 /// `toastRevertRequested`).
 enum DaySheetOutcome { saved, cleared, swapRequested, revertRequested }
+
+/// U-25: the pencil that turns the summary into the editor — keyed so a flow
+/// test reaches it without a localized finder.
+const daySheetEditKey = Key('day-sheet-edit');
 
 /// The day sheet — a native modal bottom sheet (owner directive: use the
 /// platform where it improves on the web's inline panel). Since lote 2 this is
@@ -25,6 +30,13 @@ enum DaySheetOutcome { saved, cleared, swapRequested, revertRequested }
 /// filter), undoing an approved swap opens a REVERT (with the F-47 observation
 /// question when the answer changes something) — the direct write only happens
 /// when no workflow applies. The database enforces all of it regardless.
+///
+/// U-25 (closed alpha, 12/08/2026: *"essa lista suspensa está muito poluído…
+/// falta um botão voltar"*): an assigned day opens as a SUMMARY — who has the
+/// child, the swap and the handoff as one row of pills, and the day's note —
+/// with the editor one pencil away and a ✕ that is always there. An empty day
+/// has nothing to summarize and opens straight in the editor. No rule moved:
+/// the same form, the same save routing, one tap deeper.
 Future<DaySheetOutcome?> showDaySheet({
   required BuildContext context,
   required DateTime date,
@@ -130,6 +142,14 @@ class _DaySheetState extends State<_DaySheet> {
   bool _showAdminConfirm = false;
   bool _adminConfirmed = false;
 
+  /// U-25: the editor is on screen. Starts false on an assigned day (the
+  /// summary) and true on an empty one, where the only thing to do is assign.
+  late bool _editing;
+
+  /// Where "Cancelar" goes: back to the summary the editor was opened from,
+  /// or — an empty day has no summary — out of the sheet.
+  late final bool _startedInSummary;
+
   // F-47: the observation question. The answer belongs to ONE save attempt;
   // dismissing is not an answer — the next attempt asks again.
   bool _showRevertConfirm = false;
@@ -143,6 +163,17 @@ class _DaySheetState extends State<_DaySheet> {
   late Future<int?> _prevEffective;
 
   bool get _isPast => isDayInPast(widget.date, widget.today);
+
+  /// Nothing planned: no row, or a row that names nobody.
+  bool get _isEmptyDay {
+    final day = widget.day;
+    return day == null ||
+        (day.scheduledParentId == 0 && day.actualParentId == null);
+  }
+
+  /// Past without the admin bypass, frozen, or offline: nothing can be saved,
+  /// so there is no editor to reach.
+  bool get _readOnly => _saveBlocked || widget.offline;
   bool get _isFrozen => isDayFrozen(widget.date, widget.frozenDates);
 
   DayAssignment? get _assignment {
@@ -209,16 +240,11 @@ class _DaySheetState extends State<_DaySheet> {
   @override
   void initState() {
     super.initState();
-    final day = widget.day;
-    _scheduledParentId =
-        (day != null && day.scheduledParentId != 0) ? day.scheduledParentId : null;
-    _actualParentId = day?.actualParentId ?? 0;
-    _notes = TextEditingController(text: day?.notes ?? '');
+    _notes = TextEditingController();
     _swapMessage = TextEditingController();
-    final handoff = parseTimeOfDay(day?.handoffTime);
-    if (handoff != null) {
-      _handoff = TimeOfDay(hour: handoff.hour, minute: handoff.minute);
-    }
+    _resetDraft();
+    _editing = !_readOnly && _isEmptyDay;
+    _startedInSummary = !_editing;
     final previous = widget.previousDay;
     if (previous != null) {
       _prevEffective = Future.value(previous.effectiveParentId);
@@ -233,6 +259,39 @@ class _DaySheetState extends State<_DaySheet> {
     } else {
       _prevEffective = Future.value(null);
     }
+  }
+
+  /// The editor's fields as the stored day has them — on open, and again when
+  /// "Cancelar" returns to the summary, so a draft never survives a cancel.
+  void _resetDraft() {
+    final day = widget.day;
+    _scheduledParentId =
+        (day != null && day.scheduledParentId != 0) ? day.scheduledParentId : null;
+    _actualParentId = day?.actualParentId ?? 0;
+    _notes.text = day?.notes ?? '';
+    _swapMessage.clear();
+    final handoff = parseTimeOfDay(day?.handoffTime);
+    _handoff = handoff == null
+        ? null
+        : TimeOfDay(hour: handoff.hour, minute: handoff.minute);
+    _error = null;
+    _showAdminConfirm = false;
+    _adminConfirmed = false;
+    _showRevertConfirm = false;
+    _revertNotesChoice = null;
+    _revertSnapshotText = null;
+    _revertCurrentText = null;
+  }
+
+  void _cancelEdit() {
+    if (!_startedInSummary) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _resetDraft();
+      _editing = false;
+    });
   }
 
   @override
@@ -510,14 +569,27 @@ class _DaySheetState extends State<_DaySheet> {
 
     final banners = _guardBanners(l, assignment);
     // U-28 QA: the day is READ-ONLY here, and the owner's review said the
-    // stripped-down version of this sheet is the best thing on the screen — so
-    // it keeps exactly what it had. The responsible line survives only in this
-    // branch: with the form on screen it repeats what "Agendado" and "Real"
-    // already say two lines below.
-    final readOnly = _saveBlocked || widget.offline;
+    // stripped-down version of this sheet was the best thing on the screen.
+    // U-25 made that version the DEFAULT: every assigned day opens as it, and
+    // the form is one pencil away wherever a save is possible.
+    final readOnly = _readOnly;
+    final editing = _editing && !readOnly;
     return AppSheetFrame(
       title: _capitalize('${formatHandoffDate(widget.date, l)} · '
           '${daysUntilLabel(widget.date, widget.today, l)}'),
+      // U-25: the visible way out, in both modes.
+      onClose: () => Navigator.of(context).pop(),
+      closeLabel: l[K.commonClose],
+      headerActions: [
+        if (!readOnly && !editing)
+          IconButton(
+            key: daySheetEditKey,
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: l[K.editorAriaLabel],
+            color: context.tokens.textMuted,
+            onPressed: () => setState(() => _editing = true),
+          ),
+      ],
       // A guard is the reason the sheet looks the way it does; it must not be
       // something the reader can scroll past.
       pinnedNotice: banners.isEmpty
@@ -531,15 +603,15 @@ class _DaySheetState extends State<_DaySheet> {
                       child: b),
               ],
             ),
-      primaryLabel: readOnly || _showAdminConfirm ? null : l[K.commonSave],
+      primaryLabel: !editing || _showAdminConfirm ? null : l[K.commonSave],
       onPrimary: _scheduledParentId == null || _deleting || _beyondRetroReach
           ? null
           : _save,
       secondaryLabel:
-          readOnly || _showAdminConfirm ? null : l[K.commonCancel],
-      onSecondary: () => Navigator.of(context).pop(),
+          !editing || _showAdminConfirm ? null : l[K.commonCancel],
+      onSecondary: _deleting ? null : _cancelEdit,
       busy: _saving,
-      extraAction: readOnly ||
+      extraAction: !editing ||
               _showAdminConfirm ||
               widget.day == null ||
               isClearDayBlocked(adminBypass: widget.adminBypass)
@@ -559,8 +631,8 @@ class _DaySheetState extends State<_DaySheet> {
               label: Text(l[K.editorClearDay]),
             ),
       children: [
-        if (readOnly) _readView(l, day, assignment),
-        if (!readOnly) ..._form(l),
+        if (!editing) _summary(l, day, assignment),
+        if (editing) ..._form(l),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: Spacing.sm),
@@ -577,41 +649,93 @@ class _DaySheetState extends State<_DaySheet> {
   String _capitalize(String text) =>
       text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
 
-  Widget _readView(
+  /// U-25: the day in one glance — the pills say what the grid cell says, in
+  /// words, and the lines under them say what the cell CANNOT: whom the day
+  /// was planned for, and the note.
+  Widget _summary(
       Localization l, CareSchedule? day, DayAssignment? assignment) {
-    if (day == null) return Text(l[KApp.sheetNoResponsible]);
-    final previous = widget.previousDay;
-    final isTransition = isTransitionDay(
-      previous?.effectiveParentId,
-      assignment!.effectiveParentId,
-    );
+    if (day == null || assignment == null || _isEmptyDay) {
+      return Text(l[KApp.sheetNoResponsible]);
+    }
+    final tokens = context.tokens;
+    final textTheme = Theme.of(context).textTheme;
+    final swapped = isSwapped(assignment);
+    final effective = assignment.effectiveParentId;
+    final notes = day.notes?.trim() ?? '';
+    const pillHeight = 28.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // U-28 QA defect: this printed the INITIAL ("Responsável: I"). An
-        // initial is what a 40 dp calendar cell can afford; a sheet has room
-        // for the name, and the name is what the reader came for.
-        Text(
-            l.format(KApp.sheetResponsible, [
-                  _nameOf(assignment.effectiveParentId)
-                ]) +
-                (isSwapped(assignment) ? l[KApp.sheetSwappedSuffix] : ''),
-            style: Theme.of(context).textTheme.titleSmall),
-        if (isTransition)
+        Wrap(
+          spacing: Spacing.sm,
+          runSpacing: Spacing.xs,
+          children: [
+            // U-28 QA defect: this once printed the INITIAL ("Responsável: I").
+            // An initial is what a 40 dp cell can afford; a sheet has room for
+            // the name, and the name is what the reader came for.
+            SlotPill(
+              key: const ValueKey('day-summary-responsible'),
+              slot: tokens.slot(profileSlotIndex(effective, widget.memberViews)),
+              label: _summaryName(effective, l),
+              height: pillHeight,
+              patterned: true,
+              maxWidth: 220,
+            ),
+            if (swapped)
+              SlotPill(
+                key: const ValueKey('day-summary-swapped'),
+                slot: tokens.swapped,
+                label: l[K.calSwapped],
+                height: pillHeight,
+                dashed: true,
+              ),
+            // T-27/T-45: the database keeps a time only on a transition day,
+            // so a stored time IS the transition — no previous day to fetch.
+            if (day.handoffTime != null)
+              SlotPill(
+                key: const ValueKey('day-summary-handoff'),
+                slot: SlotColors(
+                    tone: tokens.neutral, pattern: SlotPattern.none),
+                icon: Icons.schedule,
+                // U-24: the wire's HH:mm:ss renders per language
+                // (14:30 · 2:30 PM) — never a raw substring.
+                label: l.format(KApp.sheetHandoffAt,
+                    [l.formatTimeString(day.handoffTime!)]),
+                height: pillHeight,
+              ),
+          ],
+        ),
+        if (swapped)
           Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: Spacing.xs),
             child: Text(
-              day.handoffTime != null
-                  // U-24: the wire's HH:mm:ss renders per language
-                  // (14:30 · 2:30 PM) — never a raw substring.
-                  ? l.format(KApp.sheetTransitionAt,
-                      [l.formatTimeString(day.handoffTime!)])
-                  : l[KApp.sheetTransition],
-              style: Theme.of(context).textTheme.bodySmall,
+              l.format(KApp.sheetPlanned,
+                  [_summaryName(day.scheduledParentId, l)]),
+              style: textTheme.bodySmall?.copyWith(color: tokens.textMuted),
             ),
           ),
+        if (notes.isNotEmpty) ...[
+          const SizedBox(height: Spacing.md),
+          Text(l[K.editorDayNote],
+              style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
+          const SizedBox(height: 2),
+          Text(notes, style: textTheme.bodyMedium),
+        ],
       ],
     );
+  }
+
+  /// The name with the member's state beside it: F-56's "(pendente)" for a
+  /// carer with no account yet, S-11's "(saiu)" for one who left — the grid
+  /// paints both, and the summary must not drop what it paints.
+  String _summaryName(int? id, Localization l) {
+    final name = _nameOf(id);
+    for (final v in widget.memberViews) {
+      if (v.id != id) continue;
+      if (v.isPendingMember) return '$name ${l[KApp.calMemberPending]}';
+      if (!v.isAssignable) return '$name ${l[K.calMemberLeft]}';
+    }
+    return name;
   }
 
   /// The carer's name, or their initial as the last resort — a member the

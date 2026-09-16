@@ -452,6 +452,14 @@ regras e ~0% do visual — por um sistema de tokens. O que ela estabelece:
   F-44 ficam nela, porque a folha não abre mais para um pedido fechado). Antes eram duas
   cópias da mesma ação — o cartão com campo de texto e dois botões POR pedido, e a folha —
   que já divergiam; as duas formatavam o horário à mão, ignorando `formatTimeString`.
+- **A folha do dia abre como RESUMO (U-25, 16/09/2026).** Um dia atribuído mostra pills
+  (`SlotPill`, o mesmo desenho da legenda do mês) do responsável real, "Trocado" tracejado e
+  "Troca às HH:MM", "Planejado: X" só no dia trocado, e a observação — sem campo nem barra
+  de ações. O ✏️ abre o formulário de sempre na mesma folha (nenhuma regra mudou); Cancelar
+  volta ao resumo descartando o rascunho, e o ✕ do cabeçalho (`AppSheetFrame.onClose`, também
+  na folha de dia congelado) fecha. Dia vazio abre direto no formulário. Origem: o closed
+  alpha achou a folha "muito poluída" e sem "botão voltar"; o corpo liberado é onde o F-55
+  vai desenhar a agenda do dia.
 - **Skeletons no lugar dos spinners** onde a forma do que vem é conhecida: o grid do mês, as
   listas de Notificações e de auditoria, os cartões do resumo, Família, Perfil, papéis
   personalizados e o histórico premium. Ficam spinner de propósito: botão em ação (o giro é

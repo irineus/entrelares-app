@@ -18,6 +18,7 @@ import 'package:entrelares_db_contracts/models/role.dart';
 import 'package:entrelares_db_contracts/models/subscription.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
 import 'package:entrelares_app/screens/calendar_screen.dart';
+import 'package:entrelares_app/screens/day_sheet.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
@@ -1035,6 +1036,13 @@ Future<void> openDay(WidgetTester tester, int day) async {
   await tester.pumpAndSettle();
 }
 
+/// U-25: an assigned day opens as a SUMMARY; the editor is one pencil away.
+/// An empty day opens straight in the editor, so it keeps [openDay].
+Future<void> openDayEditor(WidgetTester tester, int day) async {
+  await openDay(tester, day);
+  await tapSheet(tester, find.byKey(daySheetEditKey));
+}
+
 /// The full editor is taller than the sheet's viewport — scroll the target
 /// into view before tapping.
 Future<void> tapSheet(WidgetTester tester, Finder finder) async {
@@ -1140,7 +1148,7 @@ void main() {
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
 
-    await openDay(tester, day);
+    await openDayEditor(tester, day);
     // S-09 (lote 2): the planned parent of an assigned day is locked for
     // non-admins — the note is the editable surface that triggers the update.
     await tester.enterText(find.byType(TextField), 'Trocar mochila');
@@ -1171,7 +1179,7 @@ void main() {
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
 
-    await openDay(tester, day);
+    await openDayEditor(tester, day);
     await tester.enterText(find.byType(TextField), 'Nota qualquer');
     await tapSheet(tester, find.text('Salvar'));
 
@@ -1250,7 +1258,7 @@ void main() {
     expect(find.text('Trocado'), findsNothing);
     expect(find.text('Ana'), findsOneWidget, reason: 'names never translate');
 
-    await openDay(tester, day);
+    await openDayEditor(tester, day);
     expect(find.text('Planned caregiver'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
     // U-28 QA: the redundant "Responsável: X (swapped)" line is gone; the fact

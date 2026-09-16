@@ -16,12 +16,13 @@ abstract final class KApp {
   // ── Calendar screen ──
   static const String errCalendarLoad = 'app.calendar.loadError';
 
-  // ── Day sheet (native read view — the web's editor has no read mode) ──
+  // ── Day sheet (native summary — the web's editor has no read mode) ──
   static const String sheetNoResponsible = 'app.sheet.noResponsible';
-  static const String sheetResponsible = 'app.sheet.responsible';
-  static const String sheetSwappedSuffix = 'app.sheet.swappedSuffix';
-  static const String sheetTransitionAt = 'app.sheet.transitionAt';
-  static const String sheetTransition = 'app.sheet.transition';
+  // U-25: the summary's chips. The responsible sentence and its "(trocado)"
+  // suffix became pills; the planned carer and the handoff are what the grid
+  // cell does NOT say, so they are the words that stayed.
+  static const String sheetPlanned = 'app.sheet.planned';
+  static const String sheetHandoffAt = 'app.sheet.handoffAt';
   static const String sheetNote = 'app.sheet.note';
   static const String sheetWhoQuestion = 'app.sheet.whoQuestion';
   static const String sheetSave = 'app.sheet.save';
@@ -245,10 +246,8 @@ abstract final class KApp {
     sessionExpired,
     errCalendarLoad,
     sheetNoResponsible,
-    sheetResponsible,
-    sheetSwappedSuffix,
-    sheetTransitionAt,
-    sheetTransition,
+    sheetPlanned,
+    sheetHandoffAt,
     sheetNote,
     sheetWhoQuestion,
     sheetSave,
@@ -382,10 +381,8 @@ abstract final class StringsAppPtBr {
     KApp.sessionExpired: 'Sessão expirada — saia e entre novamente.',
     KApp.errCalendarLoad: 'Não foi possível carregar o calendário.',
     KApp.sheetNoResponsible: 'Dia sem responsável definido.',
-    KApp.sheetResponsible: 'Responsável: {0}',
-    KApp.sheetSwappedSuffix: ' (trocado)',
-    KApp.sheetTransitionAt: 'Dia de transição — troca às {0}',
-    KApp.sheetTransition: 'Dia de transição',
+    KApp.sheetPlanned: 'Planejado: {0}',
+    KApp.sheetHandoffAt: 'Troca às {0}',
     KApp.sheetNote: 'Observação: {0}',
     KApp.sheetWhoQuestion: 'Quem fica com a criança neste dia?',
     KApp.sheetSave: 'Salvar',
@@ -585,10 +582,8 @@ abstract final class StringsAppEn {
     KApp.sessionExpired: 'Session expired — sign out and sign in again.',
     KApp.errCalendarLoad: 'Could not load the calendar.',
     KApp.sheetNoResponsible: 'No caregiver assigned to this day.',
-    KApp.sheetResponsible: 'Caregiver: {0}',
-    KApp.sheetSwappedSuffix: ' (swapped)',
-    KApp.sheetTransitionAt: 'Transition day — handoff at {0}',
-    KApp.sheetTransition: 'Transition day',
+    KApp.sheetPlanned: 'Planned: {0}',
+    KApp.sheetHandoffAt: 'Handoff at {0}',
     KApp.sheetNote: 'Note: {0}',
     KApp.sheetWhoQuestion: 'Who has the child on this day?',
     KApp.sheetSave: 'Save',

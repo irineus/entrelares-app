@@ -222,6 +222,11 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
       // emoji: inside the sentences it writes, never as structural chrome.
       title: '$headerIcon '
           '${l[isRevert ? K.frozenRevertTitle : K.frozenSwapTitle]}',
+      // U-25: a tap on a day opens this sheet or the day sheet, and both carry
+      // the same visible way out — the reader cannot tell in advance which one
+      // a day will open.
+      onClose: () => Navigator.of(context).pop(),
+      closeLabel: l[K.commonClose],
       // U-28 QA: the urgency line is CENTRED and BOLD, as the web has it. It is
       // the one sentence on the sheet that changes what the reader should do
       // next, and it was rendering as a left-aligned run of body text.

@@ -21,6 +21,7 @@ import '../theme/tokens.dart';
 import '../widgets/account_button.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
+import '../widgets/slot_pill.dart';
 import '../widgets/today_card.dart';
 import 'bulk_sheet.dart';
 import 'day_sheet.dart';
@@ -1648,39 +1649,13 @@ class _Legend extends StatelessWidget {
   /// U-28 QA replaced a swatch-plus-label pair with this. The pill IS the
   /// colour, so carrying a separate swatch beside it said the same thing twice
   /// and spent width the legend cannot spare. The swapped key keeps its dashed
-  /// outline — that border is the signal, not the fill.
+  /// outline — that border is the signal, not the fill. U-25 moved the pill to
+  /// [SlotPill], so the day sheet's chips are the same shape.
   Widget _key(BuildContext context,
-      {required SlotColors slot,
-      required String label,
-      bool dashed = false}) {
-    // No `alignment:` here, and that is the whole fix: a Container WITH an
-    // alignment expands to fill whatever space it is offered, so each key took
-    // a full row of the Wrap and the legend became a stack of banners. Without
-    // it the Container shrink-wraps its text, which is what a pill is.
-    final pill = Container(
-      height: rowHeight,
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-      decoration: BoxDecoration(
-        color: slot.tone.container,
-        borderRadius: BorderRadius.circular(Radii.lg),
-        border: dashed ? null : Border.all(color: slot.tone.border),
-      ),
-      child: Center(
-        widthFactor: 1,
-        child: Text(label,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: slot.tone.onContainer)),
-      ),
-    );
-    if (!dashed) return pill;
-    return CustomPaint(
-      foregroundPainter:
-          DashedBorderPainter(color: slot.tone.border, radius: Radii.lg),
-      child: pill,
-    );
-  }
+          {required SlotColors slot,
+          required String label,
+          bool dashed = false}) =>
+      SlotPill(slot: slot, label: label, height: rowHeight, dashed: dashed);
 }
 
 class _MonthGrid extends StatelessWidget {

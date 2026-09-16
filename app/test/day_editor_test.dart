@@ -80,7 +80,7 @@ void main() {
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
 
-    await openDay(tester, future);
+    await openDayEditor(tester, future);
     // U-28 QA: the explanation moved off the label and into an ⓘ tooltip, so
     // it is a Tooltip's message now and not a line of text under the chips.
     expect(
@@ -104,7 +104,7 @@ void main() {
     await tester.pumpWidget(app(ds, adminMode: activeAdminMode()));
     await tester.pumpAndSettle();
 
-    await openDay(tester, future);
+    await openDayEditor(tester, future);
     expect(find.text(pt[K.editorLockedHint]), findsNothing);
     await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno').first);
     await tapSheet(tester, find.text(pt[K.commonSave]));
@@ -126,7 +126,7 @@ void main() {
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
 
-    await openDay(tester, future);
+    await openDayEditor(tester, future);
     expect(find.text(pt[K.editorClearDay]), findsNothing);
   });
 
@@ -138,7 +138,7 @@ void main() {
         members: [anaAdmin, bruno], days: [row(7, dayOfMonth(future), 1)]);
     await tester.pumpWidget(app(ds, adminMode: activeAdminMode()));
     await tester.pumpAndSettle();
-    await openDay(tester, future);
+    await openDayEditor(tester, future);
     await tapSheet(tester, find.text(pt[K.editorClearDay]));
 
     expect(ds.deleted, [7]);
@@ -157,7 +157,7 @@ void main() {
     await tester.pumpWidget(app(ds, adminMode: activeAdminMode()));
     await tester.pumpAndSettle();
 
-    await openDay(tester, past);
+    await openDayEditor(tester, past);
     expect(find.text(pt[K.editorAdminOverride]), findsOneWidget);
     expect(find.text(pt[K.editorActualParent]), findsOneWidget);
 
@@ -196,7 +196,7 @@ void main() {
     await tester.pumpWidget(app(ds, adminMode: activeAdminMode()));
     await tester.pumpAndSettle();
 
-    await openDay(tester, past);
+    await openDayEditor(tester, past);
     expect(find.text(pt.format(KApp.editorRetroBeyondFree, [0, 6])),
         findsOneWidget);
     expect(
@@ -239,7 +239,7 @@ void main() {
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
 
-    await openDay(tester, future);
+    await openDayEditor(tester, future);
     expect(
         find.textContaining(
             pt.format(KApp.sheetSwapUnavailablePending, ['Eva Pendente'])),
