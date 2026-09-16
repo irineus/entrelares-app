@@ -254,6 +254,28 @@ abstract final class NotificationRenderer {
     return parsed;
   }
 
+  /// A pictograph or marker glyph with its presentation selector; a
+  /// zero-width-joined run of them (👨‍👩‍👧) is ONE mark.
+  static const _glyph = r'[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}'
+      r'\u{2B00}-\u{2BFF}\u{231A}-\u{23FF}\u{2139}\u{21A9}\u{21AA}]'
+      r'\u{FE0F}?';
+  static const _mark = '$_glyph(?:\\u{200D}$_glyph)*';
+  static final _leadingMark =
+      RegExp('^((?:\\[[^\\]]+\\] )?)$_mark ', unicode: true);
+  static final _trailingMark = RegExp(' $_mark\$', unicode: true);
+
+  /// U-31: a stored title as it can be shown today. Rows written before
+  /// 16/09/2026 carry the emoji every writer used to put at the start ("✅
+  /// Solicitação aprovada automaticamente") or the end ("Troca aprovada! ✅")
+  /// of the sentence, and a row with no usable `params` renders that sentence
+  /// raw. The title is always OUR sentence — names and custom roles ride in
+  /// the message — so dropping that one mark changes no fact, and the rows
+  /// themselves are never rewritten. Everything else is kept byte for byte,
+  /// the environment prefix included.
+  static String legacyTitle(String storedTitle) => storedTitle
+      .replaceFirstMapped(_leadingMark, (m) => m[1]!)
+      .replaceFirst(_trailingMark, '');
+
   /// The notification's title in the reader's language, or the stored one.
   ///
   /// The environment prefix the writers add to the stored title (e.g.
@@ -269,7 +291,7 @@ abstract final class NotificationRenderer {
     Localization l,
   ) {
     final p = _parse(paramsJson);
-    if (p == null) return storedTitle;
+    if (p == null) return legacyTitle(storedTitle);
 
     final kind = p['kind'];
 
@@ -326,7 +348,7 @@ abstract final class NotificationRenderer {
       _ => null,
     };
 
-    if (key == null) return storedTitle;
+    if (key == null) return legacyTitle(storedTitle);
 
     return switch (p['tag']) {
       'urgent' => l[K.notifRenderTagUrgent] + l[key],

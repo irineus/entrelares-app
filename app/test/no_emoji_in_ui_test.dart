@@ -62,15 +62,20 @@ Iterable<File> _appSources() => Directory('lib')
     .whereType<File>()
     .where((f) => f.path.endsWith('.dart'));
 
-/// The words every screen renders, in both languages — and the push
-/// catalog, which the F-09 mirror holds string for string against them, so
-/// a glyph put back on one side turns the core lane red and on the other
-/// would reach a lock screen.
+/// The words every screen renders, in both languages.
 const _catalogs = [
   '../packages/entrelares_core/lib/src/localization/strings_pt_br.dart',
   '../packages/entrelares_core/lib/src/localization/strings_en.dart',
-  '../supabase/functions/_shared/push.ts',
 ];
+
+/// Every Edge Function source: the push catalog (`_shared/push.ts`, held
+/// string for string against the Dart one by the F-09 mirror), the e-mail
+/// copy (`_shared/i18n.ts`), the e-mail layout's wordmark, and whatever the
+/// next function writes to a lock screen or an inbox (U-31 PR 2).
+Iterable<File> _functionSources() => Directory('../supabase/functions')
+    .listSync(recursive: true)
+    .whereType<File>()
+    .where((f) => f.path.endsWith('.ts'));
 
 void main() {
   test('no emoji in the app\'s own code', () {
@@ -79,7 +84,7 @@ void main() {
             'sentence carries no emoji at all.');
   });
 
-  test('no emoji in the catalogs the screens and the push render', () {
+  test('no emoji in the catalogs the screens render', () {
     final files = [for (final path in _catalogs) File(path)];
     for (final file in files) {
       expect(file.existsSync(), isTrue,
@@ -90,7 +95,22 @@ void main() {
             'needs one, is placed by the widget that renders it.');
   });
 
-  // A scanner pointed at nothing would make the two gates above pass forever.
+  test('no emoji in what the server writes to a lock screen or an inbox', () {
+    final files = _functionSources().toList();
+    expect(
+        files.map((f) => f.path.replaceAll(r'\', '/')),
+        containsAll([
+          endsWith('_shared/push.ts'),
+          endsWith('_shared/i18n.ts'),
+          endsWith('_shared/email_layout.ts'),
+        ]),
+        reason: 'the function tree moved — the gate would pass over nothing');
+    expect(_offendersIn(files), isEmpty,
+        reason: 'U-31: a push title, an e-mail subject and an e-mail heading '
+            'are sentences too, and a sentence carries no emoji.');
+  });
+
+  // A scanner pointed at nothing would make the gates above pass forever.
   test('the scanner finds the glyphs it is looking for', () {
     const palette =
         '../packages/entrelares_core/lib/src/custom_role_rules.dart';

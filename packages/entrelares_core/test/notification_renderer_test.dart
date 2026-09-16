@@ -176,11 +176,35 @@ void main() {
             NotificationRenderer.message(
                 'auto_approved', json, storedMessage, en),
             storedMessage);
+        // U-31: the stored sentence, minus the emoji the writer used to put
+        // in front of it — the environment prefix stays byte for byte.
         expect(
             NotificationRenderer.title('auto_approved', json, storedTitle, en),
-            storedTitle);
+            '[DEV] Solicitação aprovada automaticamente');
       });
     }
+
+    group('U-31 · a legacy title drops its mark and nothing else', () {
+      for (final (stored, shown) in [
+        ('✅ Solicitação aprovada automaticamente',
+            'Solicitação aprovada automaticamente'),
+        ('[Dev] ⏰ ATRASADO: Solicitação de troca enviada',
+            '[Dev] ATRASADO: Solicitação de troca enviada'),
+        ('Troca aprovada! ✅', 'Troca aprovada!'),
+        ('Reversão recusada ❌', 'Reversão recusada'),
+        ('↩️ Pedido de reversão', 'Pedido de reversão'),
+        ('Você foi convidado(a)! 👨‍👩‍👧', 'Você foi convidado(a)!'),
+        ('📅 Calendário atualizado', 'Calendário atualizado'),
+        // Already clean, and a title with no mark at an edge: untouched.
+        ('Calendário atualizado', 'Calendário atualizado'),
+        ('Troca de 05/09 → 06/09', 'Troca de 05/09 → 06/09'),
+        ('[DEV] Nova solicitação', '[DEV] Nova solicitação'),
+      ]) {
+        test('"$stored"', () {
+          expect(NotificationRenderer.legacyTitle(stored), shown);
+        });
+      }
+    });
 
     test('unknown type keeps the stored sentence', () {
       expect(
