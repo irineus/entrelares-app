@@ -134,7 +134,7 @@ export function emailDocument(opts: {
     <tr><td align="center" bgcolor="${BG.page}" style="${S.page}">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BG.card}" style="${S.card}">
         <tr><td bgcolor="${BG.card}" style="${S.header}">
-          <p style="${S.wordmark}">👨‍👩‍👧 Entrelares</p>
+          <p style="${S.wordmark}">Entrelares</p>
         </td></tr>
         <tr><td bgcolor="${BG.card}" style="${S.content}">
           ${opts.body}
