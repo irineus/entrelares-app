@@ -327,6 +327,29 @@ jobs:
             echo "::error::Only ${avail_mb} MB free on the root disk; the AVD needs ~7.4 GB at boot plus the Gradle build."
             exit 1
           fi
+          echo "cores: $(nproc)"; free -h
+      # With the disk freed (16/09/2026), the emulator booted and then the VM
+      # itself went down in the middle of `assembleDevDebug`: "detected a
+      # hanging thread 'QEMU2 CPU0 thread'" for 15-19 s at a time, then "The
+      # runner has received a shutdown signal". Gradle with the repo's
+      # -Xmx8G/-XX:MaxMetaspaceSize=4G, its Kotlin daemon and a 2.5 GB guest
+      # were all competing on a runner that also warned "4 CPU cores
+      # (currently using 2)"; the green run of 14/09 landed on a host where
+      # that check said Ok. So the Android build happens BEFORE any emulator
+      # exists, with a heap cap valid only for this job (GRADLE_USER_HOME's
+      # gradle.properties outranks the project's), and its daemons are
+      # stopped so the emulator steps only pay an up-to-date assemble.
+      - name: Build the dev APK before any emulator boots
+        working-directory: app
+        run: |
+          mkdir -p ~/.gradle
+          printf '%s\n' \
+            'org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g' \
+            'kotlin.daemon.jvmargs=-Xmx1g' >> ~/.gradle/gradle.properties
+          flutter build apk --debug --flavor dev
+          pkill -f GradleDaemon || true
+          pkill -f KotlinCompileDaemon || true
+          free -h
       # The service_role key never enters the repo: it arrives as a secret and
       # reaches the fixture through --dart-define only.
       - name: E2E — two-user swap flow on an emulator
