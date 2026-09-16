@@ -204,6 +204,12 @@ npx supabase functions deploy billing-checkout     --project-ref <project-ref>
 | `billing-webhook` | T-39: receives Asaas events (auth = the `ASAAS_WEBHOOK_TOKEN` shared secret in `asaas-access-token`, hence `--no-verify-jwt`). **Idempotent by the provider's event id** — a redelivery is recorded and ignored — and applies every effect through `set_family_plan`, adopting the subscription created by the payment link (`externalReference family:<id>`, link-id fallback) |
 | `billing-checkout` | T-39: called with the **user's** JWT and admin-only (guard chain 401→403→409→503); creates the Asaas Payment Link (`RECURRENT`, `dueDateLimitDays` — the API rejects it without one) so payer data is typed only on the provider's PCI page, and handles `cancel` honouring the period already paid. Refuses everything while `billing.enabled` is false; gateway failures are audited as `CHECKOUT_ERROR` in the ledger |
 
+> **Every e-mail is built from `_shared/email_layout.ts` (U-26, 16/09/2026)** — `send-swap-email`,
+> `send-account-email` and `send-auth-email` compose from it and write no style of their own.
+> A visual change is ONE edit there, and it reaches `send-auth-email`, which has no fallback
+> behind it: break the layer and nobody confirms a sign-up. `email_layout_guard_test`
+> (entrelares_core) pins the dark-mode rules.
+>
 > An outdated `send-swap-email` used to silently build **0 e-mails** for unknown
 > types — the historical gotcha the automated redeploy-on-every-push eliminates.
 

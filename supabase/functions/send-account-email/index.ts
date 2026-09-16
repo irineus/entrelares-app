@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretKey } from "../_shared/keys.ts";
 import { hasValidUserSession, isSecretKeyCaller } from "../_shared/auth.ts";
 import { isTestRecipient } from "../_shared/mail.ts";
+import { code as codeBlock, emailDocument, heading, list, paragraph } from "../_shared/email_layout.ts";
 import { account, common, formatDateIn, type Lang, resolveLang } from "../_shared/i18n.ts";
 
 // S-11 — account-lifecycle e-mails (Resend). Separate from send-swap-email
@@ -370,14 +371,15 @@ serve(async (req: Request) => {
 // is ours, reviewed in a PR, and carries its own <strong> — the same split the
 // app's LocalizationService.Rich makes, for the same reason.
 
-const shell = (body: string, lang: Lang) => `
-    <div style="font-family: system-ui, sans-serif; color: #212529; max-width: 480px;">
-      ${body}
-      <p style="color: #868e96; font-size: 13px;">${common(lang).signature}</p>
-    </div>`;
-
-const list = (...items: string[]) =>
-  `<ul style="line-height: 1.6;">${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
+// U-26: the shell is the shared layer's, the same card every e-mail wears. The
+// heading doubles as the document title, which this sender never had.
+const shell = (lang: Lang, title: string, body: string) =>
+  emailDocument({
+    htmlLang: common(lang).htmlLang,
+    title,
+    body: `${heading(title)}${body}`,
+    footer: [common(lang).signature],
+  });
 
 // S-21. No greeting by name: the code mail is keyed by user, and the subject
 // may have no profile to take a name from. No button either — a confirmation
@@ -385,22 +387,20 @@ const list = (...items: string[]) =>
 // would be one more thing a phishing copy could imitate.
 function elevationCodeHtml(lang: Lang, code: string, minutes: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.elevationHeading}</h2>
-      <p>${t.elevationIntro}</p>
-      <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">${escapeHtml(code)}</p>
-      <p>${t.elevationExpiry(escapeHtml(minutes))}</p>
-      <p>${t.elevationIgnore}</p>`, lang);
+  return shell(lang, t.elevationHeading, `
+      ${paragraph(t.elevationIntro)}
+      ${codeBlock(escapeHtml(code))}
+      ${paragraph(t.elevationExpiry(escapeHtml(minutes)))}
+      ${paragraph(t.elevationIgnore)}`);
 }
 
 function selfHtml(lang: Lang, name: string, graceDate: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.selfHeading}</h2>
-      <p>${common(lang).greeting(escapeHtml(name))}</p>
-      <p>${t.selfIntro}</p>
-      ${list(t.selfBullet1(graceDate), t.selfBullet2, t.selfBullet3, t.selfBullet4)}
-      <p>${t.selfClosing}</p>`, lang);
+  return shell(lang, t.selfHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(name)))}
+      ${paragraph(t.selfIntro)}
+      ${list([t.selfBullet1(graceDate), t.selfBullet2, t.selfBullet3, t.selfBullet4])}
+      ${paragraph(t.selfClosing)}`);
 }
 
 // S-15/B-3 -- the warning the Terms promise before the downgrade ("Avisaremos por
@@ -409,82 +409,73 @@ function selfHtml(lang: Lang, name: string, graceDate: string): string {
 // whose custody calendar lives here. Says what happens, by when, and how to fix.
 function graceEndingHtml(lang: Lang, name: string, graceDate: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.graceHeading}</h2>
-      <p>${common(lang).greeting(escapeHtml(name))}</p>
-      <p>${t.graceIntro(graceDate)}</p>
-      <p>${t.graceBody}</p>
-      <p>${t.graceHowTo}</p>`, lang);
+  return shell(lang, t.graceHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(name)))}
+      ${paragraph(t.graceIntro(graceDate))}
+      ${paragraph(t.graceBody)}
+      ${paragraph(t.graceHowTo)}`);
 }
 
 function othersHtml(lang: Lang, recipientName: string, leaverName: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.othersHeading}</h2>
-      <p>${common(lang).greeting(escapeHtml(recipientName))}</p>
-      <p>${t.othersBody(escapeHtml(leaverName))}</p>
-      <p>${t.othersHistory}</p>`, lang);
+  return shell(lang, t.othersHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
+      ${paragraph(t.othersBody(escapeHtml(leaverName)))}
+      ${paragraph(t.othersHistory)}`);
 }
 
 function joinedHtml(lang: Lang, recipientName: string, joinerName: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.joinedHeading}</h2>
-      <p>${common(lang).greeting(escapeHtml(recipientName))}</p>
-      <p>${t.joinedBody(escapeHtml(joinerName))}</p>
-      <p>${t.joinedClosing}</p>`, lang);
+  return shell(lang, t.joinedHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
+      ${paragraph(t.joinedBody(escapeHtml(joinerName)))}
+      ${paragraph(t.joinedClosing)}`);
 }
 
 function returnedHtml(lang: Lang, recipientName: string, returnerName: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.returnedHeading}</h2>
-      <p>${common(lang).greeting(escapeHtml(recipientName))}</p>
-      <p>${t.returnedBody(escapeHtml(returnerName))}</p>`, lang);
+  return shell(lang, t.returnedHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
+      ${paragraph(t.returnedBody(escapeHtml(returnerName)))}`);
 }
 
 function fdRequesterHtml(lang: Lang, name: string, deadline: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.fdRequesterHeading}</h2>
-      <p>${common(lang).greeting(escapeHtml(name))}</p>
-      <p>${t.fdRequesterIntro(deadline)}</p>
-      ${list(t.fdRequesterBullet1, t.fdRequesterBullet2, t.fdRequesterBullet3, t.fdRequesterBullet4)}
-      <p>${t.fdRequesterClosing}</p>`, lang);
+  return shell(lang, t.fdRequesterHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(name)))}
+      ${paragraph(t.fdRequesterIntro(deadline))}
+      ${list([t.fdRequesterBullet1, t.fdRequesterBullet2, t.fdRequesterBullet3, t.fdRequesterBullet4])}
+      ${paragraph(t.fdRequesterClosing)}`);
 }
 
 function fdOthersHtml(lang: Lang, recipientName: string, requesterName: string, deadline: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.fdOthersHeading}</h2>
-      <p>${common(lang).greeting(escapeHtml(recipientName))}</p>
-      <p>${t.fdOthersIntro(escapeHtml(requesterName))}</p>
-      ${list(t.fdOthersBullet1(deadline), t.fdOthersBullet2, t.fdOthersBullet3, t.fdOthersBullet4)}`, lang);
+  return shell(lang, t.fdOthersHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
+      ${paragraph(t.fdOthersIntro(escapeHtml(requesterName)))}
+      ${list([t.fdOthersBullet1(deadline), t.fdOthersBullet2, t.fdOthersBullet3, t.fdOthersBullet4])}`);
 }
 
 function fdRefusedHtml(lang: Lang, recipientName: string, refuserName: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.fdRefusedHeading}</h2>
-      <p>${common(lang).greeting(escapeHtml(recipientName))}</p>
-      <p>${t.fdRefusedBody(escapeHtml(refuserName))}</p>`, lang);
+  return shell(lang, t.fdRefusedHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
+      ${paragraph(t.fdRefusedBody(escapeHtml(refuserName)))}`);
 }
 
 function fdWithdrawnHtml(lang: Lang, recipientName: string, requesterName: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.fdWithdrawnHeading}</h2>
-      <p>${common(lang).greeting(escapeHtml(recipientName))}</p>
-      <p>${t.fdWithdrawnBody(escapeHtml(requesterName))}</p>`, lang);
+  return shell(lang, t.fdWithdrawnHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
+      ${paragraph(t.fdWithdrawnBody(escapeHtml(requesterName)))}`);
 }
 
 function fdReminderHtml(lang: Lang, recipientName: string, deadline: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.fdReminderHeading}</h2>
-      <p>${common(lang).greeting(escapeHtml(recipientName))}</p>
-      <p>${t.fdReminderIntro(deadline)}</p>
-      ${list(t.fdReminderBullet1, t.fdReminderBullet2)}`, lang);
+  return shell(lang, t.fdReminderHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
+      ${paragraph(t.fdReminderIntro(deadline))}
+      ${list([t.fdReminderBullet1, t.fdReminderBullet2])}`);
 }
 
 // The farewell goes to people whose profile NO LONGER EXISTS (the purge already
@@ -492,10 +483,9 @@ function fdReminderHtml(lang: Lang, recipientName: string, deadline: string): st
 // and nothing else -- PT-BR is the documented fallback, same as a NULL column.
 function fdCompletedHtml(lang: Lang, familyName: string): string {
   const t = account(lang);
-  return shell(`
-      <h2>${t.fdCompletedHeading}</h2>
-      <p>${t.fdCompletedBody(escapeHtml(familyName))}</p>
-      <p>${t.fdCompletedClosing}</p>`, lang);
+  return shell(lang, t.fdCompletedHeading, `
+      ${paragraph(t.fdCompletedBody(escapeHtml(familyName)))}
+      ${paragraph(t.fdCompletedClosing)}`);
 }
 
 /** Returns true when the message was handed to Resend, false when suppressed (T-49). */

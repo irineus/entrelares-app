@@ -139,6 +139,11 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # sétimo uma Edge Function e o oitavo um catálogo de e-mail ao lado de uma migração,
 # pela mesma razão em outras linguagens. Um espelho que
 # ninguém confere apodrece calado, e é o lane mais barato do run.
+# Fora de mirrors/, no mesmo lane, a guarda do U-26 (email_layout_guard_test): todo e-mail
+# sai de supabase/functions/_shared/email_layout.ts, e a suíte lê esse arquivo e os três
+# send-*: estilo só na tabela literal `S`, `color` E `background-color` em toda entrada,
+# contraste AA, nenhuma superfície escura e nenhum `style=` num remetente. O
+# no_color_literal_test só lê o lib/ do Flutter; sem esta, um #212529 voltaria calado.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
 cd app && fvm flutter analyze && fvm flutter test
 # The three source gates live in that suite: no_literal_snack_test (catalog strings),
