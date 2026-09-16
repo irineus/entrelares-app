@@ -115,7 +115,7 @@ chores that are not backlog items.
 ## Build & test
 ```
 cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
-# Nesse lane moram os sete ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21): rótulos
+# Nesse lane moram os oito ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21 + F-60): rótulos
 # de papel em inglês, formato de data dos e-mails, a chave `lang` do redirect de reset,
 # a cobertura de `params` de todo writer de notificação, o catálogo de push
 # (F-09: o texto do push é montado no servidor, então `_shared/push.ts` duplica de
@@ -127,10 +127,17 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # errada sem erro nenhum), e os números do gate de sudo (S-21: 6 dígitos, 10 min, 60 s
 # entre pedidos e a própria janela de elevação moram em `elevate/index.ts`, e o espelho
 # lê ESSE arquivo — errar aqui recusa no cliente o código que o e-mail mandou, com os
-# dois lados compilando, e quem não passa é justamente quem não tem senha). Cinco leem
+# dois lados compilando, e quem não passa é justamente quem não tem senha), e o prazo
+# da auto-aprovação (F-60: a MESMA promessa é dita em quatro lugares — catálogo Dart,
+# push, e-mail e a frase que a RPC GRAVA — e a do e-mail não tinha espelho nenhum, então
+# `_shared/i18n.ts` podia seguir prometendo 24h enquanto o app dizia o instante, as duas
+# frases bem formadas e o build calado; o espelho lê os TRÊS lados fora do Dart, o corpo
+# VIVO de `auto_approve_expired` inclusive, e recusa janela citada numa FRASE — o
+# `interval '48 hours'` ao lado dela é a regra, que o item não tocou). Cinco leem
 # supabase/functions/_shared/i18n.ts e supabase/migrations — as duplicações que
-# existem de propósito porque Deno não chama Dart; o sexto lê um service worker e o
-# sétimo uma Edge Function, pela mesma razão em outras linguagens. Um espelho que
+# existem de propósito porque Deno não chama Dart; o sexto lê um service worker, o
+# sétimo uma Edge Function e o oitavo um catálogo de e-mail ao lado de uma migração,
+# pela mesma razão em outras linguagens. Um espelho que
 # ninguém confere apodrece calado, e é o lane mais barato do run.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
 cd app && fvm flutter analyze && fvm flutter test
