@@ -351,9 +351,17 @@ jobs:
           pkill -f KotlinCompileDaemon || true
           free -h
       # The service_role key never enters the repo: it arrives as a secret and
-      # reaches the fixture through --dart-define only.
+      # reaches the fixture through --dart-define only (e2e_emulator_run.sh
+      # reads it from the step env). The script bounds each suite, streams its
+      # progress and, on a red, takes the screenshot and the logcat before the
+      # action kills the emulator (T-77) — the per-step ceiling is there so a
+      # hang outside the script still fails THIS step, not the whole job.
       - name: E2E — two-user swap flow on an emulator
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 22
+        env:
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
+          E2E_PACK: ${{ inputs.e2e-pack || 'p0' }}
         with:
           api-level: 34
           target: google_apis
@@ -361,17 +369,17 @@ jobs:
           profile: pixel_6
           disable-animations: true
           working-directory: app
-          script: >-
-            flutter test integration_test/swap_workflow_test.dart
-            --flavor dev
-            --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
-            --dart-define=E2E_PACK=${{ inputs.e2e-pack || 'p0' }}
+          script: bash ../.github/e2e_emulator_run.sh integration_test/swap_workflow_test.dart
 
       # Lote 4 — the account/family pack. A separate emulator step rather than
       # one file with both, so a failure names which surface broke and the two
       # families never share a run id.
       - name: E2E — account and family flows on an emulator
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 22
+        env:
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
+          E2E_PACK: ${{ inputs.e2e-pack || 'p0' }}
         with:
           api-level: 34
           target: google_apis
@@ -379,11 +387,18 @@ jobs:
           profile: pixel_6
           disable-animations: true
           working-directory: app
-          script: >-
-            flutter test integration_test/account_flows_test.dart
-            --flavor dev
-            --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
-            --dart-define=E2E_PACK=${{ inputs.e2e-pack || 'p0' }}
+          script: bash ../.github/e2e_emulator_run.sh integration_test/account_flows_test.dart
+
+      # Only the screenshots: the repo is public, and the logcat already went
+      # to the masked job log.
+      - name: Upload the emulator screenshot of a red suite
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-emulator-diag
+          path: app/build/e2e-diag/*.png
+          if-no-files-found: ignore
+          retention-days: 7
 
   apk:
     if: github.event_name == 'workflow_dispatch' && inputs.build-apk
