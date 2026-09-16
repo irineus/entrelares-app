@@ -67,7 +67,7 @@ const S = {
   linkRow: "margin:20px 0 0;color:#374151;background-color:#ffffff;",
   link: "font-size:13px;text-decoration:underline;color:#6b7280;background-color:#ffffff;",
   smallLink: "text-decoration:underline;color:#6b7280;background-color:#ffffff;",
-  rawUrl: "word-break:break-all;color:#6b7280;background-color:#ffffff;",
+  rawUrl: "word-break:break-all;text-decoration:underline;color:#6b7280;background-color:#ffffff;",
   list: "margin:0 0 12px;padding-left:20px;line-height:1.6;color:#374151;background-color:#ffffff;",
   listItem: "margin:0 0 4px;color:#374151;background-color:#ffffff;",
 
@@ -176,9 +176,16 @@ export function linkRow(href: string, label: string): string {
   return `<p style="${S.linkRow}">${link(href, label)}</p>`;
 }
 
-/** A URL printed for copying, which may break anywhere. */
+/**
+ * A URL printed for copying, which may break anywhere.
+ *
+ * An ANCHOR, never plain text: Gmail auto-links a bare URL and paints it in
+ * ITS OWN link colour, which in dark theme is a pale blue — measured on the
+ * owner's device (16/09/2026, U-26 matrix) as near-invisible on the white card.
+ * An `<a>` that declares its colour keeps it, as the privacy link beside it did.
+ */
 export function rawUrl(url: string): string {
-  return `<span style="${S.rawUrl}">${url}</span>`;
+  return `<a href="${url}" style="${S.rawUrl}">${url}</a>`;
 }
 
 export function list(items: string[]): string {

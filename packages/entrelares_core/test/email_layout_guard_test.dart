@@ -189,6 +189,21 @@ void main() {
       }
     });
 
+    test('a printed URL is an anchor that declares its colour', () {
+      // Measured on the owner's Gmail Android in dark theme (16/09/2026): a
+      // bare URL inside a <span> was auto-linked by Gmail and painted in ITS
+      // pale link blue, near-invisible on the white card. The privacy link
+      // beside it — an <a> with an explicit colour — kept ours.
+      final body = RegExp(r'export function rawUrl\([^)]*\)[^{]*\{([^}]*(?:\}[^}]*)*?)\n\}')
+          .firstMatch(layoutCode)
+          ?.group(1);
+      expect(body, isNotNull, reason: 'rawUrl() not found in $_layoutPath.');
+      expect(body, contains('<a href='));
+      expect(layoutCode, isNot(contains('<span')),
+          reason: 'a styled <span> around a URL loses its colour to the '
+              "client's auto-link.");
+    });
+
     test('nothing depends on prefers-color-scheme', () {
       expect(layoutCode, isNot(contains('prefers-color-scheme')),
           reason: 'Gmail ignores the query and applies its own inversion — a '
