@@ -289,6 +289,16 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                     if (createdAtLocal != null)
                       infoRow(K.frozenRequestedAt,
                           l.formatDateTime(createdAtLocal)),
+                    // F-60: the deadline the reminder promises, on the screen
+                    // where the person decides. It is the DAY's clock
+                    // (`expiry + 48h`, the F-24 anchor) and never a window
+                    // measured from the request — which is what the old
+                    // "em 24h" copy described and no request ever had.
+                    infoRow(
+                        K.frozenAutoApproval,
+                        l.formatDateTime(autoApprovalDeadline(
+                            request.scheduleDate,
+                            request.proposedHandoffTime))),
                   ],
                 ),
               ),

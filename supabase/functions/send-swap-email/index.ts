@@ -56,6 +56,30 @@ function computePriorityTag(scheduleDate: string, handoffTime: string | null): P
   return handoff.getTime() - nowSp.getTime() < 24 * 3600 * 1000 ? "urgent" : null;
 }
 
+// F-60: the instant the request stops waiting, as `auto_approve_expired()`
+// computes it — the DAY being decided (`schedule_date + handoff`, midnight when
+// there is none) plus 48 h, in America/Sao_Paulo. The arithmetic runs in UTC on
+// a WALL CLOCK so the runtime's own zone cannot shift it; Brazil has no DST to
+// make the +48 h anything but 48 h. Never a window measured from the request:
+// that is the sentence this item exists to delete.
+function autoApprovalDeadline(
+  scheduleDate: string,
+  handoffTime: string | null,
+): { date: string; time: string } {
+  const [y, mo, d] = scheduleDate.split("-").map(Number);
+  const [hRaw = 0, miRaw = 0] = (handoffTime ?? "00:00").split(":").map(Number);
+  // An unparseable handoff is midnight — the same fallback the RPC's
+  // COALESCE and the client's `parseTimeOfDay` make. Inventing an hour here
+  // would put a wrong deadline in the subject line of the one e-mail whose
+  // entire job is the deadline.
+  const h = Number.isFinite(hRaw) ? hRaw : 0;
+  const mi = Number.isFinite(miRaw) ? miRaw : 0;
+  const at = new Date(Date.UTC(y!, mo! - 1, d!, h, mi));
+  at.setUTCHours(at.getUTCHours() + 48);
+  const iso = at.toISOString();
+  return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
+}
+
 interface SwapRequest {
   id: number;
   schedule_date: string;
@@ -487,15 +511,20 @@ function buildEmails(
       }
       break;
 
-    // F-24 — nudge the approver 24h before the request auto-approves.
+    // F-24 — nudge the approver 24 h after the day expired, 24 h before the
+    // auto-approval. F-60: the copy states that instant instead of a window.
     case "reminder": {
       const isRevertReq = swap.status === "revert_pending";
       if (target?.email) {
         const lang = langOf(target), t = swapText(lang);
+        // F-60: subject and body name the deadline, in the RECIPIENT's format.
+        const deadline = autoApprovalDeadline(swap.schedule_date, swap.proposed_handoff_time);
+        const deadlineDate = formatDateIn(lang, deadline.date);
+        const deadlineTime = formatTimeIn(lang, deadline.time) ?? deadline.time;
         emails.push({
           to: target.email,
-          subject: t.subjReminder(dateIn(lang), isRevertReq),
-          html: templateReminder(lang, dateIn(lang), handoffIn(lang), isRevertReq, appUrl, swap.request_message),
+          subject: t.subjReminder(dateIn(lang), isRevertReq, deadlineDate, deadlineTime),
+          html: templateReminder(lang, dateIn(lang), handoffIn(lang), isRevertReq, appUrl, swap.request_message, deadlineDate, deadlineTime),
         });
       }
       break;
@@ -752,12 +781,12 @@ function templateReverted(lang: Lang, date: string, appUrl: string): string {
   );
 }
 
-function templateReminder(lang: Lang, date: string, handoffTime: string | null, isRevert: boolean, appUrl: string, requestMessage: string | null = null): string {
+function templateReminder(lang: Lang, date: string, handoffTime: string | null, isRevert: boolean, appUrl: string, requestMessage: string | null, deadlineDate: string, deadlineTime: string): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.reminderTitle,
-    `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 14px;margin:0 0 16px;font-size:13px;font-weight:700;color:#856404;text-align:center;">${t.reminderBanner}</div>
-     <h2 ${h2("#212529")}>${t.reminderHeading}</h2>
-     <p ${P}>${t.reminderBody(date, isRevert)}</p>
+    `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 14px;margin:0 0 16px;font-size:13px;font-weight:700;color:#856404;text-align:center;">${t.reminderBanner(deadlineDate, deadlineTime)}</div>
+     <h2 ${h2("#212529")}>${t.reminderHeading(deadlineDate, deadlineTime)}</h2>
+     <p ${P}>${t.reminderBody(date, isRevert, deadlineDate, deadlineTime)}</p>
      ${detailLine(lang, requestMessage)}${handoffLine(lang, handoffTime)}<p ${P_LAST}>${t.reminderCta}</p>
      <a href="${appUrl}/notifications" ${btn("#212529")}>${t.reminderButton}</a>`
   );

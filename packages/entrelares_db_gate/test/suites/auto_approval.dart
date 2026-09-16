@@ -113,6 +113,34 @@ void autoApprovalTests(GateFixture fx) {
       // sentence in `message` keeps its own format, as the fallback record of
       // what was sent.
       expect(reminder.paramsJson, contains(isoDate(request.scheduleDate)));
+
+      // F-60: and it carries the INSTANT it will be approved at — the day's
+      // expiry plus 48 h, as a `YYYY-MM-DDTHH:MM` wall clock of
+      // America/Sao_Paulo. Without it the client renders the sentence with no
+      // deadline at all, which is the pre-F-60 copy minus its wrong number.
+      final expiry = DateTime(
+        request.scheduleDate.year,
+        request.scheduleDate.month,
+        request.scheduleDate.day,
+        int.parse(request.proposedHandoffTime!.substring(0, 2)),
+        int.parse(request.proposedHandoffTime!.substring(3, 5)),
+      );
+      final deadline = expiry.add(const Duration(hours: 48));
+      final expected = '${isoDate(deadline)}T'
+          '${deadline.hour.toString().padLeft(2, '0')}:'
+          '${deadline.minute.toString().padLeft(2, '0')}';
+      expect(reminder.paramsJson, contains('"deadline":"$expected"'),
+          reason: 'the reminder must name the instant it promises, not a '
+              'window measured from the request (F-60)');
+
+      // The stored PT-BR sentence is the fallback record, and it says the same
+      // instant — a reader whose row predates the client update must not be
+      // told a number that was never true.
+      expect(reminder.message, contains(' será aprovada automaticamente em '));
+      for (final window in ['24h', '48h', '24 horas', '48 horas']) {
+        expect(reminder.message, isNot(contains(window)),
+            reason: 'the reminder quotes a window again');
+      }
     });
 
     test('auto-approval fans out to the uninvolved caregiver', () async {
