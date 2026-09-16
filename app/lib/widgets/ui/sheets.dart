@@ -84,6 +84,20 @@ class AppSheetFrame extends StatelessWidget {
 
   final bool busy;
 
+  /// U-25: a visible way out, at the end of the title row. The closed alpha's
+  /// "falta um botão voltar" was said over a sheet that already closed on a
+  /// backdrop tap and on a drag — neither was found. Null draws no ✕; a sheet
+  /// that must not be dismissed simply does not pass it.
+  final VoidCallback? onClose;
+
+  /// The ✕'s tooltip and its screen-reader name — the catalog's "Fechar".
+  final String? closeLabel;
+
+  /// U-25: small icon actions that sit BEFORE the ✕ on the title row — the day
+  /// sheet's pencil. Chrome, not the sheet's answer: that stays in the pinned
+  /// action row.
+  final List<Widget> headerActions;
+
   const AppSheetFrame({
     super.key,
     required this.title,
@@ -96,7 +110,14 @@ class AppSheetFrame extends StatelessWidget {
     this.onSecondary,
     this.extraAction,
     this.busy = false,
+    this.onClose,
+    this.closeLabel,
+    this.headerActions = const [],
   });
+
+  /// The ✕'s key, so a flow test can close any sheet without a localized
+  /// finder.
+  static const closeKey = Key('sheet-close');
 
   @override
   Widget build(BuildContext context) {
@@ -111,18 +132,37 @@ class AppSheetFrame extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-                Spacing.md, 0, Spacing.md, Spacing.sm),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: EdgeInsets.fromLTRB(Spacing.md, 0,
+                onClose == null && headerActions.isEmpty ? Spacing.md : Spacing.xs,
+                Spacing.sm),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(title, style: textTheme.titleLarge),
-                if (subtitle != null) ...[
-                  const SizedBox(height: Spacing.xs),
-                  Text(subtitle!,
-                      style: textTheme.bodySmall
-                          ?.copyWith(color: tokens.textMuted)),
-                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: textTheme.titleLarge),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: Spacing.xs),
+                        Text(subtitle!,
+                            style: textTheme.bodySmall
+                                ?.copyWith(color: tokens.textMuted)),
+                      ],
+                    ],
+                  ),
+                ),
+                ...headerActions,
+                if (onClose != null)
+                  IconButton(
+                    key: closeKey,
+                    icon: const Icon(Icons.close),
+                    tooltip: closeLabel,
+                    color: tokens.textMuted,
+                    // A save in flight is not abandoned by a stray tap; the
+                    // ✕ comes back with the result.
+                    onPressed: busy ? null : onClose,
+                  ),
               ],
             ),
           ),

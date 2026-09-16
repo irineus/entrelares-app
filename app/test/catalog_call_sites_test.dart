@@ -54,7 +54,6 @@ const _webOnly = <String>{
   'K.calAriaSelected',
   'K.calAriaSwapDone',
   'K.calAriaToday',
-  'K.editorAriaLabel',
   'K.famCopyInviteLink',
   'K.famPageTitle',
   'K.layoutErrorBody',
