@@ -169,6 +169,15 @@ cd app && fvm flutter analyze && fvm flutter test
 # 1,00 em todo emoji que a fonte do host não desenha. Cor nova em tokens.dart
 # passa por esse gate; o que a suíte NÃO mede — ordem de leitura, live region,
 # como uma dica soa — é a passada com leitor de tela em aparelho, do owner.
+# Desde o U-48 (17/09/2026, parte 2) o canal web tem modelo de entrada:
+# web_input_u48_test prende ←/→ com a barra do mês focada e PageUp/PageDown de
+# qualquer lugar do calendário (a tela toma o foco ao montar, num nó que o Tab
+# pula), Enter/Espaço abrindo a célula focada, Escape fechando a sheet, e o hover
+# da célula pintado DENTRO da caixa tingida (Material transparente entre o fill e
+# o InkWell — antes o ripple caía no Material do Scaffold, embaixo do fill). O
+# título do documento por rota é regra pura no core (DocumentTitle, com teste):
+# "Calendário · Entrelares", prefixo [Dev] na frente, e os *PageTitle herdados
+# do Blazor perdem o " - Entrelares" para toda rota ler numa forma só.
 cd app && fvm flutter build apk --debug --flavor dev --split-per-abi
 # Canal web: os dois flags NÃO são opcionais — sem o define o build aponta para o
 # banco de QA, e sem o --no-web-resources-cdn o CanvasKit vem do gstatic.

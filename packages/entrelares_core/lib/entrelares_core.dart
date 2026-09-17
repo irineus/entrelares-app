@@ -44,6 +44,7 @@ export 'src/push_routing.dart';
 export 'src/quick_swap_rules.dart';
 export 'src/report_rules.dart';
 export 'src/role_catalog.dart';
+export 'src/document_title.dart';
 export 'src/route_rules.dart';
 export 'src/save_errors.dart';
 export 'src/schedule_range_rules.dart';

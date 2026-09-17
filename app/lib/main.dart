@@ -664,6 +664,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _authSub?.cancel();
     if (_routerLive) {
       _router.routeInformationProvider.removeListener(_trackPageView);
+      _router.routeInformationProvider.removeListener(_refreshDocumentTitle);
     }
     _inactivityTimer?.cancel();
     _adminMode.dispose();
@@ -750,6 +751,28 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     if (_routerLive) return;
     _routerLive = true;
     _router.routeInformationProvider.addListener(_trackPageView);
+    _router.routeInformationProvider.addListener(_refreshDocumentTitle);
+  }
+
+  /// U-48: the browser's tab and history name the SCREEN, not just the
+  /// product. `MaterialApp.title` is read at build, so a navigation rebuilds
+  /// the root; go_router keeps the pages it built (T-65), so the cost is the
+  /// `Title` widget alone.
+  void _refreshDocumentTitle() {
+    if (mounted) setState(() {});
+  }
+
+  /// "Calendário · Entrelares" for the location on screen, the brand alone
+  /// while the gate decides — reading [_router] before that would BUILD it,
+  /// which is the T-64 defect, so the guard is [_routerLive], never the phase.
+  String get _documentTitle {
+    final prefix = environmentTitlePrefix(isProduction: Env.current.isProduction);
+    if (!_routerLive) return '$prefix${DocumentTitle.brand}';
+    return DocumentTitle.compose(
+      _router.routeInformationProvider.value.uri.toString(),
+      _l,
+      environmentPrefix: prefix,
+    );
   }
 
   /// T-65 — whether to offer the crossing into the installed app.
@@ -1102,9 +1125,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         behavior: HitTestBehavior.translucent,
         onPointerDown: (_) => _lastInteraction = DateTime.now(),
         child: MaterialApp.router(
-          title:
-              '${environmentTitlePrefix(isProduction: Env.current.isProduction)}'
-              'Entrelares',
+          // U-48: per route ("Família · Entrelares"), so tabs and history
+          // are readable — T-64 fixed the URL and left the title.
+          title: _documentTitle,
           // Material's own surfaces (dialogs, tooltips, a11y announcements)
           // follow the session language; the app's text reads the catalog.
           locale: _l.isEnglish ? const Locale('en') : const Locale('pt', 'BR'),
