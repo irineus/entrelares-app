@@ -29,12 +29,16 @@ const _catalogFiles = {
 // was written to force — the classification is a debt register, not a
 // permanent home.
 
-/// Web-only by construction, or replaced by a native affordance: document
-/// <title> (an app has app bars), the PWA install banner and shell chrome (the
-/// map DROPS them), ARIA strings the app expresses through Semantics
-/// differently, the month buttons that became a swipe, the "Filtrar" button
-/// that became reload-on-change, and the browser print hint the F-33 redesign
-/// replaced with the share sheet.
+/// Web-only by construction, or replaced by a native affordance: the PWA
+/// install banner and shell chrome (the map DROPS them), ARIA strings the app
+/// expresses through Semantics differently, the month buttons that became a
+/// swipe, the "Filtrar" button that became reload-on-change, and the browser
+/// print hint the F-33 redesign replaced with the share sheet.
+///
+/// The document `<title>` keys LEFT this list in U-48 (17/09/2026): the web
+/// channel names its tab per route again (`DocumentTitle`, core), and the
+/// `*PageTitle` strings are what it prints. The three still here name tabs
+/// or pages that have no route of their own (family, audit, summary, PDF).
 ///
 /// The 404 route left this list in T-64 (08/09/2026): it was classified here
 /// while this stack had no error route at all, and an unknown path was
@@ -64,7 +68,6 @@ const _webOnly = <String>{
   'K.layoutPolicyNoticeHint',
   'K.layoutPolicyNoticeTitle',
   'K.loginDismissNotice',
-  'K.loginPageTitle',
   'K.navAdmin',
   'K.notifFilterAria',
   'K.onbChecklistDismiss',
@@ -73,13 +76,9 @@ const _webOnly = <String>{
   'K.pdfPageTitle',
   'K.pdfPrintHint',
   'K.pdfUpsellButton',
-  'K.registerPageTitle',
   'K.repFilter',
   'K.repTabsAria',
-  'K.resetPageTitle',
-  'K.rolesPageTitle',
   'K.sumPageTitle',
-  'K.updatePwdPageTitle',
   'K.wfAriaLabel',
 };
 

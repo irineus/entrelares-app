@@ -1140,7 +1140,18 @@ class _CalendarScreenState extends State<CalendarScreen>
     // to happen, and the two do opposite things.
     final visible = _visibleMonth.year * 12 + _visibleMonth.month;
     final current = _today.year * 12 + _today.month;
-    return Row(
+    // U-48: with the month bar focused (either arrow, the today chip), ← and
+    // → step the month — the keys a reader expects on the row that names it.
+    // Scoped to the bar on purpose: over the grid the arrows keep Flutter's
+    // own meaning, moving focus from cell to cell.
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            _stepMonth(-1),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            _stepMonth(1),
+      },
+      child: Row(
       children: [
         IconButton(
           visualDensity: VisualDensity.compact,
@@ -1182,6 +1193,7 @@ class _CalendarScreenState extends State<CalendarScreen>
           onPressed: () => _stepMonth(1),
         ),
       ],
+      ),
     );
   }
 
@@ -1382,7 +1394,23 @@ class _CalendarScreenState extends State<CalendarScreen>
                 const AppAccountButton(),
               ],
             ),
-      body: Column(
+      // U-48: PageUp / PageDown change the month from ANYWHERE on the
+      // calendar, and the screen takes keyboard focus as it mounts so the
+      // keys work before the reader tabs to anything (the node is skipped by
+      // Tab, so it never costs a stop). Above the body, not inside a cell:
+      // key events bubble UP from the focused node, so the shortcuts have to
+      // be an ancestor of whatever holds focus.
+      body: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.pageUp): () =>
+              _stepMonth(-1),
+          const SingleActivator(LogicalKeyboardKey.pageDown): () =>
+              _stepMonth(1),
+        },
+        child: Focus(
+          autofocus: true,
+          skipTraversal: true,
+          child: Column(
         children: [
           if (_showChecklist)
             OnboardingLauncher(
@@ -1531,6 +1559,8 @@ class _CalendarScreenState extends State<CalendarScreen>
               ),
             ),
         ],
+          ),
+        ),
       ),
     );
   }
@@ -2096,16 +2126,23 @@ class _DayCell extends StatelessWidget {
       // open the day; double-tap and hold to select several days".
       onTapHint: l[K.calAriaTapHint],
       onLongPressHint: l[K.calAriaLongPressHint],
-      child: InkWell(
-      onTap: () => onTap(date),
-      // U-11: the mobile entry point to bulk selection (web: 500 ms press).
-      onLongPress: () => onLongPress(date),
-      borderRadius: BorderRadius.circular(8),
       child: Stack(
         fit: StackFit.expand,
         children: [
           Container(
             decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(Radii.md),
+              color: isSelected
+                  ? primary.withValues(alpha: 0.12)
+                  : assigned
+                      ? slot.tone.container
+                      : null,
+            ),
+            // U-48: the border is a FOREGROUND decoration, so the ink below
+            // fills the whole cell (a `decoration` border insets the child by
+            // its width, and the U-28/U-39 suites measure the InkWell as the
+            // cell) and the ring draws over hover and ripple, never under.
+            foregroundDecoration: BoxDecoration(
               borderRadius: BorderRadius.circular(Radii.md),
               // U-28: "today" was a 2 px indigo hairline that vanished into a
               // tinted cell. It is the mark a reader looks for FIRST, so it
@@ -2118,13 +2155,27 @@ class _DayCell extends StatelessWidget {
                           color: assigned && !isSwapped
                               ? slot.tone.border
                               : tokens.outline),
-              color: isSelected
-                  ? primary.withValues(alpha: 0.12)
-                  : assigned
-                      ? slot.tone.container
-                      : null,
             ),
-            child: CustomPaint(
+            // U-48: the ink lives INSIDE the tinted box. An `InkWell` paints
+            // its hover and ripple on the nearest `Material` — the
+            // Scaffold's, UNDER this opaque container — so on the web a
+            // pointer over an assigned day showed nothing (and a tap rippled
+            // under the fill). A transparent `Material` between the fill and
+            // the ink puts the state layer over the tint, at Material 3's
+            // 8 % of the slot's own colour (the card's 4 % vanished on a
+            // tinted container). The pointer cursor is the InkWell's own.
+            child: Material(
+              type: MaterialType.transparency,
+              borderRadius: BorderRadius.circular(Radii.md),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => onTap(date),
+                // U-11: the mobile entry point to bulk selection (web:
+                // 500 ms press).
+                onLongPress: () => onLongPress(date),
+                hoverColor: (assigned ? slot.tone.solid : tokens.text)
+                    .withValues(alpha: _hoverAlpha),
+                child: CustomPaint(
               painter: assigned
                   ? SlotPatternPainter(slot.pattern, slot.tone.border)
                   : null,
@@ -2207,6 +2258,8 @@ class _DayCell extends StatelessWidget {
                   ],
                 ),
               ),
+                ),
+              ),
             ),
           ),
           // Drawn over the fill so it survives the selected/today border,
@@ -2225,7 +2278,9 @@ class _DayCell extends StatelessWidget {
             ),
         ],
       ),
-      ),
     );
   }
+
+  /// Material 3's hover state layer: 8 % of the content colour.
+  static const double _hoverAlpha = 0.08;
 }
