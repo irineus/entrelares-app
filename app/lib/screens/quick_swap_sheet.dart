@@ -193,6 +193,8 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
       secondaryLabel: l[K.commonCancel],
       onSecondary: () => Navigator.of(context).pop(),
       busy: _saving,
+      // U-38: pinned under the title, not after the message field.
+      error: _error,
       children: [
         // ── What changes hands, in calendar order, and who approves ──
         AppCard(
@@ -236,14 +238,6 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
           Text(_progressLabel, style: textTheme.bodySmall),
           const SizedBox(height: 8),
         ],
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: AppBanner(
-                tone: context.tokens.danger,
-                icon: Icons.error_outline,
-                message: _error!),
-          ),
       ],
     );
   }

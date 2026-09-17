@@ -280,77 +280,43 @@ class _WizardSheetState extends State<_WizardSheet> {
     return AppSheetFrame(
       title: l[K.wizTitle],
       subtitle: l[K.wizSubtitle],
-      pinnedNotice: _errorMessage == null
-          ? null
-          : AppBanner(
-              tone: context.tokens.danger,
-              icon: Icons.error_outline,
-              message: _errorMessage!),
-      // F-51: while the S-09 question is on screen it owns the action row,
-      // exactly as the bulk sheet does for its own confirmations.
-      primaryLabel: _showReplaceConfirm
-          ? null
-          : (_completed ? l[K.wizClose] : l[K.wizGenerate]),
+      error: _errorMessage,
+      // F-51: while the S-09 question is on screen it owns the action row —
+      // since U-38 literally, in the row's own place, where "Gerar" was
+      // tapped. It used to open at the TOP of the form, out of sight of
+      // anyone who had scrolled down to the options.
+      confirmation: _showReplaceConfirm ? _replaceConfirmation(l) : null,
+      primaryLabel: _completed ? l[K.wizClose] : l[K.wizGenerate],
       onPrimary: _completed
           ? () => Navigator.of(context).pop(true)
           : (_generating ? null : _generate),
-      secondaryLabel:
-          _showReplaceConfirm || _completed ? null : l[K.commonCancel],
+      secondaryLabel: _completed ? null : l[K.commonCancel],
       onSecondary: () => Navigator.of(context).pop(),
       busy: _generating,
       children: _completed ? _successView(l) : _form(l),
     );
   }
 
-  /// F-51: the S-09 warning, in the bulk sheet's own box — confirmation
-  /// first, the way out after it (U-27).
-  Widget _replaceConfirmBox(Localization l) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(Spacing.sm + Spacing.xs),
-        decoration: BoxDecoration(
-          color: context.tokens.danger.container,
-          border: Border.all(color: context.tokens.danger.border),
-          borderRadius: BorderRadius.circular(Radii.md),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.warning_amber_rounded,
-                    size: 20, color: context.tokens.danger.onContainer),
-                const SizedBox(width: Spacing.sm),
-                Expanded(
-                  child: Text(
-                      l.format(
-                          _replaceCount == 1
-                              ? K.bulkOverwriteWarningOne
-                              : K.bulkOverwriteWarningMany,
-                          [_replaceCount]),
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: context.tokens.danger.onContainer)),
-                ),
-              ],
-            ),
-            const SizedBox(height: Spacing.sm),
-            AppActionPair(
-              primaryLabel: l[K.editorYesChange],
-              destructive: true,
-              busy: _generating,
-              onPrimary: () {
-                setState(() {
-                  _showReplaceConfirm = false;
-                  _replaceConfirmed = true;
-                });
-                _generate();
-              },
-              secondaryLabel: l[K.editorNoGoBack],
-              onSecondary: () => setState(() => _showReplaceConfirm = false),
-            ),
-          ],
-        ),
+  /// F-51: the S-09 warning, the bulk sheet's own question (U-38: the shared
+  /// [AppSheetConfirmation]).
+  Widget _replaceConfirmation(Localization l) =>
+      AppSheetConfirmation.destructive(
+        message: l.format(
+            _replaceCount == 1
+                ? K.bulkOverwriteWarningOne
+                : K.bulkOverwriteWarningMany,
+            [_replaceCount]),
+        yesLabel: l[K.editorYesChange],
+        busy: _generating,
+        onYes: () {
+          setState(() {
+            _showReplaceConfirm = false;
+            _replaceConfirmed = true;
+          });
+          _generate();
+        },
+        noLabel: l[K.editorNoGoBack],
+        onNo: () => setState(() => _showReplaceConfirm = false),
       );
 
   List<Widget> _successView(Localization l) => [
@@ -382,10 +348,6 @@ class _WizardSheetState extends State<_WizardSheet> {
       handoffTime: _handoffTime,
     );
     return [
-      if (_showReplaceConfirm) ...[
-        _replaceConfirmBox(l),
-        const SizedBox(height: Spacing.sm),
-      ],
       // ── Preset shortcuts (the VALUES are pattern ids, never localized) ──
       //
       // U-28 QA: every control on this sheet was a bare `DropdownButton` — an

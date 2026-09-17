@@ -604,42 +604,30 @@ class _DaySheetState extends State<_DaySheet> {
                       child: b),
               ],
             ),
-      primaryLabel: !editing || _showAdminConfirm ? null : l[K.commonSave],
+      // U-38: a failure is pinned under the title, and a question the save
+      // raised takes the action row's place — both where the reader can see
+      // them from the pinned "Salvar" they just tapped.
+      error: _error,
+      confirmation: editing ? _confirmation(l) : null,
+      primaryLabel: !editing ? null : l[K.commonSave],
       onPrimary: _scheduledParentId == null || _deleting || _beyondRetroReach
           ? null
           : _save,
-      secondaryLabel:
-          !editing || _showAdminConfirm ? null : l[K.commonCancel],
+      secondaryLabel: !editing ? null : l[K.commonCancel],
       onSecondary: _deleting ? null : _cancelEdit,
       busy: _saving,
       extraAction: !editing ||
-              _showAdminConfirm ||
               widget.day == null ||
               isClearDayBlocked(adminBypass: widget.adminBypass)
           ? null
-          : OutlinedButton.icon(
-              onPressed: _saving || _deleting ? null : _clearDay,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: context.tokens.danger.onContainer,
-                side: BorderSide(color: context.tokens.danger.border),
-              ),
-              icon: _deleting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.delete_outline),
-              label: Text(l[K.editorClearDay]),
+          : AppSheetDangerAction(
+              label: l[K.editorClearDay],
+              busy: _deleting,
+              onPressed: _saving ? null : _clearDay,
             ),
       children: [
         if (!editing) _summary(l, day, assignment),
         if (editing) ..._form(l),
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsets.only(top: Spacing.sm),
-            child: Text(_error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ),
       ],
     );
   }
@@ -967,148 +955,110 @@ class _DaySheetState extends State<_DaySheet> {
         ),
       ],
 
-      // ── The admin confirmation stays IN the scroll: it is a question about
-      //    what is on screen, not the sheet's own action row (which the frame
-      //    pins and which this branch hides).
-      if (_showAdminConfirm)
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: context.tokens.danger.container,
-            border: Border.all(color: context.tokens.danger.border),
-            borderRadius: BorderRadius.circular(Radii.md),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.warning_amber_rounded,
-                      size: 20, color: context.tokens.danger.onContainer),
-                  const SizedBox(width: Spacing.sm),
-                  Expanded(
-                    child: Text(l[K.editorAdminChangeWarning],
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: context.tokens.danger.onContainer)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: Spacing.sm),
-              AppActionPair(
-                primaryLabel: l[K.editorYesChange],
-                destructive: true,
-                busy: _saving,
-                onPrimary: () {
-                  setState(() {
-                    _showAdminConfirm = false;
-                    _adminConfirmed = true;
-                  });
-                  _save();
-                },
-                secondaryLabel: l[K.editorNoGoBack],
-                onSecondary: () => setState(() => _showAdminConfirm = false),
-              ),
-            ],
-          ),
-        )
-      else if (_showRevertConfirm)
-        // F-47: reverting undoes the swap and replays the day's pre-swap
-        // state — but the observation may have been rewritten since. Only
-        // asked when the two texts differ.
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: context.tokens.warning.container,
-            border: Border.all(color: context.tokens.warning.border),
-            borderRadius: BorderRadius.circular(Radii.md),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.edit_note,
-                      size: 20, color: context.tokens.warning.onContainer),
-                  const SizedBox(width: Spacing.sm),
-                  Expanded(
-                    child: Text(l[K.editorRevertNotesQuestion],
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: context.tokens.warning.onContainer)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              for (final (labelKey, value) in [
-                (K.editorRevertNotesCurrent, _revertCurrentText),
-                (K.editorRevertNotesBefore, _revertSnapshotText),
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text.rich(TextSpan(children: [
-                    TextSpan(
-                        text: '${l[labelKey]} ',
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600)),
-                    TextSpan(
-                        text: (value == null || value.trim().isEmpty)
-                            ? l[K.editorNoNote]
-                            : value,
-                        style: const TextStyle(fontSize: 12)),
-                  ])),
-                ),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  FilledButton(
-                    onPressed: _saving
-                        ? null
-                        : () {
-                            setState(() {
-                              _showRevertConfirm = false;
-                              _revertNotesChoice = false;
-                            });
-                            _save();
-                          },
-                    child: Text(l[K.editorKeepCurrent]),
-                  ),
-                  OutlinedButton(
-                    onPressed: _saving
-                        ? null
-                        : () {
-                            setState(() {
-                              _showRevertConfirm = false;
-                              _revertNotesChoice = true;
-                            });
-                            _save();
-                          },
-                    child: Text(l[K.editorRestorePrevious]),
-                  ),
-                ],
-              ),
-              // Dismissing is not an answer: nothing is sent and the next
-              // attempt asks again from the fail-safe default.
-              TextButton(
-                onPressed: _saving
-                    ? null
-                    : () => setState(() {
-                          _showRevertConfirm = false;
-                          _revertNotesChoice = null;
-                          _revertSnapshotText = null;
-                          _revertCurrentText = null;
-                        }),
-                child: Text(l[K.commonCancel]),
-              ),
-            ],
-          ),
-        )
     ];
+  }
+
+  /// U-38: the two questions a save can raise. They used to render at the END
+  /// of the form while the frame's action row disappeared — so the reader
+  /// tapped the pinned "Salvar", the button vanished and the question was born
+  /// below the fold. The frame now puts them where the button was.
+  Widget? _confirmation(Localization l) {
+    if (_showAdminConfirm) {
+      return AppSheetConfirmation.destructive(
+        message: l[K.editorAdminChangeWarning],
+        yesLabel: l[K.editorYesChange],
+        busy: _saving,
+        onYes: () {
+          setState(() {
+            _showAdminConfirm = false;
+            _adminConfirmed = true;
+          });
+          _save();
+        },
+        noLabel: l[K.editorNoGoBack],
+        onNo: () => setState(() => _showAdminConfirm = false),
+      );
+    }
+    if (_showRevertConfirm) {
+      // F-47: reverting undoes the swap and replays the day's pre-swap state
+      // — but the observation may have been rewritten since. Only asked when
+      // the two texts differ.
+      final textTheme = Theme.of(context).textTheme;
+      final ink = context.tokens.warning.onContainer;
+      return AppSheetConfirmation(
+        tone: context.tokens.warning,
+        icon: Icons.edit_note,
+        message: l[K.editorRevertNotesQuestion],
+        details: [
+          for (final (labelKey, value) in [
+            (K.editorRevertNotesCurrent, _revertCurrentText),
+            (K.editorRevertNotesBefore, _revertSnapshotText),
+          ])
+            Padding(
+              padding: const EdgeInsets.only(bottom: Spacing.xs),
+              child: Text.rich(TextSpan(children: [
+                TextSpan(
+                    text: '${l[labelKey]} ',
+                    style: textTheme.bodySmall?.copyWith(
+                        color: ink, fontWeight: FontWeight.w600)),
+                TextSpan(
+                    text: (value == null || value.trim().isEmpty)
+                        ? l[K.editorNoNote]
+                        : value,
+                    style: textTheme.bodySmall?.copyWith(color: ink)),
+              ])),
+            ),
+        ],
+        actions: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: Spacing.sm,
+              runSpacing: Spacing.xs,
+              children: [
+                FilledButton(
+                  onPressed: _saving
+                      ? null
+                      : () {
+                          setState(() {
+                            _showRevertConfirm = false;
+                            _revertNotesChoice = false;
+                          });
+                          _save();
+                        },
+                  child: Text(l[K.editorKeepCurrent]),
+                ),
+                OutlinedButton(
+                  onPressed: _saving
+                      ? null
+                      : () {
+                          setState(() {
+                            _showRevertConfirm = false;
+                            _revertNotesChoice = true;
+                          });
+                          _save();
+                        },
+                  child: Text(l[K.editorRestorePrevious]),
+                ),
+              ],
+            ),
+            // Dismissing is not an answer: nothing is sent and the next
+            // attempt asks again from the fail-safe default.
+            TextButton(
+              onPressed: _saving
+                  ? null
+                  : () => setState(() {
+                        _showRevertConfirm = false;
+                        _revertNotesChoice = null;
+                        _revertSnapshotText = null;
+                        _revertCurrentText = null;
+                      }),
+              child: Text(l[K.commonCancel]),
+            ),
+          ],
+        ),
+      );
+    }
+    return null;
   }
 }

@@ -7,7 +7,9 @@
 ///
 /// * [AppSectionHeader], [AppCard], [AppListRow], [AppBulletList],
 ///   [AppTimelineEntry] — structure
-/// * [showAppSheet], [AppSheetFrame], [AppFieldLabel], [AppInfoTip] — sheets
+/// * [showAppSheet], [AppSheetFrame], [AppSheetConfirmation],
+///   [AppSheetDangerAction], [AppClearToggle], [AppFieldLabel], [AppInfoTip]
+///   — sheets (U-38 added the middle three)
 /// * [AppBanner], [AppBadge], [AppEmptyState], [AppDangerZone] — state
 /// * [AppTextField], [AppTimeField], [AppSegmented], [AppActionPair],
 ///   [AppAvatar] — action

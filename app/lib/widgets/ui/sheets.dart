@@ -14,11 +14,19 @@
 ///
 /// [showAppSheet] fixes the first; [AppSheetFrame] fixes the other two by
 /// construction: content scrolls, actions do not.
+///
+/// U-38 finished the thought. A pinned "Salvar" means the finger is at the
+/// BOTTOM of the sheet and the eyes may be anywhere in the scroll, so whatever
+/// that tap produces must appear where it can be seen from there: a failure is
+/// pinned under the title ([AppSheetFrame.error]), a question takes the action
+/// row's own place ([AppSheetFrame.confirmation]), and a destructive action has
+/// one slot and one look ([AppSheetDangerAction]).
 library;
 
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import 'signals.dart';
 
 /// How much of the screen a sheet may take. The remaining tenth is not spare
 /// room — it is the target a reader taps to get out, and the visual cue that
@@ -65,6 +73,18 @@ class AppSheetFrame extends StatelessWidget {
   /// is on").
   final Widget? pinnedNotice;
 
+  /// U-38: what went wrong with the sheet's last action — a danger [AppBanner]
+  /// pinned under the title, never at the end of the scroll, where a tap on the
+  /// pinned action row produced a failure nobody saw. A parameter rather than a
+  /// convention, so a sheet cannot put it anywhere else.
+  final String? error;
+
+  /// U-38: a question the last tap raised ("this rewrites 3 planned days…").
+  /// It REPLACES the action row, in the action row's place, because the finger
+  /// is already there. While it is set neither the action row nor
+  /// [extraAction] is drawn: the question's own buttons are the way out.
+  final Widget? confirmation;
+
   final List<Widget> children;
 
   /// The confirming action. Null renders no action row at all, which is right
@@ -78,8 +98,10 @@ class AppSheetFrame extends StatelessWidget {
   final String? secondaryLabel;
   final VoidCallback? onSecondary;
 
-  /// A third action that belongs with the others but is not the answer — the
-  /// day sheet's "Limpar dia".
+  /// A third action that belongs with the others but is not the answer. U-38:
+  /// this is THE place for a destructive-but-legitimate action ("Limpar dia",
+  /// "Limpar dias", "Cancelar solicitação"), drawn as an [AppSheetDangerAction]
+  /// — never a red text button tucked into a field's label row.
   final Widget? extraAction;
 
   final bool busy;
@@ -104,6 +126,8 @@ class AppSheetFrame extends StatelessWidget {
     required this.children,
     this.subtitle,
     this.pinnedNotice,
+    this.error,
+    this.confirmation,
     this.primaryLabel,
     this.onPrimary,
     this.secondaryLabel,
@@ -118,6 +142,15 @@ class AppSheetFrame extends StatelessWidget {
   /// The ✕'s key, so a flow test can close any sheet without a localized
   /// finder.
   static const closeKey = Key('sheet-close');
+
+  /// The pinned failure banner, so a test can measure where it sits.
+  static const errorKey = Key('sheet-error');
+
+  /// The strip that holds a [confirmation], for the same reason.
+  static const confirmationKey = Key('sheet-confirmation');
+
+  /// The scrolling body — what "pinned" is measured against.
+  static const bodyKey = Key('sheet-body');
 
   @override
   Widget build(BuildContext context) {
@@ -166,6 +199,21 @@ class AppSheetFrame extends StatelessWidget {
               ],
             ),
           ),
+          // U-38: the failure comes first — it is about the tap just made, and
+          // the guards under it were on screen before that tap.
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  Spacing.md, 0, Spacing.md, Spacing.sm),
+              child: Semantics(
+                liveRegion: true,
+                child: AppBanner(
+                    key: errorKey,
+                    tone: tokens.danger,
+                    icon: Icons.error_outline,
+                    message: error!),
+              ),
+            ),
           if (pinnedNotice != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -174,6 +222,7 @@ class AppSheetFrame extends StatelessWidget {
             ),
           Flexible(
             child: SingleChildScrollView(
+              key: bodyKey,
               padding: const EdgeInsets.fromLTRB(
                   Spacing.md, 0, Spacing.md, Spacing.md),
               child: Column(
@@ -182,12 +231,35 @@ class AppSheetFrame extends StatelessWidget {
               ),
             ),
           ),
-          if (primaryLabel != null || extraAction != null)
+          if (confirmation != null)
+            _confirmation(context, tokens)
+          else if (primaryLabel != null || extraAction != null)
             _actions(context, tokens),
         ],
       ),
     );
   }
+
+  /// The action row's own surface, holding the question instead. Capped at
+  /// half the screen and scrollable inside: a question that quotes two notes
+  /// (F-47) must not squeeze the sheet's body to nothing.
+  Widget _confirmation(BuildContext context, AppTokens tokens) => Container(
+        key: confirmationKey,
+        decoration: BoxDecoration(
+          color: tokens.surfaceAlt,
+          border: Border(top: BorderSide(color: tokens.outline)),
+        ),
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.5),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+                Spacing.md, Spacing.sm, Spacing.md, Spacing.sm),
+            child: confirmation,
+          ),
+        ),
+      );
 
   Widget _actions(BuildContext context, AppTokens tokens) => Container(
         decoration: BoxDecoration(
@@ -235,6 +307,235 @@ class AppSheetFrame extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      );
+}
+
+/// U-38: the question a sheet's pinned action raised, for
+/// [AppSheetFrame.confirmation]. Three sheets carried private copies of this
+/// box (the day sheet, the bulk sheet twice, the wizard), and every copy
+/// rendered inside the scroll while the action row vanished.
+///
+/// The [tone] is the question's weight: danger (the default) for "this
+/// rewrites planned days", warning for "which note should the revert keep"
+/// (F-47). [details] sits between the sentence and the [actions].
+class AppSheetConfirmation extends StatelessWidget {
+  final String message;
+  final ToneColors? tone;
+  final IconData icon;
+  final List<Widget> details;
+  final Widget actions;
+
+  const AppSheetConfirmation({
+    super.key,
+    required this.message,
+    required this.actions,
+    this.tone,
+    this.icon = Icons.warning_amber_rounded,
+    this.details = const [],
+  });
+
+  /// The common case: a destructive yes and a way back — the confirmation
+  /// first, the way out after it (U-27).
+  factory AppSheetConfirmation.destructive({
+    Key? key,
+    required String message,
+    required String yesLabel,
+    required VoidCallback onYes,
+    required String noLabel,
+    required VoidCallback onNo,
+    bool busy = false,
+  }) =>
+      AppSheetConfirmation(
+        key: key,
+        message: message,
+        actions: _HalfAndHalf(
+          yesLabel: yesLabel,
+          onYes: onYes,
+          noLabel: noLabel,
+          onNo: onNo,
+          busy: busy,
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tone ?? context.tokens.danger;
+    // The box the private copies drew, kept: the owner reviewed it (U-28 QA)
+    // and its weight is the point — only its PLACE was wrong.
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(Spacing.sm + Spacing.xs),
+        decoration: BoxDecoration(
+          color: t.container,
+          border: Border.all(color: t.border),
+          borderRadius: BorderRadius.circular(Radii.md),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 20, color: t.onContainer),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: Text(message,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: t.onContainer)),
+                ),
+              ],
+            ),
+            if (details.isNotEmpty) ...[
+              const SizedBox(height: Spacing.sm),
+              ...details,
+            ],
+            const SizedBox(height: Spacing.sm),
+            actions,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The yes/no of [AppSheetConfirmation.destructive], shaped like the action
+/// row it stands in for: two halves, so a long label wraps inside its button
+/// instead of pushing the pair off a narrow phone (AppActionPair sizes to its
+/// labels, which suits a wide dialog and not this row).
+class _HalfAndHalf extends StatelessWidget {
+  final String yesLabel;
+  final VoidCallback onYes;
+  final String noLabel;
+  final VoidCallback onNo;
+  final bool busy;
+
+  const _HalfAndHalf({
+    required this.yesLabel,
+    required this.onYes,
+    required this.noLabel,
+    required this.onNo,
+    required this.busy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton(
+            onPressed: busy ? null : onYes,
+            style: FilledButton.styleFrom(
+                backgroundColor: tokens.danger.solid,
+                foregroundColor: tokens.danger.onSolid),
+            child: busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(yesLabel, textAlign: TextAlign.center),
+          ),
+        ),
+        const SizedBox(width: Spacing.sm),
+        Expanded(
+          child: OutlinedButton(
+            onPressed: busy ? null : onNo,
+            child: Text(noLabel, textAlign: TextAlign.center),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// U-38: the one look of a destructive action in a sheet — outlined, in the
+/// danger tone, in [AppSheetFrame.extraAction]. "Limpar dia" had it, "Limpar
+/// dias" was a red text button in a label row, and "Cancelar solicitação" was
+/// danger ink on a neutral border: three looks for one meaning.
+class AppSheetDangerAction extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+
+  /// A spinner in place of the icon while THIS action is in flight.
+  final bool busy;
+
+  const AppSheetDangerAction({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon = Icons.delete_outline,
+    this.busy = false,
+  });
+
+  /// The same outline for a destructive button that shares a row with others.
+  static ButtonStyle styleOf(BuildContext context) => OutlinedButton.styleFrom(
+        foregroundColor: context.tokens.danger.onContainer,
+        side: BorderSide(color: context.tokens.danger.border),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    const spinner = SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2));
+    if (icon == null) {
+      return OutlinedButton(
+        onPressed: busy ? null : onPressed,
+        style: styleOf(context),
+        child: busy ? spinner : Text(label),
+      );
+    }
+    return OutlinedButton.icon(
+      onPressed: busy ? null : onPressed,
+      style: styleOf(context),
+      icon: busy ? spinner : Icon(icon),
+      label: Text(label),
+    );
+  }
+}
+
+/// U-38: "Limpar" trailing a field's label in a batch editor — ticked, the
+/// batch CLEARS that field on every selected day instead of leaving it alone.
+/// The bulk sheet has three; the next batch editor takes this control rather
+/// than writing a fourth copy.
+///
+/// Not for an OPTION that changes what a whole action does (the wizard's
+/// "substituir dias planejados", F-51): that is a checkbox with a hint, and a
+/// different question.
+class AppClearToggle extends StatelessWidget {
+  final String label;
+  final bool value;
+
+  /// Null disables it — the field holds a value that makes clearing
+  /// meaningless, or the sheet is busy.
+  final ValueChanged<bool>? onChanged;
+
+  const AppClearToggle({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => MergeSemantics(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Checkbox(
+              value: value,
+              onChanged:
+                  onChanged == null ? null : (v) => onChanged!(v ?? false),
+              visualDensity: VisualDensity.compact,
+            ),
+            Text(label, style: Theme.of(context).textTheme.bodySmall),
+          ],
         ),
       );
 }
