@@ -161,12 +161,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   /// A legal link, sized to its text: the default `TextButton` padding is what
   /// made the pair too wide for one line.
+  ///
+  /// U-32: the WIDTH is the text's, the tap target is not — `shrinkWrap` left
+  /// an 18 dp target on the first screen every user meets (measured), so the
+  /// Material padding is back on the height alone.
   Widget _legalLink(String label, VoidCallback onTap) => TextButton(
         onPressed: onTap,
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          minimumSize: const Size(0, 48),
+          tapTargetSize: MaterialTapTargetSize.padded,
         ),
         child: Text(label, style: Theme.of(context).textTheme.bodySmall),
       );
@@ -298,7 +302,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         _legalLink(l[K.commonPrivacyPolicy],
                             () => _openWebPage(DeepLinkUrls.privacy)),
-                        Text('·', style: Theme.of(context).textTheme.bodySmall),
+                        // U-32: decoration — a screen reader has no word for it.
+                        ExcludeSemantics(
+                          child: Text('·',
+                              style: Theme.of(context).textTheme.bodySmall),
+                        ),
                         _legalLink(l[K.commonTermsOfUse],
                             () => _openWebPage(DeepLinkUrls.terms)),
                       ],

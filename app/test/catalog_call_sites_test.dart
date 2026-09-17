@@ -46,7 +46,6 @@ const _webOnly = <String>{
   'K.bulkAriaLabel',
   'K.calAriaCalendarOf',
   'K.calAriaHandoffAt',
-  'K.calAriaNoResponsible',
   'K.calAriaNotDefined',
   'K.calAriaRequestAwaitingYou',
   'K.calAriaRequestPending',

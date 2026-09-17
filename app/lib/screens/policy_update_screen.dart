@@ -168,6 +168,13 @@ class _PolicyUpdateScreenState extends State<PolicyUpdateScreen> {
                     children: [
                       Checkbox(
                         value: _accepted,
+                        // U-32: the box names what it accepts (see
+                        // register_screen).
+                        semanticLabel: '${l[K.registerConsentAccept]} '
+                            '${l[K.commonPrivacyPolicy]} '
+                            '${l[K.registerConsentAnd]} '
+                            '${l[K.commonTermsOfUse]} '
+                            '${l[K.policyAcceptUpdated]}',
                         onChanged: (value) =>
                             setState(() => _accepted = value ?? false),
                       ),

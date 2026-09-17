@@ -435,6 +435,13 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
           children: [
             Checkbox(
               value: _acceptedTerms,
+              // U-32: the sentence beside the box is three texts and two
+              // buttons, none of them the box's own — a screen reader heard
+              // an unnamed checkbox. The box carries the whole sentence.
+              semanticLabel: '${l[K.registerConsentAccept]} '
+                  '${l[K.commonPrivacyPolicy]} '
+                  '${l[K.registerConsentAnd]} '
+                  '${l[K.commonTermsOfUse]}',
               onChanged: (value) =>
                   setState(() => _acceptedTerms = value ?? false),
             ),

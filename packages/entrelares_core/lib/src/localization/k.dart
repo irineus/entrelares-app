@@ -208,6 +208,8 @@ abstract final class K {
   static const String calAriaRequestAwaitingYou = 'cal.aria.requestAwaitingYou';
   static const String calAriaRequestPending = 'cal.aria.requestPending';
   static const String calAriaSelected = 'cal.aria.selected';
+  static const String calAriaTapHint = 'cal.aria.tapHint';
+  static const String calAriaLongPressHint = 'cal.aria.longPressHint';
   static const String selectionResolve = 'selection.resolve';
   static const String selectionEdit = 'selection.edit';
   static const String selectionCancel = 'selection.cancel';
@@ -1315,6 +1317,8 @@ abstract final class K {
     calAriaRequestAwaitingYou,
     calAriaRequestPending,
     calAriaSelected,
+    calAriaTapHint,
+    calAriaLongPressHint,
     selectionResolve,
     selectionEdit,
     selectionCancel,

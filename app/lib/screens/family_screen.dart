@@ -666,11 +666,15 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             maxLength: RegisterRules.maxNameLength,
           ),
         ),
+        // U-32: the two were the only icon-only controls in the app with no
+        // tooltip — a screen reader heard "button" twice.
         IconButton(
+          tooltip: l[K.commonSave],
           icon: const Icon(Icons.check),
           onPressed: () => _saveName(l),
         ),
         IconButton(
+          tooltip: l[K.commonCancel],
           icon: const Icon(Icons.close),
           onPressed: () => setState(() => _editingName = false),
         ),
