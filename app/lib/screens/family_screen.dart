@@ -49,6 +49,15 @@ final RouteObserver<ModalRoute<void>> familyRouteObserver =
 /// is a countdown the whole family must see, and the shell banner already
 /// points here.
 class FamilyScreen extends StatefulWidget {
+  /// U-47: the ⋮ of a pending member's card, so a flow test can open it
+  /// without a localized finder.
+  static Key memberMenuKey(int memberId) =>
+      ValueKey('family-member-menu-$memberId');
+
+  /// U-47: the ⋮ of an invitation card, for the same reason.
+  static Key invitationMenuKey(int invitationId) =>
+      ValueKey('family-invitation-menu-$invitationId');
+
   final CustodyDataSource dataSource;
 
   /// T-37 — optional: the viral-loop signal never gates an invitation.
@@ -389,7 +398,18 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     }
   }
 
+  /// U-47: revoking kills a link that may already sit in someone's inbox, so
+  /// it asks first — the one destructive move on the roster that used to act
+  /// on a single tap.
   Future<void> _revokeInvite(FamilyInvitation invitation, Localization l) async {
+    final confirmed = await _confirmDestructive(
+      title: l[KApp.famRevokeTitle],
+      message: l.format(KApp.famRevokeConfirm,
+          [_placeholderNameFor(invitation) ?? invitation.email]),
+      yesLabel: l[K.famRevoke],
+      l: l,
+    );
+    if (!confirmed || !mounted) return;
     try {
       await widget.dataSource.revokeInvitation(invitation.id);
       if (!mounted) return;
@@ -495,32 +515,13 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
   /// never-planned placeholder and freezes one with history (future days
   /// freed, the name kept on the past) — the confirmation says exactly that.
   Future<void> _removePending(Member member, Localization l) async {
-    final confirmed = await showAppSheet<bool>(
-      context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(l.format(KApp.famPendingRemoveConfirm, [member.fullName])),
-          const SizedBox(height: Spacing.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(l[K.commonCancel]),
-              ),
-              const SizedBox(width: Spacing.sm),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text(l[KApp.famPendingRemove]),
-              ),
-            ],
-          ),
-        ],
-      ),
+    final confirmed = await _confirmDestructive(
+      title: l.format(KApp.famPendingRemoveTitle, [member.fullName]),
+      message: l.format(KApp.famPendingRemoveConfirm, [member.fullName]),
+      yesLabel: l[KApp.famPendingRemove],
+      l: l,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     try {
       await widget.dataSource.removePendingMember(member.id);
       if (!mounted) return;
@@ -531,6 +532,35 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
           type: AppSnackType.error);
     }
+  }
+
+  /// U-47: the one question a destructive roster action asks. The sheet is an
+  /// `AppSheetFrame` whose pinned row IS the question (U-38's shape): the
+  /// danger "yes" and the way back sit where a sheet's actions always sit,
+  /// instead of the private `Column` + `Row` the remove-pending confirmation
+  /// used to draw. The card had asked for `AppActionPair(destructive: true)`;
+  /// U-38 fixed the shape of every question in a sheet after that was written.
+  Future<bool> _confirmDestructive({
+    required String title,
+    required String message,
+    required String yesLabel,
+    required Localization l,
+  }) async {
+    final confirmed = await showAppSheet<bool>(
+      context: context,
+      builder: (context) => AppSheetFrame(
+        title: title,
+        confirmation: AppSheetConfirmation.destructive(
+          message: message,
+          yesLabel: yesLabel,
+          onYes: () => Navigator.of(context).pop(true),
+          noLabel: l[K.commonCancel],
+          onNo: () => Navigator.of(context).pop(false),
+        ),
+        children: const [],
+      ),
+    );
+    return confirmed == true;
   }
 
   @override
@@ -705,35 +735,100 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                         text: l[K.famAdminBadge], tone: context.tokens.accent),
                 ],
               ),
-              // F-56: what a placeholder is, and the admin's two moves on it.
-              // "Convidar" only while no invitation is out — the invitation
-              // card below carries resend/revoke once one exists.
+              // F-56: what a placeholder is. The admin's two moves on it live
+              // in the trailing ⋮ (U-47) — never as buttons inside a tile
+              // that is itself a tap target.
               if (member.isPendingMember) ...[
                 const SizedBox(height: Spacing.xs),
                 Text(l[KApp.famPendingHint], style: theme.textTheme.bodySmall),
-                if (_isAdmin)
-                  Wrap(
-                    spacing: Spacing.xs,
-                    children: [
-                      if (_invitationFor(member) == null)
-                        TextButton(
-                          onPressed: () => _invitePending(member, l),
-                          child: Text(l[KApp.famPendingInvite]),
-                        ),
-                      TextButton(
-                        onPressed: () => _removePending(member, l),
-                        child: Text(l[KApp.famPendingRemove]),
-                      ),
-                    ],
-                  ),
               ],
             ],
           ),
         ),
         // U-28: the affordance the port dropped — without it nothing says a
-        // row opens anything.
-        trailing: canOpen ? const Icon(Icons.chevron_right) : null,
+        // row opens anything. U-47: on a placeholder the admin's menu takes
+        // that slot; the tile still opens the profile on tap.
+        trailing: member.isPendingMember && _isAdmin
+            ? _memberMenu(member, l)
+            : canOpen
+                ? const Icon(Icons.chevron_right)
+                : null,
       ),
+    );
+  }
+
+  /// U-47: the admin's moves on a placeholder, in ONE menu. "Convidar" only
+  /// while no invitation is out — the invitation card carries resend/revoke
+  /// once one exists. "Remover" wears the danger ink: it is the destructive
+  /// item, and it asks before acting.
+  Widget _memberMenu(Member member, Localization l) {
+    return PopupMenuButton<_MemberAction>(
+      key: FamilyScreen.memberMenuKey(member.id),
+      tooltip: l[KApp.commonMoreActions],
+      icon: const Icon(Icons.more_vert),
+      onSelected: (action) => switch (action) {
+        _MemberAction.invite => _invitePending(member, l),
+        _MemberAction.remove => _removePending(member, l),
+      },
+      itemBuilder: (context) => [
+        if (_invitationFor(member) == null)
+          PopupMenuItem(
+            value: _MemberAction.invite,
+            child: _menuRow(Icons.mail_outline, l[KApp.famPendingInvite]),
+          ),
+        PopupMenuItem(
+          value: _MemberAction.remove,
+          child: _menuRow(
+              Icons.person_remove_outlined, l[KApp.famPendingRemove],
+              danger: true),
+        ),
+      ],
+    );
+  }
+
+  /// U-47: the ⋮ of an invitation card — everything that is not the card's
+  /// one primary. A pending invitation keeps its link moves here (copy,
+  /// resend) plus revoke; an expired one has no link to copy and shows
+  /// "Reenviar" as its primary, so only revoke remains.
+  Widget _invitationMenu(FamilyInvitation invitation, Localization l,
+      {required bool expired}) {
+    return PopupMenuButton<_InvitationAction>(
+      key: FamilyScreen.invitationMenuKey(invitation.id),
+      tooltip: l[KApp.commonMoreActions],
+      icon: const Icon(Icons.more_vert),
+      onSelected: (action) => switch (action) {
+        _InvitationAction.copyLink => _copyLink(invitation, l),
+        _InvitationAction.resend => _resendInvite(invitation, l),
+        _InvitationAction.revoke => _revokeInvite(invitation, l),
+      },
+      itemBuilder: (context) => [
+        if (!expired) ...[
+          PopupMenuItem(
+            value: _InvitationAction.copyLink,
+            child: _menuRow(Icons.copy, l[K.famCopyLink]),
+          ),
+          PopupMenuItem(
+            value: _InvitationAction.resend,
+            child: _menuRow(Icons.refresh, l[K.famResendInvite]),
+          ),
+        ],
+        PopupMenuItem(
+          value: _InvitationAction.revoke,
+          child: _menuRow(Icons.link_off, l[K.famRevoke], danger: true),
+        ),
+      ],
+    );
+  }
+
+  /// The calendar's menu row (icon + label), with the danger ink for the one
+  /// destructive item a menu may hold.
+  Widget _menuRow(IconData icon, String label, {bool danger = false}) {
+    final ink = danger ? context.tokens.danger.onContainer : null;
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: ink),
+      title: Text(label, style: ink == null ? null : TextStyle(color: ink)),
     );
   }
 
@@ -839,39 +934,48 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                       [l.formatDate(invitation.expiresAt.toLocal())]),
                   style: theme.textTheme.bodySmall),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
+            // U-47: ONE primary per card and the rest behind ⋮. Five actions
+            // in three button styles used to share a Wrap with no primary.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // F-62: no placeholder behind this invitation — offer one
-                // without touching the token. Expired or not: the placeholder
-                // outlives the link, and a resend afterwards carries it.
-                if (invitation.profileId == null)
-                  FilledButton.tonalIcon(
-                    icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
-                    label: Text(l[KApp.famAttachInvite]),
-                    onPressed: () => _attachPending(invitation, l),
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      // F-62: no placeholder behind this invitation — offer
+                      // one without touching the token. Expired or not: the
+                      // placeholder outlives the link, and a resend afterwards
+                      // carries it. It stays visible because it is the action
+                      // that changes what the card IS.
+                      if (invitation.profileId == null)
+                        FilledButton.tonalIcon(
+                          icon: const Icon(Icons.person_add_alt_1_outlined,
+                              size: 18),
+                          label: Text(l[KApp.famAttachInvite]),
+                          onPressed: () => _attachPending(invitation, l),
+                        ),
+                      if (expired)
+                        // No link left to share: resending is what changes
+                        // this card's state.
+                        FilledButton.icon(
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: Text(l[K.famResendInvite]),
+                          onPressed: () => _resendInvite(invitation, l),
+                        )
+                      else
+                        // The native improvement over "copy and paste on
+                        // WhatsApp" (F-63) is the primary.
+                        FilledButton.icon(
+                          icon: const Icon(Icons.share_outlined, size: 18),
+                          label: Text(l[KApp.commonShare]),
+                          onPressed: () => _shareLink(invitation, l),
+                        ),
+                    ],
                   ),
-                if (!expired) ...[
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.copy, size: 18),
-                    label: Text(l[K.famCopyLink]),
-                    onPressed: () => _copyLink(invitation, l),
-                  ),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.share_outlined, size: 18),
-                    label: Text(l[KApp.commonShare]),
-                    onPressed: () => _shareLink(invitation, l),
-                  ),
-                ],
-                TextButton.icon(
-                  onPressed: () => _resendInvite(invitation, l),
-                  icon: const Icon(Icons.refresh, size: 18),
-                  label: Text(l[K.famResendInvite]),
                 ),
-                TextButton(
-                  onPressed: () => _revokeInvite(invitation, l),
-                  child: Text(l[K.famRevoke]),
-                ),
+                _invitationMenu(invitation, l, expired: expired),
               ],
             ),
           ],
@@ -1288,6 +1392,12 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
   }
 
 }
+
+/// U-47: what a pending member's ⋮ offers.
+enum _MemberAction { invite, remove }
+
+/// U-47: what an invitation card's ⋮ offers.
+enum _InvitationAction { copyLink, resend, revoke }
 
 /// F-62: the one question an admin answers to give a legacy invitation its
 /// placeholder — the name. E-mail and role are already the invitation's; the

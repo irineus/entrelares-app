@@ -26,6 +26,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:entrelares_app/main.dart' as app;
+import 'package:entrelares_app/screens/family_screen.dart';
+import 'package:entrelares_app/widgets/ui/ui.dart';
 
 import 'e2e_family.dart';
 import 'e2e_proof.dart';
@@ -146,7 +148,10 @@ void main() {
     // the database. Wait for the card, not for the frames — and BEFORE reading
     // the database (T-71): the card on screen is the proof that the RPC the
     // tap fired has returned, so a server read after it cannot race the write.
-    await pumpUntilFound(tester, find.text(l[K.famRevoke]),
+    // U-47: "Revogar" is behind the card's ⋮ now, so the card's own e-mail is
+    // the sign that it arrived (the form clears on send, so the address is on
+    // screen once, on the card).
+    await pumpUntilFound(tester, find.text(invitee),
         reason: 'the invitation card must appear once the Família page '
             'refetches after create_invitation');
 
@@ -159,7 +164,18 @@ void main() {
         reason: 'F-56: the invitation is FOR the placeholder the form created');
 
     // ── Revoke ──
-    await tapVisible(tester, find.text(l[K.famRevoke]).first);
+    // U-47: "Revogar" lives behind the card's ⋮ and asks before acting. The
+    // menu is found by the invitation's id, because the placeholder's member
+    // card carries a ⋮ of its own on the same screen.
+    final invitationId = created.single['id'] as int;
+    await tapVisible(
+        tester, find.byKey(FamilyScreen.invitationMenuKey(invitationId)));
+    await tester.tap(find.text(l[K.famRevoke]));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppSheetFrame), findsOneWidget,
+        reason: 'U-47: revoking asks first');
+    // The menu is gone, so the only "Revogar" left is the sheet's danger yes.
+    await tapVisible(tester, find.text(l[K.famRevoke]).last);
     // T-71 (run 371, 13/09/2026, same tree as the green run 372 beside it):
     // the tap fires `_revokeInvite` → `await revokeInvitation()` → `_load()`,
     // and `tapVisible` settles FRAMES, not the request — so with the dev
@@ -167,7 +183,7 @@ void main() {
     // database was read while the RPC was still in flight and the row was
     // still open. The card leaving the screen is the signal that the request
     // and the refetch both completed; only then is the server state a fact.
-    await pumpUntilGone(tester, find.text(l[K.famRevoke]),
+    await pumpUntilGone(tester, find.text(invitee),
         reason: 'the invitation card must leave the Família page once '
             'revoke_invitation returns and the page refetches');
 
