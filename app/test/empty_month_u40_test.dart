@@ -13,8 +13,10 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_app/screens/calendar_screen.dart';
 
 import 'calendar_slice_test.dart';
+import 'frozen_day_test.dart' show swapReq;
 import 'horizon_clamp_test.dart'
     show freeFamily, monthsAhead, swipeToNextMonth, tightSettings;
+import 'workflow_test.dart' show longPressDay, twoFutureDays;
 
 final _pt = Localization(AppLanguage.ptBr);
 final _en = Localization(AppLanguage.en);
@@ -151,6 +153,31 @@ void main() {
     expect(find.text(_pt.format(K.horizonFree, [1, 24])), findsOneWidget);
     expect(_strip(_pt, shown), findsNothing);
     expect(_planButton, findsNothing);
+  });
+
+  testWidgets('the strip pushing a month with marks to the floor does not '
+      'overflow a cell when the step changes', (tester) async {
+    // The scene `workflow_test` paints: an empty month whose two frozen days
+    // get long-pressed. The selection bar takes the cell from 61 dp to the
+    // 50 dp floor and the U-39 step drops to compact — the disc must take
+    // its new radius on that frame, not tween into it (a CircleAvatar did,
+    // and overflowed the shrunken column by 5 px for 200 ms).
+    final days = twoFutureDays;
+    if (days == null) return;
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..frozenRequests = [
+        swapReq(10, dayOfMonth(days.$1)),
+        swapReq(11, dayOfMonth(days.$2), requesting: 1, target: 2, proposed: 2),
+      ];
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    expect(_strip(_pt, today), findsOneWidget);
+
+    await longPressDay(tester, days.$1);
+    await longPressDay(tester, days.$2);
+    expect(tester.takeException(), isNull);
+    // The strip survives the selection: the month is still empty.
+    expect(_strip(_pt, today), findsOneWidget);
   });
 
   testWidgets('an English session reads the strip in English',

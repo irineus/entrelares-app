@@ -1961,6 +1961,40 @@ class EmptyMonthStrip extends StatelessWidget {
   }
 }
 
+/// The carer's disc in a day cell — a circle that takes its new radius on
+/// the SAME frame the cell does.
+///
+/// It was a `CircleAvatar`, which is an `AnimatedContainer` inside: when the
+/// U-39 step drops from comfortable to compact (the selection bar appearing
+/// takes the cell from 61 dp to its 50 dp floor), the avatar kept animating
+/// from radius 12 to 9 for 200 ms while the cell had already shrunk, and for
+/// those frames 14 + 2 + 24 + 2 + 11 = 51 dp of content sat in a 46 dp
+/// column — `RenderFlex overflowed by 5 pixels`, found by U-40's strip, which
+/// is what first pushed a month with marks to the floor in a test. A cell's
+/// geometry is decided once per layout; nothing inside it may tween.
+class DayCellAvatar extends StatelessWidget {
+  final double radius;
+  final Color color;
+  final Widget child;
+
+  const DayCellAvatar({
+    super.key,
+    required this.radius,
+    required this.color,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: radius * 2,
+        height: radius * 2,
+        child: DecoratedBox(
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+          child: Center(child: child),
+        ),
+      );
+}
+
 /// What a frozen day paints on its cell (computed in [_MonthGrid._markFor]).
 class _FrozenMark {
   final IconData badge; // bell (mine) · hourglass (theirs)
@@ -2096,10 +2130,9 @@ class _DayCell extends StatelessWidget {
                             height: 1,
                             color: assigned ? slot.tone.onContainer : null)),
                     const SizedBox(height: DayCellType.gap),
-                    CircleAvatar(
+                    DayCellAvatar(
                       radius: type.avatarRadius,
-                      backgroundColor:
-                          assigned ? slot.tone.solid : Colors.transparent,
+                      color: assigned ? slot.tone.solid : Colors.transparent,
                       child: Text(initial,
                           style: TextStyle(
                               fontSize: type.initial,
