@@ -1349,7 +1349,7 @@ not apply because no Edge Function reads this config.
 > PRODUCTION web app, whose database has no such token, so it answers
 > "convite inválido". That is honest and harmless — a dev token can do nothing
 > in prod — but it means **dev invite testing happens inside the app**, never
-> from the inbox: use "Copiar link" on the Família screen, or push the link
+> from the inbox: use "Copiar link" behind the invitation card's ⋮ on the Família screen (U-47), or push the link
 > straight in with
 > `adb shell am start -a android.intent.action.VIEW -d "https://web.entrelares.app/register?invite=<token>" com.entrelares.flutter`.
 > A debug build never verifies App Links (per-machine certificate), so the

@@ -58,6 +58,8 @@ abstract final class KApp {
   // ── Native affordances the web has no word for (lote 4) — the system share
   //    sheet replaces "copie o link e mande no WhatsApp" ──
   static const String commonShare = 'app.common.share';
+  // U-47: the tooltip of a card's overflow menu (⋮).
+  static const String commonMoreActions = 'app.common.moreActions';
 
   // ── Sudo S-10 (lote 4) — the outcomes `SudoService.ElevateAsync` builds
   //    itself in the web, as hardcoded PT literals; the catalogued rule ports,
@@ -192,6 +194,10 @@ abstract final class KApp {
   static const String famPendingRemove = 'app.fam.pendingRemove';
   static const String famPendingRemoveConfirm = 'app.fam.pendingRemoveConfirm';
   static const String famPendingRemoved = 'app.fam.pendingRemoved';
+  // U-47: the two questions a roster card asks before a destructive move.
+  static const String famPendingRemoveTitle = 'app.fam.pendingRemoveTitle';
+  static const String famRevokeTitle = 'app.fam.revokeTitle';
+  static const String famRevokeConfirm = 'app.fam.revokeConfirm';
   // ── F-62 legacy invitation → placeholder ("Adicionar ao calendário") ──
   static const String famAttachInvite = 'app.fam.attachInvite';
   static const String famAttachTitle = 'app.fam.attachTitle';
@@ -271,6 +277,7 @@ abstract final class KApp {
     wizErrBlockDays,
     wfProgressProcessing,
     commonShare,
+    commonMoreActions,
     sudoErrCooldown,
     sudoErrNoSession,
     sudoErrWrongPassword,
@@ -352,6 +359,9 @@ abstract final class KApp {
     famPendingRemove,
     famPendingRemoveConfirm,
     famPendingRemoved,
+    famPendingRemoveTitle,
+    famRevokeTitle,
+    famRevokeConfirm,
     famAttachInvite,
     famAttachTitle,
     famAttachHint,
@@ -420,6 +430,7 @@ abstract final class StringsAppPtBr {
     KApp.wizErrBlockDays: 'Cada bloco deve ter pelo menos 1 dia.',
     KApp.wfProgressProcessing: 'Processando {0}/{1}...',
     KApp.commonShare: 'Compartilhar',
+    KApp.commonMoreActions: 'Mais ações',
     KApp.sudoErrCooldown: 'Muitas tentativas. Aguarde {0} segundos.',
     KApp.sudoErrNoSession: 'Sessão inválida. Entre novamente.',
     KApp.sudoErrWrongPassword: 'Senha incorreta.',
@@ -540,6 +551,11 @@ abstract final class StringsAppPtBr {
         'Remover {0} do calendário? Os dias futuros planejados para essa '
             'pessoa serão liberados; os passados ficam no histórico.',
     KApp.famPendingRemoved: '{0} foi removido do calendário.',
+    KApp.famPendingRemoveTitle: 'Remover {0}',
+    KApp.famRevokeTitle: 'Revogar convite',
+    KApp.famRevokeConfirm:
+        'Revogar o convite de {0}? O link que essa pessoa recebeu deixa de '
+            'funcionar.',
     KApp.famAttachInvite: 'Adicionar ao calendário',
     KApp.famAttachTitle: 'Adicionar {0} ao calendário',
     KApp.famAttachHint:
@@ -628,6 +644,7 @@ abstract final class StringsAppEn {
     KApp.wizErrBlockDays: 'Each block needs at least 1 day.',
     KApp.wfProgressProcessing: 'Processing {0}/{1}...',
     KApp.commonShare: 'Share',
+    KApp.commonMoreActions: 'More actions',
     KApp.sudoErrCooldown: 'Too many attempts. Wait {0} seconds.',
     KApp.sudoErrNoSession: 'Invalid session. Sign in again.',
     KApp.sudoErrWrongPassword: 'Wrong password.',
@@ -745,6 +762,10 @@ abstract final class StringsAppEn {
         'Remove {0} from the calendar? Future days planned for them are '
             'freed; past ones stay in the history.',
     KApp.famPendingRemoved: '{0} was removed from the calendar.',
+    KApp.famPendingRemoveTitle: 'Remove {0}',
+    KApp.famRevokeTitle: 'Revoke invitation',
+    KApp.famRevokeConfirm:
+        'Revoke the invitation to {0}? The link they received stops working.',
     KApp.famAttachInvite: 'Add to the calendar',
     KApp.famAttachTitle: 'Add {0} to the calendar',
     KApp.famAttachHint:

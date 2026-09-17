@@ -23,6 +23,7 @@ import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/services/analytics_service.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
+import 'package:entrelares_app/widgets/ui/ui.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource;
 
@@ -97,6 +98,21 @@ FamilyInvitation expiredInvite({int id = 11}) => FamilyInvitation(
       expiresAt: DateTime.now().toUtc().subtract(const Duration(days: 1)),
     );
 
+/// U-47: opens a card's ⋮ and waits for the menu.
+Future<void> openMenu(WidgetTester tester, Key key) async {
+  await tester.tap(find.byKey(key));
+  await tester.pumpAndSettle();
+}
+
+/// U-47: a LABELLED button — what "a button inside a tappable tile" and "at
+/// most two visible buttons per card" count. The ⋮ is an `IconButton`, which
+/// Material 3 also builds on `ButtonStyleButton`, so the type alone would
+/// count the overflow as a button; these four are the ones with a word on
+/// them.
+final labelledButton = find.byWidgetPredicate((w) =>
+    w is TextButton || w is FilledButton || w is OutlinedButton ||
+    w is ElevatedButton);
+
 FakeCustodyDataSource source({
   List<Member> members = const [admin, plain],
   List<FamilyInvitation> invitations = const [],
@@ -123,6 +139,7 @@ Future<void> pumpFamily(
   VoidCallback? onOpenDeletion,
   AnalyticsService? analytics,
   Future<void> Function(String message)? onShareInvite,
+  void Function(Member member, bool isOwn)? onOpenProfile,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 2400));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -140,6 +157,7 @@ Future<void> pumpFamily(
         onOpenDeletion: onOpenDeletion,
         analytics: analytics,
         onShareInvite: onShareInvite,
+        onOpenProfile: onOpenProfile,
       ),
     ),
   ));
@@ -406,8 +424,8 @@ void main() {
       expect(ds.addedPending, isEmpty);
     });
 
-    testWidgets('a pending invitation offers copy, share, resend and revoke',
-        (tester) async {
+    testWidgets('a pending invitation shows ONE primary (Compartilhar) and '
+        'keeps copy, resend and revoke behind the ⋮ (U-47)', (tester) async {
       await pumpFamily(
           tester,
           source(
@@ -417,8 +435,14 @@ void main() {
 
       expect(find.text('vovo@example.com'), findsOne);
       expect(find.text(l[K.famInviteSentBadge]), findsOne);
+      expect(find.widgetWithText(FilledButton, l[KApp.commonShare]), findsOne,
+          reason: 'the native share is the card\'s one filled action');
+      expect(find.text(l[K.famCopyLink]), findsNothing);
+      expect(find.text(l[K.famResendInvite]), findsNothing);
+      expect(find.text(l[K.famRevoke]), findsNothing);
+
+      await openMenu(tester, FamilyScreen.invitationMenuKey(10));
       expect(find.text(l[K.famCopyLink]), findsOne);
-      expect(find.text(l[KApp.commonShare]), findsOne);
       expect(find.text(l[K.famResendInvite]), findsOne);
       expect(find.text(l[K.famRevoke]), findsOne);
     });
@@ -464,7 +488,17 @@ void main() {
       expect(find.text(l[K.famInviteExpiredBadge]), findsOne);
       expect(find.text(l[K.famInviteExpiredHint]), findsOne);
       expect(find.text(l[K.famCopyLink]), findsNothing);
-      expect(find.text(l[K.famResendInvite]), findsOne);
+      // U-47: with no link left, resending is the primary — and the menu
+      // holds revoke alone, no copy or share for a dead link.
+      expect(
+          find.widgetWithText(FilledButton, l[K.famResendInvite]), findsOne);
+      expect(find.text(l[KApp.commonShare]), findsNothing);
+
+      await openMenu(tester, FamilyScreen.invitationMenuKey(11));
+      expect(find.text(l[K.famRevoke]), findsOne);
+      expect(find.text(l[K.famCopyLink]), findsNothing);
+      expect(find.text(l[KApp.commonShare]), findsNothing);
+      expect(find.byWidgetPredicate((w) => w is PopupMenuItem), findsOne);
     });
 
     testWidgets('resending re-creates for the same address and role',
@@ -483,17 +517,71 @@ void main() {
       ]);
     });
 
-    testWidgets('revoking calls the RPC', (tester) async {
+    testWidgets('revoking asks first (U-47), then calls the RPC',
+        (tester) async {
       final ds = source(
           members: const [admin],
           invitations: [pendingInvite()],
           plan: 'premium');
       await pumpFamily(tester, ds);
 
+      await openMenu(tester, FamilyScreen.invitationMenuKey(10));
       await tester.tap(find.text(l[K.famRevoke]));
       await tester.pumpAndSettle();
 
+      // The question is a sheet of the app's own shape (U-38): the frame,
+      // with the question in the pinned row's place.
+      expect(find.byType(AppSheetFrame), findsOne);
+      expect(find.byKey(AppSheetFrame.confirmationKey), findsOne);
+      expect(find.text(l[KApp.famRevokeTitle]), findsOne);
+      expect(find.text(l.format(KApp.famRevokeConfirm, ['vovo@example.com'])),
+          findsOne);
+      expect(ds.revokedInvitations, isEmpty, reason: 'nothing before the answer');
+
+      // The menu is closed, so the "Revogar" left is the sheet's danger yes.
+      await tester.tap(find.text(l[K.famRevoke]).last);
+      await tester.pumpAndSettle();
+
       expect(ds.revokedInvitations, [10]);
+      expect(find.byType(AppSheetFrame), findsNothing);
+    });
+
+    testWidgets('"Cancelar" on the revoke question revokes nothing (U-47)',
+        (tester) async {
+      final ds = source(
+          members: const [admin],
+          invitations: [pendingInvite()],
+          plan: 'premium');
+      await pumpFamily(tester, ds);
+
+      await openMenu(tester, FamilyScreen.invitationMenuKey(10));
+      await tester.tap(find.text(l[K.famRevoke]));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.commonCancel]));
+      await tester.pumpAndSettle();
+
+      expect(ds.revokedInvitations, isEmpty);
+      expect(find.byType(AppSheetFrame), findsNothing);
+      expect(find.text('vovo@example.com'), findsOne, reason: 'card intact');
+    });
+
+    testWidgets('a placeholder\'s revoke question names the person, not the '
+        'address (U-47)', (tester) async {
+      await pumpFamily(
+          tester,
+          source(
+              members: const [admin, pending],
+              invitations: [
+                pendingInvite(profileId: 6, email: 'eva@example.com')
+              ],
+              plan: 'premium'));
+
+      await openMenu(tester, FamilyScreen.invitationMenuKey(10));
+      await tester.tap(find.text(l[K.famRevoke]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l.format(KApp.famRevokeConfirm, ['Eva Pendente'])),
+          findsOne);
     });
 
     testWidgets('the server\'s own cap refusal is shown verbatim',
@@ -527,10 +615,16 @@ void main() {
       expect(find.text('Eva Pendente'), findsOne);
       expect(find.text(l[KApp.famPendingBadge]), findsOne);
       expect(find.text(l[KApp.famPendingHint]), findsOne);
-      expect(find.text(l[KApp.famPendingInvite]), findsOne);
-      expect(find.text(l[KApp.famPendingRemove]), findsOne);
       expect(find.text(l[K.famLeftBadge]), findsNothing);
       expect(find.text(l[K.famFreeCapNotice]), findsOne);
+
+      // U-47: the two moves are behind the card's ⋮, not buttons in the tile.
+      expect(find.text(l[KApp.famPendingInvite]), findsNothing);
+      expect(find.text(l[KApp.famPendingRemove]), findsNothing);
+      expect(find.byKey(FamilyScreen.memberMenuKey(6)), findsOne);
+      await openMenu(tester, FamilyScreen.memberMenuKey(6));
+      expect(find.text(l[KApp.famPendingInvite]), findsOne);
+      expect(find.text(l[KApp.famPendingRemove]), findsOne);
     });
 
     testWidgets('a non-admin sees the badge but no moves', (tester) async {
@@ -543,6 +637,8 @@ void main() {
       expect(find.text(l[KApp.famPendingBadge]), findsOne);
       expect(find.text(l[KApp.famPendingInvite]), findsNothing);
       expect(find.text(l[KApp.famPendingRemove]), findsNothing);
+      expect(find.byKey(FamilyScreen.memberMenuKey(6)), findsNothing,
+          reason: 'U-47: no menu for a reader who has no moves');
     });
 
     testWidgets('without an e-mail the form adds to the calendar and sends '
@@ -573,6 +669,7 @@ void main() {
       final ds = source(members: const [admin, pending], plan: 'premium');
       await pumpFamily(tester, ds);
 
+      await openMenu(tester, FamilyScreen.memberMenuKey(6));
       await tester.tap(find.text(l[KApp.famPendingInvite]));
       await tester.pumpAndSettle();
       expect(
@@ -601,18 +698,30 @@ void main() {
               invitations: [pendingInvite(profileId: 6, email: 'eva@example.com')],
               plan: 'premium'));
 
-      expect(find.text(l[KApp.famPendingInvite]), findsNothing);
       expect(find.text('Eva Pendente'), findsNWidgets(2));
       expect(find.text('eva@example.com'), findsOne);
-      expect(find.text(l[K.famResendInvite]), findsOne);
+      expect(find.widgetWithText(FilledButton, l[KApp.commonShare]), findsOne,
+          reason: 'the invitation card is there, with its primary');
+
+      // U-47: the member's ⋮ offers "Remover" alone while a link is out.
+      await openMenu(tester, FamilyScreen.memberMenuKey(6));
+      expect(find.text(l[KApp.famPendingInvite]), findsNothing);
+      expect(find.text(l[KApp.famPendingRemove]), findsOne);
     });
 
     testWidgets('removing asks first, then calls the RPC', (tester) async {
       final ds = source(members: const [admin, pending], plan: 'premium');
       await pumpFamily(tester, ds);
 
+      await openMenu(tester, FamilyScreen.memberMenuKey(6));
       await tester.tap(find.text(l[KApp.famPendingRemove]));
       await tester.pumpAndSettle();
+      // U-47: the question wears the app's sheet chrome (U-38) — the frame,
+      // the question in the pinned row's place — instead of a bare Column.
+      expect(find.byType(AppSheetFrame), findsOne);
+      expect(find.byKey(AppSheetFrame.confirmationKey), findsOne);
+      expect(find.text(l.format(KApp.famPendingRemoveTitle, ['Eva Pendente'])),
+          findsOne);
       expect(
           find.text(
               l.format(KApp.famPendingRemoveConfirm, ['Eva Pendente'])),
@@ -653,7 +762,7 @@ void main() {
               invitations: [pendingInvite(profileId: 6)],
               plan: 'premium'));
       expect(attachButton, findsNothing);
-      expect(find.text(l[K.famResendInvite]), findsOne,
+      expect(find.text(l[KApp.commonShare]), findsOne,
           reason: 'the card is there — only the attach is not');
     });
 
@@ -714,6 +823,130 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('já foi aceito'), findsOne);
+    });
+  });
+
+  // U-47: the roster's action hierarchy — one primary per card, the rest
+  // behind ⋮, and no button nested inside a tile that is itself a target.
+  // Measured on a 360 dp phone at the reader's real width, because the
+  // defect was a Wrap of five buttons that only a narrow screen showed.
+  group('U-47 action hierarchy', () {
+    Future<void> pumpPhone(WidgetTester tester, FakeCustodyDataSource ds) async {
+      // With a profile page to open, so the tiles ARE tap targets (F-16):
+      // that is the case the nested buttons used to live in.
+      await pumpFamily(tester, ds, onOpenProfile: (_, _) {});
+      await tester.binding.setSurfaceSize(const Size(360, 2400));
+      await tester.pumpAndSettle();
+    }
+
+    /// The tappable tiles on screen — a tile with an `onTap` is a target,
+    /// and nothing with a word on it may be tapped inside it.
+    final tappableTile =
+        find.byWidgetPredicate((w) => w is ListTile && w.onTap != null);
+
+    testWidgets('no labelled button renders inside a tappable tile',
+        (tester) async {
+      // An admin looking at a placeholder: the tile opens the profile AND
+      // the admin has two moves — the case that used to nest buttons.
+      await pumpPhone(
+          tester,
+          source(members: const [admin, pending], plan: 'premium'));
+      expect(tappableTile, findsAtLeast(1),
+          reason: 'the pending member\'s tile opens the profile for an admin');
+      expect(find.descendant(of: tappableTile, matching: labelledButton),
+          findsNothing);
+      expect(find.byKey(FamilyScreen.memberMenuKey(6)), findsOne);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('each invitation card shows at most two labelled buttons',
+        (tester) async {
+      // Both flavours at once: a legacy pending invitation (attach + share)
+      // and a legacy expired one (attach + resend) — the most a card shows.
+      await pumpPhone(
+          tester,
+          source(
+              members: const [admin],
+              invitations: [pendingInvite(), expiredInvite()],
+              plan: 'premium'));
+      for (final id in [10, 11]) {
+        final card = find.ancestor(
+            of: find.byKey(FamilyScreen.invitationMenuKey(id)),
+            matching: find.byType(Card));
+        expect(card, findsOne);
+        expect(
+            find.descendant(of: card.first, matching: labelledButton)
+                .evaluate()
+                .length,
+            lessThanOrEqualTo(2),
+            reason: 'invitation $id');
+      }
+      // And the primary of each is the one the card's state calls for.
+      expect(find.widgetWithText(FilledButton, l[KApp.commonShare]), findsOne);
+      expect(
+          find.widgetWithText(FilledButton, l[K.famResendInvite]), findsOne);
+      expect(tester.takeException(), isNull,
+          reason: 'no overflow on a 360 dp phone');
+    });
+
+    testWidgets('a placeholder\'s pending invitation shows the primary alone',
+        (tester) async {
+      await pumpPhone(
+          tester,
+          source(
+              members: const [admin, pending],
+              invitations: [pendingInvite(profileId: 6, email: 'eva@example.com')],
+              plan: 'premium'));
+      final card = find.ancestor(
+          of: find.byKey(FamilyScreen.invitationMenuKey(10)),
+          matching: find.byType(Card));
+      expect(find.descendant(of: card.first, matching: labelledButton),
+          findsOne);
+      expect(find.widgetWithText(FilledButton, l[KApp.commonShare]), findsOne);
+    });
+
+    testWidgets('the F-62 attach and the F-56 invite/remove stay within two '
+        'taps, in English too', (tester) async {
+      for (final language in AppLanguage.values) {
+        final lang = Localization(language);
+        final ds = source(
+            members: const [admin, pending],
+            invitations: [pendingInvite()],
+            plan: 'premium');
+        await pumpFamily(tester, ds, language: language);
+
+        // Attach: one tap, on the card — found by its icon, because the
+        // invite form's blank-address button uses the same words (F-56).
+        await tester.tap(find.byIcon(Icons.person_add_alt_1_outlined));
+        await tester.pumpAndSettle();
+        expect(
+            find.text(lang.format(KApp.famAttachTitle, ['vovo@example.com'])),
+            findsOne,
+            reason: '$language');
+        await tester.tap(find.text(lang[K.commonCancel]));
+        await tester.pumpAndSettle();
+
+        // Invite: ⋮ then the item.
+        await openMenu(tester, FamilyScreen.memberMenuKey(6));
+        await tester.tap(find.text(lang[KApp.famPendingInvite]));
+        await tester.pumpAndSettle();
+        expect(
+            find.text(
+                lang.format(KApp.famPendingInviteTitle, ['Eva Pendente'])),
+            findsOne,
+            reason: '$language');
+        await tester.tap(find.text(lang[K.commonCancel]));
+        await tester.pumpAndSettle();
+
+        // Remove: ⋮ then the item, and the question opens.
+        await openMenu(tester, FamilyScreen.memberMenuKey(6));
+        await tester.tap(find.text(lang[KApp.famPendingRemove]));
+        await tester.pumpAndSettle();
+        expect(find.byType(AppSheetFrame), findsOne, reason: '$language');
+        await tester.tap(find.text(lang[K.commonCancel]));
+        await tester.pumpAndSettle();
+        expect(ds.removedPending, isEmpty, reason: '$language');
+      }
     });
   });
 
