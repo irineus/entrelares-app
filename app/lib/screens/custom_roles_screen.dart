@@ -195,33 +195,30 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                     if (_isPremium)
                       _form(l)
                     else
-                      Card(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(l[K.rolesPremiumGate]),
-                              if (widget.onSeePremium != null)
-                                TextButton.icon(
-                                  // F-41: same funnel family as the other
-                                  // gates (T-37), told apart by `gate`.
-                                  onPressed: () {
-                                    widget.analytics?.trackEvent(
-                                        'premium-gate-click',
-                                        props: {'gate': 'custom-roles'});
-                                    widget.onSeePremium!();
-                                  },
-                                  icon: const Icon(Icons.auto_awesome,
-                                      size: 18),
-                                  label: Text(l[K.famSeePremium]),
-                                ),
-                            ],
-                          ),
-                        ),
+                      // U-49: the gate is a banner, the shared shape for
+                      // "this is why the form is not here" — it was a tinted
+                      // Card with a loose TextButton, outside the component
+                      // set.
+                      AppBanner(
+                        tone: context.tokens.info,
+                        icon: Icons.lock_outline,
+                        message: l[K.rolesPremiumGate],
+                        actionLabel: widget.onSeePremium == null
+                            ? null
+                            : l[K.famSeePremium],
+                        actionIcon: widget.onSeePremium == null
+                            ? null
+                            : Icons.auto_awesome,
+                        onAction: widget.onSeePremium == null
+                            ? null
+                            // F-41: same funnel family as the other gates
+                            // (T-37), told apart by `gate`.
+                            : () {
+                                widget.analytics?.trackEvent(
+                                    'premium-gate-click',
+                                    props: {'gate': 'custom-roles'});
+                                widget.onSeePremium!();
+                              },
                       ),
                   ],
                 ),

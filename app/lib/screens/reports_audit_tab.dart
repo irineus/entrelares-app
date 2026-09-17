@@ -309,7 +309,8 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
                       child: DropdownButtonFormField<int>(
                         initialValue: _year,
                         items: [
-                          for (var y = thisYear - 1; y <= thisYear + 2; y++)
+                          // U-49: one range for the three report tabs.
+                          for (final y in reportYearRange(thisYear))
                             DropdownMenuItem(value: y, child: Text('$y')),
                         ],
                         onChanged: _loading

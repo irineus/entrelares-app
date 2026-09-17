@@ -391,21 +391,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           if (target.leftAt != null) ...[
-            Card(
-              color: Theme.of(context).colorScheme.errorContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.lock_outline,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.onErrorContainer),
-                    const SizedBox(width: Spacing.sm),
-                    Expanded(child: Text(l[K.profFrozenBanner])),
-                  ],
-                ),
-              ),
+            // U-49: the shared danger banner — this was a Card painted with
+            // `errorContainer` by hand, the only one of its kind.
+            AppBanner(
+              tone: context.tokens.danger,
+              icon: Icons.lock_outline,
+              message: l[K.profFrozenBanner],
             ),
             const SizedBox(height: 16),
           ],
@@ -458,8 +449,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // U-49: the same header the family screen draws, with its spacing built
+  // in — the profile's was a bare Text and an 8 px SizedBox at each call.
   Widget _sectionTitle(String text) =>
-      Text(text, style: Theme.of(context).textTheme.titleMedium);
+      AppSectionHeader(title: text, topSpacing: 0);
 
   /// U-28 — the language setting, back on the page that holds settings.
   Widget _languageSection(Localization l) => AppCard(
@@ -793,7 +786,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _sectionTitle(l[last ? K.profLeaveTitleLast : K.profLeaveTitle]),
-          const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -870,7 +862,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _sectionTitle(l[last ? K.profLeaveTitleLast : K.profLeaveTitle]),
-        const SizedBox(height: 8),
         ...[
           Text(l[last ? K.profLeaveConfirmTextLast : K.profLeaveConfirmText],
               style: TextStyle(color: theme.colorScheme.error)),

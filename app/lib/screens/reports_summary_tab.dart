@@ -252,8 +252,10 @@ class _ReportsSummaryTabState extends State<ReportsSummaryTab> {
                     child: DropdownButtonFormField<int>(
                       initialValue: _year,
                       items: [
-                        // Web parity: last year through two years ahead.
-                        for (var y = thisYear - 1; y <= thisYear + 2; y++)
+                        // U-49: one range for the three report tabs (this one
+                        // used to offer last year through two years ahead;
+                        // the PDF tab two back and one ahead).
+                        for (final y in reportYearRange(thisYear))
                           DropdownMenuItem(value: y, child: Text('$y')),
                       ],
                       onChanged: _loading

@@ -1163,9 +1163,12 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     }
     return [
       const SizedBox(height: 12),
-      TextButton(
+      // U-49: the open/closed state is a vector chevron, not a glyph glued
+      // to the label — the label is the catalog's word alone.
+      TextButton.icon(
         onPressed: () => _toggleHistory(l),
-        child: Text('${_historyOpen ? '▾' : '▸'} ${l[K.premHistoryToggle]}'),
+        icon: Icon(_historyOpen ? Icons.expand_more : Icons.chevron_right),
+        label: Text(l[K.premHistoryToggle]),
       ),
       if (_historyOpen)
         if (_historyLoading)

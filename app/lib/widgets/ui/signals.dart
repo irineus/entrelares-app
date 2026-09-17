@@ -29,6 +29,16 @@ class AppBanner extends StatelessWidget {
   /// Whether the banner draws its border. Off inside an already-bordered card.
   final bool bordered;
 
+  /// U-49: the one thing the reader can DO about what the banner says — the
+  /// "Ver Premium" of a gate. Both or neither, like [AppEmptyState]'s pair;
+  /// [actionIcon] is the optional mark before the label. Drawn as a text
+  /// button in the tone's own ink, under the message: three gate cards each
+  /// glued their own `TextButton.icon` under a tinted `Card`, and none of
+  /// them was a component.
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final IconData? actionIcon;
+
   const AppBanner({
     super.key,
     required this.tone,
@@ -36,7 +46,13 @@ class AppBanner extends StatelessWidget {
     this.title,
     this.icon,
     this.bordered = true,
-  });
+    this.actionLabel,
+    this.onAction,
+    this.actionIcon,
+  })  : assert((actionLabel == null) == (onAction == null),
+            'actionLabel and onAction come together'),
+        assert(actionIcon == null || actionLabel != null,
+            'an action icon needs an action to sit on');
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +70,26 @@ class AppBanner extends StatelessWidget {
           message,
           style: textTheme.bodyMedium?.copyWith(color: tone.onContainer),
         ),
+        if (actionLabel != null) ...[
+          const SizedBox(height: Spacing.xs),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: actionIcon == null
+                ? TextButton(
+                    style: TextButton.styleFrom(
+                        foregroundColor: tone.onContainer),
+                    onPressed: onAction,
+                    child: Text(actionLabel!),
+                  )
+                : TextButton.icon(
+                    style: TextButton.styleFrom(
+                        foregroundColor: tone.onContainer),
+                    onPressed: onAction,
+                    icon: Icon(actionIcon, size: 18),
+                    label: Text(actionLabel!),
+                  ),
+          ),
+        ],
       ],
     );
     return Container(

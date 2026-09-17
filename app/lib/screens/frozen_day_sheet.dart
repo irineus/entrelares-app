@@ -159,27 +159,21 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
         ? null
         : DateTime.tryParse(request.createdAt!)?.toLocal();
 
+    // U-49: the shared label/value row — this sheet kept a private copy with
+    // its own column split. A quoted message keeps its italic through
+    // `valueWidget`; everything else is the row's own text.
     Widget infoRow(String labelKey, String value, {bool isMessage = false}) =>
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                  child: Text(l[labelKey],
-                      style: Theme.of(context).textTheme.bodySmall)),
-              Expanded(
-                child: Text(value,
-                    textAlign: TextAlign.end,
-                    style: isMessage
-                        ? Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontStyle: FontStyle.italic)
-                        : Theme.of(context).textTheme.bodyMedium),
-              ),
-            ],
-          ),
+        AppListRow(
+          label: l[labelKey],
+          value: isMessage ? null : value,
+          valueWidget: isMessage
+              ? Text(value,
+                  textAlign: TextAlign.end,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontStyle: FontStyle.italic))
+              : null,
         );
 
     Widget actionButton({

@@ -757,7 +757,7 @@ void main() {
         ];
       await _pump(tester, ds);
 
-      await tester.tap(_text('▸ ${l[K.premHistoryToggle]}'));
+      await tester.tap(_text(l[K.premHistoryToggle]));
       await tester.pumpAndSettle();
 
       expect(
@@ -772,11 +772,29 @@ void main() {
       expect(ds.billingHistoryFetches, 1);
 
       // Collapsing and expanding again reads the cache, not the RPC.
-      await tester.tap(_text('▾ ${l[K.premHistoryToggle]}'));
+      await tester.tap(_text(l[K.premHistoryToggle]));
       await tester.pumpAndSettle();
-      await tester.tap(_text('▸ ${l[K.premHistoryToggle]}'));
+      await tester.tap(_text(l[K.premHistoryToggle]));
       await tester.pumpAndSettle();
       expect(ds.billingHistoryFetches, 1);
+    });
+
+    testWidgets('U-49: the open/closed state is a chevron, not a glyph in the '
+        'label', (tester) async {
+      final ds = _source(
+        plan: 'premium',
+        subscription: _subscription(status: 'active'),
+      );
+      await _pump(tester, ds);
+
+      expect(find.textContaining('▸'), findsNothing);
+      expect(find.textContaining('▾'), findsNothing);
+      expect(find.byIcon(Icons.chevron_right), findsOne);
+
+      await tester.tap(_text(l[K.premHistoryToggle]));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.expand_more), findsOne);
+      expect(find.byIcon(Icons.chevron_right), findsNothing);
     });
 
     testWidgets('a failed load closes the panel and says so', (tester) async {
@@ -786,7 +804,7 @@ void main() {
       )..throwOnBillingHistory = Exception('boom');
       await _pump(tester, ds);
 
-      await tester.tap(_text('▸ ${l[K.premHistoryToggle]}'));
+      await tester.tap(_text(l[K.premHistoryToggle]));
       await tester.pumpAndSettle();
 
       expect(_text(l[K.famBillingHistoryLoadFailed]), findsOne);
