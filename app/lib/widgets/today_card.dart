@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 import 'app_l10n.dart';
+import 'ui/ui.dart';
 
 /// Today at a Glance — port of `TodayCard.razor`. A dumb presentational
 /// widget: every rule arrives computed ([TodayGlance] and the pure helpers in
@@ -58,6 +59,12 @@ class TodayCard extends StatelessWidget {
 
   /// The greeting's name. The web prints the full legal name; on a phone that
   /// is three lines of card spent on something the reader already knows.
+  /// U-48: the most of the greeting line the date may claim. 0.7 holds
+  /// "Quarta-feira, 19 de agosto" whole at 1.3× on a 360 dp phone and still
+  /// leaves "Olá, Ana" its room; past that the date shrinks to its floor and
+  /// then ellipsizes, never the reader's font setting.
+  static const double _dateShare = 0.7;
+
   String get _firstName {
     final parts = userFullName.trim().split(' ');
     return parts.isEmpty ? userFullName : parts.first;
@@ -104,50 +111,63 @@ class TodayCard extends StatelessWidget {
                   // box started right after the name no matter what alignment
                   // lived inside it. With the leftover placed BETWEEN the two,
                   // the greeting keeps the left edge and the date the right.
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          l.format(K.cardGreeting, [_firstName]),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(color: user.tone.onContainer),
+                  //
+                  // U-48: the date gets FIRST claim on the line — up to
+                  // [_dateShare] of it, its natural width within that — and
+                  // the greeting takes what is left. Two equal `Flexible`s
+                  // gave each half, so at 1.3× the date shrank to 0.75× while
+                  // half the line sat empty beside a four-letter name.
+                  LayoutBuilder(
+                    builder: (context, box) => Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            l.format(K.cardGreeting, [_firstName]),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(color: user.tone.onContainer),
+                          ),
                         ),
-                      ),
-                      // U-28 QA: the date must arrive WHOLE — "quinta-feira,
-                      // 20 de ag…" is worse than no date at all. It is not
-                      // rigid either, or a long month name would overflow the
-                      // row on a narrow phone: `scaleDown` gives up a couple of
-                      // percent of type size instead of the last five letters.
-                      //
-                      // The `Align` is not decoration. `Expanded` + `FittedBox`
-                      // alone left the date floating next to the name: a
-                      // FittedBox reports the size its CHILD needs, so the
-                      // alignment inside it had nothing to align against.
-                      // `Align` takes the whole half and puts the date at the
-                      // end of it, which is what "right-aligned" means.
-                      Flexible(
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: Spacing.sm),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              _capitalize(l.formatTodayHeading(today)),
-                              maxLines: 1,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(color: user.tone.onContainer),
+                        // U-28 QA: the date must arrive WHOLE — "quinta-feira,
+                        // 20 de ag…" is worse than no date at all. It is not
+                        // rigid either, or a long month name would overflow
+                        // the row on a narrow phone: the shrink gives up a
+                        // couple of percent of type size instead of the last
+                        // five letters. U-48: a couple of percent is now a
+                        // FLOOR of 15 % ([AppShrinkToFit]); at a scale where
+                        // even that does not hold, the ellipsis returns rather
+                        // than the reader's font setting being undone.
+                        //
+                        // The alignment is not decoration. A shrinking box
+                        // reports the size its CHILD needs, so an alignment
+                        // inside it would have nothing to align against; the
+                        // box takes its whole share and puts the date at the
+                        // end of it, which is what "right-aligned" means.
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                              maxWidth: box.maxWidth * _dateShare),
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: Spacing.sm),
+                            child: AppShrinkToFit(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                _capitalize(l.formatTodayHeading(today)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(color: user.tone.onContainer),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   // U-28 QA: "Voltar para hoje" used to sit here as a line of
                   // link text and read as an orphan sentence inside a coloured

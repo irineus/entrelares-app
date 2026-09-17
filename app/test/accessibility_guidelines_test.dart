@@ -123,11 +123,22 @@ Widget _host(Widget home, {required bool dark}) => AppL10n(
 
 typedef _Scene = Future<void> Function(WidgetTester tester, bool dark);
 
-/// One scene, both themes; semantics are on before the first frame.
+/// U-48 — the reader's font setting, as the card names it: 1.3× is the
+/// "large" step of both platforms' accessibility settings.
+const double _largeText = 1.3;
+
+/// One scene, both themes, and a third pass in light at 1.3× (U-48): the
+/// same measurements, plus whatever a screen throws when its layout does not
+/// hold — a `RenderFlex overflowed` is a test failure, so "every screen
+/// holds at 1.3× on 360 dp" is a fact this suite states, not a hope.
+/// Semantics are on before the first frame.
 void _scene(String name, _Scene body) {
-  for (final dark in [false, true]) {
-    testWidgets('$name (${dark ? 'dark' : 'light'})', (tester) async {
+  for (final (dark, scale) in [(false, 1.0), (true, 1.0), (false, _largeText)]) {
+    final variant = scale == 1.0 ? (dark ? 'dark' : 'light') : 'light, $scale×';
+    testWidgets('$name ($variant)', (tester) async {
       await _usePhone(tester);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       final handle = tester.ensureSemantics();
       await body(tester, dark);
       handle.dispose();
