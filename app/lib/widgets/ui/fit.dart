@@ -6,9 +6,10 @@
 /// summary's paired stats, the today card's date, the login's legal links),
 /// each with a comment explaining why a shrink beat a wrap at ORDINARY
 /// scales — true, and beside the point at 1.3×, where the shrink quietly
-/// undid the whole setting. A child that is a TAP TARGET is designed
-/// `48 / floor` tall, so it still measures 48 dp on screen at the floor —
-/// the U-32 gate measured the login's links at 41 under a bare 0.85 shrink.
+/// undid the whole setting. A child that is a TAP TARGET may shrink only at
+/// the reader's default scale (`floor: 1.0` under large text): the U-32 gate
+/// measured the login's links at 41 dp under a 0.85 shrink at 1.3×, and a
+/// smaller target is the wrong answer to "make my text bigger".
 ///
 /// The shape U-39 settled for the day cell — a ceiling with a floor and a
 /// reason — is what this widget gives every one-liner: shrink by at most
