@@ -17,6 +17,7 @@ import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
 import 'package:entrelares_app/screens/custom_roles_screen.dart';
+import 'package:entrelares_app/screens/family_screen.dart';
 import 'package:entrelares_app/screens/frozen_day_sheet.dart';
 import 'package:entrelares_app/screens/reports_pdf_tab.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
@@ -467,6 +468,8 @@ void main() {
           plan: 'premium',
         ),
       );
+      // U-47: the pending member's actions live behind the card's menu.
+      await family.openMenu(tester, FamilyScreen.memberMenuKey(6));
       await tester.tap(find.text(_l[KApp.famPendingInvite]));
       await tester.pumpAndSettle();
 
