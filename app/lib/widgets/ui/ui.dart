@@ -13,9 +13,12 @@
 /// * [AppBanner], [AppBadge], [AppEmptyState], [AppDangerZone] — state
 /// * [AppTextField], [AppTimeField], [AppSegmented], [AppActionPair],
 ///   [AppAvatar] — action
+/// * [AppShrinkToFit] — a one-liner that shrinks to fit, never under 0.85×
+///   (U-48: the floor `FittedBox.scaleDown` never had)
 library;
 
 export 'controls.dart';
+export 'fit.dart';
 export 'signals.dart';
 export 'surfaces.dart';
 export 'sheets.dart';

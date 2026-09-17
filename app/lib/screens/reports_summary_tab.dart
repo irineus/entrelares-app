@@ -356,28 +356,28 @@ class _ReportsSummaryTabState extends State<ReportsSummaryTab> {
   /// One stat: label above, value under it — each on EXACTLY one line. A
   /// half-column is narrow enough that at large font scales a whole word
   /// stops fitting ("Agendad / o", owner's device), and a mid-word break is
-  /// worse than a fractionally smaller word: the [FittedBox] shrinks the
-  /// line only when it would otherwise wrap, so at ordinary scales nothing
-  /// changes at all.
+  /// worse than a fractionally smaller word. U-48: the shrink has a FLOOR
+  /// now — [AppShrinkToFit] gives up at most 15 % of the type size, and past
+  /// that the word ellipsizes rather than turning the reader's font setting
+  /// back down. At ordinary scales nothing changes at all.
   Widget _stat(String label, String value, {required ToneColors tone}) =>
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _oneLine(Text(label,
+          _oneLine(label,
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
-                  ?.copyWith(color: tone.onContainer))),
-          _oneLine(Text(value,
+                  ?.copyWith(color: tone.onContainer)),
+          _oneLine(value,
               style: TextStyle(
-                  fontWeight: FontWeight.bold, color: tone.onContainer))),
+                  fontWeight: FontWeight.bold, color: tone.onContainer)),
         ],
       );
 
-  Widget _oneLine(Widget text) => FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: AlignmentDirectional.centerStart,
-        child: text,
+  Widget _oneLine(String text, {TextStyle? style}) => AppShrinkToFit(
+        child: Text(text,
+            maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
       );
 
   /// Two stats side by side in equal columns — the owner's sketch:

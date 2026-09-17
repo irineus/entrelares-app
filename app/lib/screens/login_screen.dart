@@ -175,6 +175,18 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Text(label, style: Theme.of(context).textTheme.bodySmall),
       );
 
+  /// U-48: the pair below shrinks to keep U-28's one line on a NARROW phone
+  /// (283.6 dp of Inter against 256 at 320 dp — measured), and only at the
+  /// reader's default scale. With large text on, it never shrinks: the
+  /// buttons are tap targets, a 0.85× target is 41 dp against the 48 the
+  /// U-32 gate holds, and the honest answer to "make my text bigger" is a
+  /// second line, not a smaller link. The majority, at 1.0×, sees nothing
+  /// change (owner, 17/09/2026: accessibility never costs the many).
+  double _legalPairFloor(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(1) > 1
+          ? 1.0
+          : AppShrinkToFit.defaultFloor;
+
   Future<void> _openWebPage(String url) async {
     // Legal pages live on the web until lote 4 ports them.
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
@@ -292,13 +304,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 // U-28: ONE line, always. As a `Wrap` of two default-padded
                 // `TextButton`s the pair broke in two on a phone and left the
-                // screen tall and strewn; `FittedBox` gives up a couple of
+                // screen tall and strewn; the shrink gives up a couple of
                 // percent of type size on the narrowest screens instead.
+                // U-48: a couple of percent has a floor now (0.85×,
+                // [AppShrinkToFit]), only at the default scale
+                // (`_legalPairFloor`), and the child is a `Wrap` again: where
+                // it may not shrink, the pair breaks into two centred lines.
                 Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  child: AppShrinkToFit(
+                    floor: _legalPairFloor(context),
+                    alignment: Alignment.center,
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         _legalLink(l[K.commonPrivacyPolicy],
                             () => _openWebPage(DeepLinkUrls.privacy)),

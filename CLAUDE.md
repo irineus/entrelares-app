@@ -169,6 +169,19 @@ cd app && fvm flutter analyze && fvm flutter test
 # 1,00 em todo emoji que a fonte do host não desenha. Cor nova em tokens.dart
 # passa por esse gate; o que a suíte NÃO mede — ordem de leitura, live region,
 # como uma dica soa — é a passada com leitor de tela em aparelho, do owner.
+# Desde o U-48 (17/09/2026) cada cena roda uma TERCEIRA vez, no claro a 1,3× —
+# a escala "grande" dos dois sistemas — e um overflow aí é vermelho: "toda tela
+# segura a 1,3× em 360 dp" é fato da suíte, não esperança. No mesmo item, o
+# quinto gate de fonte, no_tiny_text_test: nenhum fontSize < 11 em lib/ (o PDF,
+# Roboto em pontos no papel, é o único arquivo fora da varredura), o tema nomeado
+# nunca abaixo de 11, e as TRÊS exceções que o owner manteve em 17/09 presas pelo
+# nome — a célula compacta do calendário (inicial 9, horário 9, medida do U-28),
+# só a linha do horário no degrau confortável quando "12:00 PM" não cabe (U-39)
+# e as iniciais do AppAvatar r14 (0,7 × raio = 9,8) — para que uma quarta não
+# entre calada e nenhuma das três desça. E o FittedBox.scaleDown deixou de existir
+# em lib/: um texto de uma linha que precisa caber usa AppShrinkToFit (widgets/ui/),
+# que encolhe até 0,85× e, abaixo disso, entrega ao filho a largura do piso — Text
+# faz reticência, Wrap quebra a linha — em vez de desfazer a fonte que o leitor pediu.
 cd app && fvm flutter build apk --debug --flavor dev --split-per-abi
 # Canal web: os dois flags NÃO são opcionais — sem o define o build aponta para o
 # banco de QA, e sem o --no-web-resources-cdn o CanvasKit vem do gstatic.
