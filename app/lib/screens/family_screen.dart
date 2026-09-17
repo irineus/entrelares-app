@@ -862,23 +862,19 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             // plan page. The CTA never carries a price or an external link —
             // it navigates, and the page decides what the CHANNEL may offer
             // (T-38).
-            Card(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(l[K.famFreeCapNotice]),
-                    if (widget.onOpenPlan != null)
-                      TextButton.icon(
-                        onPressed: () => _goToPremium('extra-caregiver'),
-                        icon: const Icon(Icons.auto_awesome, size: 18),
-                        label: Text(l[K.famSeePremium]),
-                      ),
-                  ],
-                ),
-              ),
+            // U-49: the gate is a banner — the shared shape for "this is
+            // why the form is not here", with the CTA as the banner's action.
+            AppBanner(
+              tone: context.tokens.info,
+              icon: Icons.lock_outline,
+              message: l[K.famFreeCapNotice],
+              actionLabel:
+                  widget.onOpenPlan == null ? null : l[K.famSeePremium],
+              actionIcon:
+                  widget.onOpenPlan == null ? null : Icons.auto_awesome,
+              onAction: widget.onOpenPlan == null
+                  ? null
+                  : () => _goToPremium('extra-caregiver'),
             )
           else if (_seatsTaken < _settings.maxCaregivers)
             AppCard(child: _inviteForm(l))
@@ -1280,18 +1276,29 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         ]),
         const SizedBox(height: 12),
         // Who said what — an absent row reads "aguardando", never "concordou".
+        // U-49: a row per voter with the answer as a badge (success / danger /
+        // neutral), instead of "Nome — aguardando" in prose.
         for (final voter in FamilyLifecycleRules.voters(
             _lifecycleMembers, request.requestedBy))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              '${_members.where((m) => m.id == voter.id).map((m) => m.fullName).firstOrNull ?? ''}'
-              ' — ${switch (FamilyLifecycleRules.voteOf(_votes, voter.id)) {
-                true => l[K.famDelVoteAgreed],
-                false => l[K.famDelVoteRefused],
-                null => l[K.famDelVoteWaiting],
-              }}',
-              style: theme.textTheme.bodySmall,
+          AppListRow(
+            label: _members
+                    .where((m) => m.id == voter.id)
+                    .map((m) => m.fullName)
+                    .firstOrNull ??
+                '',
+            valueWidget: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: switch (FamilyLifecycleRules.voteOf(_votes, voter.id)) {
+                true => AppBadge(
+                    text: l[K.famDelVoteAgreed],
+                    tone: context.tokens.success),
+                false => AppBadge(
+                    text: l[K.famDelVoteRefused],
+                    tone: context.tokens.danger),
+                null => AppBadge(
+                    text: l[K.famDelVoteWaiting],
+                    tone: context.tokens.neutral),
+              },
             ),
           ),
         const SizedBox(height: 12),
@@ -1434,15 +1441,16 @@ class _AttachPendingSheetState extends State<_AttachPendingSheet> {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    // U-49: the shared frame — title, hint, the action pair pinned and the
+    // keyboard inset handled once. The field's error stays on the field.
+    return AppSheetFrame(
+      title: widget.title,
+      subtitle: l[KApp.famAttachHint],
+      primaryLabel: l[KApp.famAttachInvite],
+      onPrimary: _submit,
+      secondaryLabel: l[K.commonCancel],
+      onSecondary: () => Navigator.of(context).pop(),
       children: [
-        Text(widget.title, style: theme.textTheme.titleMedium),
-        const SizedBox(height: Spacing.xs),
-        Text(l[KApp.famAttachHint], style: theme.textTheme.bodySmall),
-        const SizedBox(height: Spacing.md),
         AppTextField(
           label: l[KApp.famInviteName],
           hint: l[KApp.famInviteNameHint],
@@ -1451,21 +1459,6 @@ class _AttachPendingSheetState extends State<_AttachPendingSheet> {
           errorText: _errorKey == null ? null : l[_errorKey!],
           autofocus: true,
           onSubmitted: (_) => _submit(),
-        ),
-        const SizedBox(height: Spacing.md),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(l[K.commonCancel]),
-            ),
-            const SizedBox(width: Spacing.sm),
-            FilledButton(
-              onPressed: _submit,
-              child: Text(l[KApp.famAttachInvite]),
-            ),
-          ],
         ),
       ],
     );
@@ -1510,12 +1503,14 @@ class _InvitePendingSheetState extends State<_InvitePendingSheet> {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    // U-49: same frame as the attach sheet above.
+    return AppSheetFrame(
+      title: widget.title,
+      primaryLabel: l[K.famSendInvite],
+      onPrimary: _submit,
+      secondaryLabel: l[K.commonCancel],
+      onSecondary: () => Navigator.of(context).pop(),
       children: [
-        Text(widget.title, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: Spacing.md),
         AppTextField(
           label: l[K.commonEmail],
           hint: l[K.famInviteEmailPlaceholder],
@@ -1524,21 +1519,6 @@ class _InvitePendingSheetState extends State<_InvitePendingSheet> {
           errorText: _errorKey == null ? null : l[_errorKey!],
           autofocus: true,
           onSubmitted: (_) => _submit(),
-        ),
-        const SizedBox(height: Spacing.md),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(l[K.commonCancel]),
-            ),
-            const SizedBox(width: Spacing.sm),
-            FilledButton(
-              onPressed: _submit,
-              child: Text(l[K.famSendInvite]),
-            ),
-          ],
         ),
       ],
     );
