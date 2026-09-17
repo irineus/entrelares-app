@@ -224,6 +224,9 @@ class _ResolveSheetState extends State<_ResolveSheet> {
       primaryLabel: l[K.wfClose],
       onPrimary: _acting ? null : () => Navigator.of(context).pop(),
       busy: _acting,
+      // U-38: pinned — the actions live in groups down the scroll, and a
+      // failure of one of them used to land after the last group.
+      error: _error,
       children: [
               if (pendingForMe.isNotEmpty) ...[
                 AppCard(
@@ -363,14 +366,6 @@ class _ResolveSheetState extends State<_ResolveSheet> {
                 Text(_progressLabel,
                     style: Theme.of(context).textTheme.bodySmall),
               ],
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: Spacing.sm),
-                  child: AppBanner(
-                      tone: context.tokens.danger,
-                      icon: Icons.error_outline,
-                      message: _error!),
-                ),
       ],
     );
   }

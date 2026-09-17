@@ -554,31 +554,36 @@ class _BulkSheetState extends State<_BulkSheet> {
     // U-28 QA: same frame as every other sheet — capped height so a strip of
     // calendar stays visible and tappable, and the action row pinned rather
     // than sitting at the end of a long form.
-    final confirming = _showDeleteAllConfirm || _showOverwriteConfirm;
     return AppSheetFrame(
       title: l.format(count == 1 ? K.bulkTitleOne : K.bulkTitleMany, [count]),
-      primaryLabel: confirming ? null : l[K.commonSave],
+      // U-38: the failure pinned under the title and the question in the
+      // action row's place — the batch is saved from the pinned row, and both
+      // used to appear at the end of this long form.
+      error: _error,
+      confirmation: _confirmation(l),
+      primaryLabel: l[K.commonSave],
       onPrimary: _scheduledParentId == 0 ? null : _save,
-      secondaryLabel: confirming ? null : l[K.commonCancel],
+      secondaryLabel: l[K.commonCancel],
       onSecondary: () => Navigator.of(context).pop(),
       busy: _saving,
+      // U-38: "Limpar dias" left the planned parent's label row, where it was
+      // a small red text button beside a dropdown, for the frame's one
+      // destructive slot. Clearing assigned days stays admin-only (S-09).
+      extraAction: !widget.adminBypass
+          ? null
+          : AppSheetDangerAction(
+              key: const Key('bulkClearDays'),
+              label: l[K.bulkClearDaysAction],
+              onPressed: _saving
+                  ? null
+                  : () => setState(() => _showDeleteAllConfirm = true),
+            ),
       children: [
-              if (_showDeleteAllConfirm)
-                _confirmBox(
-                  l[K.bulkDeleteAllWarning],
-                  yesLabel: l[K.bulkYesDelete],
-                  onYes: () {
-                    setState(() => _showDeleteAllConfirm = false);
-                    _save(clearScheduled: true);
-                  },
-                  onNo: () => setState(() => _showDeleteAllConfirm = false),
-                )
-              else ...[
                 // U-29: this sheet had missed the U-28 QA pass — bare
                 // underline `DropdownButton`s, loose labels and no grouping,
                 // exactly what the day sheet and the wizard were converted
                 // away from. Same conventions now: one AppCard per question,
-                // AppFieldLabel (the "Limpar" checkboxes ride as trailing),
+                // AppFieldLabel (the "Limpar" toggles ride as trailing),
                 // and bordered form fields.
                 //
                 // ── Planned parent ──
@@ -586,29 +591,8 @@ class _BulkSheetState extends State<_BulkSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                              child: AppFieldLabel(
-                                  l[K.editorScheduledParent],
-                                  info:
-                                      l[K.editorScheduledParentHint])),
-                          // QA: clearing assigned days is admin-only (S-09).
-                          if (widget.adminBypass)
-                            TextButton.icon(
-                              onPressed: _saving
-                                  ? null
-                                  : () => setState(
-                                      () => _showDeleteAllConfirm = true),
-                              style: TextButton.styleFrom(
-                                  foregroundColor:
-                                      Theme.of(context).colorScheme.error,
-                                  visualDensity: VisualDensity.compact),
-                              icon: const Icon(Icons.delete_outline, size: 18),
-                              label: Text(l[K.bulkClearDaysAction]),
-                            ),
-                        ],
-                      ),
+                      AppFieldLabel(l[K.editorScheduledParent],
+                          info: l[K.editorScheduledParentHint]),
                       DropdownButtonFormField<int>(
                         key: const Key('bulkScheduled'),
                         isExpanded: true,
@@ -795,99 +779,60 @@ class _BulkSheetState extends State<_BulkSheet> {
                       style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 8),
                 ],
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: AppBanner(
-                        tone: context.tokens.danger,
-                        icon: Icons.error_outline,
-                        message: _error!),
-                  ),
-                if (_showOverwriteConfirm)
-                  _confirmBox(
-                    l.format(
-                        _overwriteCount == 1
-                            ? K.bulkOverwriteWarningOne
-                            : K.bulkOverwriteWarningMany,
-                        [_overwriteCount]),
-                    yesLabel: l[K.editorYesChange],
-                    onYes: () {
-                      setState(() {
-                        _showOverwriteConfirm = false;
-                        _overwriteConfirmed = true;
-                      });
-                      _save();
-                    },
-                    onNo: () =>
-                        setState(() => _showOverwriteConfirm = false),
-                  )
-                ,
-              ],
       ],
     );
   }
 
+  /// U-38: the two questions this sheet asks before it writes — clearing the
+  /// selected days, and overwriting planned parents (S-09).
+  Widget? _confirmation(Localization l) {
+    if (_showDeleteAllConfirm) {
+      return AppSheetConfirmation.destructive(
+        message: l[K.bulkDeleteAllWarning],
+        yesLabel: l[K.bulkYesDelete],
+        busy: _saving,
+        onYes: () {
+          setState(() => _showDeleteAllConfirm = false);
+          _save(clearScheduled: true);
+        },
+        noLabel: l[K.editorNoGoBack],
+        onNo: () => setState(() => _showDeleteAllConfirm = false),
+      );
+    }
+    if (_showOverwriteConfirm) {
+      return AppSheetConfirmation.destructive(
+        message: l.format(
+            _overwriteCount == 1
+                ? K.bulkOverwriteWarningOne
+                : K.bulkOverwriteWarningMany,
+            [_overwriteCount]),
+        yesLabel: l[K.editorYesChange],
+        busy: _saving,
+        onYes: () {
+          setState(() {
+            _showOverwriteConfirm = false;
+            _overwriteConfirmed = true;
+          });
+          _save();
+        },
+        noLabel: l[K.editorNoGoBack],
+        onNo: () => setState(() => _showOverwriteConfirm = false),
+      );
+    }
+    return null;
+  }
+
+  /// U-38: the shared [AppClearToggle]; `unavailable` is the field already
+  /// holding a value, which a clear would contradict.
   Widget _clearCheckbox(Localization l,
       {required bool value,
       required bool unavailable,
       required bool enabled,
       required ValueChanged<bool> onChanged}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Checkbox(
-          value: value,
-          onChanged: unavailable || !enabled
-              ? null
-              : (v) => onChanged(v ?? false),
-          visualDensity: VisualDensity.compact,
-        ),
-        Text(l[K.bulkClear], style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-  }
-
-  Widget _confirmBox(String warning,
-      {required String yesLabel,
-      required VoidCallback onYes,
-      required VoidCallback onNo}) {
-    final l = AppL10n.of(context).l;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(Spacing.sm + Spacing.xs),
-      decoration: BoxDecoration(
-        color: context.tokens.danger.container,
-        border: Border.all(color: context.tokens.danger.border),
-        borderRadius: BorderRadius.circular(Radii.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.warning_amber_rounded,
-                  size: 20, color: context.tokens.danger.onContainer),
-              const SizedBox(width: Spacing.sm),
-              Expanded(
-                child: Text(warning,
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: context.tokens.danger.onContainer)),
-              ),
-            ],
-          ),
-          const SizedBox(height: Spacing.sm),
-          AppActionPair(
-            primaryLabel: yesLabel,
-            destructive: true,
-            busy: _saving,
-            onPrimary: onYes,
-            secondaryLabel: l[K.editorNoGoBack],
-            onSecondary: onNo,
-          ),
-        ],
-      ),
+    return AppClearToggle(
+      label: l[K.bulkClear],
+      value: value,
+      onChanged: unavailable || !enabled ? null : onChanged,
     );
   }
 }

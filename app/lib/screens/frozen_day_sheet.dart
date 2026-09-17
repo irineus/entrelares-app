@@ -197,10 +197,11 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
         return FilledButton(onPressed: _acting ? null : onPressed, child: child);
       }
       if (destructive) {
+        // U-38: the destructive look every sheet shares — danger ink on a
+        // danger outline, not on the neutral border the others wear.
         return OutlinedButton(
           onPressed: _acting ? null : onPressed,
-          style: OutlinedButton.styleFrom(
-              foregroundColor: context.tokens.danger.onContainer),
+          style: AppSheetDangerAction.styleOf(context),
           child: child,
         );
       }
@@ -220,6 +221,8 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
       // a day will open.
       onClose: () => Navigator.of(context).pop(),
       closeLabel: l[K.commonClose],
+      // U-38: the approve/reject/cancel row is pinned, so its failure is too.
+      error: _error,
       // U-28 QA: the urgency line is CENTRED and BOLD, as the web has it. It is
       // the one sentence on the sheet that changes what the reader should do
       // next, and it was rendering as a left-aligned run of body text.
@@ -314,13 +317,6 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                   ],
                 ),
               ),
-              if (_error != null) ...[
-                const SizedBox(height: Spacing.sm),
-                AppBanner(
-                    tone: context.tokens.danger,
-                    icon: Icons.error_outline,
-                    message: _error!),
-              ],
               const SizedBox(height: Spacing.sm),
               if (widget.offline)
                 AppBanner(
