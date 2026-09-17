@@ -18,6 +18,8 @@
 ///   protanopia reads the grid from the texture.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// The pattern a calendar slot paints behind its fill.
@@ -553,6 +555,188 @@ abstract final class TypeScale {
   static const double body = 16;
   static const double bodySmall = 14;
   static const double label = 12;
+}
+
+/// U-39 — the two typographic steps of a calendar day cell.
+///
+/// U-28 made the cell's HEIGHT a range (50–76 dp, `calendar_screen.dart`) but
+/// left the type inside it fixed at the floor's sizes: on a tall phone or in
+/// the web channel's 600 px column the cell is 76 dp and mostly empty around a
+/// 9 px "18:00" — the one datum a parent reads a handoff day for. So the grid
+/// picks a step from the cell it is about to draw: [compact] is exactly the
+/// floor as U-28 measured it; [comfortable] is what a 76 dp cell can afford.
+/// One component, two sets of numbers — never two branches of paint code.
+///
+/// **The step is chosen at the READER's text scale, not at 1.0×.** The
+/// comfortable step needs 60 dp at 1.0× (its last line is the 13 dp mark,
+/// which does not scale — not the 11 px time the card counted, hence 60 and
+/// not 58) and ~66 dp at 1.3×, so a fixed threshold would overflow a 60 dp
+/// cell under large text. [resolve] asks "does the comfortable step fit at
+/// this scale?" and falls back to compact.
+///
+/// **Width counts too, and it is the LANGUAGE's.** The time is the widest
+/// line: "18:00" in PT-BR, "6:00 PM" in English. On a 360 dp phone a cell is
+/// ~46 dp wide, ~41 inside the today ring, and "12:00 PM" at 11 px does not
+/// fit — so the grid MEASURES the widest time its language prints (`timeWidth`
+/// in [resolve]) instead of trusting a character count, and where the
+/// comfortable time would not fit, ONLY the time line keeps the compact size
+/// (owner, 16/09/2026): number and avatar still grow, which is most of what
+/// the item buys, and a time that wraps or clips is not a time.
+///
+/// **And the compact step honours the scale up to what the floor holds.** At
+/// 50 dp even the compact step overflows at 1.3× (the number alone grows 3.6
+/// dp), and the card ruled it stays as measured. [textScaleCap] is the largest
+/// factor, at most the reader's and never below 1.0, at which the resolved
+/// step fits the cell in both dimensions; the cell clamps its text scaling to
+/// it. Unlike the `FittedBox.scaleDown` U-48 lists, this has a floor (the
+/// design size) and a reason (the measured cell), so large text is honoured
+/// wherever it fits.
+final class DayCellType {
+  /// Font size of the day number (the theme's `labelSmall` shape).
+  final double number;
+
+  /// Radius of the carer's avatar; its initial's font size.
+  final double avatarRadius;
+  final double initial;
+
+  /// Font size of the handoff time under the avatar.
+  final double time;
+
+  /// Size of the frozen mark (bell / hourglass) that replaces the time.
+  final double mark;
+
+  /// The text scale the cell clamps to — the reader's own wherever this step
+  /// fits at it, less where it would not (see [resolve]). Unbounded on the
+  /// two presets, which are vocabulary, not a resolved cell.
+  final double textScaleCap;
+
+  const DayCellType._({
+    required this.number,
+    required this.avatarRadius,
+    required this.initial,
+    required this.time,
+    required this.mark,
+    this.textScaleCap = double.infinity,
+  });
+
+  /// The floor's step — every number is what U-28 measured into 50 dp.
+  static const compact = DayCellType._(
+    number: TypeScale.label,
+    avatarRadius: 9,
+    initial: 9,
+    time: 9,
+    mark: 11,
+  );
+
+  /// The step a 76 dp cell can afford (U-39 card: number 14, avatar 12/11,
+  /// time 11, the mark one size up).
+  static const comfortable = DayCellType._(
+    number: 14,
+    avatarRadius: 12,
+    initial: 11,
+    time: 11,
+    mark: 13,
+  );
+
+  /// The breath between the number and the avatar, and between the avatar
+  /// and the time or mark (U-29 round 4).
+  static const double gap = 2;
+
+  /// The widest border a cell wears — the "today" ring (U-28) — which the
+  /// content has to fit inside, on all four sides.
+  static const double ring = 2.5;
+
+  DayCellType _copyWith({double? time, double? textScaleCap}) => DayCellType._(
+        number: number,
+        avatarRadius: avatarRadius,
+        initial: initial,
+        time: time ?? this.time,
+        mark: mark,
+        textScaleCap: textScaleCap ?? this.textScaleCap,
+      );
+
+  /// The cell height this step needs at [scale]: number, avatar and the
+  /// TALLER of the time text and the mark icon (the icon does not scale),
+  /// with both gaps, inside the today ring.
+  double needs(double scale) =>
+      number * scale +
+      gap +
+      2 * avatarRadius +
+      gap +
+      math.max(time * scale, mark) +
+      2 * ring;
+
+  /// The largest text scale at which this step's HEIGHT fits [height], at
+  /// most [scale] and never below 1.0.
+  double heightCap(double height, double scale) {
+    if (needs(scale) <= height) return scale;
+    final fixed = 2 * gap + 2 * avatarRadius + 2 * ring;
+    // Below the mark's height the time text is not the binding line: only the
+    // number grows. Above it, both texts grow together.
+    final markBound = (height - fixed - mark) / number;
+    final cap = time * markBound <= mark
+        ? markBound
+        : (height - fixed) / (number + time);
+    return math.min(scale, math.max(1.0, cap));
+  }
+
+  /// The largest text scale at which this step's time fits [width], at most
+  /// [scale] and never below 1.0. Text width grows linearly with the font
+  /// size (the time carries no letter spacing), so it is one division on the
+  /// width [timeWidth] measures at the design size.
+  double widthCap(
+      double width, double scale, double Function(double fontSize) timeWidth) {
+    final atDesignSize = timeWidth(time);
+    if (atDesignSize <= 0) return scale;
+    return math.min(scale, math.max(1.0, (width - 2 * ring) / atDesignSize));
+  }
+
+  /// The step for a cell [height] dp tall, read at the reader's text
+  /// [scale]: comfortable whenever its height fits, compact otherwise.
+  static DayCellType forHeight(double height, double scale) =>
+      comfortable.needs(scale) <= height ? comfortable : compact;
+
+  /// The step for a cell of [width] × [height] at the reader's [scale], with
+  /// [timeWidth] measuring the widest time the reader's language prints at a
+  /// font size — the caller's text engine, because a character count is not
+  /// a width. Height picks the step; a comfortable time too wide for the cell
+  /// steps down alone; then [textScaleCap] is what keeps the result inside.
+  static DayCellType resolve({
+    required double width,
+    required double height,
+    required double scale,
+    required double Function(double fontSize) timeWidth,
+  }) {
+    var step = forHeight(height, scale);
+    if (step.time > compact.time &&
+        timeWidth(step.time * scale) > width - 2 * ring) {
+      step = step._copyWith(time: compact.time);
+    }
+    final cap = math.min(step.heightCap(height, scale),
+        step.widthCap(width, scale, timeWidth));
+    return step._copyWith(textScaleCap: cap);
+  }
+
+  /// Whether this is the comfortable step, time line aside.
+  bool get isComfortable => number == comfortable.number;
+
+  @override
+  bool operator ==(Object other) =>
+      other is DayCellType &&
+      other.number == number &&
+      other.avatarRadius == avatarRadius &&
+      other.initial == initial &&
+      other.time == time &&
+      other.mark == mark &&
+      other.textScaleCap == textScaleCap;
+
+  @override
+  int get hashCode =>
+      Object.hash(number, avatarRadius, initial, time, mark, textScaleCap);
+
+  @override
+  String toString() => 'DayCellType(${isComfortable ? 'comfortable' : 'compact'}'
+      ', time $time, cap $textScaleCap)';
 }
 
 /// The widest the app ever draws itself.

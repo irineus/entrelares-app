@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
@@ -43,15 +44,18 @@ import 'wizard_sheet.dart';
 /// height the screen actually gives it, divided by the weeks the month really
 /// has, clamped at both ends.
 ///
-/// The floor is measurement, not taste: the content is 12 + 2 + 18 + 11 = 43 dp
-/// with every line's height pinned, inside a 2.5 dp "today" ring — 48 dp, so 50
-/// is the floor with two to spare. A six-week month with the admin strip on and
-/// a four-carer legend has to fit a 700 dp phone, and
-/// `calendar_fits_u28_test` fails if either side of that stops being true.
+/// The floor is measurement, not taste: the content is 12 + 2 + 18 + 2 + 11 =
+/// 45 dp with every line's height pinned, inside a 2.5 dp "today" ring — 50 dp
+/// exactly ([DayCellType.compact.needs] at 1.0×, which `calendar_fits_u28_test`
+/// holds to the floor). A six-week month with the admin strip on and a
+/// four-carer legend has to fit a 700 dp phone, and the same test fails if
+/// either side of that stops being true.
 ///
 /// The ceiling exists so a five-week month on a tall phone does not turn each
 /// day into a letterbox: past about 76 dp the cell is mostly empty and the grid
-/// stops reading as a month.
+/// stops reading as a month. U-39: what a 76 dp cell IS allowed to spend the
+/// room on is bigger type — [DayCellType.comfortable], resolved once per
+/// month from the cell this range produced ([DayCellType.resolve]).
 const double _dayCellMinHeight = 50;
 const double _dayCellMaxHeight = 76;
 
@@ -1771,18 +1775,52 @@ class _MonthGrid extends StatelessWidget {
           final cellHeight = (free / rows)
               .clamp(_dayCellMinHeight, _dayCellMaxHeight);
           final ratio = cellWidth / cellHeight;
-          return loading
-              // U-27: the grid's own shape, at its own aspect ratio — the month
-              // does not jump into place when the days land.
-              ? AppSkeletonCalendar(childAspectRatio: ratio)
-              : _grid(context, ratio, daysInMonth, blanksBefore, todayIso);
+          if (loading) {
+            // U-27: the grid's own shape, at its own aspect ratio — the month
+            // does not jump into place when the days land.
+            return AppSkeletonCalendar(childAspectRatio: ratio);
+          }
+          // U-39: one typographic step for the whole month, chosen from the
+          // cell this range produced, at the READER's scale (the factor at
+          // the cell's own type size — exact for the number, within a hair
+          // for the 9–11 px lines), and with the time's width MEASURED in
+          // the reader's language rather than counted.
+          final scale = MediaQuery.textScalerOf(context).scale(TypeScale.label) /
+              TypeScale.label;
+          final type = DayCellType.resolve(
+              width: cellWidth,
+              height: cellHeight,
+              scale: scale,
+              timeWidth: (fontSize) => _widestTime(context, fontSize));
+          return _grid(
+              context, ratio, type, daysInMonth, blanksBefore, todayIso);
         }),
       ],
     );
   }
 
-  Widget _grid(BuildContext context, double ratio, int daysInMonth,
-          int blanksBefore, String todayIso) =>
+  /// The width of the widest handoff time the reader's language prints, at
+  /// [fontSize] (already scaled), in the style the cell paints it with. Two
+  /// probes cover both catalogs: "10:00" / "10:00 AM" and "12:00" /
+  /// "12:00 PM" — the 12-hour clock adds a period, and the digits differ.
+  double _widestTime(BuildContext context, double fontSize) {
+    final l = AppL10n.of(context).l;
+    final style =
+        DefaultTextStyle.of(context).style.copyWith(fontSize: fontSize, height: 1);
+    var widest = 0.0;
+    for (final probe in const ['10:00', '12:00']) {
+      final painter = TextPainter(
+        text: TextSpan(text: l.formatTimeString(probe), style: style),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      widest = math.max(widest, painter.width);
+      painter.dispose();
+    }
+    return widest;
+  }
+
+  Widget _grid(BuildContext context, double ratio, DayCellType type,
+          int daysInMonth, int blanksBefore, String todayIso) =>
       GridView.count(
             crossAxisCount: 7,
             shrinkWrap: true,
@@ -1809,6 +1847,7 @@ class _MonthGrid extends StatelessWidget {
                       todayIso,
                   isSelected: selectedIso.contains(CareSchedule.isoDate(
                       DateTime(month.year, month.month, day))),
+                  type: type,
                   onTap: onDayTap,
                   onLongPress: onDayLongPress,
                 ),
@@ -1832,6 +1871,10 @@ class _DayCell extends StatelessWidget {
   final List<MemberView> views;
   final bool isToday;
   final bool isSelected;
+
+  /// U-39 — the typographic step [_MonthGrid] resolved for this month,
+  /// text-scale cap included (see [DayCellType.resolve]).
+  final DayCellType type;
   final void Function(DateTime) onTap;
   final void Function(DateTime) onLongPress;
 
@@ -1842,6 +1885,7 @@ class _DayCell extends StatelessWidget {
     required this.views,
     required this.isToday,
     required this.isSelected,
+    required this.type,
     required this.onTap,
     required this.onLongPress,
   });
@@ -1933,72 +1977,85 @@ class _DayCell extends StatelessWidget {
               painter: assigned
                   ? SlotPatternPainter(slot.pattern, slot.tone.border)
                   : null,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('${date.day}',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          height: 1,
-                          color: assigned ? slot.tone.onContainer : null)),
-                  const SizedBox(height: 2),
-                  CircleAvatar(
-                    radius: 9,
-                    backgroundColor:
-                        assigned ? slot.tone.solid : Colors.transparent,
-                    child: Text(initial,
+              // U-39: one clamp over the cell's texts, a no-op wherever the
+              // step fits at the reader's scale (DayCellType.textScaleCap).
+              child: MediaQuery.withClampedTextScaling(
+                maxScaleFactor: type.textScaleCap,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('${date.day}',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontSize: type.number,
+                            height: 1,
+                            color: assigned ? slot.tone.onContainer : null)),
+                    const SizedBox(height: DayCellType.gap),
+                    CircleAvatar(
+                      radius: type.avatarRadius,
+                      backgroundColor:
+                          assigned ? slot.tone.solid : Colors.transparent,
+                      child: Text(initial,
+                          style: TextStyle(
+                              fontSize: type.initial,
+                              height: 1,
+                              color: assigned
+                                  ? slot.tone.onSolid
+                                  : Theme.of(context).hintColor)),
+                    ),
+                    // U-29 round 4 (owner): the same breath the date already
+                    // gets above the avatar — without it the time sat glued to
+                    // the initial. Gated, so a badge-less cell stays centred.
+                    if (frozenMark != null || day?.handoffTime != null)
+                      const SizedBox(height: DayCellType.gap),
+                    // Web parity: the frozen badge REPLACES the handoff badge.
+                    // (U-29: its label rides the CELL's semantics node now.)
+                    if (frozenMark != null)
+                      Container(
+                        padding: frozenMark!.overdue
+                            ? const EdgeInsets.symmetric(horizontal: 3)
+                            : EdgeInsets.zero,
+                        decoration: frozenMark!.overdue
+                            ? BoxDecoration(
+                                color: tokens.danger.container,
+                                borderRadius: BorderRadius.circular(6),
+                              )
+                            : null,
+                        child: Icon(frozenMark!.badge,
+                            size: type.mark,
+                            color: frozenMark!.overdue
+                                ? tokens.danger.onContainer
+                                : frozenMark!.badge ==
+                                        Icons.notifications_active
+                                    ? tokens.warning.solid
+                                    : tokens.textMuted),
+                      )
+                    else if (day?.handoffTime != null)
+                      // U-28: the TIME, not an anonymous swap arrow. The web
+                      // prints "18:00" on every handoff day and the port replaced
+                      // it with an icon that says a handoff exists but not when —
+                      // which is the only thing a parent reads a handoff day for.
+                      // (It is also what the square cell had no room for: the
+                      // overflow the review caught was this line being clipped.)
+                      Text(
+                        AppL10n.of(context)
+                            .l
+                            .formatTimeString(day!.handoffTime!),
+                        // One line, always: the step and the cap were chosen
+                        // so it fits; below the design size (which U-28
+                        // measured to fit) a clip beats a second line that
+                        // would push the avatar out of the cell.
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.clip,
                         style: TextStyle(
-                            fontSize: 9,
+                            fontSize: type.time,
                             height: 1,
                             color: assigned
-                                ? slot.tone.onSolid
-                                : Theme.of(context).hintColor)),
-                  ),
-                  // U-29 round 4 (owner): the same breath the date already
-                  // gets above the avatar — without it the time sat glued to
-                  // the initial. Gated, so a badge-less cell stays centred.
-                  if (frozenMark != null || day?.handoffTime != null)
-                    const SizedBox(height: 2),
-                  // Web parity: the frozen badge REPLACES the handoff badge.
-                  // (U-29: its label rides the CELL's semantics node now.)
-                  if (frozenMark != null)
-                    Container(
-                      padding: frozenMark!.overdue
-                          ? const EdgeInsets.symmetric(horizontal: 3)
-                          : EdgeInsets.zero,
-                      decoration: frozenMark!.overdue
-                          ? BoxDecoration(
-                              color: tokens.danger.container,
-                              borderRadius: BorderRadius.circular(6),
-                            )
-                          : null,
-                      child: Icon(frozenMark!.badge,
-                          size: 11,
-                          color: frozenMark!.overdue
-                              ? tokens.danger.onContainer
-                              : frozenMark!.badge ==
-                                      Icons.notifications_active
-                                  ? tokens.warning.solid
-                                  : tokens.textMuted),
-                    )
-                  else if (day?.handoffTime != null)
-                    // U-28: the TIME, not an anonymous swap arrow. The web
-                    // prints "18:00" on every handoff day and the port replaced
-                    // it with an icon that says a handoff exists but not when —
-                    // which is the only thing a parent reads a handoff day for.
-                    // (It is also what the square cell had no room for: the
-                    // overflow the review caught was this line being clipped.)
-                    Text(
-                      AppL10n.of(context)
-                          .l
-                          .formatTimeString(day!.handoffTime!),
-                      style: TextStyle(
-                          fontSize: 9,
-                          height: 1,
-                          color: assigned
-                              ? slot.tone.onContainer
-                              : Theme.of(context).hintColor),
-                    ),
-                ],
+                                ? slot.tone.onContainer
+                                : Theme.of(context).hintColor),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
