@@ -46,6 +46,59 @@ void main() {
             'would be scanning for something that never exists.');
   });
 
+  // U-49: the third gate. A `Card` or `Material` painted with a
+  // `colorScheme` container is a component's job — three gate cards, the
+  // profile's frozen notice and the onboarding strip each did it by hand,
+  // and each was a banner or a tinted strip the component set already had.
+  // The regex tolerates the formatter's line breaks (`Theme.of(context)`,
+  // `.colorScheme`, `.surfaceContainerHighest` on three lines) and up to two
+  // named arguments before `color:` (`margin:`, `key:`).
+  final tintedSurface = RegExp(
+    r'\b(?:Card|Material)\(\s*(?:[a-zA-Z]+:\s*(?:[^,()]|\([^()]*\))*,\s*){0,2}'
+    r'color:\s*(?:Theme\.of\(context\)|theme)\s*\.\s*colorScheme\s*\.',
+  );
+  const componentDir = 'widgets/ui/';
+
+  test('no Card or Material is painted with a colorScheme surface outside '
+      'widgets/ui/ (U-49)', () {
+    final offenders = <String>[];
+    for (final file in appSources()) {
+      final path = file.path.replaceAll('\\', '/');
+      if (path.contains(componentDir) || path.contains('/theme/')) continue;
+      final content = file.readAsStringSync();
+      for (final match in tintedSurface.allMatches(content)) {
+        final line =
+            '\n'.allMatches(content.substring(0, match.start)).length + 1;
+        offenders.add('$path:$line');
+      }
+    }
+    expect(offenders, isEmpty,
+        reason: 'A screen painted a surface by hand. A tinted block with a '
+            'message is an AppBanner; a tinted strip takes a token '
+            '(`context.tokens.<tone>.container`): $offenders');
+  });
+
+  test('the tinted-surface scanner recognises the shapes it retired', () {
+    // The real shapes this gate replaced, verbatim — a scanner that matched
+    // none of them would be green over the defect it exists for.
+    const retired = [
+      'Card(\n  color: Theme.of(context).colorScheme.surfaceContainerHighest,',
+      'Card(\n  color: Theme.of(context)\n      .colorScheme\n'
+          '      .surfaceContainerHighest,',
+      'Material(\n  color: theme.colorScheme.secondaryContainer,',
+      'Card(\n  margin: const EdgeInsets.only(bottom: 8),\n'
+          '  color: Theme.of(context).colorScheme.errorContainer,',
+    ];
+    for (final sample in retired) {
+      expect(tintedSurface.hasMatch(sample), isTrue, reason: sample);
+    }
+    // A Card whose CHILD carries a colorScheme colour is not a tinted card.
+    expect(
+        tintedSurface.hasMatch(
+            'Card(\n  child: Icon(Icons.x, color: theme.colorScheme.error),'),
+        isFalse);
+  });
+
   group('tokens', () {
     test('both themes define every calendar slot', () {
       expect(AppTokens.light.slots.length, 5);

@@ -28,6 +28,8 @@ import 'package:entrelares_app/widgets/ui/ui.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource, ana, bruno;
 import 'custom_roles_test.dart' as roles;
+import 'family_page_test.dart' as family;
+import 'lifecycle_test.dart' as lifecycle;
 import 'profile_test.dart' as profile;
 import 'reports_audit_test.dart' as audit;
 import 'reports_pdf_test.dart' as pdf;
@@ -365,6 +367,132 @@ void main() {
       expect(icon.color, AppTokens.light.neutral.onContainer);
     },
   );
+
+  group('PR 2 — the family screen (after U-47)', () {
+    testWidgets(
+      'item 4: the F-37 cap notice is an info AppBanner whose action is '
+      'the gate CTA',
+      (tester) async {
+        var opened = false;
+        await family.pumpFamily(
+          tester,
+          family.source(),
+          onOpenPlan: () => opened = true,
+        );
+
+        final banner = tester.widget<AppBanner>(
+          find.ancestor(
+            of: find.text(_l[K.famFreeCapNotice]),
+            matching: find.byType(AppBanner),
+          ),
+        );
+        expect(banner.tone, AppTokens.light.info);
+        expect(banner.actionLabel, _l[K.famSeePremium]);
+        await tester.tap(find.text(_l[K.famSeePremium]));
+        expect(opened, isTrue);
+      },
+    );
+
+    testWidgets('item 4: without a plan door the notice has no action', (
+      tester,
+    ) async {
+      await family.pumpFamily(tester, family.source());
+
+      final banner = tester.widget<AppBanner>(
+        find.ancestor(
+          of: find.text(_l[K.famFreeCapNotice]),
+          matching: find.byType(AppBanner),
+        ),
+      );
+      expect(banner.actionLabel, isNull);
+      expect(find.text(_l[K.famSeePremium]), findsNothing);
+    });
+
+    testWidgets('item 5: deletion votes are rows with a badge per answer', (
+      tester,
+    ) async {
+      await lifecycle.pumpFamily(
+        tester,
+        lifecycle.source(
+          members: const [lifecycle.ana, lifecycle.bruno, lifecycle.carla],
+          pending: lifecycle.deletion(),
+        ),
+      );
+
+      // Two voters (the requester does not vote on their own request).
+      final badges = tester
+          .widgetList<AppBadge>(find.byType(AppBadge))
+          .toList();
+      expect(badges.where((b) => b.text == _l[K.famDelVoteWaiting]).length, 2);
+      expect(
+        find.descendant(
+          of: find.byType(AppListRow),
+          matching: find.byType(AppBadge),
+        ),
+        findsNWidgets(2),
+      );
+      expect(
+        find.textContaining(' — ${_l[K.famDelVoteWaiting]}'),
+        findsNothing,
+        reason: 'no vote is prose any more',
+      );
+    });
+
+    testWidgets('item 8: the attach-pending sheet is an AppSheetFrame', (
+      tester,
+    ) async {
+      await family.pumpFamily(
+        tester,
+        family.source(
+          members: const [family.admin],
+          invitations: [family.pendingInvite()],
+        ),
+      );
+      await tester.tap(find.text(_l[KApp.famAttachInvite]));
+      await tester.pumpAndSettle();
+
+      final frame = tester.widget<AppSheetFrame>(find.byType(AppSheetFrame));
+      expect(frame.subtitle, _l[KApp.famAttachHint]);
+      expect(frame.primaryLabel, _l[KApp.famAttachInvite]);
+      expect(frame.secondaryLabel, _l[K.commonCancel]);
+    });
+
+    testWidgets('item 8: the invite-pending sheet is an AppSheetFrame', (
+      tester,
+    ) async {
+      await family.pumpFamily(
+        tester,
+        family.source(
+          members: const [family.admin, family.pending],
+          plan: 'premium',
+        ),
+      );
+      await tester.tap(find.text(_l[KApp.famPendingInvite]));
+      await tester.pumpAndSettle();
+
+      final frame = tester.widget<AppSheetFrame>(find.byType(AppSheetFrame));
+      expect(frame.primaryLabel, _l[K.famSendInvite]);
+      expect(frame.secondaryLabel, _l[K.commonCancel]);
+    });
+
+    test('the whole sweep: no Card painted by hand is left in lib/', () {
+      // The third gate lives in no_color_literal_test; this is the item's
+      // own acceptance line, read from source.
+      final offenders = <String>[];
+      for (final file
+          in Directory('lib')
+              .listSync(recursive: true)
+              .whereType<File>()
+              .where((f) => f.path.endsWith('.dart'))) {
+        final path = file.path.replaceAll('\\', '/');
+        if (path.contains('widgets/ui/') || path.contains('/theme/')) continue;
+        if (RegExp(r'Card\(\s*color:').hasMatch(file.readAsStringSync())) {
+          offenders.add(path);
+        }
+      }
+      expect(offenders, isEmpty);
+    });
+  });
 
   test(
     'item 1 (verified, not re-touched): no screen builds a clock by hand',
