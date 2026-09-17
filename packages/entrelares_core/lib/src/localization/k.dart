@@ -197,8 +197,8 @@ abstract final class K {
   static const String calAwaitingYou = 'cal.awaitingYou';
   static const String calAwaitingFrom = 'cal.awaitingFrom';
   static const String calOtherCaregiver = 'cal.otherCaregiver';
-  static const String calEmptyTitle = 'cal.emptyTitle';
-  static const String calEmptyHint = 'cal.emptyHint';
+  static const String calEmptyMonth = 'cal.emptyMonth';
+  static const String calEmptyMonthPlan = 'cal.emptyMonthPlan';
   static const String calAriaToday = 'cal.aria.today';
   static const String calAriaNoResponsible = 'cal.aria.noResponsible';
   static const String calAriaResponsible = 'cal.aria.responsible';
@@ -880,6 +880,7 @@ abstract final class K {
   static const String repFilter = 'rep.filter';
   static const String sumEmptyTitle = 'rep.sum.emptyTitle';
   static const String sumEmptyBody = 'rep.sum.emptyBody';
+  static const String sumEmptyAction = 'rep.sum.emptyAction';
   static const String sumPlanned = 'rep.sum.planned';
   static const String sumActual = 'rep.sum.actual';
   static const String sumProjected = 'rep.sum.projected';
@@ -1303,8 +1304,8 @@ abstract final class K {
     calAwaitingYou,
     calAwaitingFrom,
     calOtherCaregiver,
-    calEmptyTitle,
-    calEmptyHint,
+    calEmptyMonth,
+    calEmptyMonthPlan,
     calAriaToday,
     calAriaNoResponsible,
     calAriaResponsible,
@@ -1922,6 +1923,7 @@ abstract final class K {
     repFilter,
     sumEmptyTitle,
     sumEmptyBody,
+    sumEmptyAction,
     sumPlanned,
     sumActual,
     sumProjected,

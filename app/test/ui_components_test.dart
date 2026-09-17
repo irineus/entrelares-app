@@ -89,6 +89,27 @@ void main() {
       expect(find.text('Nada aqui'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('U-40: an action renders as ONE tonal button and fires',
+        (tester) async {
+      var fired = 0;
+      await tester.pumpWidget(_host(AppEmptyState(
+          icon: Icons.event_busy_outlined,
+          title: 'Nada aqui',
+          actionLabel: 'Ir para o calendário',
+          onAction: () => fired++)));
+      expect(find.byType(FilledButton), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Ir para o calendário'));
+      expect(fired, 1);
+    });
+
+    test('U-40: a label without a callback is refused at construction', () {
+      // A button that does nothing is worse than no button.
+      expect(
+          () => AppEmptyState(
+              icon: Icons.event_busy_outlined, title: 'x', actionLabel: 'y'),
+          throwsAssertionError);
+    });
   });
 
   group('AppListRow', () {

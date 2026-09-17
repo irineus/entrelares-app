@@ -62,6 +62,11 @@ const double _dayCellMaxHeight = 76;
 /// The vertical gap between two week rows.
 const double _daySpacing = 3;
 
+/// U-40: what the empty-month strip costs the grid, so the cells shrink
+/// (down to their floor) before the list has to scroll. One line of muted
+/// text beside a compact text button, plus its top gap.
+const double _emptyStripHeight = 48;
+
 /// U-27 — the F-27 slot palette now lives in [AppTokens.slots], with a
 /// [SlotPattern] alongside each hue and a dark set that did not exist before.
 /// "Trocado" is the web's amber with a DASHED border, which is also what frees
@@ -670,15 +675,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     // planning horizon with the tier message instead of advancing. The
     // horizon check comes BEFORE the guard, same order as NextMonth.
     if (!canPageToMonth(month, _horizonDate)) {
-      showAppSnack(
-          context,
-          _isPremiumForPaging
-              ? AppL10n.of(context).l.format(
-                  K.horizonPremium, [_settings.calendarMonthsPremium])
-              : AppL10n.of(context).l.format(K.horizonFree, [
-                  _settings.calendarMonthsFree,
-                  _settings.calendarMonthsPremium,
-                ]));
+      showAppSnack(context, _horizonSentence(AppL10n.of(context).l));
       _bounceBack();
       return;
     }
@@ -689,6 +686,25 @@ class _CalendarScreenState extends State<CalendarScreen>
     setState(() => _visibleMonth = month);
     _load();
   }
+
+  /// The F-39 tier message — the paging bounce's snack, and the sentence the
+  /// U-40 strip prints when the month on screen fell beyond the horizon.
+  String _horizonSentence(Localization l) => _isPremiumForPaging
+      ? l.format(K.horizonPremium, [_settings.calendarMonthsPremium])
+      : l.format(K.horizonFree, [
+          _settings.calendarMonthsFree,
+          _settings.calendarMonthsPremium,
+        ]);
+
+  /// U-40: what the visible month says under its grid. Decided in core;
+  /// the load error branch never reaches the grid, so it is not an input.
+  EmptyMonthPrompt get _emptyPrompt => emptyMonthPrompt(
+        visibleMonth: _visibleMonth,
+        today: _today,
+        horizonDate: _horizonDate,
+        hasPlannedDays: _daysByIso.isNotEmpty,
+        loading: _loading,
+      );
 
   List<MemberView> get _memberViews =>
       _members.map((m) => m.toView()).toList(growable: false);
@@ -885,13 +901,16 @@ class _CalendarScreenState extends State<CalendarScreen>
     }
   }
 
-  Future<void> _openWizard() async {
+  /// [start] is the U-40 strip's: the first day the empty month can still be
+  /// planned for. The ⋮ menu and the checklist pass nothing (today).
+  Future<void> _openWizard({DateTime? start}) async {
     if (_refuseWriteOffline()) return;
     final generated = await showWizardSheet(
       context: context,
       activeMembers: _assignableMembers,
       today: _today,
       dataSource: widget.dataSource,
+      initialStart: start,
       // F-39: the wizard clamps to the same horizon as the paging.
       maxScheduleDate: _horizonDate,
       isFreeTier: !_isPremiumForPaging,
@@ -1441,6 +1460,15 @@ class _CalendarScreenState extends State<CalendarScreen>
                           onDayLongPress: _onDayLongPress,
                           // U-28 QA: the height the grid may actually spend.
                           availableHeight: box.maxHeight,
+                          // U-40: only the month whose rows are in hand can
+                          // say it is empty — a neighbour page gets nothing.
+                          emptyPrompt: isVisible
+                              ? _emptyPrompt
+                              : EmptyMonthPrompt.none,
+                          horizonNote: _horizonSentence(l),
+                          onPlanMonth: () => _openWizard(
+                              start: emptyMonthPlanStart(
+                                  visibleMonth: month, today: _today)),
                         ),
                 );
                 });
@@ -1681,6 +1709,12 @@ class _MonthGrid extends StatelessWidget {
   /// height is derived from it and the number of weeks the month really has.
   final double availableHeight;
 
+  /// U-40: the sentence under an empty month (`emptyMonthPrompt`, core), the
+  /// F-39 sentence for the beyond-horizon case, and the wizard door.
+  final EmptyMonthPrompt emptyPrompt;
+  final String horizonNote;
+  final VoidCallback onPlanMonth;
+
   const _MonthGrid({
     required this.month,
     required this.daysByIso,
@@ -1693,6 +1727,9 @@ class _MonthGrid extends StatelessWidget {
     required this.onDayTap,
     required this.onDayLongPress,
     required this.availableHeight,
+    required this.emptyPrompt,
+    required this.horizonNote,
+    required this.onPlanMonth,
   });
 
   /// The F-12 cell badge — mirror of Home.razor's day-frozen markup: a bell
@@ -1771,7 +1808,11 @@ class _MonthGrid extends StatelessWidget {
           // What is left after the weekday initials, the list's bottom padding
           // and the gaps between rows.
           const chrome = 20.0 + 2 + 8;
-          final free = availableHeight - chrome - (rows - 1) * _daySpacing;
+          // U-40: the strip is part of what has to fit under the initials.
+          final strip =
+              emptyPrompt == EmptyMonthPrompt.none ? 0.0 : _emptyStripHeight;
+          final free =
+              availableHeight - chrome - strip - (rows - 1) * _daySpacing;
           final cellHeight = (free / rows)
               .clamp(_dayCellMinHeight, _dayCellMaxHeight);
           final ratio = cellWidth / cellHeight;
@@ -1795,6 +1836,16 @@ class _MonthGrid extends StatelessWidget {
           return _grid(
               context, ratio, type, daysInMonth, blanksBefore, todayIso);
         }),
+        // U-40: thirty grey dots look like a plan; the sentence says there is
+        // none, and what to do — under the grid it describes, in the list, so
+        // it travels with the month.
+        if (emptyPrompt != EmptyMonthPrompt.none)
+          EmptyMonthStrip(
+            month: month,
+            prompt: emptyPrompt,
+            horizonNote: horizonNote,
+            onPlan: onPlanMonth,
+          ),
       ],
     );
   }
@@ -1853,6 +1904,95 @@ class _MonthGrid extends StatelessWidget {
                 ),
             ],
           );
+}
+
+/// U-40 — the sentence under an empty month. Two shapes, both decided in
+/// core (`emptyMonthPrompt`): the month named plus *Gerar plano*, or the F-39
+/// sentence alone when the wizard could not write a single day of this month.
+/// Discreet on purpose — muted body text and a text button, never a banner:
+/// an empty future month is a normal state, not a warning. Public so the
+/// tests can find its door by key.
+class EmptyMonthStrip extends StatelessWidget {
+  final DateTime month;
+  final EmptyMonthPrompt prompt;
+  final String horizonNote;
+  final VoidCallback onPlan;
+
+  /// The *Gerar plano* button.
+  static const Key planKey = Key('empty-month-plan');
+
+  const EmptyMonthStrip({
+    super.key,
+    required this.month,
+    required this.prompt,
+    required this.horizonNote,
+    required this.onPlan,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context).l;
+    final style = Theme.of(context)
+        .textTheme
+        .bodySmall
+        ?.copyWith(color: context.tokens.textMuted);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, Spacing.sm, 4, 0),
+      child: prompt == EmptyMonthPrompt.beyondHorizon
+          ? Text(horizonNote, style: style, textAlign: TextAlign.center)
+          : Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l.format(K.calEmptyMonth, [l.monthName(month.month)]),
+                    style: style,
+                  ),
+                ),
+                TextButton(
+                  key: planKey,
+                  style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact),
+                  onPressed: onPlan,
+                  child: Text(l[K.calEmptyMonthPlan]),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// The carer's disc in a day cell — a circle that takes its new radius on
+/// the SAME frame the cell does.
+///
+/// It was a `CircleAvatar`, which is an `AnimatedContainer` inside: when the
+/// U-39 step drops from comfortable to compact (the selection bar appearing
+/// takes the cell from 61 dp to its 50 dp floor), the avatar kept animating
+/// from radius 12 to 9 for 200 ms while the cell had already shrunk, and for
+/// those frames 14 + 2 + 24 + 2 + 11 = 51 dp of content sat in a 46 dp
+/// column — `RenderFlex overflowed by 5 pixels`, found by U-40's strip, which
+/// is what first pushed a month with marks to the floor in a test. A cell's
+/// geometry is decided once per layout; nothing inside it may tween.
+class DayCellAvatar extends StatelessWidget {
+  final double radius;
+  final Color color;
+  final Widget child;
+
+  const DayCellAvatar({
+    super.key,
+    required this.radius,
+    required this.color,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: radius * 2,
+        height: radius * 2,
+        child: DecoratedBox(
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+          child: Center(child: child),
+        ),
+      );
 }
 
 /// What a frozen day paints on its cell (computed in [_MonthGrid._markFor]).
@@ -1990,10 +2130,9 @@ class _DayCell extends StatelessWidget {
                             height: 1,
                             color: assigned ? slot.tone.onContainer : null)),
                     const SizedBox(height: DayCellType.gap),
-                    CircleAvatar(
+                    DayCellAvatar(
                       radius: type.avatarRadius,
-                      backgroundColor:
-                          assigned ? slot.tone.solid : Colors.transparent,
+                      color: assigned ? slot.tone.solid : Colors.transparent,
                       child: Text(initial,
                           style: TextStyle(
                               fontSize: type.initial,

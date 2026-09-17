@@ -191,7 +191,7 @@ void main() {
               'is at least 11 px');
       expect(
           tester
-              .widget<CircleAvatar>(_inGrid(find.byType(CircleAvatar)).first)
+              .widget<DayCellAvatar>(_inGrid(find.byType(DayCellAvatar)).first)
               .radius,
           DayCellType.comfortable.avatarRadius);
       expect(
@@ -224,7 +224,7 @@ void main() {
       expect(_numberFontSize(tester), DayCellType.comfortable.number);
       expect(
           tester
-              .widget<CircleAvatar>(_inGrid(find.byType(CircleAvatar)).first)
+              .widget<DayCellAvatar>(_inGrid(find.byType(DayCellAvatar)).first)
               .radius,
           DayCellType.comfortable.avatarRadius);
       // The width does not afford its time: the widest English time is
@@ -244,7 +244,7 @@ void main() {
       expect(_timeFontSize(tester), DayCellType.compact.time);
       expect(
           tester
-              .widget<CircleAvatar>(_inGrid(find.byType(CircleAvatar)).first)
+              .widget<DayCellAvatar>(_inGrid(find.byType(DayCellAvatar)).first)
               .radius,
           DayCellType.compact.avatarRadius);
       expect(
