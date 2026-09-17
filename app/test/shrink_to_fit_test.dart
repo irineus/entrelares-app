@@ -332,34 +332,17 @@ void main() {
     Rect link(WidgetTester tester, String key) =>
         tester.getRect(find.widgetWithText(TextButton, l[key]));
 
-    testWidgets('login at 1.3×: the pair shrinks to ≥ 0.85× and each link '
-        'still measures 48 dp on screen', (tester) async {
+    testWidgets('login at 1.3×: the pair never shrinks — it wraps, and each '
+        'link keeps its 48 dp', (tester) async {
       await _usePhone(tester, scale: 1.3);
       await pumpLogin(tester);
       final fit = find.byType(AppShrinkToFit);
       expect(fit, findsOneWidget);
       expect(
         _appliedScale(tester, fit),
-        greaterThanOrEqualTo(AppShrinkToFit.defaultFloor - 1e-9),
-      );
-      for (final key in [K.commonPrivacyPolicy, K.commonTermsOfUse]) {
-        expect(
-          link(tester, key).height,
-          greaterThanOrEqualTo(48 - 1e-9),
-          reason: 'a shrunken target is still a 48 dp target (U-32 gate)',
-        );
-      }
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('login at 2.0×: the pair wraps into two lines rather than '
-        'shrinking below the floor', (tester) async {
-      await _usePhone(tester, scale: 2.0);
-      await pumpLogin(tester);
-      final fit = find.byType(AppShrinkToFit);
-      expect(
-        _appliedScale(tester, fit),
-        closeTo(AppShrinkToFit.defaultFloor, 1e-9),
+        1.0,
+        reason: 'with large text on, a tap target is never scaled down '
+            '(the U-32 gate measured 41 dp under a 0.85 shrink)',
       );
       expect(
         link(tester, K.commonTermsOfUse).top,
@@ -370,6 +353,20 @@ void main() {
         expect(link(tester, key).height, greaterThanOrEqualTo(48 - 1e-9));
       }
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('login at 1.0× on 360 dp: nothing changes for the majority — '
+        'one line, no shrink, 48 dp', (tester) async {
+      await _usePhone(tester);
+      await pumpLogin(tester);
+      expect(_appliedScale(tester, find.byType(AppShrinkToFit)), 1.0);
+      expect(
+        link(tester, K.commonTermsOfUse).top,
+        closeTo(link(tester, K.commonPrivacyPolicy).top, 1e-6),
+      );
+      for (final key in [K.commonPrivacyPolicy, K.commonTermsOfUse]) {
+        expect(link(tester, key).height, closeTo(48, 1e-6));
+      }
     });
 
     testWidgets('login at 1.0× on a 320 dp phone: the pair is ONE line — the '

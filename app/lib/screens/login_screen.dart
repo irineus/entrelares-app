@@ -165,21 +165,27 @@ class _LoginScreenState extends State<LoginScreen> {
   /// U-32: the WIDTH is the text's, the tap target is not — `shrinkWrap` left
   /// an 18 dp target on the first screen every user meets (measured), so the
   /// Material padding is back on the height alone.
-  /// U-48: the pair sits in an [AppShrinkToFit], so the button's design
-  /// height is the 48 dp floor DIVIDED by the shrink's floor — at 0.85× it
-  /// still measures 48 on screen. A target that shrank to 41 dp is what the
-  /// U-32 gate caught at 1.3×.
-  static const double _legalLinkHeight = 48 / AppShrinkToFit.defaultFloor;
-
   Widget _legalLink(String label, VoidCallback onTap) => TextButton(
         onPressed: onTap,
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-          minimumSize: const Size(0, _legalLinkHeight),
+          minimumSize: const Size(0, 48),
           tapTargetSize: MaterialTapTargetSize.padded,
         ),
         child: Text(label, style: Theme.of(context).textTheme.bodySmall),
       );
+
+  /// U-48: the pair below shrinks to keep U-28's one line on a NARROW phone
+  /// (283.6 dp of Inter against 256 at 320 dp — measured), and only at the
+  /// reader's default scale. With large text on, it never shrinks: the
+  /// buttons are tap targets, a 0.85× target is 41 dp against the 48 the
+  /// U-32 gate holds, and the honest answer to "make my text bigger" is a
+  /// second line, not a smaller link. The majority, at 1.0×, sees nothing
+  /// change (owner, 17/09/2026: accessibility never costs the many).
+  double _legalPairFloor(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(1) > 1
+          ? 1.0
+          : AppShrinkToFit.defaultFloor;
 
   Future<void> _openWebPage(String url) async {
     // Legal pages live on the web until lote 4 ports them.
@@ -301,13 +307,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 // screen tall and strewn; the shrink gives up a couple of
                 // percent of type size on the narrowest screens instead.
                 // U-48: a couple of percent has a floor now (0.85×,
-                // [AppShrinkToFit]), the buttons are tall enough to measure
-                // 48 dp AFTER it (`_legalLinkHeight`), and the child is a
-                // `Wrap` again: past the floor the pair breaks into two
-                // centred lines, the honest answer to a reader who asked for
-                // large text.
+                // [AppShrinkToFit]), only at the default scale
+                // (`_legalPairFloor`), and the child is a `Wrap` again: where
+                // it may not shrink, the pair breaks into two centred lines.
                 Center(
                   child: AppShrinkToFit(
+                    floor: _legalPairFloor(context),
                     alignment: Alignment.center,
                     child: Wrap(
                       alignment: WrapAlignment.center,
