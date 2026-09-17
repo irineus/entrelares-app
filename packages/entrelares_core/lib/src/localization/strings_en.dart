@@ -173,6 +173,8 @@ abstract final class StringsEn {
     K.calAriaRequestAwaitingYou: 'request awaiting your reply',
     K.calAriaRequestPending: 'request pending, awaiting another caregiver',
     K.calAriaSelected: 'selected',
+    K.calAriaTapHint: 'open the day',
+    K.calAriaLongPressHint: 'select several days',
     K.selectionResolve: 'Resolve ({0})',
     K.selectionEdit: 'Edit ({0})',
     K.selectionCancel: 'Cancel selection',

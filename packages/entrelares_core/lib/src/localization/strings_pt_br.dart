@@ -173,6 +173,8 @@ abstract final class StringsPtBr {
     K.calAriaRequestAwaitingYou: 'solicitação aguardando sua resposta',
     K.calAriaRequestPending: 'solicitação pendente aguardando outro responsável',
     K.calAriaSelected: 'selecionado',
+    K.calAriaTapHint: 'abrir o dia',
+    K.calAriaLongPressHint: 'selecionar vários dias',
     K.selectionResolve: 'Resolver ({0})',
     K.selectionEdit: 'Editar ({0})',
     K.selectionCancel: 'Cancelar seleção',

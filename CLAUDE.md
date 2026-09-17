@@ -160,6 +160,15 @@ cd app && fvm flutter analyze && fvm flutter test
 # ou arquivo que existe em web/ — a mesma família de defeito, noutra diretiva)
 # mais o espelho do watcher pré-Flutter do index.html e, desde o T-58, a prova de
 # execução do web-e2e (driver próprio, toda suíte reporta, contagens espelhadas).
+# Desde o U-32 (17/09/2026) a mesma suíte carrega accessibility_guidelines_test:
+# toda tela num celular de 360 dp, nos DOIS temas, com a Inter real — alvo de
+# toque (48 dp; 44 dp na grade do mês, decisão do U-28; 40 dp no botão do Google,
+# U-45), rótulo em todo nó tocável (o que o TalkBack lê como "botão" quando
+# falta), e contraste lido dos TOKENS, não amostrado de pixels: o
+# textContrastGuideline do SDK mediu 2,60 num par que os tokens põem em 4,83 e
+# 1,00 em todo emoji que a fonte do host não desenha. Cor nova em tokens.dart
+# passa por esse gate; o que a suíte NÃO mede — ordem de leitura, live region,
+# como uma dica soa — é a passada com leitor de tela em aparelho, do owner.
 cd app && fvm flutter build apk --debug --flavor dev --split-per-abi
 # Canal web: os dois flags NÃO são opcionais — sem o define o build aponta para o
 # banco de QA, e sem o --no-web-resources-cdn o CanvasKit vem do gstatic.

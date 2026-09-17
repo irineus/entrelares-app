@@ -2064,10 +2064,16 @@ class _DayCell extends StatelessWidget {
         }
       }
     }
+    // U-32: a day with nobody says so — U-11's own phrase, idle in the
+    // catalog since the port. Before, a blind reader heard bare numbers for
+    // every unplanned day and could not tell "not loaded" from "nobody".
     final semanticsLabel = [
       '${date.day}',
       if (isToday) l[K.calToday],
-      ?responsibleName,
+      if (responsibleName != null)
+        responsibleName
+      else if (!assigned)
+        l[K.calAriaNoResponsible],
       if (isSwapped) l[K.calSwapped],
       if (frozenMark != null)
         frozenMark!.label
@@ -2085,6 +2091,11 @@ class _DayCell extends StatelessWidget {
       excludeSemantics: true,
       onTap: () => onTap(date),
       onLongPress: () => onLongPress(date),
+      // U-32: the long press is the only way into bulk selection on Android
+      // and nothing announced it — TalkBack reads these as "double-tap to
+      // open the day; double-tap and hold to select several days".
+      onTapHint: l[K.calAriaTapHint],
+      onLongPressHint: l[K.calAriaLongPressHint],
       child: InkWell(
       onTap: () => onTap(date),
       // U-11: the mobile entry point to bulk selection (web: 500 ms press).

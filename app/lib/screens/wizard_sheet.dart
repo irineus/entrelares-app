@@ -570,6 +570,8 @@ class _WizardSheetState extends State<_WizardSheet> {
             children: [
               Checkbox(
                 key: const Key('wizReplaceExisting'),
+                // U-32: the label is a sibling text, so the box names itself.
+                semanticLabel: l[K.wizReplaceExisting],
                 value: _replaceExisting,
                 onChanged: _generating
                     ? null

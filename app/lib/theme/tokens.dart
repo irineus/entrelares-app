@@ -183,7 +183,9 @@ class AppTokens extends ThemeExtension<AppTokens> {
       border: Color(0xFFD1D5DB),
     ),
     success: ToneColors(
-      solid: Color(0xFF16A34A),
+      // U-32: green-700, the tone U-26's e-mail heading already uses —
+          // white on #16A34A measured 3.30:1 (the success badge and button).
+          solid: Color(0xFF15803D),
       onSolid: Color(0xFFFFFFFF),
       container: Color(0xFFECFDF5),
       onContainer: Color(0xFF065F46),
@@ -216,12 +218,19 @@ class AppTokens extends ThemeExtension<AppTokens> {
     dangerBarDeep: Color(0xFF7F1D1D),
     slots: [
       // 0 — inactive / departed / unknown.
+      //
+      // U-32 (17/09/2026): the solid is `neutral.solid` and the container ink
+      // is one step darker than `textMuted`. As shipped, white on #9CA3AF
+      // measured 2.54:1 (the departed member's initial in the roster, the
+      // cell and the wizard's "?" cell) and #6B7280 on #F3F4F6 4.39:1 (the
+      // legend pill); `accessibility_guidelines_test` holds every text pair
+      // at 4.5.
       SlotColors(
         tone: ToneColors(
-          solid: Color(0xFF9CA3AF),
+          solid: Color(0xFF6B7280),
           onSolid: Color(0xFFFFFFFF),
           container: Color(0xFFF3F4F6),
-          onContainer: Color(0xFF6B7280),
+          onContainer: Color(0xFF4B5563),
           border: Color(0xFFD1D5DB),
         ),
         pattern: SlotPattern.verticalHatch,
@@ -273,7 +282,9 @@ class AppTokens extends ThemeExtension<AppTokens> {
       // little margin for a product that also renders this in dark mode.
       SlotColors(
         tone: ToneColors(
-          solid: Color(0xFFEA580C),
+          // U-32: orange-700, not -600 — white on #EA580C measured 3.56:1 on
+          // the avatar initial; the border and the container are unchanged.
+          solid: Color(0xFFC2410C),
           onSolid: Color(0xFFFFFFFF),
           container: Color(0xFFFDBA74),
           onContainer: Color(0xFF7C2D12),
