@@ -52,6 +52,7 @@ Future<void> pumpSummary(
   WidgetTester tester,
   FakeCustodyDataSource ds, {
   AppLanguage language = AppLanguage.ptBr,
+  VoidCallback? onOpenCalendar,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 2000));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -60,7 +61,8 @@ Future<void> pumpSummary(
     setLanguage: (_) async {},
     child: MaterialApp(
       home: Scaffold(
-        body: ReportsSummaryTab(dataSource: ds, now: () => today),
+        body: ReportsSummaryTab(
+            dataSource: ds, now: () => today, onOpenCalendar: onOpenCalendar),
       ),
     ),
   ));
@@ -69,6 +71,32 @@ Future<void> pumpSummary(
 
 void main() {
   final l = Localization(AppLanguage.ptBr);
+
+  group('U-40: the empty state points at the calendar', () {
+    testWidgets('an empty period offers "Ir para o calendário" and the tap '
+        'reaches the shell', (tester) async {
+      var opened = 0;
+      await pumpSummary(tester, source(days: []),
+          onOpenCalendar: () => opened++);
+
+      expect(find.text(l[K.sumEmptyTitle]), findsOne);
+      await tester.tap(find.text(l[K.sumEmptyAction]));
+      expect(opened, 1);
+    });
+
+    testWidgets('without a door from the shell the state only describes',
+        (tester) async {
+      await pumpSummary(tester, source(days: []));
+
+      expect(find.text(l[K.sumEmptyTitle]), findsOne);
+      expect(find.text(l[K.sumEmptyAction]), findsNothing);
+    });
+
+    testWidgets('a period with rows shows no such button', (tester) async {
+      await pumpSummary(tester, source(), onOpenCalendar: () {});
+      expect(find.text(l[K.sumEmptyAction]), findsNothing);
+    });
+  });
 
   group('the cards', () {
     testWidgets('one card per member, named with the role', (tester) async {

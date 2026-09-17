@@ -128,6 +128,11 @@ class AppBadge extends StatelessWidget {
 
 /// Nothing to show, said properly: what is empty, and — when there is one — the
 /// reason it is empty. Three screens had their own copy of this.
+///
+/// U-40: an empty state may also say what to DO about it — [actionLabel] +
+/// [onAction] render one tonal button under the words. It is optional on
+/// purpose: an empty audit trail is a fact with nothing to fix, while an
+/// empty Resumo has a calendar to fill.
 class AppEmptyState extends StatelessWidget {
   /// A vector icon, sized up and muted — the words carry the meaning, the
   /// icon only says which kind of nothing this is (U-31: never an emoji).
@@ -135,12 +140,20 @@ class AppEmptyState extends StatelessWidget {
   final String title;
   final String? body;
 
+  /// The next step, when there is one. Both or neither: a label with no
+  /// callback would be a button that does nothing.
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
   const AppEmptyState({
     super.key,
     required this.icon,
     required this.title,
     this.body,
-  });
+    this.actionLabel,
+    this.onAction,
+  }) : assert((actionLabel == null) == (onAction == null),
+            'actionLabel and onAction come together');
 
   @override
   Widget build(BuildContext context) {
@@ -157,6 +170,13 @@ class AppEmptyState extends StatelessWidget {
             const SizedBox(height: Spacing.xs),
             Text(body!,
                 textAlign: TextAlign.center, style: textTheme.bodySmall),
+          ],
+          if (actionLabel != null) ...[
+            const SizedBox(height: Spacing.md),
+            FilledButton.tonal(
+              onPressed: onAction,
+              child: Text(actionLabel!),
+            ),
           ],
         ],
       ),

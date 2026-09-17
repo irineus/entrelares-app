@@ -491,7 +491,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/reports',
-              builder: (_, _) => ReportsScreen(dataSource: _dataSource),
+              builder: (_, _) => ReportsScreen(
+                  dataSource: _dataSource,
+                  onOpenCalendar: () => _router.go('/')),
             ),
           ]),
         ],

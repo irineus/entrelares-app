@@ -27,10 +27,15 @@ class ReportsSummaryTab extends StatefulWidget {
   /// Injected by the tests; production reads the clock.
   final DateTime Function() now;
 
+  /// U-40: the empty state's next step. Without it the state only describes
+  /// (the audit tab's posture); with it, *Ir para o calendário*.
+  final VoidCallback? onOpenCalendar;
+
   const ReportsSummaryTab({
     super.key,
     required this.dataSource,
     this.now = DateTime.now,
+    this.onOpenCalendar,
   });
 
   @override
@@ -390,6 +395,10 @@ class _ReportsSummaryTabState extends State<ReportsSummaryTab> {
         icon: Icons.event_busy_outlined,
         title: l[K.sumEmptyTitle],
         body: l[K.sumEmptyBody],
+        // U-40: "sem dados" pointed at the calendar in words; now it goes.
+        actionLabel:
+            widget.onOpenCalendar == null ? null : l[K.sumEmptyAction],
+        onAction: widget.onOpenCalendar,
       );
 
   /// The central mappings the whole app shares: a dead session says so, and a

@@ -34,6 +34,7 @@ Future<bool?> showWizardSheet({
   required bool isFreeTier,
   bool adminBypass = false,
   AnalyticsService? analytics,
+  DateTime? initialStart,
 }) {
   return showAppSheet<bool>(
     context: context,
@@ -45,6 +46,7 @@ Future<bool?> showWizardSheet({
       isFreeTier: isFreeTier,
       adminBypass: adminBypass,
       analytics: analytics,
+      initialStart: initialStart,
     ),
   );
 }
@@ -64,6 +66,12 @@ class _WizardSheet extends StatefulWidget {
   /// T-37 — optional: the activation signal never gates the generation.
   final AnalyticsService? analytics;
 
+  /// U-40: the day the start-date field opens on — the empty month's strip
+  /// passes the 1st of that month (or today, in the current month). Null is
+  /// today. Never before today: the picker's own floor is today, so a start
+  /// behind it would be a value the field could show but never pick.
+  final DateTime? initialStart;
+
   const _WizardSheet({
     required this.activeMembers,
     required this.today,
@@ -72,6 +80,7 @@ class _WizardSheet extends StatefulWidget {
     required this.isFreeTier,
     required this.adminBypass,
     this.analytics,
+    this.initialStart,
   });
 
   @override
@@ -123,7 +132,10 @@ class _WizardSheetState extends State<_WizardSheet> {
   @override
   void initState() {
     super.initState();
-    _startDate = dateOnly(widget.today);
+    final floor = dateOnly(widget.today);
+    final wanted = widget.initialStart;
+    _startDate =
+        wanted == null || wanted.isBefore(floor) ? floor : dateOnly(wanted);
     _applyPreset('7-7');
   }
 

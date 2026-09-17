@@ -118,8 +118,6 @@ const _notWiredYet = <String>{
   'K.authErrRateLimitedReset',
   'K.authErrSignInFailed',
   'K.bulkClearDaysTitle',
-  'K.calEmptyHint',
-  'K.calEmptyTitle',
   'K.cardBackToCurrentMonth',
   'K.editorTitle',
   'K.famProgressDeleting',

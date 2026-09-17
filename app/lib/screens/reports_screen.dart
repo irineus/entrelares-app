@@ -19,7 +19,13 @@ import 'reports_summary_tab.dart';
 class ReportsScreen extends StatelessWidget {
   final CustodyDataSource dataSource;
 
-  const ReportsScreen({super.key, required this.dataSource});
+  /// U-40: where the Resumo's empty state sends the reader. Injected by the
+  /// shell (the calendar branch), like the calendar's `onOpenFamily`, so the
+  /// screen never names a route and the tests need no router.
+  final VoidCallback? onOpenCalendar;
+
+  const ReportsScreen(
+      {super.key, required this.dataSource, this.onOpenCalendar});
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +57,8 @@ class ReportsScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            ReportsSummaryTab(dataSource: dataSource),
+            ReportsSummaryTab(
+                dataSource: dataSource, onOpenCalendar: onOpenCalendar),
             ReportsAuditTab(dataSource: dataSource),
             ReportsPdfTab(dataSource: dataSource),
           ],
