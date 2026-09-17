@@ -613,4 +613,15 @@ void main() {
       expect(report.caregivers.map((c) => c.profileId), [1, 2, 3]);
     });
   });
+
+  group('reportYearRange (U-49)', () {
+    test('two years back, one ahead, ascending, the current year inside', () {
+      expect(reportYearRange(2026), [2024, 2025, 2026, 2027]);
+    });
+
+    test('is a function of the year alone — no clock, no locale', () {
+      expect(reportYearRange(1999), [1997, 1998, 1999, 2000]);
+      expect(reportYearRange(2026).length, 4);
+    });
+  });
 }

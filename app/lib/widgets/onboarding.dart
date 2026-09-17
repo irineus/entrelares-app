@@ -70,16 +70,19 @@ class OnboardingLauncher extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
     final theme = Theme.of(context);
+    // U-49: a tinted strip is a TOKEN's surface, like every other one in the
+    // app — `secondaryContainer` happened to map to the same value, which is
+    // exactly how a colour drifts the day the theme changes.
+    final strip = context.tokens.neutral;
     return Material(
-      color: theme.colorScheme.secondaryContainer,
+      color: strip.container,
       child: InkWell(
         onTap: onOpen,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              Icon(Icons.checklist,
-                  size: 20, color: theme.colorScheme.onSecondaryContainer),
+              Icon(Icons.checklist, size: 20, color: strip.onContainer),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(l[K.onbChecklistTitle],

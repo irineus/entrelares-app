@@ -255,19 +255,6 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
 
-    if (_loading) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 8),
-            Text(l[K.pdfLoading]),
-          ],
-        ),
-      );
-    }
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: [
@@ -277,7 +264,13 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         Text(l[K.pdfSubtitle],
             style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 12),
-        if (_loadErrorRaw != null)
+        // U-49 (U-29's R4): the tab knows the shape of what it is about to
+        // show — the filter card — so the wait draws that shape, not a
+        // spinner (U-27: skeletons, not spinners). The heading above stays,
+        // because it never depended on the read.
+        if (_loading)
+          _filterSkeleton(l)
+        else if (_loadErrorRaw != null)
           _banner(isSessionExpired(_loadErrorRaw!)
               ? sessionExpiredMessage(l)
               : l.format(K.pdfErrLoad, [_loadErrorRaw!]))
@@ -319,6 +312,40 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               RichLabel.of(l, K.pdfUpsellText,
                   style: Theme.of(context).textTheme.bodyMedium),
             ],
+          ),
+        ),
+      );
+
+  /// The filter card's outline while the premium check is in flight: the
+  /// segmented control, the two selectors, the name field, the toggle and the
+  /// button — in that order and at those heights, so nothing jumps when the
+  /// real card lands.
+  Widget _filterSkeleton(Localization l) => Semantics(
+        label: l[K.pdfLoading],
+        excludeSemantics: true,
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const AppSkeleton(height: 40, radius: Radii.md),
+                const SizedBox(height: 8),
+                Row(
+                  children: const [
+                    Expanded(child: AppSkeleton(height: 56)),
+                    SizedBox(width: 8),
+                    Expanded(child: AppSkeleton(height: 56)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const AppSkeleton(height: 56),
+                const SizedBox(height: 8),
+                const AppSkeleton(height: 40),
+                const SizedBox(height: 8),
+                const AppSkeleton(height: 40, radius: Radii.lg),
+              ],
+            ),
           ),
         ),
       );
@@ -369,9 +396,8 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
                         child: DropdownButtonFormField<int>(
                           initialValue: _year,
                           items: [
-                            for (var y = widget.now().year - 2;
-                                y <= widget.now().year + 1;
-                                y++)
+                            // U-49: one range for the three report tabs.
+                            for (final y in reportYearRange(widget.now().year))
                               DropdownMenuItem(value: y, child: Text('$y')),
                           ],
                           onChanged: (y) => setState(() => _year = y ?? _year),

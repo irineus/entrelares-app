@@ -560,3 +560,13 @@ ReportAuditEntry _entryFor(
     authorshipLines: authorshipLines(log: log, profiles: members, l: l),
   );
 }
+
+/// U-49: the years the three report tabs (Resumo, Histórico, PDF) offer in
+/// their year selector — ONE range, decided here. Two years back, because the
+/// record exists for a dispute that may be about a past year; one ahead,
+/// because the F-39 horizon is what limits planning forward, and a year
+/// nobody can plan yet has nothing to report. Before this the Resumo and the
+/// Histórico offered `year-1..year+2` and the PDF `year-2..year+1`, and the
+/// same family saw three different lists two taps apart.
+List<int> reportYearRange(int thisYear) =>
+    [for (var y = thisYear - 2; y <= thisYear + 1; y++) y];

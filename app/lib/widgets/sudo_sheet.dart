@@ -18,11 +18,8 @@ Future<bool> showSudoSheet({
 }) async {
   final granted = await showAppSheet<bool>(
     context: context,
-    builder: (context) => Padding(
-      padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: _SudoSheet(sudo: sudo),
-    ),
+    // U-49: the frame handles the keyboard inset; no wrapper here.
+    builder: (context) => _SudoSheet(sudo: sudo),
   );
   return granted ?? false;
 }
@@ -157,39 +154,22 @@ class _SudoSheetState extends State<_SudoSheet> {
             // disable a code the server is perfectly willing to judge.
             : !cooling && _controller.text.isNotEmpty);
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l[K.sudoTitle],
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(l[K.sudoHint],
-                style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 16),
-            if (onCode) ..._codeFace(l) else ..._passwordFace(l),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed:
-                      _busy ? null : () => Navigator.of(context).pop(false),
-                  child: Text(l[K.commonCancel]),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: canSubmit ? () => _confirm(l) : null,
-                  child: Text(l[K.sudoConfirm]),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    // U-49: the shared sheet frame — title, scrolling body, the action row
+    // pinned and the keyboard inset handled once. This sheet drew its own
+    // title and button row; it was the last of the ad-hoc sheets outside
+    // the family screen. The field's own error stays on the field (U-38:
+    // validation of one field is not a sheet-level failure).
+    return AppSheetFrame(
+      title: l[K.sudoTitle],
+      subtitle: l[K.sudoHint],
+      busy: _busy,
+      primaryLabel: l[K.sudoConfirm],
+      onPrimary: canSubmit ? () => _confirm(l) : null,
+      secondaryLabel: l[K.commonCancel],
+      onSecondary: () => Navigator.of(context).pop(false),
+      children: [
+        if (onCode) ..._codeFace(l) else ..._passwordFace(l),
+      ],
     );
   }
 
