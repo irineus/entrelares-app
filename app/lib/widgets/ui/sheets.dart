@@ -598,13 +598,26 @@ class AppFieldLabel extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: Spacing.xs),
       child: Row(
         children: [
-          Flexible(child: Text(text, style: textTheme.titleSmall)),
+          // U-48: the explanation rides the LABEL's semantics as its hint —
+          // "Observação do dia, fica no dia mesmo depois de trocas" — so a
+          // screen reader gets it where the label is read, on every channel.
+          // The ⓘ stays the sighted reader's door and is excluded from the
+          // tree: a `Tooltip` announces its message on the web only while
+          // it is open, and it closes itself after six seconds, so the same
+          // sentence twice from one node and never from the other was the
+          // worst of both.
+          Flexible(
+            child: Semantics(
+              hint: info,
+              child: Text(text, style: textTheme.titleSmall),
+            ),
+          ),
           if (optionalLabel != null) ...[
             const SizedBox(width: Spacing.xs),
             Text(optionalLabel!,
                 style: textTheme.labelSmall?.copyWith(color: tokens.textMuted)),
           ],
-          if (info != null) AppInfoTip(message: info!),
+          if (info != null) ExcludeSemantics(child: AppInfoTip(message: info!)),
           if (trailing != null) ...[
             const SizedBox(width: Spacing.xs),
             trailing!,

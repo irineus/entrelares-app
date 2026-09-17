@@ -130,6 +130,26 @@ void main() {
       expect(find.text('Fica no dia, mesmo depois de trocas.'), findsOneWidget);
     });
 
+    testWidgets('U-48: the explanation is the label\'s semantics hint, and '
+        'the tip is read once', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(_host(const Padding(
+        padding: EdgeInsets.all(20),
+        child: AppFieldLabel('Observação do dia',
+            info: 'Fica no dia, mesmo depois de trocas.'),
+      )));
+      // A screen reader lands on the label and hears the explanation with
+      // it — on the web too, where a tap-triggered tooltip that closes
+      // itself after six seconds was never read at all.
+      final label = tester.getSemantics(find.text('Observação do dia'));
+      expect(label.hint, 'Fica no dia, mesmo depois de trocas.');
+      // The ⓘ is excluded, so the same sentence is not announced twice.
+      expect(
+          find.bySemanticsLabel(RegExp('Fica no dia')), findsNothing,
+          reason: 'the tooltip node carries no label of its own');
+      handle.dispose();
+    });
+
     testWidgets('optional is marked; required is not', (tester) async {
       await tester.pumpWidget(_host(const Column(
         children: [

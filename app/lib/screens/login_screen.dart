@@ -165,11 +165,17 @@ class _LoginScreenState extends State<LoginScreen> {
   /// U-32: the WIDTH is the text's, the tap target is not — `shrinkWrap` left
   /// an 18 dp target on the first screen every user meets (measured), so the
   /// Material padding is back on the height alone.
+  /// U-48: the pair sits in an [AppShrinkToFit], so the button's design
+  /// height is the 48 dp floor DIVIDED by the shrink's floor — at 0.85× it
+  /// still measures 48 on screen. A target that shrank to 41 dp is what the
+  /// U-32 gate caught at 1.3×.
+  static const double _legalLinkHeight = 48 / AppShrinkToFit.defaultFloor;
+
   Widget _legalLink(String label, VoidCallback onTap) => TextButton(
         onPressed: onTap,
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-          minimumSize: const Size(0, 48),
+          minimumSize: const Size(0, _legalLinkHeight),
           tapTargetSize: MaterialTapTargetSize.padded,
         ),
         child: Text(label, style: Theme.of(context).textTheme.bodySmall),
@@ -292,13 +298,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 // U-28: ONE line, always. As a `Wrap` of two default-padded
                 // `TextButton`s the pair broke in two on a phone and left the
-                // screen tall and strewn; `FittedBox` gives up a couple of
+                // screen tall and strewn; the shrink gives up a couple of
                 // percent of type size on the narrowest screens instead.
+                // U-48: a couple of percent has a floor now (0.85×,
+                // [AppShrinkToFit]), the buttons are tall enough to measure
+                // 48 dp AFTER it (`_legalLinkHeight`), and the child is a
+                // `Wrap` again: past the floor the pair breaks into two
+                // centred lines, the honest answer to a reader who asked for
+                // large text.
                 Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  child: AppShrinkToFit(
+                    alignment: Alignment.center,
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         _legalLink(l[K.commonPrivacyPolicy],
                             () => _openWebPage(DeepLinkUrls.privacy)),
