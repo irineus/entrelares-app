@@ -91,6 +91,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _exporting = false;
 
+  /// U-50 — the server's answer to "does this account have a password";
+  /// `null` while unanswered. Never derived from the session's providers.
+  bool? _hasPassword;
+
   // S-11 — leaving the family
   PendingFamilyDeletion? _pendingDeletion;
   bool _confirmingLeave = false;
@@ -126,12 +130,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final results = await Future.wait([
+    final results = await Future.wait<Object?>([
       widget.dataSource.fetchMembers(),
       widget.dataSource.fetchOwnProfile(),
       widget.dataSource.fetchRoles(),
       widget.dataSource.fetchOwnFamily(),
       widget.dataSource.fetchPendingFamilyDeletion(),
+      // U-50: asked alongside the rest, so the skeleton covers it and the
+      // password card never pops in after the page is up (owner, 18/09/2026).
+      widget.dataSource.sessionHasPassword(),
     ]);
     if (!mounted) return;
     final members = results[0] as List<Member>;
@@ -152,6 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _roles = results[2] as List<Role>;
       _family = results[3] as Family?;
       _pendingDeletion = results[4] as PendingFamilyDeletion?;
+      _hasPassword = results[5] as bool?;
       _loading = false;
     });
   }
@@ -413,7 +421,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ..._signInMethodsSection(l, target),
             const SizedBox(height: 24),
             _emailSection(l, target),
-            if (SignInMethodRules.hasPassword(_signInMethods(target))) ...[
+            if (SignInMethodRules.showsPasswordCard(_signInMethods(target))) ...[
               const SizedBox(height: 24),
               _passwordSection(l, target),
             ],
@@ -583,14 +591,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// U-30 — the doors this account has, read from the session (F-57 exposed
-  /// the providers; this adds the identities, for the address each door opens
-  /// under). Both facts are session-local: no server round trip.
+  /// U-30 — the doors this account has. The PROVIDER doors are read from the
+  /// session (F-57 exposed the providers; U-30 added the identities, for the
+  /// address each door opens under). The PASSWORD door is the server's answer
+  /// (U-50): the providers never stand in for it.
   List<SignInMethod> _signInMethods(Member target) =>
       SignInMethodRules.methods(
         providers: widget.dataSource.authProviders(),
         identities: widget.dataSource.signInIdentities(),
         accountEmail: widget.dataSource.sessionEmail() ?? target.email,
+        hasPassword: _hasPassword,
       );
 
   /// U-30 — "Como você entra": one row per door, each with the address it
@@ -622,11 +632,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 height: GoogleBrand.logoSize,
                 excludeFromSemantics: true),
             l[KApp.profLoginMethodGoogle],
-            // Alone, the F-57 sentence (there is no password to change);
-            // beside a password, the sentence that survives BOTH changes.
-            l[several
-                ? KApp.profLoginMethodGoogleLinkedNote
-                : KApp.profLoginMethodNote],
+            // Beside a password, the sentence that survives BOTH changes;
+            // alone, the F-57 sentence (there is no password to change) —
+            // but only once the server SAID so (U-50). Unanswered, the row
+            // claims nothing about a password.
+            l[switch (SignInMethodRules.googleNote(
+                methods: methods, hasPassword: _hasPassword)) {
+              GoogleDoorNote.linked => KApp.profLoginMethodGoogleLinkedNote,
+              GoogleDoorNote.noPassword => KApp.profLoginMethodNote,
+              GoogleDoorNote.neutral => KApp.profLoginMethodGoogleNeutralNote,
+            }],
           ),
         SignInMethodKind.other => (
             const Icon(Icons.login_outlined, size: GoogleBrand.logoSize),
@@ -676,12 +691,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ];
   }
 
-  /// F-57 (the U-21 slice this item requires): a session whose identity
-  /// providers do not include `email` has NO password — offering "alterar
-  /// senha" to it would submit against nothing, and "esqueci a atual" would
-  /// e-mail a reset for a credential that does not exist. The caller keeps
-  /// this card off such a session (`SignInMethodRules.hasPassword`); its door
-  /// is listed in [_signInMethodsSection] instead (U-30).
+  /// F-57 (the U-21 slice this item requires): an account with NO password
+  /// gets no "alterar senha" — it would submit against nothing, and "esqueci
+  /// a atual" would e-mail a reset for a credential that does not exist. The
+  /// caller keeps this card off such an account
+  /// (`SignInMethodRules.showsPasswordCard`); its door is listed in
+  /// [_signInMethodsSection] instead (U-30). Whether the account has one is
+  /// the SERVER's answer since U-50 — F-57 read it off the providers, and one
+  /// live account was told it had no password while it had.
   ///
   /// U-21 — at rest the card is one sentence; the two fields, the eye toggle
   /// and the reset-by-e-mail door all live in the sheet.

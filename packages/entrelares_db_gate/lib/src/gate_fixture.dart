@@ -382,6 +382,24 @@ class GateFixture {
     );
   }
 
+  /// U-50: a session whose account has NO password in the database — not the
+  /// S-21 shape above, whose password is merely unknown (see
+  /// `AdminApi.noPasswordSession`). No family and no profile: the account
+  /// carries no metadata, so `handle_new_user` defers it like an OAuth sign-up
+  /// (F-57), and the only thing asked of it is who `auth.uid()` is.
+  Future<({String userId, SupabaseClient client})> createNoPasswordSession(
+      String tag) async {
+    final session = await _admin.noPasswordSession(testEmail(tag));
+    _userIds.add(session.userId);
+    final client = _track(SupabaseClient(
+      TestEnv.supabaseUrl,
+      TestEnv.anonKey,
+      headers: {'Authorization': 'Bearer ${session.accessToken}'},
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+    ));
+    return (userId: session.userId, client: client);
+  }
+
   /// F-57: registers a family created OUTSIDE [createFamily] (e.g. by
   /// `complete_oauth_onboarding`) for the run's teardown purge.
   void trackFamily(int familyId) => _extraFamilyIds.add(familyId);

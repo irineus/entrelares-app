@@ -1218,6 +1218,17 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<bool?> sessionHasPassword() async {
+    try {
+      final answer = await _client.rpc<dynamic>('session_has_password');
+      return answer is bool ? answer : null;
+    } catch (_) {
+      // Unanswered is a state (T-18), and the screen has a rendering for it.
+      return null;
+    }
+  }
+
+  @override
   List<SignInIdentity> signInIdentities() {
     final identities = _client.auth.currentUser?.identities;
     if (identities == null) return const [];

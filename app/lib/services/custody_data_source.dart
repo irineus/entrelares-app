@@ -356,10 +356,21 @@ abstract class CustodyDataSource {
   });
 
   /// The identity providers of the current session (`email`, `google`, …) —
-  /// what the profile screen reads to decide between the password card and
-  /// the sign-in-method row (the U-21 slice F-57 requires). Empty when there
-  /// is no session.
+  /// the PROVIDER doors the profile screen lists (U-30). Empty when there is
+  /// no session. Since U-50 this says nothing about a password: see
+  /// [sessionHasPassword].
   List<String> authProviders();
+
+  /// U-50 — whether the signed-in account has a password, asked of the only
+  /// party that can know (`session_has_password()`, which reads
+  /// `auth.users.encrypted_password` for `auth.uid()`). The provider list is
+  /// not an answer: production carries an account whose providers are `google`
+  /// alone and which has one.
+  ///
+  /// `null` means the server did not answer (no signal, a refused call). It
+  /// never throws — one unanswered question must not take the profile screen
+  /// down with it — and the caller must not round `null` to a guess.
+  Future<bool?> sessionHasPassword();
 
   /// U-30 — the identities of the current session, each with the address it
   /// signs in under. Beside [authProviders] because the two are different

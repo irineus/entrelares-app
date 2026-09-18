@@ -51,6 +51,7 @@ import 'suites/resolution_log_link.dart';
 import 'suites/revert_notes.dart';
 import 'suites/rls_hardening.dart';
 import 'suites/schedule_range.dart';
+import 'suites/session_has_password.dart';
 import 'suites/sudo_elevation.dart';
 import 'suites/swap_message.dart';
 import 'suites/test_recipient_suppression.dart';
@@ -117,6 +118,7 @@ void main() {
   platformOperatorTests(fx);
   sudoElevationTests(fx);
   elevationCodeTests(fx);
+  sessionHasPasswordTests(fx);
   customRoleTests(fx);
   appSettingsTests(fx);
   edgeFunctionAuthTests(fx);
