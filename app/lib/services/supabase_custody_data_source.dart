@@ -8,6 +8,7 @@ import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_deletion.dart';
 import 'package:entrelares_db_contracts/models/family_invitation.dart';
@@ -885,6 +886,46 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     final snapshot = PreEditSnapshot.parse(await _fetchOldData(preEditLogId));
     if (snapshot == null) return null;
     return PreEditNotes(snapshot.notes);
+  }
+
+  // ── F-52 aviso de imprevisto ──
+
+  @override
+  Future<List<DayNotice>> fetchDayNotices(DateTime date) async {
+    // The outcome is embedded rather than fetched separately: "is this aviso
+    // still open" is the absence of a row, and two round trips is two chances
+    // for the banner to show an answered notice as answerable.
+    final rows = await _client
+        .from('day_notices')
+        .select('*, day_notice_outcomes(*)')
+        .eq('schedule_date', CareSchedule.isoDate(date))
+        .order('created_at', ascending: false);
+    return rows.map(DayNotice.fromJson).toList();
+  }
+
+  @override
+  Future<int> sendDayNotice({
+    required String reason,
+    int? etaMinutes,
+    required String request,
+    String? note,
+  }) async {
+    // No date parameter, on purpose: the RPC reads the clock in
+    // `America/Sao_Paulo`, so a device with a wrong date cannot write a notice
+    // about a day it is not.
+    final id = await _client.rpc<dynamic>('send_day_notice', params: {
+      'p_reason': reason,
+      'p_eta_minutes': etaMinutes,
+      'p_request': request,
+      'p_note': note,
+    });
+    return id as int;
+  }
+
+  @override
+  Future<void> cancelDayNotice(int noticeId) async {
+    await _client
+        .rpc<dynamic>('cancel_day_notice', params: {'p_notice_id': noticeId});
   }
 
   @override

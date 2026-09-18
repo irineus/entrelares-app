@@ -825,6 +825,24 @@ abstract final class K {
   static const String notifRenderFamDelWithdrawn = 'notifRender.famDel.withdrawn';
   static const String notifRenderFamDelReminder = 'notifRender.famDel.reminder';
 
+  // ── Aviso de imprevisto (F-52) ──
+  // One `type` (`day_notice`), four wordings under `kind`. The reason and the
+  // estimate are VALUES in `params`, woven into the request's own template —
+  // never a Portuguese clause stored for an English reader to receive.
+  static const String notifRenderTitleDayNotice = 'notifRender.title.dayNotice';
+  static const String notifRenderTitleDayNoticeCancelled = 'notifRender.title.dayNoticeCancelled';
+  static const String notifRenderDayNoticeInfo = 'notifRender.dayNotice.info';
+  static const String notifRenderDayNoticePickup = 'notifRender.dayNotice.pickup';
+  static const String notifRenderDayNoticeKeep = 'notifRender.dayNotice.keep';
+  static const String notifRenderDayNoticeCancelled = 'notifRender.dayNotice.cancelled';
+  static const String notifRenderDayNoticeReasonDelay = 'notifRender.dayNotice.reason.delay';
+  static const String notifRenderDayNoticeReasonMedical = 'notifRender.dayNotice.reason.medical';
+  static const String notifRenderDayNoticeReasonTraffic = 'notifRender.dayNotice.reason.traffic';
+  static const String notifRenderDayNoticeReasonOther = 'notifRender.dayNotice.reason.other';
+  static const String notifRenderDayNoticeEtaMinutes = 'notifRender.dayNotice.eta.minutes';
+  static const String notifRenderDayNoticeEtaNone = 'notifRender.dayNotice.eta.none';
+  static const String notifRenderDayNoticeNoteSuffix = 'notifRender.dayNotice.noteSuffix';
+
   // ── E-mail quota (F-38) + billing grace (S-15) ──
   static const String notifRenderTitleEmailCapPremium = 'notifRender.title.emailCapPremium';
   static const String notifRenderTitleEmailCapFree = 'notifRender.title.emailCapFree';
@@ -1877,6 +1895,19 @@ abstract final class K {
     notifRenderFamDelRefused,
     notifRenderFamDelWithdrawn,
     notifRenderFamDelReminder,
+    notifRenderTitleDayNotice,
+    notifRenderTitleDayNoticeCancelled,
+    notifRenderDayNoticeInfo,
+    notifRenderDayNoticePickup,
+    notifRenderDayNoticeKeep,
+    notifRenderDayNoticeCancelled,
+    notifRenderDayNoticeReasonDelay,
+    notifRenderDayNoticeReasonMedical,
+    notifRenderDayNoticeReasonTraffic,
+    notifRenderDayNoticeReasonOther,
+    notifRenderDayNoticeEtaMinutes,
+    notifRenderDayNoticeEtaNone,
+    notifRenderDayNoticeNoteSuffix,
     notifRenderTitleEmailCapPremium,
     notifRenderTitleEmailCapFree,
     notifRenderTitleEmailCapLast,

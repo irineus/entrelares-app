@@ -39,6 +39,17 @@ class TodayCard extends StatelessWidget {
   final VoidCallback onGoToToday;
   final VoidCallback onInvite;
 
+  /// F-52: the aviso strip — the open notice, or the way to send one. It sits
+  /// INSIDE the card because an aviso is about today, and today is what this
+  /// card is; a banner floating under it would read as a page-level message.
+  ///
+  /// It is drawn only while [viewingCurrentMonth] is true, and that is not a
+  /// detail: the card carries an `onTap` on every OTHER month, and U-47 forbids
+  /// a button inside a tappable tile — one mis-tap would scroll the calendar
+  /// instead of opening the sheet. On the current month the card's own tap is
+  /// already null, so the strip is the only target in it.
+  final Widget? noticeStrip;
+
   const TodayCard({
     super.key,
     required this.glance,
@@ -50,6 +61,7 @@ class TodayCard extends StatelessWidget {
     required this.showInviteNudge,
     required this.onGoToToday,
     required this.onInvite,
+    this.noticeStrip,
   });
 
   /// A heading starts with a capital; the date formatters lowercase because
@@ -205,6 +217,11 @@ class TodayCard extends StatelessWidget {
                 color: responsible.tone.container,
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
                 child: _responsibleRow(context, l, responsible),
+              ),
+            if (viewingCurrentMonth && noticeStrip != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                child: noticeStrip,
               ),
           ],
         ),

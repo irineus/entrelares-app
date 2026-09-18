@@ -28,6 +28,7 @@ library;
 
 import 'dart:convert';
 
+import '../notice_rules.dart';
 import 'date_formats.dart';
 import 'k.dart';
 import 'localization.dart';
@@ -208,6 +209,29 @@ abstract final class NotificationRenderer {
           _ => storedMessage,
         };
 
+      // ── Aviso de imprevisto (F-52) ──
+      // The reason and the estimate are VALUES; the sentence is composed by
+      // `noticeSentence`, the one the Hoje card's banner also reads. An
+      // unknown `reason` falls back like every other unknown discriminator:
+      // it is the shape a future writer takes, and inventing "teve um
+      // imprevisto" for it would state something we were not told.
+      case 'day_notice' when date != null:
+        if (kind == 'cancelled') {
+          return l.format(K.notifRenderDayNoticeCancelled,
+              [name ?? l[K.notifRenderFbOtherCap]]);
+        }
+        final request = NoticeRequest.fromWire(kind);
+        final reason = NoticeReason.fromWire(p['reason']);
+        if (request == null || reason == null) return storedMessage;
+        return noticeSentence(
+          l: l,
+          senderName: name ?? l[K.notifRenderFbOtherCap],
+          reason: reason,
+          etaMinutes: int.tryParse(p['eta'] ?? ''),
+          request: request,
+          note: p['note'],
+        );
+
       // ── E-mail quota (F-38) ──
       case 'email_cap_reached':
         return switch (p['tier']) {
@@ -345,6 +369,19 @@ abstract final class NotificationRenderer {
         },
       'billing' =>
         kind == 'grace_warning' ? K.notifRenderTitleBillingGrace : null,
+      // F-52: three request kinds share one heading — the body is what says
+      // whether anything is being asked of the reader. A cancellation gets its
+      // own, because "Aviso de imprevisto" over "X cancelou o aviso" would
+      // announce the opposite of what happened. The `reason` is read here too
+      // and not only in the message: the heading must never render from a
+      // branch whose BODY fell back, or the reader gets an English heading
+      // over a Portuguese sentence.
+      'day_notice' => kind == 'cancelled'
+          ? K.notifRenderTitleDayNoticeCancelled
+          : (NoticeRequest.fromWire(kind) != null &&
+                  NoticeReason.fromWire(p['reason']) != null
+              ? K.notifRenderTitleDayNotice
+              : null),
       _ => null,
     };
 

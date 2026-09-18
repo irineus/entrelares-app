@@ -748,6 +748,22 @@ abstract final class StringsPtBr {
     K.notifRenderFamDelReminder: 'A família será excluída definitivamente em {0}. Você ainda pode recusar em Perfil > Exclusão da família, ou exportar seus dados antes.',
     K.notifRenderFamDelRequestedOther: '{0} solicitou a exclusão da família. Se ninguém recusar até {1}, TODOS os dados (calendário, histórico e contas de todos) serão apagados definitivamente. Você pode recusar em Perfil > Exclusão da família — qualquer recusa cancela a exclusão.',
     // ── Cota de e-mails (F-38) e carência da cobrança (S-15) ──
+    // ── Aviso de imprevisto (F-52) ──
+    // O detalhe vem entre aspas, sem rótulo: "Mensagem" é a palavra do F-44 e
+    // "Observação" a do dia, e um aviso não é nenhuma das duas.
+    K.notifRenderTitleDayNotice: 'Aviso de imprevisto',
+    K.notifRenderTitleDayNoticeCancelled: 'Aviso cancelado',
+    K.notifRenderDayNoticeInfo: '{0} avisou que {1}{2}.{3}',
+    K.notifRenderDayNoticePickup: '{0} avisou que {1}{2} e precisa que alguém busque a criança.{3}',
+    K.notifRenderDayNoticeKeep: '{0} avisou que {1}{2} e precisa que alguém fique com a criança hoje.{3}',
+    K.notifRenderDayNoticeCancelled: '{0} cancelou o aviso de hoje.',
+    K.notifRenderDayNoticeReasonDelay: 'vai atrasar',
+    K.notifRenderDayNoticeReasonMedical: 'teve um imprevisto médico',
+    K.notifRenderDayNoticeReasonTraffic: 'está preso no trânsito',
+    K.notifRenderDayNoticeReasonOther: 'teve um imprevisto',
+    K.notifRenderDayNoticeEtaMinutes: ' (cerca de {0} min)',
+    K.notifRenderDayNoticeEtaNone: ' (sem previsão)',
+    K.notifRenderDayNoticeNoteSuffix: ' "{0}"',
     K.notifRenderTitleEmailCapPremium: 'Limite de e-mails do mês atingido',
     K.notifRenderTitleEmailCapFree: 'Limite de e-mails do plano gratuito',
     K.notifRenderTitleEmailCapLast: 'Último e-mail do mês',
