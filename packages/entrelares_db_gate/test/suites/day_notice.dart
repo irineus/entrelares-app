@@ -271,6 +271,11 @@ void dayNoticeTests(GateFixture fx) {
     setUpAll(() async {
       fam = await fx.createFamily('f52ans');
       await planToday(fam.familyId, fam.adminProfile.id);
+      // The member carries the next handoff, so BOTH ends may send. This group
+      // needs FOUR avisos and the cap is two per sender per day — the first
+      // run of this suite spent the admin's two on the refusal tests and then
+      // failed the next two on the cap, which is the cap working.
+      await planTomorrow(fam.familyId, fam.memberProfile.id);
     });
 
     test('nobody answers their own aviso', () async {
@@ -286,9 +291,10 @@ void dayNoticeTests(GateFixture fx) {
           contains: 'pede nada');
     });
 
+    // From here the MEMBER sends — the admin's two are spent above.
     test('helping does not touch the calendar', () async {
-      final id = await send(fam.admin, request: 'pickup');
-      final swap = await answer(fam.member, id, 'helping', note: 'na padaria');
+      final id = await send(fam.member, request: 'pickup');
+      final swap = await answer(fam.admin, id, 'helping', note: 'na padaria');
       expect(swap, isNull);
 
       final day = (await fx.service
@@ -307,7 +313,7 @@ void dayNoticeTests(GateFixture fx) {
               .limit(1))
           .single;
       expect(outcome['outcome'], 'helping');
-      expect(outcome['actor_profile_id'], fam.memberProfile.id);
+      expect(outcome['actor_profile_id'], fam.adminProfile.id);
       expect(outcome['note'], 'na padaria');
       expect(outcome['swap_request_id'], isNull);
     });
@@ -315,8 +321,8 @@ void dayNoticeTests(GateFixture fx) {
     // A pickup asked for help NOW, not for the day. Answering it by taking the
     // day would apply a consent the sender never gave.
     test('the day cannot be taken when it was not offered', () async {
-      final id = await send(fam.admin, request: 'pickup');
-      await expectRejected(() => answer(fam.member, id, 'keeping'),
+      final id = await send(fam.member, request: 'pickup');
+      await expectRejected(() => answer(fam.admin, id, 'keeping'),
           contains: 'pediu ajuda');
     });
   });
