@@ -625,7 +625,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       // request awaiting this person lands on "Para você". The notification id
       // rides along so a SECOND tap re-applies the tab — the screen's State
       // survives inside the shell branch.
-      final landing = PushRouting.landingFor(data['type']);
+      // F-52: `kind` rides in the payload so a courtesy aviso lands on
+      // "Todas" and a request lands on "Para você".
+      final landing =
+          PushRouting.landingFor(data['type'], kind: data['kind']);
       final query = {
         'tab': landing == NotificationLanding.incoming ? 'incoming' : 'history',
         if ((data['notificationId'] ?? '').isNotEmpty)
