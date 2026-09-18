@@ -65,6 +65,7 @@ import 'package:entrelares_app/screens/reports_pdf_tab.dart';
 import 'package:entrelares_app/screens/reports_screen.dart';
 import 'package:entrelares_app/services/account_identity.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
+import 'package:entrelares_app/services/appearance.dart';
 import 'package:entrelares_app/services/notification_badge.dart';
 import 'package:entrelares_app/services/push_messaging.dart';
 import 'package:entrelares_app/services/push_service.dart';
@@ -657,12 +658,26 @@ void main() {
             dataSource: ds,
             sudo: SudoService(ds),
             deliverExport: (_, _) async {},
+            // U-12: the Aparência card renders only where the root handed the
+            // screen its controller, so the scene has to hand it one — without
+            // this the gate would measure a page the app does not ship, and
+            // the segmented control's targets and contrast would go unread.
+            appearance: Appearance(),
           ),
           dark: dark,
         ),
       );
       await tester.pumpAndSettle();
       await _measure(tester, 'profile');
+
+      // U-12: the Aparência card sits below the fold on a 740 dp phone, and a
+      // `ListView` never lays out what it did not have to — measuring the
+      // page as it lands would have measured everything BUT the new control.
+      // So the scene scrolls to it the way a thumb does, and measures again.
+      await tester.scrollUntilVisible(
+          find.text(pt[KApp.appearanceLabel]), 200.0);
+      await tester.pumpAndSettle();
+      await _measure(tester, 'profile, appearance');
     });
 
     _scene('the three report tabs', (tester, dark) async {

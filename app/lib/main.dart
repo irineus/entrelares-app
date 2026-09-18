@@ -39,6 +39,7 @@ import 'screens/update_password_screen.dart';
 import 'services/account_identity.dart';
 import 'services/admin_mode.dart';
 import 'services/analytics_service.dart';
+import 'services/appearance.dart';
 import 'services/boot_handoff.dart';
 import 'services/connectivity_status.dart';
 import 'services/auth_providers.dart';
@@ -135,15 +136,28 @@ Future<void> main() async {
     null,
     PlatformDispatcher.instance.locale.toLanguageTag(),
   );
-  runApp(EntrelaresApp(prefs: prefs, initialLanguage: language));
+  // U-12: the theme choice is resolved here too, and for the same reason —
+  // the app must not paint one theme and blink into the other on the first
+  // frame. One source only (the device is one of the three answers, not a
+  // layer under them), so there is nothing to adopt later.
+  final appearance = Appearance.fromPrefs(prefs);
+  runApp(EntrelaresApp(
+      prefs: prefs, initialLanguage: language, appearance: appearance));
 }
 
 class EntrelaresApp extends StatefulWidget {
   final SharedPreferences prefs;
   final AppLanguage initialLanguage;
 
+  /// U-12 — built by [main] from the same `prefs`, so the first frame already
+  /// wears what the reader chose.
+  final Appearance appearance;
+
   const EntrelaresApp(
-      {super.key, required this.prefs, required this.initialLanguage});
+      {super.key,
+      required this.prefs,
+      required this.initialLanguage,
+      required this.appearance});
 
   @override
   State<EntrelaresApp> createState() => _EntrelaresAppState();
@@ -456,6 +470,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                       _isLeaving = true;
                       _router.go('/leaving');
                     },
+                    appearance: widget.appearance,
                   ),
                   routes: [
                     GoRoute(
@@ -465,6 +480,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                         sudo: _sudo,
                         profileId:
                             int.tryParse(state.pathParameters['id'] ?? ''),
+                        // `/profile/<my own id>` is the same page as
+                        // `/profile`, and a setting that appears under one
+                        // address and not the other is the reader's problem,
+                        // not the router's. The card is `_isOwn`-gated inside.
+                        appearance: widget.appearance,
                       ),
                     ),
                   ],
@@ -617,6 +637,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _onboarding = OnboardingService(_dataSource, push: _push);
     _l = Localization(widget.initialLanguage);
     appConnectivity.addListener(_onConnectivityChanged);
+    // U-12: the picker sits inside a route go_router caches, so the root only
+    // learns of a change by listening — the same reason the connectivity strip
+    // is a listenable.
+    widget.appearance.addListener(_onAppearanceChanged);
     _openGate();
     _authSub = _client.auth.onAuthStateChange.listen((state) {
       switch (state.event) {
@@ -661,6 +685,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     appConnectivity.removeListener(_onConnectivityChanged);
+    widget.appearance.removeListener(_onAppearanceChanged);
     _authSub?.cancel();
     if (_routerLive) {
       _router.routeInformationProvider.removeListener(_trackPageView);
@@ -970,6 +995,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _onConnectivityChanged();
   }
 
+  /// U-12 — a new theme repaints the whole app, which is exactly what the
+  /// choice asks for: `MaterialApp.themeMode` is read in [build].
+  void _onAppearanceChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _onConnectivityChanged() {
     if (appConnectivity.offline || !_profileGatesDeferred) return;
     if (_phase != _AuthPhase.authed) return;
@@ -1135,12 +1166,13 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
           // U-27 — both themes are hand-written from the tokens, and dark
           // ships WITH them: it is nearly free here and was nearly impossible
-          // against the 79 colour literals this delivery removed. Following
-          // the system is the whole feature for now; a user-facing switch is
-          // U-12's, not this item's.
+          // against the 79 colour literals that delivery removed.
+          // U-12 — and WHICH of the two is the reader's own answer now, read
+          // from `prefs` before the first frame; "Sistema" is one of the three
+          // answers, not the absence of one.
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.system,
+          themeMode: widget.appearance.themeMode,
           // T-53 stage 4 — the web channel is a phone-shaped app, and a
           // browser window is not a phone. The Blazor PWA always capped its
           // pages (`.page-container { max-width: 500px; margin: 0 auto }`), so

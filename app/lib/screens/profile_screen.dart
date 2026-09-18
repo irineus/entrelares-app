@@ -9,6 +9,7 @@ import '../env.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
+import '../services/appearance.dart';
 import '../services/custody_data_source.dart';
 import '../services/export_service.dart';
 import '../services/file_delivery.dart';
@@ -60,6 +61,12 @@ class ProfileScreen extends StatefulWidget {
   /// on the calendar, which owns those surfaces.
   final Future<void> Function({required bool replayTour})? onReopenOnboarding;
 
+  /// U-12 — the theme choice, owned by the root (it is what `MaterialApp`
+  /// reads) and handed down here, where a reader looks for a setting. Optional
+  /// like [onReopenOnboarding]: a scene that pumps this screen without a root
+  /// simply has no Aparência card, and the production routes always pass one.
+  final Appearance? appearance;
+
   const ProfileScreen({
     super.key,
     required this.dataSource,
@@ -69,6 +76,7 @@ class ProfileScreen extends StatefulWidget {
     this.onLeaving,
     this.onOpenFamily,
     this.onReopenOnboarding,
+    this.appearance,
   });
 
   @override
@@ -432,6 +440,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // reader looks for a SETTING, and `languageHint` is the only place
             // the app says the choice follows them into their e-mail.
             _languageSection(l),
+            // U-12: the other display preference, right beside the first one.
+            // Both are per device and neither reaches the family's data — the
+            // reader who came here for one finds the other without hunting.
+            if (widget.appearance != null) ...[
+              const SizedBox(height: 24),
+              _appearanceSection(l, widget.appearance!),
+            ],
             const SizedBox(height: 24),
             _lgpdSection(l),
             if (widget.onReopenOnboarding != null) ...[
@@ -472,6 +487,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: Spacing.md),
             const LanguagePickerRow(),
+          ],
+        ),
+      );
+
+  /// U-12 — "sempre claro / sempre escuro / seguir o sistema", in the shape
+  /// the language picker already taught: one segmented control, the hint above
+  /// it. The labels are one word each because the control lives on a 360 dp
+  /// phone at up to 1.3× (U-48), and the sentence the short words drop —
+  /// per device, and what "Sistema" follows — is the hint's job.
+  ///
+  /// The [ValueListenableBuilder] is what makes the control move at all when
+  /// this screen is pumped on its own: in the app the root rebuilds everything
+  /// anyway, but the selection must follow the value, never a local copy of it.
+  Widget _appearanceSection(Localization l, Appearance appearance) => AppCard(
+        title: l[KApp.appearanceLabel],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(l[KApp.appearanceHint],
+                style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: Spacing.md),
+            Center(
+              child: ValueListenableBuilder<ThemePreference>(
+                valueListenable: appearance,
+                builder: (_, selected, _) => AppSegmented<ThemePreference>(
+                  semantics: l[KApp.appearanceAriaLabel],
+                  selected: selected,
+                  onChanged: appearance.choose,
+                  options: [
+                    (
+                      value: ThemePreference.light,
+                      label: l[KApp.appearanceLight]
+                    ),
+                    (
+                      value: ThemePreference.dark,
+                      label: l[KApp.appearanceDark]
+                    ),
+                    (
+                      value: ThemePreference.system,
+                      label: l[KApp.appearanceSystem]
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );

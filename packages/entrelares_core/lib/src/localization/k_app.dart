@@ -263,6 +263,19 @@ abstract final class KApp {
   static const String famAdminRowOff = 'app.fam.adminRowOff';
   static const String famDelReqUnavailable = 'app.fam.delReqUnavailable';
 
+  // ── U-12 appearance: the reader's own theme, beside the language on the
+  //    profile page. The three labels are deliberately ONE WORD each — the
+  //    card's prose ("sempre claro", "seguir o sistema") does not fit a
+  //    segmented control at the 1.3× scale U-48 measures every screen at, and
+  //    U-34's defect was exactly a label breaking mid-word there. The hint
+  //    carries what the short words drop. ──
+  static const String appearanceLabel = 'app.appearance.label';
+  static const String appearanceHint = 'app.appearance.hint';
+  static const String appearanceAriaLabel = 'app.appearance.ariaLabel';
+  static const String appearanceLight = 'app.appearance.light';
+  static const String appearanceDark = 'app.appearance.dark';
+  static const String appearanceSystem = 'app.appearance.system';
+
   /// See `K.allKeys`.
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -407,6 +420,12 @@ abstract final class KApp {
     famAdminRowOn,
     famAdminRowOff,
     famDelReqUnavailable,
+    appearanceLabel,
+    appearanceHint,
+    appearanceAriaLabel,
+    appearanceLight,
+    appearanceDark,
+    appearanceSystem,
   ];
 }
 
@@ -623,6 +642,15 @@ abstract final class StringsAppPtBr {
     KApp.famAdminRowOff: 'Desativado',
     KApp.famDelReqUnavailable:
         'Não há pedido de exclusão para abrir aqui. Só um administrador com outros responsáveis na família pode abrir um — e um pedido já aberto aparece na tela Família.',
+    // ── U-12 ──
+    KApp.appearanceLabel: 'Aparência',
+    KApp.appearanceHint:
+        'Guardada só neste aparelho. "Sistema" segue o tema que o aparelho '
+            'já usa.',
+    KApp.appearanceAriaLabel: 'Escolher tema',
+    KApp.appearanceLight: 'Claro',
+    KApp.appearanceDark: 'Escuro',
+    KApp.appearanceSystem: 'Sistema',
   };
 }
 
@@ -834,5 +862,14 @@ abstract final class StringsAppEn {
     KApp.famAdminRowOff: 'Off',
     KApp.famDelReqUnavailable:
         'There is no deletion request to open here. Only an administrator with other caregivers in the family can open one — and an open request shows on the Família screen.',
+    // ── U-12 ──
+    KApp.appearanceLabel: 'Appearance',
+    KApp.appearanceHint:
+        'Kept on this device only. "System" follows the theme your device '
+            'already uses.',
+    KApp.appearanceAriaLabel: 'Choose theme',
+    KApp.appearanceLight: 'Light',
+    KApp.appearanceDark: 'Dark',
+    KApp.appearanceSystem: 'System',
   };
 }
