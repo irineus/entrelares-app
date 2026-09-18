@@ -131,6 +131,42 @@ class AdminApi {
     return token;
   }
 
+  /// U-50: an account whose `encrypted_password` is genuinely EMPTY, and a
+  /// session for it — returns the user id and an access token.
+  ///
+  /// Harder than it sounds, and nothing said so until `session_has_password()`
+  /// answered `true` where `false` was expected (18/09/2026, measured on the
+  /// dev project): GoTrue WRITES A RANDOM PASSWORD in two places —
+  ///   · the Admin API's create-user, when it is given none (so
+  ///     [createPasswordlessUser] builds "a password nobody knows", which is
+  ///     all S-21 needed and not what its name says);
+  ///   · redeeming an INVITE link through `/verify` (the column is empty
+  ///     before the click and a bcrypt digest after it).
+  /// What leaves it empty: minting an invite (`generate_link` creates the user
+  /// with no credential and sends nothing) and then signing that user in
+  /// through a MAGIC LINK, whose verification confirms the address and writes
+  /// no password. Two links, one user, no mail.
+  Future<({String userId, String accessToken})> noPasswordSession(
+      String email) async {
+    final invite = await _http.post(
+      _uri('/auth/v1/admin/generate_link'),
+      headers: _headers,
+      body: jsonEncode({'type': 'invite', 'email': email}),
+    );
+    if (invite.statusCode >= 300) {
+      throw StateError("generate_link (invite) for '$email' failed "
+          '(${invite.statusCode}): ${invite.body}');
+    }
+    final userId = (jsonDecode(invite.body) as Map<String, dynamic>)['id'];
+    if (userId is! String) {
+      throw StateError('generate_link (invite) returned no id: ${invite.body}');
+    }
+    return (
+      userId: userId,
+      accessToken: await passwordlessAccessToken(email),
+    );
+  }
+
   /// F-16 tests: changes a user's e-mail as GoTrue itself would after the
   /// confirmation link — exercising the `profiles.email` sync trigger without a
   /// mailbox round-trip.

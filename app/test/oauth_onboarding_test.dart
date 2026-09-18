@@ -397,7 +397,11 @@ void main() {
 
     testWidgets('a Google-only session sees its method, never a password form',
         (tester) async {
-      final ds = source()..providers = ['google'];
+      // U-50: "no password" is the SERVER's answer now; the providers alone
+      // would no longer hide the card.
+      final ds = source()
+        ..providers = ['google']
+        ..hasPassword = false;
       await pumpProfile(tester, ds);
 
       expect(find.text(pt[KApp.profLoginMethod]), findsOneWidget);
@@ -522,16 +526,119 @@ void main() {
       expect(find.byIcon(Icons.account_circle_outlined), findsNothing);
     });
 
-    testWidgets('a session that said nothing lists nothing and keeps the form',
-        (tester) async {
+    testWidgets('a session that said nothing still lists the password door the '
+        'server vouched for, and keeps the form', (tester) async {
+      // U-50: this used to read "lists nothing and keeps the form" — the form
+      // survived on the rule "no information keeps it". The door is the
+      // server's answer now, so it is LISTED, and the form rests on that.
       final ds = linked()
         ..providers = const []
         ..identities = const [];
       await pumpProfile(tester, ds);
 
-      expect(find.text(pt[KApp.profLoginMethod]), findsNothing);
+      expect(find.byKey(const ValueKey('sign-in-method-email')), findsOneWidget);
+      expect(find.byKey(const ValueKey('sign-in-method-google')), findsNothing);
       expect(find.byKey(const ValueKey('profile-edit-password')),
           findsOneWidget);
+    });
+  });
+
+  group('U-50 — the password section follows the server, not the providers',
+      () {
+    const me = Member(
+      id: 1,
+      fullName: 'Ana Souza',
+      userId: 'u1',
+      isAdmin: true,
+      roleId: 1,
+      email: 'ana@gmail.com',
+    );
+
+    Future<void> pumpProfile(
+        WidgetTester tester, FakeCustodyDataSource ds) async {
+      await tester.binding.setSurfaceSize(const Size(800, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(wrap(ProfileScreen(
+        dataSource: ds,
+        sudo: SudoService(ds),
+        deliverExport: (_, _) async {},
+      )));
+      await tester.pumpAndSettle();
+    }
+
+    FakeCustodyDataSource googleOnly() =>
+        FakeCustodyDataSource(members: const [me], days: const [])
+          ..family = const Family(id: 7, name: 'Souza', plan: 'free')
+          ..roles = const [Role(id: 1, roleName: 'mother')]
+          ..providers = ['google']
+          ..sessionEmailValue = 'ana@gmail.com'
+          ..identities = const [
+            SignInIdentity('google', email: 'ana@gmail.com'),
+          ];
+
+    testWidgets('the production account — providers name google alone, the '
+        'server says there IS a password — gets both doors and the form',
+        (tester) async {
+      // Measured on 10/09/2026 (S-21). Until this item this person read
+      // "não há senha para alterar aqui", and had one.
+      await pumpProfile(tester, googleOnly()..hasPassword = true);
+
+      expect(find.byKey(const ValueKey('sign-in-method-email')), findsOneWidget);
+      expect(find.byKey(const ValueKey('sign-in-method-google')),
+          findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodsIntro]), findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodGoogleLinkedNote]),
+          findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodNote]), findsNothing);
+      expect(find.text(pt[K.profSectionPassword]), findsOneWidget);
+      expect(find.byKey(const ValueKey('profile-edit-password')),
+          findsOneWidget);
+    });
+
+    testWidgets('the mirror image — the `email` provider is named, the server '
+        'says there is NO password — gets no password door and no form',
+        (tester) async {
+      final ds = googleOnly()
+        ..providers = ['email', 'google']
+        ..hasPassword = false;
+      await pumpProfile(tester, ds);
+
+      expect(find.byKey(const ValueKey('sign-in-method-email')), findsNothing);
+      expect(find.byKey(const ValueKey('sign-in-method-google')),
+          findsOneWidget);
+      expect(find.text(pt[KApp.profLoginMethodNote]), findsOneWidget);
+      expect(find.text(pt[K.profSectionPassword]), findsNothing);
+      expect(find.byKey(const ValueKey('profile-edit-password')), findsNothing);
+    });
+
+    testWidgets('a server that did not answer hides the form and the Google row '
+        'claims nothing about a password (owner, 18/09/2026)', (tester) async {
+      for (final providers in [
+        ['google'],
+        ['email', 'google'],
+      ]) {
+        final ds = googleOnly()
+          ..providers = providers
+          ..hasPassword = null;
+        await pumpProfile(tester, ds);
+
+        expect(find.byKey(const ValueKey('sign-in-method-google')),
+            findsOneWidget,
+            reason: '$providers');
+        expect(find.text(pt[KApp.profLoginMethodGoogleNeutralNote]),
+            findsOneWidget,
+            reason: '$providers');
+        // Neither sentence that asserts something about a password…
+        expect(find.text(pt[KApp.profLoginMethodNote]), findsNothing,
+            reason: '$providers');
+        expect(find.text(pt[KApp.profLoginMethodGoogleLinkedNote]), findsNothing,
+            reason: '$providers');
+        // …and no guess from the `email` provider either.
+        expect(find.byKey(const ValueKey('sign-in-method-email')), findsNothing,
+            reason: '$providers');
+        expect(find.byKey(const ValueKey('profile-edit-password')), findsNothing,
+            reason: '$providers');
+      }
     });
   });
 }

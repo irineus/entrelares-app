@@ -155,6 +155,10 @@ abstract final class KApp {
       'app.prof.loginMethodPasswordNote';
   static const String profLoginMethodGoogleLinkedNote =
       'app.prof.loginMethodGoogleLinkedNote';
+  // U-50: the Google row while the server has not said whether a password
+  // exists — only what is true either way.
+  static const String profLoginMethodGoogleNeutralNote =
+      'app.prof.loginMethodGoogleNeutralNote';
   static const String profLoginMethodOther = 'app.prof.loginMethodOther';
   static const String profLoginMethodOtherNote = 'app.prof.loginMethodOtherNote';
 
@@ -329,6 +333,7 @@ abstract final class KApp {
     profLoginMethodPassword,
     profLoginMethodPasswordNote,
     profLoginMethodGoogleLinkedNote,
+    profLoginMethodGoogleNeutralNote,
     profLoginMethodOther,
     profLoginMethodOtherNote,
     profEditData,
@@ -502,6 +507,7 @@ abstract final class StringsAppPtBr {
     KApp.profLoginMethodGoogleLinkedNote:
         'Abre este login sozinha — mesmo depois de você trocar a senha ou o '
             'e-mail nesta tela.',
+    KApp.profLoginMethodGoogleNeutralNote: 'Abre este login sozinha.',
     KApp.profLoginMethodOther: 'Outro provedor: {0}',
     KApp.profLoginMethodOtherNote: 'Abre este login sozinho.',
     KApp.profEditData: 'Editar dados',
@@ -713,6 +719,7 @@ abstract final class StringsAppEn {
     KApp.profLoginMethodGoogleLinkedNote:
         'Opens this login on its own — even after you change the password or '
             'the e-mail on this screen.',
+    KApp.profLoginMethodGoogleNeutralNote: 'Opens this login on its own.',
     KApp.profLoginMethodOther: 'Another provider: {0}',
     KApp.profLoginMethodOtherNote: 'Opens this login on its own.',
     KApp.profEditData: 'Edit details',
