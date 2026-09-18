@@ -2,9 +2,14 @@
 // path (insert and full-row update), conflict translation, the Realtime
 // callback triggering a reload — and, since the U-13 port, that an English
 // session renders the same slice in English.
+import 'dart:convert';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
@@ -20,6 +25,7 @@ import 'package:entrelares_db_contracts/models/swap_request.dart';
 import 'package:entrelares_app/screens/calendar_screen.dart';
 import 'package:entrelares_app/screens/day_sheet.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
+import 'package:entrelares_app/services/analytics_service.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 
@@ -862,8 +868,15 @@ class FakeCustodyDataSource implements CustodyDataSource {
   /// Records whether the caller asked for the second (optional) read.
   final List<bool> onboardingFactReads = [];
 
+  /// T-76: how often the calendar asked. A family that already has a second
+  /// caregiver must never pay for this read.
+  int openInvitationChecks = 0;
+
   @override
-  Future<bool> hasOpenInvitation() async => openInvitationExists;
+  Future<bool> hasOpenInvitation() async {
+    openInvitationChecks++;
+    return openInvitationExists;
+  }
 
   @override
   Future<OnboardingFacts> fetchOnboardingFacts({
@@ -1018,15 +1031,18 @@ CareSchedule row(int id, DateTime date, int scheduled,
     });
 
 Widget app(FakeCustodyDataSource ds,
-        {AppLanguage language = AppLanguage.ptBr, AdminMode? adminMode}) =>
+        {AppLanguage language = AppLanguage.ptBr,
+        AdminMode? adminMode,
+        AnalyticsService? analytics}) =>
     AppL10n(
       l: Localization(language),
       setLanguage: (_) async {},
       child: MaterialApp(
         home: CalendarScreen(
-            dataSource: ds,
-            adminMode: adminMode ?? AdminMode(),
-            ),
+          dataSource: ds,
+          adminMode: adminMode ?? AdminMode(),
+          analytics: analytics,
+        ),
       ),
     );
 
@@ -1514,4 +1530,150 @@ void main() {
     expect(nextArrow.left - chip.right, greaterThan(16),
         reason: 'the chip must not sit against the month arrow');
   });
+
+  // ── T-76: the F-31 invite nudge, measured again ─────────────────────────
+  //
+  // `invite_nudge_shown` / `invite_nudge_click` fed Umami until the
+  // 23/08/2026 cutover and then stopped: the Flutter port kept the widget and
+  // dropped the events, so the only loop that brings a NEW adult into the
+  // product has been unmeasured ever since. These pin both halves plus the
+  // visibility rule the same item added.
+  group('T-76 — the invite nudge is measured again', () {
+    const soloAdmin = Member(
+        id: 1, fullName: 'Ana Souza', colorSlot: 1, userId: 'u1',
+        isAdmin: true);
+
+    late List<Map<String, dynamic>> payloads;
+
+    /// The REAL service over a recording client, so the props travel exactly
+    /// as they would in production (the family suite's FakeFunnel shape).
+    AnalyticsService funnel() {
+      payloads = [];
+      return AnalyticsService(
+        websiteId: 'site-1',
+        host: 'https://umami.example',
+        hostname: 'app.entrelares.app',
+        client: MockClient((request) async {
+          payloads.add((jsonDecode(request.body)
+              as Map<String, dynamic>)['payload'] as Map<String, dynamic>);
+          return http.Response('', 200);
+        }),
+      );
+    }
+
+    List<String> names() =>
+        payloads.map((p) => p['name']).whereType<String>().toList();
+
+    /// The nudge's CTA navigates, so the tree needs a router — and the route
+    /// it lands on is part of what the tap promises.
+    Widget routed(FakeCustodyDataSource ds, AnalyticsService analytics) =>
+        AppL10n(
+          l: Localization(AppLanguage.ptBr),
+          setLanguage: (_) async {},
+          child: MaterialApp.router(
+            routerConfig: GoRouter(routes: [
+              GoRoute(
+                  path: '/',
+                  builder: (_, _) => CalendarScreen(
+                      dataSource: ds,
+                      adminMode: AdminMode(),
+                      analytics: analytics)),
+              GoRoute(
+                  path: '/family',
+                  builder: (_, _) =>
+                      const Scaffold(body: Text('família'))),
+            ]),
+          ),
+        );
+
+    testWidgets('an admin alone sees it, and the impression is sent once',
+        (tester) async {
+      final l = Localization(AppLanguage.ptBr);
+      final ds = FakeCustodyDataSource(members: const [soloAdmin], days: []);
+      final analytics = funnel();
+
+      await tester.pumpWidget(app(ds, analytics: analytics));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[K.cardInviteTitle]), findsOneWidget);
+      expect(names(), ['invite_nudge_shown']);
+      // The channel is the dimension the whole F-48 funnel carries; without
+      // it store and web traffic are one indistinguishable number.
+      expect(payloads.single['data'], {'channel': analytics.channel});
+
+      // A reload is not a second sighting: the count would then measure the
+      // poll, not the reader.
+      ds.realtimeCallback?.call();
+      await tester.pumpAndSettle();
+      expect(names(), ['invite_nudge_shown']);
+    });
+
+    testWidgets('T-76: an open invitation silences it, and nothing is sent',
+        (tester) async {
+      final l = Localization(AppLanguage.ptBr);
+      final ds = FakeCustodyDataSource(members: const [soloAdmin], days: [])
+        ..openInvitationExists = true;
+      final analytics = funnel();
+
+      await tester.pumpWidget(app(ds, analytics: analytics));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[K.cardInviteTitle]), findsNothing,
+          reason: 'the admin already reached out — the prompt asks for '
+              'something that is already in somebody\'s inbox');
+      expect(names(), isEmpty);
+    });
+
+    testWidgets('a family with a second caregiver never pays for the read',
+        (tester) async {
+      final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+      final analytics = funnel();
+
+      await tester.pumpWidget(app(ds, analytics: analytics));
+      await tester.pumpAndSettle();
+
+      expect(ds.openInvitationChecks, 0);
+      expect(names(), isEmpty);
+    });
+
+    testWidgets('an unreadable answer keeps the prompt on screen',
+        (tester) async {
+      // Fails towards SHOWING: losing the only invite CTA to a failed bounded
+      // read costs more than telling an admin to invite somebody twice.
+      final l = Localization(AppLanguage.ptBr);
+      final ds = _InvitationReadFails(members: const [soloAdmin], days: []);
+      final analytics = funnel();
+
+      await tester.pumpWidget(app(ds, analytics: analytics));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[K.cardInviteTitle]), findsOneWidget);
+      expect(names(), ['invite_nudge_shown']);
+    });
+
+    testWidgets('the CTA sends invite_nudge_click and lands on Família',
+        (tester) async {
+      final l = Localization(AppLanguage.ptBr);
+      final ds = FakeCustodyDataSource(members: const [soloAdmin], days: []);
+      final analytics = funnel();
+
+      await tester.pumpWidget(routed(ds, analytics));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.cardInviteAction]));
+      await tester.pumpAndSettle();
+
+      expect(names(), ['invite_nudge_shown', 'invite_nudge_click']);
+      expect(payloads.last['data'], {'channel': analytics.channel});
+      expect(find.text('família'), findsOneWidget);
+    });
+  });
+}
+
+/// The one read T-76 added, failing the way a network read fails.
+class _InvitationReadFails extends FakeCustodyDataSource {
+  _InvitationReadFails({required super.members, required super.days});
+
+  @override
+  Future<bool> hasOpenInvitation() async =>
+      throw Exception('SocketException: Failed host lookup');
 }
