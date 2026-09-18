@@ -639,8 +639,16 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   /// The web highlights both sides with a background; the port left them as
   /// coloured runs inside a sentence, which a reader has to scan for. A chip is
   /// found, not read.
-  Widget _valueChip(String text, ToneColors tone, {bool struck = false}) =>
-      Container(
+  ///
+  /// U-32 (TalkBack, 18/09/2026): the strikethrough and the red/green were
+  /// the ONLY vector — a blind reader heard "Horário da troca: 19:00" for a
+  /// time that had just been REMOVED. Each chip now says which side it is.
+  Widget _valueChip(String text, ToneColors tone, {bool struck = false}) {
+    final l = AppL10n.of(context).l;
+    return Semantics(
+      label: '${l[struck ? K.auditAriaBefore : K.auditAriaNow]}: $text',
+      excludeSemantics: true,
+      child: Container(
         padding: const EdgeInsets.symmetric(
             horizontal: Spacing.xs + 2, vertical: 1),
         decoration: BoxDecoration(
@@ -654,7 +662,9 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
                 decoration: struck ? TextDecoration.lineThrough : null,
               ),
         ),
-      );
+      ),
+    );
+  }
 
   /// A line of an inset block with its mark in front — the mark is a vector
   /// icon since U-31, so it cannot ride inside the string any more.

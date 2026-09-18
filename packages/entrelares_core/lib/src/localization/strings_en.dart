@@ -564,6 +564,8 @@ abstract final class StringsEn {
     K.auditFieldActualParent: 'Actual caregiver',
     K.auditFieldHandoffTime: 'Handover time',
     K.auditFieldDayNote: 'Day note',
+    K.auditAriaBefore: 'before',
+    K.auditAriaNow: 'now',
     K.auditActionAdminGranted: 'Administrator permission granted',
     K.auditActionAdminRevoked: 'Administrator permission removed',
     K.auditActionRoleChanged: 'Role changed',

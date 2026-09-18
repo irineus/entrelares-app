@@ -34,6 +34,13 @@
 //    (slot 0 at 2.54 and 4.39, slot 4 at 3.56, success at 3.30); the tokens
 //    moved, the screens did not.
 //
+// 4. WHAT THE DEVICE HEARD — the owner's TalkBack pass (18/09/2026, the
+//    other half of U-32) found three things no guideline measures, pinned
+//    here so they stay fixed: an avatar's initial read before the name ("I,
+//    Irineu…"), the bell badge read as a bare "2" before "Avisos", and an
+//    audit diff whose struck (removed) value was read as if current — the
+//    strikethrough and the red/green were the only vector.
+//
 // Every screen is pumped on a 360×740 phone with the real Inter, in light and
 // dark, from the fixtures the screen's own suite uses — so a scene here is the
 // screen as shipped, not a mock of it. Sheets are opened the way a finger
@@ -53,6 +60,8 @@ import 'package:entrelares_app/screens/login_screen.dart';
 import 'package:entrelares_app/screens/notifications_screen.dart';
 import 'package:entrelares_app/screens/profile_screen.dart';
 import 'package:entrelares_app/screens/register_screen.dart';
+import 'package:entrelares_app/screens/reports_audit_tab.dart';
+import 'package:entrelares_app/screens/reports_pdf_tab.dart';
 import 'package:entrelares_app/screens/reports_screen.dart';
 import 'package:entrelares_app/services/account_identity.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
@@ -76,6 +85,7 @@ import 'family_page_test.dart' as fam;
 import 'frozen_day_test.dart' as frz;
 import 'profile_test.dart' as prof;
 import 'register_test.dart' as reg;
+import 'reports_audit_test.dart' as audit;
 import 'reports_summary_test.dart' as rep;
 
 final pt = Localization(AppLanguage.ptBr);
@@ -133,7 +143,11 @@ const double _largeText = 1.3;
 /// holds at 1.3× on 360 dp" is a fact this suite states, not a hope.
 /// Semantics are on before the first frame.
 void _scene(String name, _Scene body) {
-  for (final (dark, scale) in [(false, 1.0), (true, 1.0), (false, _largeText)]) {
+  for (final (dark, scale) in [
+    (false, 1.0),
+    (true, 1.0),
+    (false, _largeText),
+  ]) {
     final variant = scale == 1.0 ? (dark ? 'dark' : 'light') : 'light, $scale×';
     testWidgets('$name ($variant)', (tester) async {
       await _usePhone(tester);
@@ -625,11 +639,13 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _measure(tester, 'reports summary');
-      await tester.tap(find.byType(Tab).at(1));
+      await tester.tap(find.text(pt[K.repTabHistory]));
       await tester.pumpAndSettle();
+      expect(find.byType(ReportsAuditTab), findsOneWidget);
       await _measure(tester, 'reports audit');
-      await tester.tap(find.byType(Tab).at(2));
+      await tester.tap(find.text(pt[K.repTabPdf]));
       await tester.pumpAndSettle();
+      expect(find.byType(ReportsPdfTab), findsOneWidget);
       await _measure(tester, 'reports pdf');
     });
 
@@ -654,6 +670,150 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _measure(tester, 'custom roles');
+    });
+  });
+
+  group('what TalkBack heard on the device (18/09/2026)', () {
+    testWidgets('an avatar initial is never a node of its own: roster and '
+        'today card', (tester) async {
+      await _usePhone(tester);
+      final handle = tester.ensureSemantics();
+      final ds = fam.source(members: const [fam.admin, fam.plain]);
+      await tester.pumpWidget(
+        _host(
+          FamilyScreen(
+            dataSource: ds,
+            adminMode: AdminMode(),
+            sudo: SudoService(ds),
+            onOpenProfile: (_, _) {},
+            onOpenPlan: () {},
+            onOpenAdminMode: () {},
+            onOpenDeletion: () {},
+            onOpenCustomRoles: () {},
+          ),
+          dark: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('A'), findsWidgets, reason: 'the initial is painted');
+      expect(
+        find.bySemanticsLabel(RegExp(r'^[AB]$')),
+        findsNothing,
+        reason: 'the reader heard "I" before "Irineu…" on every card',
+      );
+
+      // The today card draws its own avatar, by hand.
+      await tester.pumpWidget(_calendar(_calendarSource(), dark: false));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel(RegExp(r'^A$')), findsNothing);
+      handle.dispose();
+    });
+
+    testWidgets('the bell badge is a sentence, never a bare number', (
+      tester,
+    ) async {
+      await _usePhone(tester);
+      final handle = tester.ensureSemantics();
+      final ds =
+          cal.FakeCustodyDataSource(members: [cal.ana, cal.bruno], days: [])
+            ..pendingForMe = [
+              frz.swapReq(10, cal.dayOfMonth(cal.today.day)),
+              frz.swapReq(11, cal.dayOfMonth(cal.today.day)),
+            ];
+      final badge = NotificationBadge(ds);
+      await badge.refresh();
+      expect(badge.count, 2);
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: [
+          StatefulShellRoute.indexedStack(
+            builder: (_, _, shell) => HomeShell(
+              shell: shell,
+              adminMode: AdminMode(),
+              identity: AccountIdentity(),
+              onSignOut: () async {},
+              onOpenProfile: () {},
+              badge: badge,
+            ),
+            branches: [
+              for (final path in ['/', '/family', '/notifications', '/reports'])
+                StatefulShellBranch(
+                  routes: [
+                    GoRoute(
+                      path: path,
+                      builder: (_, _) => const Scaffold(body: SizedBox()),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        AppL10n(
+          l: pt,
+          setLanguage: (_) async {},
+          child: MaterialApp.router(
+            theme: AppTheme.light,
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('2'), findsOneWidget, reason: 'the badge is painted');
+      expect(
+        find.bySemanticsLabel(RegExp(r'^2$')),
+        findsNothing,
+        reason: 'the reader heard "2" and then "Avisos"',
+      );
+      expect(
+        find.bySemanticsLabel(
+          RegExp(pt.format(K.navNotificationsManyPending, [2])),
+        ),
+        findsWidgets,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('an audit diff says which side each value is', (tester) async {
+      await _usePhone(tester);
+      final handle = tester.ensureSemantics();
+      final ds = audit.source(
+        logs: [
+          audit.activity(
+            id: 1,
+            oldData: const {'handoff_time': '19:00:00'},
+            newData: const {'handoff_time': null},
+          ),
+          audit.activity(
+            id: 2,
+            oldData: const {'actual_parent_id': null},
+            newData: const {'actual_parent_id': 2},
+          ),
+        ],
+      );
+      await audit.pumpAudit(tester, ds);
+      // The removed time and the new carer are painted as chips…
+      expect(find.text('19:00'), findsOneWidget);
+      expect(find.text('Bruno Lima'), findsOneWidget);
+      // …and read with their side, never as a bare value. The entry is ONE
+      // merged node (what the device read), so the side rides inside it.
+      expect(
+        find.bySemanticsLabel(RegExp(r'(^|\n)19:00(\n|$)')),
+        findsNothing,
+        reason:
+            'the reader heard "Horário da troca: 19:00" for a time '
+            'that had just been removed',
+      );
+      expect(
+        find.bySemanticsLabel(RegExp('${pt[K.auditAriaBefore]}: 19:00')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(RegExp('${pt[K.auditAriaNow]}: Bruno Lima')),
+        findsOneWidget,
+      );
+      handle.dispose();
     });
   });
 
