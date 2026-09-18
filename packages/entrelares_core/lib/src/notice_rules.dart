@@ -240,6 +240,21 @@ String noticeSentence({
       ],
     );
 
+/// The sentence the SENDER reads when somebody answers. One composition, two
+/// readers again — the notification and, once PR 3 lands, the push.
+String noticeAnswerSentence({
+  required Localization l,
+  required String answererName,
+  required NoticeOutcome outcome,
+  String? note,
+}) =>
+    l.format(
+      outcome == NoticeOutcome.keeping
+          ? K.notifRenderDayNoticeKeeping
+          : K.notifRenderDayNoticeHelping,
+      [answererName, noticeNoteSuffix(l, note)],
+    );
+
 /// How an answer resolves an aviso. Exactly one of these ever lands on a
 /// notice — the row that carries it is append-only and unique per notice, so
 /// the first answer wins and the second is refused by the database rather than

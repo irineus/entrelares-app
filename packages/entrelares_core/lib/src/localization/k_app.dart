@@ -321,6 +321,24 @@ abstract final class KApp {
   static const String noticeCancelled = 'app.notice.cancelled';
   static const String noticeErrCancel = 'app.notice.errCancel';
 
+  // ── F-52 PR 2: answering ──
+  // The same rule as the requests, from the other side: each answer SAYS what
+  // it will do. "Vou ficar com a criança hoje" is the only tap in this product
+  // that moves a day with no second confirmation from anyone, so the sentence
+  // under it names the swap, says it is already approved, and says where it
+  // will be readable afterwards.
+  static const String noticeAnswerTitle = 'app.notice.answer.title';
+  static const String noticeAnswerHelping = 'app.notice.answer.helping';
+  static const String noticeAnswerKeeping = 'app.notice.answer.keeping';
+  static const String noticeAnswerHelpingWhat = 'app.notice.answer.helpingWhat';
+  static const String noticeAnswerKeepingWhat = 'app.notice.answer.keepingWhat';
+  static const String noticeAnswerNoteLabel = 'app.notice.answer.noteLabel';
+  static const String noticeAnswerNoteHint = 'app.notice.answer.noteHint';
+  static const String noticeAnswerSend = 'app.notice.answer.send';
+  static const String noticeAnsweredHelping = 'app.notice.answeredHelping';
+  static const String noticeAnsweredKeeping = 'app.notice.answeredKeeping';
+  static const String noticeErrAnswer = 'app.notice.errAnswer';
+
   /// See `K.allKeys`.
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -504,6 +522,17 @@ abstract final class KApp {
     noticeCancelKeep,
     noticeCancelled,
     noticeErrCancel,
+    noticeAnswerTitle,
+    noticeAnswerHelping,
+    noticeAnswerKeeping,
+    noticeAnswerHelpingWhat,
+    noticeAnswerKeepingWhat,
+    noticeAnswerNoteLabel,
+    noticeAnswerNoteHint,
+    noticeAnswerSend,
+    noticeAnsweredHelping,
+    noticeAnsweredKeeping,
+    noticeErrAnswer,
   ];
 }
 
@@ -779,6 +808,22 @@ abstract final class StringsAppPtBr {
     KApp.noticeCancelKeep: 'Manter',
     KApp.noticeCancelled: 'Aviso cancelado.',
     KApp.noticeErrCancel: 'Não foi possível cancelar o aviso.',
+    KApp.noticeAnswerTitle: 'Responder ao aviso',
+    KApp.noticeAnswerHelping: 'Vou ajudar agora',
+    KApp.noticeAnswerKeeping: 'Vou ficar com a criança hoje',
+    KApp.noticeAnswerHelpingWhat:
+        'Quem enviou o aviso é informado de que você vai ajudar. O calendário '
+            'não muda: o dia de hoje continua com quem já está.',
+    KApp.noticeAnswerKeepingWhat:
+        'Uma troca já aprovada passa o dia de hoje para você, agora — foi o '
+            'que quem enviou o aviso pediu. Ela fica no histórico, com a data '
+            'e quem fez, e pode ser revertida como qualquer outra troca.',
+    KApp.noticeAnswerNoteLabel: 'Detalhe (opcional)',
+    KApp.noticeAnswerNoteHint: 'Onde você vai estar, a que horas você chega',
+    KApp.noticeAnswerSend: 'Enviar resposta',
+    KApp.noticeAnsweredHelping: 'Resposta enviada.',
+    KApp.noticeAnsweredKeeping: 'O dia de hoje passou para você.',
+    KApp.noticeErrAnswer: 'Não foi possível responder ao aviso.',
   };
 }
 
@@ -1049,5 +1094,21 @@ abstract final class StringsAppEn {
     KApp.noticeCancelKeep: 'Keep it',
     KApp.noticeCancelled: 'Notice cancelled.',
     KApp.noticeErrCancel: 'The notice could not be cancelled.',
+    KApp.noticeAnswerTitle: 'Answer the notice',
+    KApp.noticeAnswerHelping: 'I can help now',
+    KApp.noticeAnswerKeeping: 'I will keep the child today',
+    KApp.noticeAnswerHelpingWhat:
+        'Whoever sent the notice is told you are helping. The calendar does '
+            'not change: today stays with whoever already has it.',
+    KApp.noticeAnswerKeepingWhat:
+        'An already-approved swap moves today to you, now — it is what '
+            'whoever sent the notice asked for. It stays in the history, with '
+            'the date and who did it, and can be reverted like any other swap.',
+    KApp.noticeAnswerNoteLabel: 'Detail (optional)',
+    KApp.noticeAnswerNoteHint: 'Where you will be, what time you arrive',
+    KApp.noticeAnswerSend: 'Send answer',
+    KApp.noticeAnsweredHelping: 'Answer sent.',
+    KApp.noticeAnsweredKeeping: 'Today has moved to you.',
+    KApp.noticeErrAnswer: 'The notice could not be answered.',
   };
 }

@@ -245,6 +245,19 @@ abstract class CustodyDataSource {
     String? note,
   });
 
+  /// Answers somebody else's open aviso and returns the swap it produced, or
+  /// null when it produced none.
+  ///
+  /// `keeping` is the only answer that moves the calendar, and it does so
+  /// through the ordinary two-party workflow — the server opens the request,
+  /// applies the day as its target and approves it, in one transaction. There
+  /// is no second path, and this method must never grow one.
+  Future<int?> answerDayNotice({
+    required int noticeId,
+    required String outcome,
+    String? note,
+  });
+
   /// Withdraws my own open aviso about today. Whoever received it is told,
   /// because somebody may already be on their way.
   Future<void> cancelDayNotice(int noticeId);

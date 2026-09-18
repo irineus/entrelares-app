@@ -256,6 +256,187 @@ void dayNoticeTests(GateFixture fx) {
     });
   });
 
+  // ── PR 2 ────────────────────────────────────────────────────────────────
+  group('F-52 · answering', () {
+    late ThrowawayFamily fam;
+
+    Future<int?> answer(SupabaseClient who, int noticeId, String outcome,
+            {String? note}) async =>
+        await who.rpc<dynamic>('answer_day_notice', params: {
+          'p_notice_id': noticeId,
+          'p_outcome': outcome,
+          'p_note': note,
+        }) as int?;
+
+    setUpAll(() async {
+      fam = await fx.createFamily('f52ans');
+      await planToday(fam.familyId, fam.adminProfile.id);
+      // The member carries the next handoff, so BOTH ends may send. This group
+      // needs FOUR avisos and the cap is two per sender per day — the first
+      // run of this suite spent the admin's two on the refusal tests and then
+      // failed the next two on the cap, which is the cap working.
+      await planTomorrow(fam.familyId, fam.memberProfile.id);
+    });
+
+    test('nobody answers their own aviso', () async {
+      final id = await send(fam.admin, request: 'pickup');
+      await expectRejected(() => answer(fam.admin, id, 'helping'),
+          contains: 'responder ao');
+    });
+
+    // "So avisando" asks for nothing, so there is nothing to accept.
+    test('an info aviso accepts no answer', () async {
+      final id = await send(fam.admin, request: 'info');
+      await expectRejected(() => answer(fam.member, id, 'helping'),
+          contains: 'pede nada');
+    });
+
+    // From here the MEMBER sends — the admin's two are spent above.
+    test('helping does not touch the calendar', () async {
+      final id = await send(fam.member, request: 'pickup');
+      final swap = await answer(fam.admin, id, 'helping', note: 'na padaria');
+      expect(swap, isNull);
+
+      final day = (await fx.service
+              .from('care_schedules')
+              .select()
+              .eq('family_id', fam.familyId)
+              .eq('schedule_date', isoDate(today()))
+              .limit(1))
+          .single;
+      expect(day['actual_parent_id'], isNull);
+
+      final outcome = (await fx.service
+              .from('day_notice_outcomes')
+              .select()
+              .eq('notice_id', id)
+              .limit(1))
+          .single;
+      expect(outcome['outcome'], 'helping');
+      expect(outcome['actor_profile_id'], fam.adminProfile.id);
+      expect(outcome['note'], 'na padaria');
+      expect(outcome['swap_request_id'], isNull);
+    });
+
+    // A pickup asked for help NOW, not for the day. Answering it by taking the
+    // day would apply a consent the sender never gave.
+    test('the day cannot be taken when it was not offered', () async {
+      final id = await send(fam.member, request: 'pickup');
+      await expectRejected(() => answer(fam.admin, id, 'keeping'),
+          contains: 'pediu ajuda');
+    });
+  });
+
+  // The assertion the whole PR exists for: the day moves, and it moves THROUGH
+  // the two-party workflow — never beside it.
+  group('F-52 · taking the day goes through the swap workflow', () {
+    late ThrowawayFamily fam;
+    late int noticeId;
+    late int swapId;
+
+    setUpAll(() async {
+      fam = await fx.createFamily('f52take');
+      await planToday(fam.familyId, fam.adminProfile.id);
+      noticeId = await send(fam.admin, reason: 'medico', request: 'keep');
+      swapId = (await fam.member.rpc<dynamic>('answer_day_notice', params: {
+        'p_notice_id': noticeId,
+        'p_outcome': 'keeping',
+        'p_note': null,
+      })) as int;
+    });
+
+    test('today changed carer', () async {
+      final day = (await fx.service
+              .from('care_schedules')
+              .select()
+              .eq('family_id', fam.familyId)
+              .eq('schedule_date', isoDate(today()))
+              .limit(1))
+          .single;
+      expect(day['actual_parent_id'], fam.memberProfile.id);
+      expect(day['scheduled_parent_id'], fam.adminProfile.id);
+    });
+
+    // Scenario A, and it matters: the answerer proposed THEMSELVES on the
+    // sender's own day. A third party proposed on somebody else's day is the
+    // F-28 case that is forbidden by design, and this is how the aviso stays
+    // out of it.
+    test('an APPROVED swap records it, requester = the sender', () async {
+      final swap = (await fx.service
+              .from('swap_requests')
+              .select()
+              .eq('id', swapId)
+              .limit(1))
+          .single;
+      expect(swap['status'], 'approved');
+      expect(swap['requesting_profile_id'], fam.adminProfile.id);
+      expect(swap['target_profile_id'], fam.memberProfile.id);
+      expect(swap['proposed_actual_parent_id'], fam.memberProfile.id);
+      expect(swap['resolved_by'], 'user');
+      expect(swap['resolved_at'], isNotNull);
+    });
+
+    // Everything downstream is free BECAUSE the change went through the
+    // workflow: the record is written by the trigger, with its F-61 stamp, and
+    // nothing in this function had to write it.
+    test('the audit trail recorded the change by itself', () async {
+      final logs = await fx.service
+          .from('activity_logs')
+          .select()
+          .eq('family_id', fam.familyId)
+          .eq('affected_date', isoDate(today()))
+          .order('id', ascending: false)
+          .limit(1);
+      expect(logs, isNotEmpty);
+      expect(logs.first['action'], 'UPDATE');
+      expect((logs.first['new_data'] as Map)['actual_parent_id'],
+          fam.memberProfile.id);
+    });
+
+    test('the outcome links the notice to the swap it produced', () async {
+      final outcome = (await fx.service
+              .from('day_notice_outcomes')
+              .select()
+              .eq('notice_id', noticeId)
+              .limit(1))
+          .single;
+      expect(outcome['outcome'], 'keeping');
+      expect(outcome['swap_request_id'], swapId);
+    });
+
+    test('the sender is told the day moved', () async {
+      final row = (await fx.service
+              .from('notifications')
+              .select()
+              .eq('recipient_profile_id', fam.adminProfile.id)
+              .eq('type', 'day_notice')
+              .order('id', ascending: false)
+              .limit(1))
+          .single;
+      expect((row['params'] as Map)['kind'], 'keeping');
+      expect(
+        row['message'],
+        noticeAnswerSentence(
+          l: Localization(AppLanguage.ptBr),
+          answererName: fam.memberProfile.fullName,
+          outcome: NoticeOutcome.keeping,
+        ),
+      );
+    });
+
+    // One answer closes it, for good — and a second one cannot re-take a day
+    // that already moved.
+    test('a second answer is refused', () async {
+      await expectRejected(
+          () => fam.member.rpc<dynamic>('answer_day_notice', params: {
+                'p_notice_id': noticeId,
+                'p_outcome': 'helping',
+                'p_note': null,
+              }),
+          contains: 'resolvido');
+    });
+  });
+
   group('F-52 · append-only and one outcome', () {
     late ThrowawayFamily fam;
     late int noticeId;

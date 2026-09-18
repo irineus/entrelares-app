@@ -842,6 +842,13 @@ abstract final class K {
   static const String notifRenderDayNoticeEtaMinutes = 'notifRender.dayNotice.eta.minutes';
   static const String notifRenderDayNoticeEtaNone = 'notifRender.dayNotice.eta.none';
   static const String notifRenderDayNoticeNoteSuffix = 'notifRender.dayNotice.noteSuffix';
+  // The two answers (PR 2). `keeping` gets its OWN heading because the
+  // calendar moved: "Alguém vai ajudar" over "o dia passou para outra pessoa"
+  // would bury the one fact the sender must not miss.
+  static const String notifRenderTitleDayNoticeHelping = 'notifRender.title.dayNoticeHelping';
+  static const String notifRenderTitleDayNoticeKeeping = 'notifRender.title.dayNoticeKeeping';
+  static const String notifRenderDayNoticeHelping = 'notifRender.dayNotice.helping';
+  static const String notifRenderDayNoticeKeeping = 'notifRender.dayNotice.keeping';
 
   // ── E-mail quota (F-38) + billing grace (S-15) ──
   static const String notifRenderTitleEmailCapPremium = 'notifRender.title.emailCapPremium';
@@ -1908,6 +1915,10 @@ abstract final class K {
     notifRenderDayNoticeEtaMinutes,
     notifRenderDayNoticeEtaNone,
     notifRenderDayNoticeNoteSuffix,
+    notifRenderTitleDayNoticeHelping,
+    notifRenderTitleDayNoticeKeeping,
+    notifRenderDayNoticeHelping,
+    notifRenderDayNoticeKeeping,
     notifRenderTitleEmailCapPremium,
     notifRenderTitleEmailCapFree,
     notifRenderTitleEmailCapLast,

@@ -220,6 +220,18 @@ abstract final class NotificationRenderer {
           return l.format(K.notifRenderDayNoticeCancelled,
               [name ?? l[K.notifRenderFbOtherCap]]);
         }
+        // PR 2: the two answers ride the same type, discriminated by `kind`
+        // like every other multi-wording notification here.
+        final outcome = NoticeOutcome.fromWire(kind);
+        if (outcome == NoticeOutcome.helping ||
+            outcome == NoticeOutcome.keeping) {
+          return noticeAnswerSentence(
+            l: l,
+            answererName: name ?? l[K.notifRenderFbOtherCap],
+            outcome: outcome!,
+            note: p['note'],
+          );
+        }
         final request = NoticeRequest.fromWire(kind);
         final reason = NoticeReason.fromWire(p['reason']);
         if (request == null || reason == null) return storedMessage;
@@ -378,6 +390,10 @@ abstract final class NotificationRenderer {
       // over a Portuguese sentence.
       'day_notice' => kind == 'cancelled'
           ? K.notifRenderTitleDayNoticeCancelled
+          : kind == 'helping'
+          ? K.notifRenderTitleDayNoticeHelping
+          : kind == 'keeping'
+          ? K.notifRenderTitleDayNoticeKeeping
           : (NoticeRequest.fromWire(kind) != null &&
                   NoticeReason.fromWire(p['reason']) != null
               ? K.notifRenderTitleDayNotice

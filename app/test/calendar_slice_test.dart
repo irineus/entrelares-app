@@ -419,6 +419,22 @@ class FakeCustodyDataSource implements CustodyDataSource {
     return 1;
   }
 
+  /// The answers this fake received, and the swap id it hands back for a
+  /// `keeping` — null stands for "no swap", which is what `helping` produces.
+  List<({int noticeId, String outcome, String? note})> answeredNotices = [];
+  int? answerSwapId = 77;
+
+  @override
+  Future<int?> answerDayNotice({
+    required int noticeId,
+    required String outcome,
+    String? note,
+  }) async {
+    answeredNotices
+        .add((noticeId: noticeId, outcome: outcome, note: note));
+    return outcome == 'keeping' ? answerSwapId : null;
+  }
+
   @override
   Future<void> cancelDayNotice(int noticeId) async =>
       cancelledNotices.add(noticeId);

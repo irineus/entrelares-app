@@ -302,6 +302,51 @@ void main() {
     });
   });
 
+  group('the answer sentence (PR 2)', () {
+    final pt = Localization(AppLanguage.ptBr);
+    final en = Localization(AppLanguage.en);
+
+    // The sender must not be able to read "alguem vai ajudar" over a day that
+    // actually changed hands: the two outcomes say different things, and the
+    // keeping one names the move twice on purpose (the person, and the day).
+    test('helping tells, keeping says the day moved', () {
+      expect(
+        noticeAnswerSentence(
+            l: pt, answererName: 'Bruno', outcome: NoticeOutcome.helping),
+        'Bruno vai ajudar agora.',
+      );
+      expect(
+        noticeAnswerSentence(
+            l: pt, answererName: 'Bruno', outcome: NoticeOutcome.keeping),
+        'Bruno vai ficar com a criança hoje. O dia de hoje passou para Bruno.',
+      );
+    });
+
+    test('the answerer own line is quoted, like the sender one', () {
+      expect(
+        noticeAnswerSentence(
+            l: en,
+            answererName: 'Bruno',
+            outcome: NoticeOutcome.helping,
+            note: 'at the bakery'),
+        'Bruno is coming to help now. "at the bakery"',
+      );
+    });
+
+    test('a blank line renders no empty quotes', () {
+      for (final note in [null, '', '  ']) {
+        expect(
+          noticeAnswerSentence(
+              l: pt,
+              answererName: 'Bruno',
+              outcome: NoticeOutcome.keeping,
+              note: note),
+          isNot(contains('"')),
+        );
+      }
+    });
+  });
+
   group('the numbers the UI says out loud', () {
     test('the cap is two, and the note ceiling is shared with the answer', () {
       expect(noticeMaxPerSenderPerDay, 2);
