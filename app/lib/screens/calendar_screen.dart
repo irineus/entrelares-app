@@ -1254,10 +1254,19 @@ class _CalendarScreenState extends State<CalendarScreen>
         if (n.senderProfileId != me) n
     ];
     if (theirs.isNotEmpty) {
+      final first = theirs.first;
+      // "Só avisando" asks for nothing, so the banner offers nothing: an
+      // action on a notice that made no request is an invitation to answer a
+      // question nobody asked.
+      final answerable =
+          NoticeRequest.fromWire(first.request) != NoticeRequest.info;
       return AppBanner(
         tone: context.tokens.warning,
         icon: Icons.campaign_outlined,
-        message: _noticeSentence(theirs.first, l),
+        message: _noticeSentence(first, l),
+        actionLabel: answerable ? l[KApp.noticeAnswerTitle] : null,
+        actionIcon: answerable ? Icons.reply : null,
+        onAction: answerable ? () => _answerNotice(first) : null,
       );
     }
 
@@ -1282,6 +1291,27 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (id == null || !mounted) return;
     _load(silent: true);
     showAppSnack(context, AppL10n.of(context).l[KApp.noticeSent]);
+  }
+
+  /// F-52 PR 2 — answering. The sheet pops the outcome that actually landed,
+  /// because the two are not the same news: somebody who just took the day is
+  /// told THAT, not "resposta enviada".
+  Future<void> _answerNotice(DayNotice notice) async {
+    if (_refuseWriteOffline()) return;
+    final l = AppL10n.of(context).l;
+    final outcome = await showAnswerNoticeSheet(
+      context: context,
+      dataSource: widget.dataSource,
+      notice: notice,
+      sentence: _noticeSentence(notice, l),
+    );
+    if (outcome == null || !mounted) return;
+    _load(silent: true);
+    showAppSnack(
+        context,
+        AppL10n.of(context).l[outcome == NoticeOutcome.keeping
+            ? KApp.noticeAnsweredKeeping
+            : KApp.noticeAnsweredHelping]);
   }
 
   /// U-38: the question a tap raised is answered where the finger is — the

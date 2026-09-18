@@ -439,3 +439,148 @@ class _RequestOption extends StatelessWidget {
     );
   }
 }
+
+/// F-52 (PR 2) — answering somebody else's open aviso.
+///
+/// Two answers, and they are not the same kind of act. "Vou ajudar agora"
+/// tells the sender something; **"Vou ficar com a criança hoje" moves the
+/// day**, through an already-approved swap, with no further confirmation from
+/// anyone. That is the only tap in this product that does so, and it is only
+/// reachable because the sender asked for it in writing first
+/// ([NoticeRequest.keep]) — so the sentence under it names the swap, says it
+/// is already approved, and says it stays in the history and can be reverted.
+///
+/// Pops with the outcome that was sent, so the caller toasts the right one: a
+/// person who just took the day must be told that, not "resposta enviada".
+Future<NoticeOutcome?> showAnswerNoticeSheet({
+  required BuildContext context,
+  required CustodyDataSource dataSource,
+  required DayNotice notice,
+  required String sentence,
+}) {
+  return showAppSheet<NoticeOutcome>(
+    context: context,
+    builder: (context) => _AnswerNoticeSheet(
+      dataSource: dataSource,
+      notice: notice,
+      sentence: sentence,
+    ),
+  );
+}
+
+class _AnswerNoticeSheet extends StatefulWidget {
+  final CustodyDataSource dataSource;
+  final DayNotice notice;
+  final String sentence;
+
+  const _AnswerNoticeSheet({
+    required this.dataSource,
+    required this.notice,
+    required this.sentence,
+  });
+
+  @override
+  State<_AnswerNoticeSheet> createState() => _AnswerNoticeSheetState();
+}
+
+class _AnswerNoticeSheetState extends State<_AnswerNoticeSheet> {
+  static const outcomeKey = Key('notice-answer-outcome');
+
+  /// Starts on the answer that changes nothing. The one that moves a day is
+  /// never the default — it is chosen, like every other irreversible thing in
+  /// this product.
+  NoticeOutcome _outcome = NoticeOutcome.helping;
+
+  final TextEditingController _note = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  /// `keeping` exists only on an aviso that OFFERED the day. A pickup request
+  /// asked for help now, and answering it with "fico com ela" would take
+  /// something nobody put on the table.
+  bool get _canKeep =>
+      NoticeRequest.fromWire(widget.notice.request) == NoticeRequest.keep;
+
+  Future<void> _send() async {
+    if (_saving) return;
+    final l = AppL10n.of(context).l;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.dataSource.answerDayNotice(
+        noticeId: widget.notice.id,
+        outcome: _outcome.wire,
+        note: _note.text,
+      );
+      if (mounted) Navigator.of(context).pop(_outcome);
+    } catch (e) {
+      if (!mounted) return;
+      final raw = e.toString();
+      setState(() {
+        _saving = false;
+        _error = isSessionExpired(raw)
+            ? sessionExpiredMessage(l)
+            : translateSaveError(raw, l[KApp.noticeErrAnswer], l);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context).l;
+    return AppSheetFrame(
+      title: l[KApp.noticeAnswerTitle],
+      subtitle: widget.sentence,
+      primaryLabel: l[KApp.noticeAnswerSend],
+      onPrimary: _send,
+      secondaryLabel: l[K.commonCancel],
+      onSecondary: () => Navigator.of(context).pop(),
+      busy: _saving,
+      error: _error,
+      children: [
+        Column(
+          key: outcomeKey,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _RequestOption(
+              label: l[KApp.noticeAnswerHelping],
+              consequence: l[KApp.noticeAnswerHelpingWhat],
+              selected: _outcome == NoticeOutcome.helping,
+              enabled: !_saving,
+              onSelected: () =>
+                  setState(() => _outcome = NoticeOutcome.helping),
+            ),
+            // Shown even when it is not on offer, disabled: hiding it would
+            // leave the reader looking for an answer they were told exists.
+            if (_canKeep)
+              _RequestOption(
+                label: l[KApp.noticeAnswerKeeping],
+                consequence: l[KApp.noticeAnswerKeepingWhat],
+                selected: _outcome == NoticeOutcome.keeping,
+                enabled: !_saving,
+                onSelected: () =>
+                    setState(() => _outcome = NoticeOutcome.keeping),
+              ),
+          ],
+        ),
+        const SizedBox(height: Spacing.md),
+        AppTextField(
+          label: l[KApp.noticeAnswerNoteLabel],
+          hint: l[KApp.noticeAnswerNoteHint],
+          controller: _note,
+          maxLength: noticeAnswerNoteMaxLength,
+          maxLines: 2,
+          enabled: !_saving,
+        ),
+      ],
+    );
+  }
+}

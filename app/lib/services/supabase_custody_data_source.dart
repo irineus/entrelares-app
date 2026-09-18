@@ -923,6 +923,20 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<int?> answerDayNotice({
+    required int noticeId,
+    required String outcome,
+    String? note,
+  }) async {
+    final swapId = await _client.rpc<dynamic>('answer_day_notice', params: {
+      'p_notice_id': noticeId,
+      'p_outcome': outcome,
+      'p_note': note,
+    });
+    return swapId as int?;
+  }
+
+  @override
   Future<void> cancelDayNotice(int noticeId) async {
     await _client
         .rpc<dynamic>('cancel_day_notice', params: {'p_notice_id': noticeId});

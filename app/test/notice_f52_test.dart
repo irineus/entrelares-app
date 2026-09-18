@@ -274,6 +274,91 @@ void main() {
     });
   });
 
+  group('answering another caregiver aviso (PR 2)', () {
+    // A "só avisando" asks for nothing, so the banner offers nothing: an
+    // action on a notice that made no request invites an answer to a question
+    // nobody asked.
+    testWidgets('an info aviso offers no answer', (tester) async {
+      final ds = FakeCustodyDataSource(
+          members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)])
+        ..dayNotices = [_notice(sender: 2, request: 'info')];
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+      expect(find.text(_pt[KApp.noticeAnswerTitle]), findsNothing);
+    });
+
+    // A pickup asked for help NOW. Taking the day would take something nobody
+    // put on the table, so the second answer is not even drawn.
+    testWidgets('a pickup aviso offers only "vou ajudar"', (tester) async {
+      final ds = FakeCustodyDataSource(
+          members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)])
+        ..dayNotices = [_notice(sender: 2, request: 'pickup')];
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_pt[KApp.noticeAnswerTitle]).last);
+      await tester.pumpAndSettle();
+
+      expect(find.text(_pt[KApp.noticeAnswerHelping]), findsOneWidget);
+      expect(find.text(_pt[KApp.noticeAnswerKeeping]), findsNothing);
+    });
+
+    // The one tap in this product that moves a day with no second
+    // confirmation. It is never the default, and the sentence under it names
+    // the swap, says it is already approved and says it can be reverted.
+    testWidgets('a keep aviso offers the day, and says what taking it does',
+        (tester) async {
+      final ds = FakeCustodyDataSource(
+          members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)])
+        ..dayNotices = [_notice(sender: 2, request: 'keep')];
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_pt[KApp.noticeAnswerTitle]).last);
+      await tester.pumpAndSettle();
+
+      expect(find.text(_pt[KApp.noticeAnswerKeepingWhat]), findsOneWidget);
+
+      // "Vou ajudar" is selected until somebody chooses otherwise.
+      await tester.tap(find.widgetWithText(
+          FilledButton, _pt[KApp.noticeAnswerSend]));
+      await tester.pumpAndSettle();
+      expect(ds.answeredNotices.single.outcome, 'helping');
+    });
+
+    testWidgets('taking the day sends "keeping" and says so', (tester) async {
+      final ds = FakeCustodyDataSource(
+          members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)])
+        ..dayNotices = [_notice(sender: 2, request: 'keep')];
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_pt[KApp.noticeAnswerTitle]).last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(_pt[KApp.noticeAnswerKeeping]));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'estou a caminho');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(
+          FilledButton, _pt[KApp.noticeAnswerSend]));
+      await tester.pumpAndSettle();
+
+      expect(ds.answeredNotices.single.outcome, 'keeping');
+      expect(ds.answeredNotices.single.note, 'estou a caminho');
+      // The news is not "resposta enviada": this person now has the day.
+      expect(find.text(_pt[KApp.noticeAnsweredKeeping]), findsOneWidget);
+    });
+
+    // My own aviso is withdrawn, never answered.
+    testWidgets('my own aviso offers no answer', (tester) async {
+      final ds = FakeCustodyDataSource(
+          members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)])
+        ..dayNotices = [_notice(sender: 1, request: 'keep')];
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+      expect(find.text(_pt[KApp.noticeAnswerTitle]), findsNothing);
+      expect(find.text(_pt[KApp.noticeCancel]), findsOneWidget);
+    });
+  });
+
   // The cap is stated before it blocks — a limit that only announces itself by
   // refusing reads as a bug.
   testWidgets('the cap is said, then it blocks', (tester) async {
