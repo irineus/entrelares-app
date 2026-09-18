@@ -177,6 +177,9 @@ abstract final class KApp {
   static const String pushHintUnsupported = 'app.push.hintUnsupported';
   static const String pushEnable = 'app.push.enable';
   static const String pushDisable = 'app.push.disable';
+  /// U-43: the app-bar icon that replaces the card once push is on — its
+  /// tooltip is also the name a screen reader gives the button.
+  static const String pushStatusOnTooltip = 'app.push.statusOnTooltip';
   static const String pushToastOn = 'app.push.toastOn';
   static const String pushToastOff = 'app.push.toastOff';
   static const String pushErrEnable = 'app.push.errEnable';
@@ -345,6 +348,7 @@ abstract final class KApp {
     pushHintUnsupported,
     pushEnable,
     pushDisable,
+    pushStatusOnTooltip,
     pushToastOn,
     pushToastOff,
     pushErrEnable,
@@ -526,6 +530,7 @@ abstract final class StringsAppPtBr {
             'navegador, você continua vendo tudo nesta tela e por e-mail.',
     KApp.pushEnable: 'Ativar notificações',
     KApp.pushDisable: 'Desativar',
+    KApp.pushStatusOnTooltip: 'Notificações no celular: ativadas',
     KApp.pushToastOn: 'Notificações ativadas neste aparelho.',
     KApp.pushToastOff: 'Notificações desativadas neste aparelho.',
     KApp.pushErrEnable:
@@ -738,6 +743,7 @@ abstract final class StringsAppEn {
             'still see everything on this screen and by e-mail.',
     KApp.pushEnable: 'Turn notifications on',
     KApp.pushDisable: 'Turn off',
+    KApp.pushStatusOnTooltip: 'Phone notifications: on',
     KApp.pushToastOn: 'Notifications are on for this device.',
     KApp.pushToastOff: 'Notifications are off for this device.',
     KApp.pushErrEnable:

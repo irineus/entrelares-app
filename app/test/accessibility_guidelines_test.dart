@@ -66,6 +66,8 @@ import 'package:entrelares_app/screens/reports_screen.dart';
 import 'package:entrelares_app/services/account_identity.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/services/notification_badge.dart';
+import 'package:entrelares_app/services/push_messaging.dart';
+import 'package:entrelares_app/services/push_service.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/theme/app_theme.dart';
 import 'package:entrelares_app/theme/tokens.dart';
@@ -84,6 +86,7 @@ import 'custom_roles_test.dart' as roles;
 import 'family_page_test.dart' as fam;
 import 'frozen_day_test.dart' as frz;
 import 'profile_test.dart' as prof;
+import 'push_service_test.dart' as psh;
 import 'register_test.dart' as reg;
 import 'reports_audit_test.dart' as audit;
 import 'reports_summary_test.dart' as rep;
@@ -615,6 +618,35 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _measure(tester, 'notifications');
+    });
+
+    // U-43: the scene above has no push transport, so it measures the quiet
+    // line after the list. This one measures the other two shapes — the OFF
+    // card, then the app-bar icon and the sheet it opens once push is ON.
+    _scene('notifications, push off then on', (tester, dark) async {
+      final ds =
+          cal.FakeCustodyDataSource(members: [cal.ana, cal.bruno], days: []);
+      final messaging = psh.FakeMessaging(current: PushPermission.notAsked);
+      final push = PushService(ds, messaging: messaging);
+      await tester.runAsync(() => push.start(1));
+      await tester.pumpWidget(
+        _host(
+          NotificationsScreen(
+              dataSource: ds, badge: NotificationBadge(ds), push: push),
+          dark: dark,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _measure(tester, 'notifications, push off');
+
+      messaging.current = PushPermission.granted;
+      await tester.runAsync(push.enable);
+      await tester.pumpAndSettle();
+      await _measure(tester, 'notifications, push on');
+
+      await tester.tap(find.byKey(NotificationsScreen.pushStatusKey));
+      await tester.pumpAndSettle();
+      await _measure(tester, 'notifications, push sheet');
     });
 
     _scene('profile', (tester, dark) async {
