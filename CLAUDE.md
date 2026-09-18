@@ -144,6 +144,13 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # send-*: estilo só na tabela literal `S`, `color` E `background-color` em toda entrada,
 # contraste AA, nenhuma superfície escura e nenhum `style=` num remetente. O
 # no_color_literal_test só lê o lib/ do Flutter; sem esta, um #212529 voltaria calado.
+# Também fora de mirrors/, desde o U-34 (18/09/2026), vocabulary_test lê os DOIS catálogos
+# como conjunto: a aba do shell e o título da tela são a mesma palavra, nenhuma aba interna
+# repete rótulo de outra ("Histórico" é só a trilha de auditoria; a de Notificações é
+# "Todas"), o que o sistema envia é "notificação"/"notification" — "aviso" está RESERVADO
+# ao F-52 e "alert" não nomeia push —, e scheduled_parent é "planejado", nunca "agendado".
+# String nova com uma dessas palavras derruba o lane core; as exceções são presas pelo nome
+# da chave. O glossário do produto mora na subpágina Design system and UX.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
 cd app && fvm flutter analyze && fvm flutter test
 # The four source gates live in that suite: no_literal_snack_test (catalog strings),
