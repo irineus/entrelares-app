@@ -41,12 +41,13 @@ export const PUSH_TYPES: readonly string[] = [
 	"revert_approved",
 	"revert_rejected",
 	"revert_cancelled",
-	// F-52. Only the avisos that ASK for something reach this module at all: the
-	// trigger filters `params.kind` to `pickup` and `keep` before it calls, so a
-	// courtesy note, an answer and a cancellation stay in-app. That split cannot
-	// live here — `landingFor` routes by TYPE, so every pushable `day_notice`
-	// lands on "Para você", and a receipt landing there would show an empty tab,
-	// which is the exact defect PushRouting exists to prevent.
+	// F-52. All four wordings of an aviso reach a phone. The FIRST version cut
+	// three of them, because routing was by TYPE alone and a courtesy note would
+	// have landed on "Para você" without being listed there. The owner sent two
+	// courtesy avisos on the first real round and nothing rang: "vou atrasar 15
+	// minutes" is the most common one there is. So the payload carries `kind` now
+	// and both channels route on it — asking goes to "Para você", telling goes to
+	// "Todas", where the row always is.
 	"day_notice",
 ];
 

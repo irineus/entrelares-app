@@ -118,6 +118,11 @@ serve(async (req: Request) => {
       // routes from these, it never renders them.
       notificationId: String(row.id),
       type: row.type,
+      // F-52: the second dimension the tap routes on. One type carries four
+      // wordings, and only two of them leave the reader with something to do —
+      // without this the channel has to choose one tab for all four, and the
+      // first version chose by not pushing the other three at all.
+      kind: typeof row.params?.["kind"] === "string" ? row.params["kind"] : "",
       swapRequestId: row.swap_request_id === null ? "" : String(row.swap_request_id),
       date: row.params?.["date"] ?? "",
     });

@@ -109,9 +109,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   /// F-52: the avisos about TODAY that are still open, are somebody else's and
   /// ASK for something. They sit in "Para você" because that is the tab a push
-  /// of this type opens — `PushRouting.landingFor` routes by type alone, so a
-  /// notice that arrives on this phone and is not listed here is exactly the
-  /// empty-tab defect that rule exists to prevent.
+  /// of a PICKUP or KEEP opens — `PushRouting.landingFor` sends those two
+  /// kinds here and every other one to "Todas". A notice that asks something,
+  /// arrives on this phone and is not listed here is exactly the empty-tab
+  /// defect that rule exists to prevent.
   List<DayNotice> _openNotices = const [];
   List<SwapRequest> _sent = const [];
   List<AppNotification> _history = const [];

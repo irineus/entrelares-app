@@ -38,13 +38,30 @@ void main() {
       }
     });
 
-    // F-52: an aviso that reaches a phone is one that ASKED for something —
-    // the trigger filters `params.kind` to pickup/keep before the round trip,
-    // because routing is by TYPE alone and a receipt landing on "Para você"
-    // would open an empty tab under a notice that said something happened.
-    test('an aviso lands on "Para você", where it is answered', () {
-      expect(PushRouting.landingFor('day_notice'),
+    // F-52: one type, four wordings, two destinations. The first version
+    // routed by type alone, so it had to pick ONE tab for all four — and
+    // avoided the empty-tab defect by refusing to push the other three. The
+    // owner's first real round sent a courtesy aviso twice and no phone rang.
+    test('an aviso that ASKS lands on "Para você", where it is answered', () {
+      expect(PushRouting.landingFor('day_notice', kind: 'pickup'),
           NotificationLanding.incoming);
+      expect(PushRouting.landingFor('day_notice', kind: 'keep'),
+          NotificationLanding.incoming);
+    });
+
+    test('an aviso that only TELLS lands on "Todas", where it is listed', () {
+      for (final kind in ['info', 'cancelled', 'helping', 'keeping']) {
+        expect(PushRouting.landingFor('day_notice', kind: kind),
+            NotificationLanding.history,
+            reason: kind);
+      }
+    });
+
+    // A `day_notice` with no kind is a payload we could not read; Todas always
+    // holds the row, so the wrong guess this way shows a full list.
+    test('an aviso with no kind falls to "Todas"', () {
+      expect(PushRouting.landingFor('day_notice'),
+          NotificationLanding.history);
     });
 
     test('an unknown or missing type falls to "Todas"', () {
