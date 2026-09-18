@@ -28,6 +28,7 @@ export 'src/freemium_rules.dart';
 export 'src/install_hint_rules.dart';
 export 'src/environment_rules.dart';
 export 'src/feedback_rules.dart';
+export 'src/notice_rules.dart';
 export 'src/onboarding_steps.dart';
 export 'src/localization/app_language.dart';
 export 'src/localization/date_formats.dart';

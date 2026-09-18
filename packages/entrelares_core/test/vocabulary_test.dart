@@ -74,20 +74,49 @@ void main() {
     expect(pt[K.notifTabHistory], isNot(contains('istórico')));
   });
 
-  // The glossary reserves "Aviso" for F-52 (a notice one carer SENDS, the
-  // third term beside Observação and Mensagem). A reservation is only true
-  // while nothing else in the product answers to the word: until this item
-  // the push card called what the SYSTEM sends "avisos", in twelve strings.
-  // What the system sends is a "notificação" — in the app, on the phone and
-  // by e-mail. The one survivor is the tooltip that closes a banner.
-  test('"aviso" names nothing the product writes, so F-52 can have it', () {
+  // U-34 RESERVED "Aviso" for F-52 — the third term beside Observação do dia
+  // and Mensagem — and F-52 (18/09/2026) SPENT it. So the assertion inverts:
+  // the word is no longer absent, it is an ADDRESS. It names the notice one
+  // carer sends about today, and nothing else; what the SYSTEM sends is still
+  // a "notificação", in the app, on the phone and by e-mail. The one survivor
+  // outside F-52 is the tooltip that closes a banner.
+  //
+  // The address is the key PREFIX, not a hand-kept list: a new F-52 string is
+  // free to use the word, and a string anywhere else is not. That is the only
+  // form of this rule that survives the next person adding a key.
+  const noticePrefixes = ['app.notice.', 'notifRender.dayNotice.'];
+  const noticeTitles = {
+    K.notifRenderTitleDayNotice,
+    K.notifRenderTitleDayNoticeCancelled,
+  };
+
+  test('"aviso" names the F-52 notice, and nothing else', () {
     const survivors = {K.loginDismissNotice};
     final pt = catalogs['pt-BR']!;
-    final word = RegExp(r'\bavis(o|os|a|ar|am)\b', caseSensitive: false);
+    final word =
+        RegExp(r'\bavis(o|os|a|ar|am|ou|aram)\b', caseSensitive: false);
     for (final key in [...K.allKeys, ...KApp.allKeys]) {
-      if (survivors.contains(key)) continue;
+      if (survivors.contains(key) || noticeTitles.contains(key)) continue;
+      if (noticePrefixes.any(key.startsWith)) continue;
       expect(word.hasMatch(pt[key]), isFalse,
           reason: '$key says "${pt[key]}"');
+    }
+  });
+
+  // The half of a reservation that rots in silence: a word held for a thing
+  // that never says it. If the F-52 surface stops calling itself an aviso, the
+  // test above goes green over a glossary entry pointing at nothing.
+  test('the F-52 surface calls itself an aviso', () {
+    final pt = catalogs['pt-BR']!;
+    final word = RegExp(r'\bavis', caseSensitive: false);
+    for (final key in [
+      KApp.noticeAction,
+      KApp.noticeTitle,
+      KApp.noticeSend,
+      K.notifRenderTitleDayNotice,
+      K.notifRenderTitleDayNoticeCancelled,
+    ]) {
+      expect(word.hasMatch(pt[key]), isTrue, reason: '$key says "${pt[key]}"');
     }
   });
 

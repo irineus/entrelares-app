@@ -15,6 +15,7 @@ import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_invitation.dart';
 import 'package:entrelares_db_contracts/models/invite_info.dart';
@@ -390,6 +391,37 @@ class FakeCustodyDataSource implements CustodyDataSource {
   @override
   Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate) async =>
       preEditNotes;
+
+  // ── F-52 ──
+  /// Every aviso the fake knows about, newest first — the calendar reads it
+  /// through [fetchDayNotices] and the strip decides from it.
+  List<DayNotice> dayNotices = const [];
+  List<({String reason, int? etaMinutes, String request, String? note})>
+      sentNotices = [];
+  List<int> cancelledNotices = [];
+
+  @override
+  Future<List<DayNotice>> fetchDayNotices(DateTime date) async => dayNotices;
+
+  @override
+  Future<int> sendDayNotice({
+    required String reason,
+    int? etaMinutes,
+    required String request,
+    String? note,
+  }) async {
+    sentNotices.add((
+      reason: reason,
+      etaMinutes: etaMinutes,
+      request: request,
+      note: note
+    ));
+    return 1;
+  }
+
+  @override
+  Future<void> cancelDayNotice(int noticeId) async =>
+      cancelledNotices.add(noticeId);
 
   @override
   Future<List<AppNotification>> fetchNotifications(int myProfileId) async =>

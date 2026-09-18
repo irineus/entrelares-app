@@ -276,6 +276,51 @@ abstract final class KApp {
   static const String appearanceDark = 'app.appearance.dark';
   static const String appearanceSystem = 'app.appearance.system';
 
+  // ── F-52 aviso de imprevisto ──
+  // "Aviso" is the third term beside Observação do dia and Mensagem, and
+  // `vocabulary_test` now pins the word to the keys below and nowhere else.
+  //
+  // **Every choice states its consequence** (owner, 18/09/2026). The three
+  // requests do visibly different things — one asks nothing, one asks for help
+  // now, and one puts TODAY on offer — and the third can hand the day to
+  // whoever answers, with no second confirmation from the sender. A person
+  // cannot consent to that by reading a four-word label, so each request
+  // carries a sentence saying what will happen, shown beside the choice and
+  // not hidden behind a tooltip or a help page.
+  static const String noticeAction = 'app.notice.action';
+  static const String noticeTitle = 'app.notice.title';
+  static const String noticeSubtitle = 'app.notice.subtitle';
+  static const String noticeReasonLabel = 'app.notice.reasonLabel';
+  static const String noticeReasonDelay = 'app.notice.reason.delay';
+  static const String noticeReasonMedical = 'app.notice.reason.medical';
+  static const String noticeReasonTraffic = 'app.notice.reason.traffic';
+  static const String noticeReasonOther = 'app.notice.reason.other';
+  static const String noticeEtaLabel = 'app.notice.etaLabel';
+  static const String noticeEtaMinutes = 'app.notice.eta.minutes';
+  static const String noticeEtaNone = 'app.notice.eta.none';
+  static const String noticeRequestLabel = 'app.notice.requestLabel';
+  static const String noticeRequestInfo = 'app.notice.request.info';
+  static const String noticeRequestPickup = 'app.notice.request.pickup';
+  static const String noticeRequestKeep = 'app.notice.request.keep';
+  static const String noticeConsequenceInfo = 'app.notice.consequence.info';
+  static const String noticeConsequencePickup = 'app.notice.consequence.pickup';
+  static const String noticeConsequenceKeep = 'app.notice.consequence.keep';
+  static const String noticeConsequenceKeepBlocked = 'app.notice.consequence.keepBlocked';
+  static const String noticeConsequenceKeepNotMyDay = 'app.notice.consequence.keepNotMyDay';
+  static const String noticeNoteLabel = 'app.notice.noteLabel';
+  static const String noticeNoteHint = 'app.notice.noteHint';
+  static const String noticeSend = 'app.notice.send';
+  static const String noticeCapHint = 'app.notice.capHint';
+  static const String noticeCapReached = 'app.notice.capReached';
+  static const String noticeSent = 'app.notice.sent';
+  static const String noticeErrSend = 'app.notice.errSend';
+  static const String noticeOpenMine = 'app.notice.openMine';
+  static const String noticeCancel = 'app.notice.cancel';
+  static const String noticeCancelConfirm = 'app.notice.cancelConfirm';
+  static const String noticeCancelKeep = 'app.notice.cancelKeep';
+  static const String noticeCancelled = 'app.notice.cancelled';
+  static const String noticeErrCancel = 'app.notice.errCancel';
+
   /// See `K.allKeys`.
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -426,6 +471,39 @@ abstract final class KApp {
     appearanceLight,
     appearanceDark,
     appearanceSystem,
+    noticeAction,
+    noticeTitle,
+    noticeSubtitle,
+    noticeReasonLabel,
+    noticeReasonDelay,
+    noticeReasonMedical,
+    noticeReasonTraffic,
+    noticeReasonOther,
+    noticeEtaLabel,
+    noticeEtaMinutes,
+    noticeEtaNone,
+    noticeRequestLabel,
+    noticeRequestInfo,
+    noticeRequestPickup,
+    noticeRequestKeep,
+    noticeConsequenceInfo,
+    noticeConsequencePickup,
+    noticeConsequenceKeep,
+    noticeConsequenceKeepBlocked,
+    noticeConsequenceKeepNotMyDay,
+    noticeNoteLabel,
+    noticeNoteHint,
+    noticeSend,
+    noticeCapHint,
+    noticeCapReached,
+    noticeSent,
+    noticeErrSend,
+    noticeOpenMine,
+    noticeCancel,
+    noticeCancelConfirm,
+    noticeCancelKeep,
+    noticeCancelled,
+    noticeErrCancel,
   ];
 }
 
@@ -651,6 +729,56 @@ abstract final class StringsAppPtBr {
     KApp.appearanceLight: 'Claro',
     KApp.appearanceDark: 'Escuro',
     KApp.appearanceSystem: 'Sistema',
+    // ── F-52 ──
+    KApp.noticeAction: 'Enviar um aviso',
+    KApp.noticeTitle: 'Aviso de imprevisto',
+    KApp.noticeSubtitle:
+        'Para o dia de hoje. Um aviso sozinho não muda quem está com a '
+            'criança.',
+    KApp.noticeReasonLabel: 'O que aconteceu',
+    KApp.noticeReasonDelay: 'Vou atrasar',
+    KApp.noticeReasonMedical: 'Imprevisto médico',
+    KApp.noticeReasonTraffic: 'Trânsito',
+    KApp.noticeReasonOther: 'Outro',
+    KApp.noticeEtaLabel: 'Previsão',
+    KApp.noticeEtaMinutes: '{0} min',
+    KApp.noticeEtaNone: 'Sem previsão',
+    KApp.noticeRequestLabel: 'O que você precisa',
+    KApp.noticeRequestInfo: 'Só avisando',
+    KApp.noticeRequestPickup: 'Alguém pode buscar a criança?',
+    KApp.noticeRequestKeep: 'Alguém pode ficar com a criança hoje?',
+    KApp.noticeConsequenceInfo:
+        'Ninguém precisa responder e o calendário não muda.',
+    KApp.noticeConsequencePickup:
+        'Quem receber pode se oferecer para ajudar agora. O calendário não '
+            'muda: o dia de hoje continua sendo seu.',
+    KApp.noticeConsequenceKeep:
+        'Quem receber pode se oferecer para ficar com a criança. Se alguém '
+            'aceitar, uma troca já aprovada passa o dia de hoje para essa '
+            'pessoa, sem precisar de outra confirmação sua. Você verá quem '
+            'aceitou, e a troca fica no histórico.',
+    KApp.noticeConsequenceKeepBlocked:
+        'Com uma previsão de tempo, ninguém pode assumir o dia. Escolha '
+            '"Sem previsão" se você precisa que alguém fique com a criança.',
+    KApp.noticeConsequenceKeepNotMyDay:
+        'Só quem está com o dia de hoje pode oferecê-lo. Hoje o dia é de '
+            'outra pessoa.',
+    KApp.noticeNoteLabel: 'Detalhe (opcional)',
+    KApp.noticeNoteHint: 'Onde você está, o que ajuda quem for responder',
+    KApp.noticeSend: 'Enviar aviso',
+    KApp.noticeCapHint: 'Você pode enviar até {0} avisos por dia.',
+    KApp.noticeCapReached:
+        'Você já enviou {0} avisos hoje. O limite volta amanhã.',
+    KApp.noticeSent: 'Aviso enviado.',
+    KApp.noticeErrSend: 'Não foi possível enviar o aviso.',
+    KApp.noticeOpenMine: 'Seu aviso de hoje está aberto.',
+    KApp.noticeCancel: 'Cancelar aviso',
+    KApp.noticeCancelConfirm:
+        'Cancelar este aviso? Quem recebeu será informado de que não é mais '
+            'necessário. Ele continua contando no seu limite do dia.',
+    KApp.noticeCancelKeep: 'Manter',
+    KApp.noticeCancelled: 'Aviso cancelado.',
+    KApp.noticeErrCancel: 'Não foi possível cancelar o aviso.',
   };
 }
 
@@ -871,5 +999,55 @@ abstract final class StringsAppEn {
     KApp.appearanceLight: 'Light',
     KApp.appearanceDark: 'Dark',
     KApp.appearanceSystem: 'System',
+    // ── F-52 ──
+    KApp.noticeAction: 'Send a notice',
+    KApp.noticeTitle: 'Notice about today',
+    KApp.noticeSubtitle:
+        'For today only. A notice on its own does not change who has the '
+            'child.',
+    KApp.noticeReasonLabel: 'What happened',
+    KApp.noticeReasonDelay: 'I am running late',
+    KApp.noticeReasonMedical: 'Medical emergency',
+    KApp.noticeReasonTraffic: 'Traffic',
+    KApp.noticeReasonOther: 'Something else',
+    KApp.noticeEtaLabel: 'Estimate',
+    KApp.noticeEtaMinutes: '{0} min',
+    KApp.noticeEtaNone: 'No estimate',
+    KApp.noticeRequestLabel: 'What you need',
+    KApp.noticeRequestInfo: 'Just letting you know',
+    KApp.noticeRequestPickup: 'Can someone collect the child?',
+    KApp.noticeRequestKeep: 'Can someone keep the child today?',
+    KApp.noticeConsequenceInfo:
+        'Nobody has to answer, and the calendar does not change.',
+    KApp.noticeConsequencePickup:
+        'Whoever receives it can offer to help now. The calendar does not '
+            'change: today stays yours.',
+    KApp.noticeConsequenceKeep:
+        'Whoever receives it can offer to keep the child. If someone '
+            'accepts, an already-approved swap moves today to them, with no '
+            'further confirmation from you. You will see who accepted, and '
+            'the swap stays in the history.',
+    KApp.noticeConsequenceKeepBlocked:
+        'With a stated estimate nobody can take over the day. Choose "No '
+            'estimate" if you need someone to keep the child.',
+    KApp.noticeConsequenceKeepNotMyDay:
+        'Only the carer whose day it is can offer it. Today belongs to '
+            'someone else.',
+    KApp.noticeNoteLabel: 'Detail (optional)',
+    KApp.noticeNoteHint: 'Where you are, what helps whoever answers',
+    KApp.noticeSend: 'Send notice',
+    KApp.noticeCapHint: 'You can send up to {0} notices a day.',
+    KApp.noticeCapReached:
+        'You have already sent {0} notices today. The limit resets tomorrow.',
+    KApp.noticeSent: 'Notice sent.',
+    KApp.noticeErrSend: 'The notice could not be sent.',
+    KApp.noticeOpenMine: 'Your notice for today is open.',
+    KApp.noticeCancel: 'Cancel notice',
+    KApp.noticeCancelConfirm:
+        'Cancel this notice? Whoever received it will be told it is no '
+            'longer needed. It still counts towards your daily limit.',
+    KApp.noticeCancelKeep: 'Keep it',
+    KApp.noticeCancelled: 'Notice cancelled.',
+    KApp.noticeErrCancel: 'The notice could not be cancelled.',
   };
 }

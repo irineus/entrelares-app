@@ -11,6 +11,7 @@ import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_deletion.dart';
 import 'package:entrelares_db_contracts/models/family_invitation.dart';
@@ -223,6 +224,30 @@ abstract class CustodyDataSource {
   /// when there is nothing to restore FROM (no approved swap on the date, no
   /// snapshot reference, or an old_data-less snapshot).
   Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate);
+
+  // ── F-52 aviso de imprevisto ──
+
+  /// The family's avisos for [date] — at most a handful, newest first, with
+  /// the outcome row folded in. Read by the Hoje card's banner.
+  Future<List<DayNotice>> fetchDayNotices(DateTime date);
+
+  /// Sends an aviso about TODAY and returns its id. The day is the SERVER's
+  /// today in `America/Sao_Paulo` — never a date the client picks, or a device
+  /// with a wrong clock would write a notice about the wrong day.
+  ///
+  /// Every guard (who may send, the daily cap, `keep` needing the day and no
+  /// estimate) is refused by the database; the sheet mirrors them only so it
+  /// can disable rather than let the server say no.
+  Future<int> sendDayNotice({
+    required String reason,
+    int? etaMinutes,
+    required String request,
+    String? note,
+  });
+
+  /// Withdraws my own open aviso about today. Whoever received it is told,
+  /// because somebody may already be on their way.
+  Future<void> cancelDayNotice(int noticeId);
 
   /// My notifications, newest 100 — the "Todas" tab.
   Future<List<AppNotification>> fetchNotifications(int myProfileId);

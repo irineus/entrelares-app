@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
@@ -25,6 +26,7 @@ import '../widgets/app_snack.dart';
 import '../widgets/slot_pill.dart';
 import '../widgets/today_card.dart';
 import 'bulk_sheet.dart';
+import 'notice_sheet.dart';
 import 'day_sheet.dart';
 import 'frozen_day_sheet.dart';
 import 'quick_swap_sheet.dart';
@@ -154,6 +156,15 @@ class _CalendarScreenState extends State<CalendarScreen>
   // Today + the next-handoff window ([today, today + 91] — the web scans
   // [tomorrow, tomorrow + 90]; one query serves the card's row and the scan).
   List<CareSchedule> _upcoming = const [];
+
+  /// F-52: every aviso about today, open or closed, newest first. The strip
+  /// under the Hoje card reads the OPEN ones; the closed ones are kept so a
+  /// cancellation stops showing the instant the load returns.
+  List<DayNotice> _todayNotices = const [];
+
+  /// F-52: yesterday's row, for the "who handed over today" end of the sender
+  /// rule. Fetched on its own because `_upcoming` starts at today.
+  CareSchedule? _yesterdayRow;
   // F-12: the visible month's OPEN swap requests — the frozen-day source
   // (paint, guards, panel). Keyed alongside _daysByIso on every load.
   Map<String, SwapRequest> _frozenByIso = const {};
@@ -443,6 +454,20 @@ class _CalendarScreenState extends State<CalendarScreen>
           // case is an admin told to invite somebody they already invited.
         }
       }
+      // F-52: today's avisos, and yesterday's row — the second end of a
+      // handover happening today. `_upcoming` starts at today, so yesterday is
+      // in `_daysByIso` on most days and MISSING on the 1st of a month; a
+      // carer whose eligibility depends on it would silently lose the action
+      // once a month, which is exactly the kind of defect nobody reports.
+      // Both reads are best-effort: a calendar must not fail to draw because
+      // an aviso could not be counted.
+      var todayNotices = _todayNotices;
+      var yesterdayRow = _yesterdayRow;
+      try {
+        todayNotices = await widget.dataSource.fetchDayNotices(_today);
+        yesterdayRow = await widget.dataSource
+            .fetchDay(DateTime(_today.year, _today.month, _today.day - 1));
+      } catch (_) {/* keep whatever we had */}
       if (!mounted) return;
       setState(() {
         _members = members;
@@ -457,6 +482,8 @@ class _CalendarScreenState extends State<CalendarScreen>
         };
         _ownProfile = ownProfile;
         _upcoming = upcoming;
+        _todayNotices = todayNotices;
+        _yesterdayRow = yesterdayRow;
         _loadedMonth = month;
         _openInvitation = openInvitation;
         _loading = false;
@@ -1131,7 +1158,148 @@ class _CalendarScreenState extends State<CalendarScreen>
           todayRow?.effectiveParentId, AppL10n.of(context).l.current),
       onGoToToday: _goToToday,
       onInvite: _onInviteNudgeTap,
+      noticeStrip: _noticeStrip(context, todayRow, nextHandoff),
     );
+  }
+
+  // ── F-52 aviso de imprevisto ───────────────────────────────────────────────
+
+  List<DayNotice> get _openNotices =>
+      [for (final n in _todayNotices) if (n.isOpen) n];
+
+  /// My own open aviso, or null. At most one matters: the strip offers to
+  /// withdraw the one I am waiting on, and the cap keeps the number small.
+  DayNotice? get _myOpenNotice {
+    final me = _ownProfile?.id;
+    if (me == null) return null;
+    for (final n in _openNotices) {
+      if (n.senderProfileId == me) return n;
+    }
+    return null;
+  }
+
+  /// Whether I am one of the day's three ends (`noticeSenderIds`). The server
+  /// decides for real; this only chooses whether to OFFER the action, because
+  /// an action that always ends in a refusal is worse than no action at all.
+  bool _canSendNotice(CareSchedule? todayRow, DateTime? nextHandoff) {
+    final me = _ownProfile?.id;
+    if (me == null) return false;
+    CareSchedule? nextRow;
+    if (nextHandoff != null) {
+      final iso = CareSchedule.isoDate(nextHandoff);
+      for (final d in _upcoming) {
+        if (CareSchedule.isoDate(d.scheduleDate) == iso) {
+          nextRow = d;
+          break;
+        }
+      }
+    }
+    return noticeSenderIds(
+      dayParentId: todayRow?.effectiveParentId,
+      previousParentId: _yesterdayRow?.effectiveParentId,
+      nextHandoffParentId: nextRow?.effectiveParentId,
+    ).contains(me);
+  }
+
+  /// The sentence a reader sees for an open aviso — the SAME one the
+  /// notification carries, composed once in core. Two copies of it is how the
+  /// strip says "30 min" while the notification says "sem previsão", both
+  /// well-formed.
+  String _noticeSentence(DayNotice notice, Localization l) {
+    final reason = NoticeReason.fromWire(notice.reason);
+    final request = NoticeRequest.fromWire(notice.request);
+    // A row we cannot read is a FUTURE writer's; saying nothing about it beats
+    // inventing a reason it never gave.
+    if (reason == null || request == null) return '';
+    var senderName = l[K.notifRenderFbOtherCap];
+    for (final m in _members) {
+      if (m.id == notice.senderProfileId) {
+        senderName = m.fullName;
+        break;
+      }
+    }
+    return noticeSentence(
+      l: l,
+      senderName: senderName,
+      reason: reason,
+      etaMinutes: notice.etaMinutes,
+      request: request,
+      note: notice.note,
+    );
+  }
+
+  Widget? _noticeStrip(
+      BuildContext context, CareSchedule? todayRow, DateTime? nextHandoff) {
+    if (_loading || _ownProfile == null) return null;
+    final l = AppL10n.of(context).l;
+    final me = _ownProfile!.id;
+
+    final mine = _myOpenNotice;
+    if (mine != null) {
+      return AppBanner(
+        tone: context.tokens.warning,
+        icon: Icons.campaign_outlined,
+        title: l[KApp.noticeOpenMine],
+        message: _noticeSentence(mine, l),
+        actionLabel: l[KApp.noticeCancel],
+        actionIcon: Icons.close,
+        onAction: () => _confirmCancelNotice(mine),
+      );
+    }
+
+    // Somebody else is asking. PR 2 puts the two answers on this banner; here
+    // it says what happened, which is already more than the product did.
+    final theirs = [
+      for (final n in _openNotices)
+        if (n.senderProfileId != me) n
+    ];
+    if (theirs.isNotEmpty) {
+      return AppBanner(
+        tone: context.tokens.warning,
+        icon: Icons.campaign_outlined,
+        message: _noticeSentence(theirs.first, l),
+      );
+    }
+
+    // Nothing open: the card grows by NOTHING. An idle affordance here cost
+    // the month grid 8 dp per cell (76 → 67.8 at 360x740, measured), and U-28
+    // already paid for that lesson once — the Hoje card growing takes a whole
+    // week off the grid for everyone, every day, to serve a rare event. The
+    // way to SEND one lives in the month bar instead, which is a row of
+    // buttons already and costs no height at all.
+    return null;
+  }
+
+  Future<void> _openNoticeSheet(int? dayParentId, int sentToday) async {
+    if (_refuseWriteOffline()) return;
+    final id = await showNoticeSheet(
+      context: context,
+      dataSource: widget.dataSource,
+      myProfileId: _ownProfile!.id,
+      dayParentId: dayParentId,
+      sentToday: sentToday,
+    );
+    if (id == null || !mounted) return;
+    _load(silent: true);
+    showAppSnack(context, AppL10n.of(context).l[KApp.noticeSent]);
+  }
+
+  /// U-38: the question a tap raised is answered where the finger is — the
+  /// sheet's `confirmation:` IS the question, in the action row's own place.
+  Future<void> _confirmCancelNotice(DayNotice notice) async {
+    if (_refuseWriteOffline()) return;
+    final l = AppL10n.of(context).l;
+    final done = await showAppSheet<bool>(
+      context: context,
+      builder: (context) => CancelNoticeSheet(
+        dataSource: widget.dataSource,
+        notice: notice,
+        sentence: _noticeSentence(notice, l),
+      ),
+    );
+    if (done != true || !mounted) return;
+    _load(silent: true);
+    showAppSnack(context, AppL10n.of(context).l[KApp.noticeCancelled]);
   }
 
   /// T-76 — the other half of the F-31 measurement, under the name the Blazor
@@ -1251,6 +1419,62 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
+  /// F-52 — whether "Enviar um aviso" belongs in the ⋮ menu right now.
+  ///
+  /// **Why the menu and not the Hoje card.** The card is the one surface whose
+  /// height the month grid pays for: an idle strip in it took the cells from
+  /// 76 dp to 67.8 at 360x740, measured — U-28 already paid for that lesson,
+  /// and U-48's rule is that an addition must not change what the majority
+  /// sees at 1.0×. The month bar was the next candidate and is worse: its
+  /// arrows are 40 dp and pass the U-32 gate only because they touch the
+  /// screen edge, so a fourth button there un-exempts "Próximo mês" and turns
+  /// the gate red on a defect this item did not cause. The ⋮ is free, and it
+  /// is where U-47 puts everything that is not a card's one primary action.
+  /// The Hoje card keeps the half the strip is FOR: an aviso that is open.
+  bool get _canOfferNotice {
+    if (_loading || _ownProfile == null) return false;
+    if (!isCurrentMonth(_visibleMonth, _today)) return false;
+    // An aviso already open is withdrawn on the card's strip, not sent twice.
+    if (_myOpenNotice != null) return false;
+    final todayRow = _rowForToday();
+    return _canSendNotice(todayRow, _nextHandoffFrom(todayRow));
+  }
+
+  void _openNoticeFromMenu() {
+    final todayRow = _rowForToday();
+    final me = _ownProfile!.id;
+    final sentToday = [
+      for (final n in _todayNotices)
+        if (n.senderProfileId == me) n
+    ].length;
+    unawaited(_openNoticeSheet(todayRow?.effectiveParentId, sentToday));
+  }
+
+  /// Today's row out of [_upcoming], which the load fetches starting today.
+  CareSchedule? _rowForToday() {
+    final todayIso = CareSchedule.isoDate(_today);
+    for (final d in _upcoming) {
+      if (CareSchedule.isoDate(d.scheduleDate) == todayIso) return d;
+    }
+    return null;
+  }
+
+  /// The next day whose effective carer differs from today's — null on a day
+  /// with no row, because the scan needs a carer to differ FROM.
+  DateTime? _nextHandoffFrom(CareSchedule? todayRow) {
+    if (todayRow == null) return null;
+    final todayIso = CareSchedule.isoDate(_today);
+    return nextHandoffDate(todayRow.effectiveParentId, [
+      for (final d in _upcoming)
+        if (CareSchedule.isoDate(d.scheduleDate) != todayIso)
+          (
+            date: d.scheduleDate,
+            scheduledParentId: d.scheduledParentId,
+            actualParentId: d.actualParentId,
+          ),
+    ]);
+  }
+
   /// U-28 QA — the way back to today, as a chip that says which WAY it goes.
   ///
   /// It used to be a line of link text under the greeting, where it read as an
@@ -1339,6 +1563,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               // long-press). Once armed, tapping a day toggles its selection.
               _CalendarAction.selectDays =>
                 setState(() => _selectionArmed = true),
+              _CalendarAction.notice => _openNoticeFromMenu(),
               _CalendarAction.clearMonth => _clearMonth(),
             },
             itemBuilder: (context) => [
@@ -1360,6 +1585,19 @@ class _CalendarScreenState extends State<CalendarScreen>
                   title: Text(l[K.calSelectDays]),
                 ),
               ),
+              // F-52: offered only to one of the day's three ends, and only
+              // on the month today is in — an action about today offered from
+              // December reads as a bug.
+              if (_canOfferNotice)
+                PopupMenuItem(
+                  value: _CalendarAction.notice,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.campaign_outlined),
+                    title: Text(l[KApp.noticeAction]),
+                  ),
+                ),
               // F-51 "Limpar mês": the third item, after a divider —
               // destructive, so last and set apart, in the danger tone. Only
               // under the admin bypass (clearing a planned day is an admin
@@ -1621,7 +1859,7 @@ class _CalendarScreenState extends State<CalendarScreen>
 }
 
 /// U-36 — the items of the calendar's ⋮ menu. F-51 adds `clearMonth` here.
-enum _CalendarAction { wizard, selectDays, clearMonth }
+enum _CalendarAction { wizard, selectDays, notice, clearMonth }
 
 /// The today card's outline while it loads — the same card, the same two
 /// bands, the same heights, so nothing moves when the real one arrives.
