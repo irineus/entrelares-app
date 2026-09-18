@@ -38,6 +38,15 @@ void main() {
       }
     });
 
+    // F-52: an aviso that reaches a phone is one that ASKED for something —
+    // the trigger filters `params.kind` to pickup/keep before the round trip,
+    // because routing is by TYPE alone and a receipt landing on "Para você"
+    // would open an empty tab under a notice that said something happened.
+    test('an aviso lands on "Para você", where it is answered', () {
+      expect(PushRouting.landingFor('day_notice'),
+          NotificationLanding.incoming);
+    });
+
     test('an unknown or missing type falls to "Todas"', () {
       // A future writer's notice is a receipt until somebody decides
       // otherwise, and the wrong guess this way shows a full list rather than
