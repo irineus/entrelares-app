@@ -263,8 +263,8 @@ class HomeShell extends StatelessWidget {
                 label: l[K.navFamily]),
             NavigationDestination(
                 key: tourKeys?.keyFor(TourTarget.notificationsTab),
-                icon: _bellIcon(const Icon(Icons.notifications_outlined)),
-                selectedIcon: _bellIcon(const Icon(Icons.notifications)),
+                icon: _bellIcon(const Icon(Icons.notifications_outlined), l),
+                selectedIcon: _bellIcon(const Icon(Icons.notifications), l),
                 tooltip: badge.count > 0
                     ? l.format(
                         badge.count == 1
@@ -461,9 +461,22 @@ class HomeShell extends StatelessWidget {
     );
   }
 
-  Widget _bellIcon(Icon icon) => Badge(
-        isLabelVisible: badge.count > 0,
-        label: Text(bellBadgeText(badge.count)),
-        child: icon,
+  /// U-32 (TalkBack, 18/09/2026): the badge's text was its own node, so the
+  /// reader heard "2" and then "Avisos". The count rides as the sentence the
+  /// tooltip already carries, and the bare number leaves the tree.
+  Widget _bellIcon(Icon icon, Localization l) => Semantics(
+        label: badge.count > 0
+            ? l.format(
+                badge.count == 1
+                    ? K.navNotificationsOnePending
+                    : K.navNotificationsManyPending,
+                [badge.count])
+            : null,
+        excludeSemantics: true,
+        child: Badge(
+          isLabelVisible: badge.count > 0,
+          label: Text(bellBadgeText(badge.count)),
+          child: icon,
+        ),
       );
 }

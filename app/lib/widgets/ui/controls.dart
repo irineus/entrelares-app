@@ -235,12 +235,17 @@ class AppAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = slot?.tone;
-    final label = Text(
-      initials,
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: tone?.onSolid,
-            fontSize: radius * 0.7,
-          ),
+    // U-32 (TalkBack, 18/09/2026): the initial is decoration — the name is
+    // always beside it — and the reader heard "I" before "Irineu…" on every
+    // roster card and on the account button.
+    final label = ExcludeSemantics(
+      child: Text(
+        initials,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: tone?.onSolid,
+              fontSize: radius * 0.7,
+            ),
+      ),
     );
     if (slot == null) return CircleAvatar(radius: radius, child: label);
     return CircleAvatar(

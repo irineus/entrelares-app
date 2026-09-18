@@ -626,6 +626,8 @@ abstract final class K {
   static const String auditFieldActualParent = 'audit.field.actualParent';
   static const String auditFieldHandoffTime = 'audit.field.handoffTime';
   static const String auditFieldDayNote = 'audit.field.dayNote';
+  static const String auditAriaBefore = 'audit.aria.before';
+  static const String auditAriaNow = 'audit.aria.now';
   static const String auditActionAdminGranted = 'audit.action.adminGranted';
   static const String auditActionAdminRevoked = 'audit.action.adminRevoked';
   static const String auditActionRoleChanged = 'audit.action.roleChanged';
@@ -1695,6 +1697,8 @@ abstract final class K {
     auditFieldScheduledParent,
     auditFieldActualParent,
     auditFieldHandoffTime,
+    auditAriaBefore,
+    auditAriaNow,
     auditFieldDayNote,
     auditActionAdminGranted,
     auditActionAdminRevoked,

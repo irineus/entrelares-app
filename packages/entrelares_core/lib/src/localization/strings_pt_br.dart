@@ -564,6 +564,8 @@ abstract final class StringsPtBr {
     K.auditFieldActualParent: 'Responsável real',
     K.auditFieldHandoffTime: 'Horário da troca',
     K.auditFieldDayNote: 'Observação do dia',
+    K.auditAriaBefore: 'antes',
+    K.auditAriaNow: 'agora',
     K.auditActionAdminGranted: 'Permissão de admin concedida',
     K.auditActionAdminRevoked: 'Permissão de admin removida',
     K.auditActionRoleChanged: 'Papel alterado',

@@ -241,11 +241,14 @@ class TodayCard extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: responsible.tone.solid,
-          child: Text(glance.avatarLetter,
-              style: TextStyle(color: responsible.tone.onSolid)),
+        // U-32: the letter is decoration; the name follows it.
+        ExcludeSemantics(
+          child: CircleAvatar(
+            radius: 18,
+            backgroundColor: responsible.tone.solid,
+            child: Text(glance.avatarLetter,
+                style: TextStyle(color: responsible.tone.onSolid)),
+          ),
         ),
         const SizedBox(width: Spacing.sm),
         Expanded(
