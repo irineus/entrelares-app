@@ -80,6 +80,22 @@ class AnalyticsService {
   Future<void> trackEvent(String name, {Map<String, Object>? props}) =>
       _send(name, _currentPath, props);
 
+  /// Event names already sent by this service instance — i.e. by this app
+  /// session, which is the scope the Blazor client counted impressions in
+  /// (its `AnalyticsService` was Scoped, so one per page load).
+  final Set<String> _sentOnce = <String>{};
+
+  /// An IMPRESSION rather than an action (T-76): a screen that repaints, a
+  /// month that reloads and the F-23 poll would each count the same sighting
+  /// again, and a count that grows with redraws measures the renderer, not the
+  /// reader. Sent at most once per app session — on the web a reload starts a
+  /// new one, exactly as it did before the cutover, so the series continues
+  /// comparable.
+  Future<void> trackEventOnce(String name, {Map<String, Object>? props}) {
+    if (!_sentOnce.add(name)) return Future<void>.value();
+    return trackEvent(name, props: props);
+  }
+
   Future<void> _send(
       String? name, String location, Map<String, Object>? props) async {
     if (!isEnabled) return;

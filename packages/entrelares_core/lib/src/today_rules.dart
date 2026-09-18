@@ -129,12 +129,39 @@ DateTime? nextHandoffDate(
 /// F-31 mirror (`Home.razor` `ShowInviteNudge`): an admin alone in the family
 /// sees the invite prompt instead of the responsible row — the app only works
 /// fully when both caregivers use it. Never during a load (no flicker).
-bool showInviteNudge({
+///
+/// T-76 split the rule in two. This half is the PRECONDITION, and it is what
+/// decides whether the calendar pays for the open-invitation read at all: a
+/// family whose second seat is filled never asks the question.
+bool inviteNudgeApplies({
   required bool isLoading,
   required bool isAdmin,
   required int activeMemberCount,
 }) =>
     !isLoading && isAdmin && activeMemberCount == 1;
+
+/// Whether the nudge is actually drawn (T-76, owner 18/09/2026) — the
+/// refinement the F-31 record left written down and never shipped: an admin
+/// whose invitation is still open has already done the thing the nudge asks
+/// for, so it stays quiet until that invitation is accepted, revoked or
+/// EXPIRES. Expiry brings it back on purpose: a reach-out that fizzled is a
+/// family alone again, which is the state the nudge exists for.
+///
+/// [hasOpenInvitation] is required and not defaulted: a fact that can hide the
+/// prompt has to be answered by every caller, never inherited from a default —
+/// the F-56 lesson about saying WHICH null you mean.
+bool showInviteNudge({
+  required bool isLoading,
+  required bool isAdmin,
+  required int activeMemberCount,
+  required bool hasOpenInvitation,
+}) =>
+    inviteNudgeApplies(
+      isLoading: isLoading,
+      isAdmin: isAdmin,
+      activeMemberCount: activeMemberCount,
+    ) &&
+    !hasOpenInvitation;
 
 /// Web: `IsViewingCurrentMonth` — the card is tappable ("back to today") only
 /// when the visible month is NOT today's.

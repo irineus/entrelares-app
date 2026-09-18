@@ -141,25 +141,70 @@ void main() {
     });
   });
 
-  group('showInviteNudge — F-31', () {
-    test('admin alone in the family sees the nudge', () {
+  group('showInviteNudge — F-31 + T-76', () {
+    test('admin alone in the family, nobody invited yet, sees the nudge', () {
       expect(
           showInviteNudge(
-              isLoading: false, isAdmin: true, activeMemberCount: 1),
+              isLoading: false,
+              isAdmin: true,
+              activeMemberCount: 1,
+              hasOpenInvitation: false),
           isTrue);
     });
 
     test('never during a load, never for non-admins, never with company', () {
       expect(
-          showInviteNudge(isLoading: true, isAdmin: true, activeMemberCount: 1),
+          showInviteNudge(
+              isLoading: true,
+              isAdmin: true,
+              activeMemberCount: 1,
+              hasOpenInvitation: false),
           isFalse);
       expect(
           showInviteNudge(
-              isLoading: false, isAdmin: false, activeMemberCount: 1),
+              isLoading: false,
+              isAdmin: false,
+              activeMemberCount: 1,
+              hasOpenInvitation: false),
           isFalse);
       expect(
           showInviteNudge(
+              isLoading: false,
+              isAdmin: true,
+              activeMemberCount: 2,
+              hasOpenInvitation: false),
+          isFalse);
+    });
+
+    test('T-76: an open invitation silences it — the admin already reached out',
+        () {
+      expect(
+          showInviteNudge(
+              isLoading: false,
+              isAdmin: true,
+              activeMemberCount: 1,
+              hasOpenInvitation: true),
+          isFalse);
+    });
+
+    test('the precondition is the same rule minus the invitation', () {
+      // It exists so the calendar can decide whether to ASK: a family with a
+      // second seat filled must never pay for the open-invitation read.
+      expect(
+          inviteNudgeApplies(
+              isLoading: false, isAdmin: true, activeMemberCount: 1),
+          isTrue);
+      expect(
+          inviteNudgeApplies(
               isLoading: false, isAdmin: true, activeMemberCount: 2),
+          isFalse);
+      expect(
+          inviteNudgeApplies(
+              isLoading: true, isAdmin: true, activeMemberCount: 1),
+          isFalse);
+      expect(
+          inviteNudgeApplies(
+              isLoading: false, isAdmin: false, activeMemberCount: 1),
           isFalse);
     });
   });

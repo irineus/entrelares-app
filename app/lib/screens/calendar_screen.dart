@@ -144,6 +144,12 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   // U-23 — first-run onboarding.
   OnboardingSignals? _onboardingSignals;
+
+  /// T-76 — whether this family already has an invitation waiting to be
+  /// accepted. Read inside the load, and only when the F-31 precondition
+  /// holds, so the card paints its final answer on the first frame instead of
+  /// flashing the nudge at somebody who already invited the other caregiver.
+  bool _openInvitation = false;
   bool _tourShown = false;
   // Today + the next-handoff window ([today, today + 91] — the web scans
   // [tomorrow, tomorrow + 90]; one query serves the card's row and the scan).
@@ -417,6 +423,26 @@ class _CalendarScreenState extends State<CalendarScreen>
       final ownProfile = await widget.dataSource.fetchOwnProfile();
       final upcoming = await widget.dataSource
           .fetchUpcoming(_today, nextHandoffWindowDays + 1);
+      // T-76: the nudge's own fact, asked only when the nudge could show at
+      // all — a family whose second seat is filled never pays for the read.
+      // It rides INSIDE the load for the same reason the rule refuses to run
+      // while loading: an answer that arrives after the frame is a prompt
+      // that blinks.
+      final nudgeApplies = inviteNudgeApplies(
+        isLoading: false,
+        isAdmin: ownProfile?.isAdmin ?? false,
+        activeMemberCount: members.where((m) => !m.hasLeft).length,
+      );
+      var openInvitation = false;
+      if (nudgeApplies) {
+        try {
+          openInvitation = await widget.dataSource.hasOpenInvitation();
+        } catch (_) {
+          // Best-effort, and it fails towards SHOWING: the growth loop's only
+          // prompt must not disappear because one bounded read did. The worst
+          // case is an admin told to invite somebody they already invited.
+        }
+      }
       if (!mounted) return;
       setState(() {
         _members = members;
@@ -432,6 +458,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         _ownProfile = ownProfile;
         _upcoming = upcoming;
         _loadedMonth = month;
+        _openInvitation = openInvitation;
         _loading = false;
         _loadError = null;
       });
@@ -456,6 +483,18 @@ class _CalendarScreenState extends State<CalendarScreen>
       AccountScope.identityOf(context)?.adopt(
           fullName: ownProfile?.fullName, colorSlot: ownProfile?.colorSlot);
       unawaited(_refreshOnboarding(ownProfile, members));
+      // T-76 — the impression the Flutter port lost: `invite_nudge_shown` fed
+      // Umami until the 23/08/2026 cutover and then simply stopped, leaving
+      // the one loop that brings a new adult into the product unmeasured.
+      // Fired where the answer is KNOWN (never from `build`) and once per app
+      // session, the scope the pre-cutover series was counted in.
+      if (nudgeApplies && !openInvitation) {
+        final analytics = widget.analytics;
+        if (analytics != null) {
+          unawaited(analytics.trackEventOnce('invite_nudge_shown',
+              props: analyticsFunnelProps(channel: analytics.channel)));
+        }
+      }
     } catch (e) {
       if (!mounted) return;
       final l = AppL10n.of(context).l;
@@ -1085,12 +1124,27 @@ class _CalendarScreenState extends State<CalendarScreen>
         // F-56: a pending member counts — the nudge is "reach out", and a
         // caregiver already on the calendar was reached.
         activeMemberCount: _assignableMembers.length,
+        // T-76: so was somebody with an invitation still in their inbox.
+        hasOpenInvitation: _openInvitation,
       ),
       responsibleRole: _roleLabelFor(
           todayRow?.effectiveParentId, AppL10n.of(context).l.current),
       onGoToToday: _goToToday,
-      onInvite: () => context.go('/family'),
+      onInvite: _onInviteNudgeTap,
     );
+  }
+
+  /// T-76 — the other half of the F-31 measurement, under the name the Blazor
+  /// client used (`invite_nudge_click`), so the series that stopped at the
+  /// cutover continues instead of starting over. Fired before the navigation:
+  /// the tap is the fact, and `/family` is what it leads to.
+  void _onInviteNudgeTap() {
+    final analytics = widget.analytics;
+    if (analytics != null) {
+      unawaited(analytics.trackEvent('invite_nudge_click',
+          props: analyticsFunnelProps(channel: analytics.channel)));
+    }
+    context.go('/family');
   }
 
   /// A heading starts with a capital; the date formatters lowercase because

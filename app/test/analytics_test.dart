@@ -56,6 +56,43 @@ void main() {
     });
   });
 
+  group('once per session (T-76)', () {
+    test('an impression is sent once, however often the screen resolves it',
+        () async {
+      final analytics = service();
+
+      await analytics.trackEventOnce('invite_nudge_shown',
+          props: {'channel': 'web'});
+      await analytics.trackEventOnce('invite_nudge_shown',
+          props: {'channel': 'web'});
+
+      expect(sent, hasLength(1),
+          reason: 'a count that grows with reloads measures the poll, not '
+              'the reader');
+    });
+
+    test('the guard is per NAME — another impression still gets through',
+        () async {
+      final analytics = service();
+
+      await analytics.trackEventOnce('invite_nudge_shown');
+      await analytics.trackEventOnce('install-hint-view');
+
+      expect(sent, hasLength(2));
+    });
+
+    test('an action is never deduplicated', () async {
+      // The click is a fact each time it happens; only the sighting is
+      // once-per-session.
+      final analytics = service();
+
+      await analytics.trackEvent('invite_nudge_click');
+      await analytics.trackEvent('invite_nudge_click');
+
+      expect(sent, hasLength(2));
+    });
+  });
+
   group('pageview', () {
     test('posts the Umami event shape to /api/send', () async {
       final analytics = service();

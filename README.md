@@ -322,7 +322,8 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
 - **Card Today at a Glance:** port do `TodayCard.razor` no topo do calendário — responsável
   de hoje (efetivo `actual ?? scheduled`), badges 🔄/⏰, próxima troca (janela de 90 dias,
   primeiro dia com responsável efetivo diferente — mesmo scan do web), nudge de convite
-  F-31 (admin sozinho na família) e "voltar para hoje" quando navegando outro mês. A
+  F-31 (admin sozinho na família e, desde o T-76, sem convite aberto) e "voltar para hoje"
+  quando navegando outro mês. A
   projeção que no web vivia inline (sem teste) virou regra pura em `today_rules.dart`.
 - **Espelho T-41 (settings):** seam `parseIntSetting`/`parseBoolSetting` (semântica .NET
   `TryParse`) + `PublicSettings` com os 10 acessores e fallbacks dos seeds; o fetch
