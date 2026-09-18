@@ -91,6 +91,23 @@ void main() {
     }
   });
 
+  // `scheduled_parent` is "planejado" / "planned" — the word the day sheet, the
+  // onboarding, the wizard and the PDF already used. Three stragglers said
+  // "agendado"; what is left of that word is a DATE something is set for
+  // (a family deletion, a reactivation), never a carer.
+  test('the planned carer is "planejado", never "agendado"', () {
+    const dated = {K.layoutFamilyDeletionRequester, K.premScheduledStatus};
+    final pt = catalogs['pt-BR']!;
+    final word = RegExp(r'agendad[oa]s?', caseSensitive: false);
+    for (final key in [...K.allKeys, ...KApp.allKeys]) {
+      if (dated.contains(key)) continue;
+      expect(word.hasMatch(pt[key]), isFalse,
+          reason: '$key says "${pt[key]}"');
+    }
+    expect(pt[K.editorScheduledParent], 'Responsável planejado');
+    expect(pt[K.sumPlanned], 'Planejado');
+  });
+
   test('EN: what the system sends is a "notification", never an "alert"', () {
     // "System alert" is the heading of an operator banner, not a push.
     const survivors = {K.homeSystemAlert};

@@ -154,7 +154,7 @@ void main() {
       await tester.pumpWidget(_host(const Column(
         children: [
           AppFieldLabel('Horário de troca', optionalLabel: 'opcional'),
-          AppFieldLabel('Responsável agendado'),
+          AppFieldLabel('Responsável planejado'),
         ],
       )));
       expect(find.text('opcional'), findsOneWidget,
