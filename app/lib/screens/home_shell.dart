@@ -64,7 +64,7 @@ class InstallHintBanner {
 }
 
 /// The authenticated hull — the same four destinations as the web's NavMenu
-/// bottom tab bar (Calendário, Família, Avisos, Relatórios). Branch state is
+/// bottom tab bar (Calendário, Família, Notificações, Relatórios). Branch state is
 /// preserved per tab by the indexed stack, the native improvement over the
 /// web's full page swaps. The bell badge counts the OPEN REQUESTS AWAITING
 /// ME (web parity — not unread notifications), capped at "99+".
@@ -242,42 +242,50 @@ class HomeShell extends StatelessWidget {
       ),
       bottomNavigationBar: ListenableBuilder(
         listenable: badge,
-        builder: (context, _) => NavigationBar(
-          selectedIndex: shell.currentIndex,
-          onDestinationSelected: (index) {
-            shell.goBranch(index,
-                // Re-tapping the active tab resets it to its root, the
-                // platform convention.
-                initialLocation: index == shell.currentIndex);
-            // Web parity: the badge refreshes on every navigation.
-            badge.refresh();
-          },
-          destinations: [
-            NavigationDestination(
-                icon: const Icon(Icons.calendar_month_outlined),
-                selectedIcon: const Icon(Icons.calendar_month),
-                label: l[K.navCalendar]),
-            NavigationDestination(
-                icon: const Icon(Icons.group_outlined),
-                selectedIcon: const Icon(Icons.group),
-                label: l[K.navFamily]),
-            NavigationDestination(
-                key: tourKeys?.keyFor(TourTarget.notificationsTab),
-                icon: _bellIcon(const Icon(Icons.notifications_outlined), l),
-                selectedIcon: _bellIcon(const Icon(Icons.notifications), l),
-                tooltip: badge.count > 0
-                    ? l.format(
-                        badge.count == 1
-                            ? K.navNotificationsOnePending
-                            : K.navNotificationsManyPending,
-                        [badge.count])
-                    : null,
-                label: l[K.navNotificationsShort]),
-            NavigationDestination(
-                icon: const Icon(Icons.bar_chart_outlined),
-                selectedIcon: const Icon(Icons.bar_chart),
-                label: l[K.navReports]),
+        builder: (context, _) => _NavLabelFit(
+          labels: [
+            l[K.navCalendar],
+            l[K.navFamily],
+            l[K.navNotificationsShort],
+            l[K.navReports],
           ],
+          child: NavigationBar(
+            selectedIndex: shell.currentIndex,
+            onDestinationSelected: (index) {
+              shell.goBranch(index,
+                  // Re-tapping the active tab resets it to its root, the
+                  // platform convention.
+                  initialLocation: index == shell.currentIndex);
+              // Web parity: the badge refreshes on every navigation.
+              badge.refresh();
+            },
+            destinations: [
+              NavigationDestination(
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  selectedIcon: const Icon(Icons.calendar_month),
+                  label: l[K.navCalendar]),
+              NavigationDestination(
+                  icon: const Icon(Icons.group_outlined),
+                  selectedIcon: const Icon(Icons.group),
+                  label: l[K.navFamily]),
+              NavigationDestination(
+                  key: tourKeys?.keyFor(TourTarget.notificationsTab),
+                  icon: _bellIcon(const Icon(Icons.notifications_outlined), l),
+                  selectedIcon: _bellIcon(const Icon(Icons.notifications), l),
+                  tooltip: badge.count > 0
+                      ? l.format(
+                          badge.count == 1
+                              ? K.navNotificationsOnePending
+                              : K.navNotificationsManyPending,
+                          [badge.count])
+                      : null,
+                  label: l[K.navNotificationsShort]),
+              NavigationDestination(
+                  icon: const Icon(Icons.bar_chart_outlined),
+                  selectedIcon: const Icon(Icons.bar_chart),
+                  label: l[K.navReports]),
+            ],
+          ),
         ),
       ),
     );
@@ -462,7 +470,7 @@ class HomeShell extends StatelessWidget {
   }
 
   /// U-32 (TalkBack, 18/09/2026): the badge's text was its own node, so the
-  /// reader heard "2" and then "Avisos". The count rides as the sentence the
+  /// reader heard "2" and then "Notificações". The count rides as the sentence the
   /// tooltip already carries, and the bare number leaves the tree.
   Widget _bellIcon(Icon icon, Localization l) => Semantics(
         label: badge.count > 0
@@ -479,4 +487,59 @@ class HomeShell extends StatelessWidget {
           child: icon,
         ),
       );
+}
+
+/// U-34 — the bar's labels fit their slots at the reader's text scale.
+///
+/// The bell's tab says "Notificações", the word its screen's title says, and
+/// with the real font that is 79.7 dp in a 90 dp slot at 1.0× and 101.7 dp at
+/// 1.3× — where `NavigationDestination` (a bare `Text`, no overflow rule)
+/// breaks it mid-word into a bar that has one line of height. So the whole
+/// bar takes ONE ceiling, the U-39 shape: the largest factor at which the
+/// widest label still fits, never below 1.0 and never above what the reader
+/// asked for. At the default scale this is a no-op (U-48: the adjustment is
+/// paid for by the reader who asked for it), and one ceiling for the four
+/// labels keeps them the same size as each other.
+class _NavLabelFit extends StatelessWidget {
+  final List<String> labels;
+  final Widget child;
+
+  const _NavLabelFit({required this.labels, required this.child});
+
+  /// Air kept on each side of the widest label, so two neighbours never touch.
+  static const double _sideGap = 2;
+
+  /// The SDK already stops the bar's labels here (`navigation_bar.dart`).
+  static const double _sdkCeiling = 1.3;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = NavigationBarTheme.of(context)
+        .labelTextStyle
+        ?.resolve(const {WidgetState.selected});
+    final size = style?.fontSize;
+    if (style == null || size == null || labels.isEmpty) return child;
+    final reader =
+        (MediaQuery.textScalerOf(context).scale(size) / size)
+            .clamp(1.0, _sdkCeiling);
+    if (reader <= 1.0) return child;
+
+    var widest = 0.0;
+    for (final label in labels) {
+      final painter = TextPainter(
+        text: TextSpan(text: label, style: style),
+        textDirection: Directionality.of(context),
+        maxLines: 1,
+      )..layout();
+      if (painter.width > widest) widest = painter.width;
+      painter.dispose();
+    }
+    if (widest <= 0) return child;
+    final slot =
+        MediaQuery.sizeOf(context).width / labels.length - 2 * _sideGap;
+    final ceiling = (slot / widest).clamp(1.0, reader);
+    if (ceiling >= reader) return child;
+    return MediaQuery.withClampedTextScaling(
+        maxScaleFactor: ceiling, child: child);
+  }
 }

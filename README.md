@@ -233,7 +233,7 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
 ## Casco e deep links (lote 1 — PR2)
 
 - **Navegação:** `go_router` com `StatefulShellRoute` — os mesmos 4 destinos do NavMenu
-  web (Calendário, Família, Avisos, Relatórios); cada lote trocou um placeholder pelo
+  web (Calendário, Família, Notificações, Relatórios); cada lote trocou um placeholder pelo
   miolo real, e com Relatórios (lote 6) não sobrou nenhum. Guard estilo S-02 no `redirect`: tudo é
   protegido exceto `/login`, `/reset-password` e `/update-password`. Desde o F-57 há uma
   quarta fase de auth: sessão validada SEM perfil (cadastro Google diferido) fica confinada

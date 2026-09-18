@@ -12,7 +12,7 @@
 /// channels agree on the destination.
 ///
 /// **Why it needs a gate.** The failure is silent and one-directional. Move a
-/// type from "Histórico" to "Para você" in Dart and the web keeps opening the
+/// type from "Todas" to "Para você" in Dart and the web keeps opening the
 /// old tab: a real screen, with real rows, that simply is not the one the
 /// notice was about — the exact complaint that produced [PushRouting] in the
 /// first place (owner, on the first device round of F-09). Nothing throws,
@@ -68,7 +68,7 @@ void main() {
   test('the worker sends every pushable type to the tab Dart would', () {
     // The authority on WHICH types can arrive at all. Reading it here rather
     // than hard-coding a list is what makes a new pushable type fail this
-    // suite instead of silently defaulting to Histórico on one channel only.
+    // suite instead of silently defaulting to Todas on one channel only.
     final pushTypes = _stringList(
       repoFile(_sender),
       RegExp(r'PUSH_TYPES: readonly string\[\] = \[([^\]]*)\]'),
@@ -87,7 +87,7 @@ void main() {
     }
   });
 
-  test('an unknown type falls to Histórico on both sides', () {
+  test('an unknown type falls to Todas on both sides', () {
     // The rule that makes a future writer's notice harmless: the wrong guess
     // in this direction shows a full list instead of an empty one.
     const unknown = 'some_type_no_release_has_shipped_yet';

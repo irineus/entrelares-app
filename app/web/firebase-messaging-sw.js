@@ -108,7 +108,7 @@ const FIREBASE_CONFIG = {
 
 // The MIRROR of `PushRouting` (packages/entrelares_core) — the types that leave
 // the recipient with something to DO, and therefore land on "Para você" instead
-// of "Histórico". It is duplicated here for the same reason `_shared/push.ts`
+// of "Todas". It is duplicated here for the same reason `_shared/push.ts`
 // duplicates the copy catalog: a click on a notification is handled by a
 // service worker, which cannot call Dart. `push_routing_worker_mirror_test`
 // reads THIS file and compares it against `PushRouting.landingFor` for every

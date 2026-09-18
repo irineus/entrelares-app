@@ -19,7 +19,7 @@ void main() {
           NotificationLanding.incoming);
     });
 
-    test('every receipt opens on "Histórico"', () {
+    test('every receipt opens on "Todas"', () {
       // These are about requests that are already closed. "Para você" lists
       // OPEN requests, so it is empty for exactly these — the person taps a
       // notice and arrives at "nada pendente", which reads as the app having
@@ -38,7 +38,7 @@ void main() {
       }
     });
 
-    test('an unknown or missing type falls to "Histórico"', () {
+    test('an unknown or missing type falls to "Todas"', () {
       // A future writer's notice is a receipt until somebody decides
       // otherwise, and the wrong guess this way shows a full list rather than
       // an empty one.

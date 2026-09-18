@@ -291,7 +291,8 @@ void main() {
     // English reader: the SAME row renders in English (U-13), date per U-24.
     await tester.pumpWidget(notifApp(ds, badge, language: AppLanguage.en));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('History'));
+    await tester.tap(
+        find.text(Localization(AppLanguage.en)[K.notifTabHistory]));
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
@@ -346,7 +347,7 @@ void main() {
 // "nada pendente para você", which reads as the app having lost what it just
 // told them. `PushRouting` decides the tab; these prove the screen obeys it.
 void _landingTests() {
-  testWidgets('a receipt lands on Histórico, where its row always is',
+  testWidgets('a receipt lands on Todas, where its row always is',
       (tester) async {
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
       ..notifications = [

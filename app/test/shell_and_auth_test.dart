@@ -100,7 +100,13 @@ void main() {
       await tester.tap(find.text(pt[K.navNotificationsShort]));
       await tester.pumpAndSettle();
 
-      expect(find.text(pt[K.navNotifications]), findsOneWidget);
+      // U-34: the tab and its screen's title are the same word now, so the
+      // title is looked for where a title lives.
+      expect(
+          find.descendant(
+              of: find.byType(AppBar),
+              matching: find.text(pt[K.navNotifications])),
+          findsOneWidget);
       expect(
           find.text(pt[KApp.shellUnderConstructionTitle]), findsOneWidget);
 

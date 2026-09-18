@@ -1,4 +1,4 @@
-// U-28 — the Avisos and Relatórios pass: the two event logs get their rail
+// U-28 — the Notificações and Relatórios pass: the two event logs get their rail
 // back, the summary gets its colour back, and each report tab names itself.
 import 'package:entrelares_app/screens/reports_screen.dart';
 import 'package:entrelares_app/theme/app_theme.dart';

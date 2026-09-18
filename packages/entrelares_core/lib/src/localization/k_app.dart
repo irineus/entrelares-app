@@ -513,31 +513,31 @@ abstract final class StringsAppPtBr {
     KApp.profEditData: 'Editar dados',
     KApp.profPasswordSummary:
         'Senha definida. Altere aqui ou redefina por e-mail.',
-    KApp.pushTitle: 'Avisos no celular',
+    KApp.pushTitle: 'Notificações no celular',
     KApp.pushHintOff:
-        'Receba um aviso quando alguém pedir uma troca ou responder a sua — '
+        'Receba uma notificação quando alguém pedir uma troca ou responder a sua — '
             'mesmo com o app fechado.',
-    KApp.pushHintOn: 'Este aparelho recebe avisos de trocas e prazos.',
+    KApp.pushHintOn: 'Este aparelho recebe notificações de trocas e prazos.',
     KApp.pushHintBlocked:
         'As notificações estão bloqueadas para o Entrelares nas configurações '
-            'do seu aparelho. Libere-as por lá para voltar a receber avisos.',
+            'do seu aparelho. Libere-as por lá para voltar a recebê-las.',
     KApp.pushHintUnsupported:
-        'Avisos no celular funcionam no aplicativo instalado. Aqui no '
+        'Notificações no celular funcionam no aplicativo instalado. Aqui no '
             'navegador, você continua vendo tudo nesta tela e por e-mail.',
-    KApp.pushEnable: 'Ativar avisos',
+    KApp.pushEnable: 'Ativar notificações',
     KApp.pushDisable: 'Desativar',
-    KApp.pushToastOn: 'Avisos ativados neste aparelho.',
-    KApp.pushToastOff: 'Avisos desativados neste aparelho.',
+    KApp.pushToastOn: 'Notificações ativadas neste aparelho.',
+    KApp.pushToastOff: 'Notificações desativadas neste aparelho.',
     KApp.pushErrEnable:
-        'Não foi possível ativar os avisos agora. Você continua recebendo '
+        'Não foi possível ativar as notificações agora. Você continua recebendo '
             'tudo nesta tela e por e-mail.',
-    KApp.onbStepPushTitle: 'Ativar avisos no celular',
+    KApp.onbStepPushTitle: 'Ativar notificações no celular',
     KApp.onbStepPushHint:
-        'Uma troca costuma ser pedida em cima da hora. Com os avisos ligados '
+        'Uma troca costuma ser pedida em cima da hora. Com as notificações ligadas '
             'você fica sabendo na mesma hora, mesmo com o app fechado.',
     KApp.onbStepPushDoneHint:
-        'Este aparelho avisa você sobre pedidos de troca e prazos.',
-    KApp.onbStepPushAction: 'Ativar avisos',
+        'Este aparelho notifica você sobre pedidos de troca e prazos.',
+    KApp.onbStepPushAction: 'Ativar notificações',
     KApp.famPendingBadge: 'Ainda não entrou',
     KApp.famPendingHint:
         'Sem conta ainda: você planeja os dias dessa pessoa, e as trocas '
@@ -725,31 +725,31 @@ abstract final class StringsAppEn {
     KApp.profEditData: 'Edit details',
     KApp.profPasswordSummary:
         'Password set. Change it here or reset it by e-mail.',
-    KApp.pushTitle: 'Phone alerts',
+    KApp.pushTitle: 'Phone notifications',
     KApp.pushHintOff:
-        'Get an alert when someone asks for a swap, or answers yours — even '
+        'Get a notification when someone asks for a swap, or answers yours — even '
             'with the app closed.',
-    KApp.pushHintOn: 'This device receives swap and deadline alerts.',
+    KApp.pushHintOn: 'This device receives swap and deadline notifications.',
     KApp.pushHintBlocked:
         'Notifications are blocked for Entrelares in your device settings. '
-            'Allow them there to start receiving alerts again.',
+            'Allow them there to start receiving them again.',
     KApp.pushHintUnsupported:
-        'Phone alerts work in the installed app. Here in the browser you '
+        'Phone notifications work in the installed app. Here in the browser you '
             'still see everything on this screen and by e-mail.',
-    KApp.pushEnable: 'Turn alerts on',
+    KApp.pushEnable: 'Turn notifications on',
     KApp.pushDisable: 'Turn off',
-    KApp.pushToastOn: 'Alerts are on for this device.',
-    KApp.pushToastOff: 'Alerts are off for this device.',
+    KApp.pushToastOn: 'Notifications are on for this device.',
+    KApp.pushToastOff: 'Notifications are off for this device.',
     KApp.pushErrEnable:
-        'Could not turn alerts on right now. You still get everything on this '
+        'Could not turn notifications on right now. You still get everything on this '
             'screen and by e-mail.',
-    KApp.onbStepPushTitle: 'Turn on phone alerts',
+    KApp.onbStepPushTitle: 'Turn on phone notifications',
     KApp.onbStepPushHint:
-        'A swap is usually asked for at short notice. With alerts on you hear '
+        'A swap is usually asked for at short notice. With notifications on you hear '
             'about it right away, even with the app closed.',
     KApp.onbStepPushDoneHint:
-        'This device alerts you about swap requests and deadlines.',
-    KApp.onbStepPushAction: 'Turn alerts on',
+        'This device notifies you about swap requests and deadlines.',
+    KApp.onbStepPushAction: 'Turn notifications on',
     KApp.famPendingBadge: 'Not joined yet',
     KApp.famPendingHint:
         'No account yet: you plan this person\'s days, and swaps become '

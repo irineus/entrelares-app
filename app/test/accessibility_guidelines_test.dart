@@ -37,7 +37,7 @@
 // 4. WHAT THE DEVICE HEARD — the owner's TalkBack pass (18/09/2026, the
 //    other half of U-32) found three things no guideline measures, pinned
 //    here so they stay fixed: an avatar's initial read before the name ("I,
-//    Irineu…"), the bell badge read as a bare "2" before "Avisos", and an
+//    Irineu…"), the bell badge read as a bare "2" before "Notificações", and an
 //    audit diff whose struck (removed) value was read as if current — the
 //    strikethrough and the red/green were the only vector.
 //
@@ -764,7 +764,7 @@ void main() {
       expect(
         find.bySemanticsLabel(RegExp(r'^2$')),
         findsNothing,
-        reason: 'the reader heard "2" and then "Avisos"',
+        reason: 'the reader heard "2" and then "Notificações"',
       );
       expect(
         find.bySemanticsLabel(

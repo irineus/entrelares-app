@@ -224,7 +224,7 @@ abstract class CustodyDataSource {
   /// snapshot reference, or an old_data-less snapshot).
   Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate);
 
-  /// My notifications, newest 100 — the "Histórico" tab.
+  /// My notifications, newest 100 — the "Todas" tab.
   Future<List<AppNotification>> fetchNotifications(int myProfileId);
 
   /// Opening the Notifications page marks EVERYTHING read (web parity) — one
