@@ -35,9 +35,9 @@ class NotificationsScreen extends StatefulWidget {
   final CustodyDataSource dataSource;
   final NotificationBadge badge;
 
-  /// F-09. Null on a build with no push transport at all — the card then says
-  /// so rather than disappearing, because "where are my alerts?" is a question
-  /// a blank space answers badly.
+  /// F-09. Null on a build with no push transport at all — the screen then says
+  /// so (U-43: a line after the list) rather than staying silent, because
+  /// "where are my alerts?" is a question a blank space answers badly.
   final PushService? push;
 
   /// F-09: which tab a TAPPED notification asked for ([PushRouting]).
@@ -61,6 +61,13 @@ class NotificationsScreen extends StatefulWidget {
       this.push,
       this.landing,
       this.landingNonce});
+
+  /// U-43 — the three shapes of the push control, so a test finds each without
+  /// a localized finder: the app-bar icon (on), the sheet's way out, and the
+  /// line after the list (blocked / unsupported).
+  static const pushStatusKey = Key('push-status');
+  static const pushDisableKey = Key('push-disable');
+  static const pushFooterKey = Key('push-footer');
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -104,6 +111,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _applyLanding();
+    widget.push?.addListener(_onPushChanged);
     _init();
   }
 
@@ -111,6 +119,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void didUpdateWidget(NotificationsScreen old) {
     super.didUpdateWidget(old);
     if (widget.landingNonce != old.landingNonce) _applyLanding();
+    if (widget.push != old.push) {
+      old.push?.removeListener(_onPushChanged);
+      widget.push?.addListener(_onPushChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.push?.removeListener(_onPushChanged);
+    super.dispose();
+  }
+
+  /// U-43: WHERE the push control sits now depends on its state, so a state
+  /// that settles after this screen mounted (the service is still reading the
+  /// permission) has to move it — not wait for the next unrelated rebuild.
+  void _onPushChanged() {
+    if (mounted) setState(() {});
   }
 
   /// F-09 — a tapped notification chooses the tab.
@@ -209,7 +234,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Scaffold(
       appBar: AppBar(
           title: Text(l[K.notifPageTitle]),
-          actions: const [AppAccountButton()]),
+          actions: [
+            // U-43: with push ON the control is this icon, not a card — the
+            // first fold belongs to the list.
+            if (_pushState == PushState.on)
+              IconButton(
+                key: NotificationsScreen.pushStatusKey,
+                icon: const Icon(Icons.notifications_active_outlined),
+                tooltip: l[KApp.pushStatusOnTooltip],
+                onPressed: () => _openPushSheet(l),
+              ),
+            const AppAccountButton(),
+          ]),
       body: Column(
         children: [
           Padding(
@@ -229,7 +265,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               onChanged: (v) => setState(() => _tab = v),
             ),
           ),
-          _pushCard(l),
+          if (_pushState == PushState.off) _pushCard(l),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
@@ -254,7 +290,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   onPressed: _loadAll,
                                   child: Text(l[K.layoutErrorReload])),
                             ]),
-                          )
+                          ),
+                          ..._pushFooter(l),
                         ])
                       : switch (_tab) {
                           _Tab.incoming => _incomingTab(l),
@@ -277,33 +314,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// about — the one moment where "get these on your phone" answers a question
   /// they already have.
   ///
-  /// Every state renders something, including the two that offer no button.
-  /// A blocked permission and a browser both look identical to a card that
-  /// hides itself: alerts that never come, and no explanation anywhere.
+  /// U-43 — the control keeps this home and changes SHAPE with its state. Only
+  /// OFF is a card above the list: it is a nudge, and it sits over exactly the
+  /// list it promises. ON is an icon in the app bar ([_openPushSheet]); blocked
+  /// and unsupported are a quiet line after the list ([_pushFooter]). Before,
+  /// all four were this card, on every visit — a settings row holding the first
+  /// fold of a screen whose purpose is the list.
+  ///
+  /// Every state still renders something. A blocked permission and a browser
+  /// both look identical to a control that hides itself: alerts that never
+  /// come, and no explanation anywhere.
+  PushState get _pushState => widget.push?.state ?? PushState.unsupported;
+
   Widget _pushCard(Localization l) {
-    final push = widget.push;
-    final state = push?.state ?? PushState.unsupported;
-
-    final (String hint, Widget? action) = switch (state) {
-      PushState.on => (
-          l[KApp.pushHintOn],
-          TextButton(
-              onPressed: () => _setPush(l, on: false),
-              child: Text(l[KApp.pushDisable]))
-        ),
-      PushState.off => (
-          l[KApp.pushHintOff],
-          FilledButton(
-              onPressed: () => _setPush(l, on: true),
-              child: Text(l[KApp.pushEnable]))
-        ),
-      // No button on purpose: the OS will not show the dialog again, so a
-      // button here would do nothing when pressed — the failure that makes an
-      // app look broken while it behaves exactly as designed.
-      PushState.blocked => (l[KApp.pushHintBlocked], null),
-      PushState.unsupported => (l[KApp.pushHintUnsupported], null),
-    };
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, Spacing.sm),
       child: AppCard(
@@ -311,15 +334,78 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(hint, style: Theme.of(context).textTheme.bodySmall),
-            if (action != null) ...[
-              const SizedBox(height: Spacing.sm),
-              Align(alignment: Alignment.centerLeft, child: action),
-            ],
+            Text(l[KApp.pushHintOff],
+                style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: Spacing.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton(
+                  onPressed: () => _setPush(l, on: true),
+                  child: Text(l[KApp.pushEnable])),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  /// U-43 — push is ON: the state and the way out, two taps from any tab.
+  Future<void> _openPushSheet(Localization l) async {
+    final disable = await showAppSheet<bool>(
+      context: context,
+      builder: (sheetContext) => AppSheetFrame(
+        title: l[KApp.pushTitle],
+        onClose: () => Navigator.of(sheetContext).pop(),
+        closeLabel: l[K.commonClose],
+        extraAction: OutlinedButton.icon(
+          key: NotificationsScreen.pushDisableKey,
+          onPressed: () => Navigator.of(sheetContext).pop(true),
+          icon: const Icon(Icons.notifications_off_outlined),
+          label: Text(l[KApp.pushDisable]),
+        ),
+        children: [Text(l[KApp.pushHintOn])],
+      ),
+    );
+    if (disable == true && mounted) await _setPush(l, on: false);
+  }
+
+  /// U-43 — blocked / unsupported: the explanation, as the LAST item of
+  /// whatever the tab shows (the empty state and the load error included).
+  ///
+  /// No button on purpose: the OS will not show the dialog again, so a button
+  /// here would do nothing when pressed — the failure that makes an app look
+  /// broken while it behaves exactly as designed.
+  List<Widget> _pushFooter(Localization l) {
+    final hint = switch (_pushState) {
+      PushState.blocked => l[KApp.pushHintBlocked],
+      PushState.unsupported => l[KApp.pushHintUnsupported],
+      PushState.on || PushState.off => null,
+    };
+    if (hint == null) return const [];
+    final muted = context.tokens.textMuted;
+    return [
+      Padding(
+        key: NotificationsScreen.pushFooterKey,
+        padding: const EdgeInsets.fromLTRB(
+            Spacing.md, Spacing.sm, Spacing.md, Spacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExcludeSemantics(
+                child: Icon(Icons.notifications_off_outlined,
+                    size: 18, color: muted)),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(hint,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: muted)),
+            ),
+          ],
+        ),
+      ),
+    ];
   }
 
   Future<void> _setPush(Localization l, {required bool on}) async {
@@ -355,6 +441,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         children: [
           const SizedBox(height: Spacing.md),
           AppEmptyState(icon: icon, title: l[textKey]),
+          ..._pushFooter(l),
         ],
       );
 
@@ -464,6 +551,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       children: [
         for (final req in _incoming) _incomingRow(req, now, l),
         const SizedBox(height: 12),
+        ..._pushFooter(l),
       ],
     );
   }
@@ -504,6 +592,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       children: [
         for (final req in _sent) _sentRow(req, now, l),
         const SizedBox(height: 12),
+        ..._pushFooter(l),
       ],
     );
   }
@@ -572,6 +661,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       children: [
         for (final notif in _history) _historyItem(notif, l),
         const SizedBox(height: 12),
+        ..._pushFooter(l),
       ],
     );
   }
