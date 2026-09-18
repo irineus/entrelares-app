@@ -430,8 +430,11 @@ regras e ~0% do visual — por um sistema de tokens. O que ela estabelece:
   `color` e `background-color` explícitos, contraste AA e nenhuma superfície escura — a faixa
   e o botão `#212529` do convite sumiam em cliente de e-mail no tema escuro.
 - **Modo escuro entrou JUNTO com os tokens**, seguindo o sistema
-  (`themeMode: ThemeMode.system`). Uma chave visível para o usuário é a U-12, não este
-  item. O único desvio da tabela de tokens do registro: no escuro o indigo da marca clareia
+  (`themeMode: ThemeMode.system`). A chave visível para o usuário era a U-12 e **saiu em
+  18/09/2026**: o card *Aparência* no perfil (Claro/Escuro/Sistema), guardado em
+  `shared_preferences` por aparelho e lido antes do primeiro frame — `themeMode` passou a
+  vir do `Appearance` (`lib/services/appearance.dart`), e "Sistema" é uma das três
+  respostas, não a ausência de uma. O único desvio da tabela de tokens do registro: no escuro o indigo da marca clareia
   para `#818CF8` — `#4F46E5` sobre `#111827` mede 2,3:1 e deixaria todo rótulo acentuado
   ilegível. Mesma matiz, tom legível.
 - **`ColorScheme` escrito à mão**, nunca `fromSeed`: semear a partir do indigo tinge todos
