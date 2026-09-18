@@ -147,8 +147,13 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # Também fora de mirrors/, desde o U-34 (18/09/2026), vocabulary_test lê os DOIS catálogos
 # como conjunto: a aba do shell e o título da tela são a mesma palavra, nenhuma aba interna
 # repete rótulo de outra ("Histórico" é só a trilha de auditoria; a de Notificações é
-# "Todas"), o que o sistema envia é "notificação"/"notification" — "aviso" está RESERVADO
-# ao F-52 e "alert" não nomeia push —, e scheduled_parent é "planejado", nunca "agendado".
+# "Todas"), o que o sistema envia é "notificação"/"notification" — e "alert" não nomeia
+# push —, e scheduled_parent é "planejado", nunca "agendado".
+# Desde o F-52 (18/09/2026) a reserva de "aviso" foi GASTA e a asserção inverteu: a palavra
+# é um ENDEREÇO — as chaves `app.notice.*` e `notifRender.dayNotice.*`, e mais nenhuma (o
+# sobrevivente é o tooltip que fecha uma faixa). Um segundo teste prende a metade que
+# apodrece calada: a superfície do F-52 tem de continuar se chamando aviso, senão o
+# glossário aponta para o vazio e o primeiro teste fica verde sobre nada.
 # String nova com uma dessas palavras derruba o lane core; as exceções são presas pelo nome
 # da chave. O glossário do produto mora na subpágina Design system and UX.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
