@@ -41,6 +41,13 @@ export const PUSH_TYPES: readonly string[] = [
 	"revert_approved",
 	"revert_rejected",
 	"revert_cancelled",
+	// F-52. Only the avisos that ASK for something reach this module at all: the
+	// trigger filters `params.kind` to `pickup` and `keep` before it calls, so a
+	// courtesy note, an answer and a cancellation stay in-app. That split cannot
+	// live here — `landingFor` routes by TYPE, so every pushable `day_notice`
+	// lands on "Para você", and a receipt landing there would show an empty tab,
+	// which is the exact defect PushRouting exists to prevent.
+	"day_notice",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -73,6 +80,18 @@ const K = {
 	revertApproved: "notifRender.revertApproved",
 	revertRejected: "notifRender.revertRejected",
 	revertCancelled: "notifRender.revertCancelled",
+
+	titleDayNotice: "notifRender.title.dayNotice",
+	dayNoticeInfo: "notifRender.dayNotice.info",
+	dayNoticePickup: "notifRender.dayNotice.pickup",
+	dayNoticeKeep: "notifRender.dayNotice.keep",
+	dayNoticeReasonDelay: "notifRender.dayNotice.reason.delay",
+	dayNoticeReasonMedical: "notifRender.dayNotice.reason.medical",
+	dayNoticeReasonTraffic: "notifRender.dayNotice.reason.traffic",
+	dayNoticeReasonOther: "notifRender.dayNotice.reason.other",
+	dayNoticeEtaMinutes: "notifRender.dayNotice.eta.minutes",
+	dayNoticeEtaNone: "notifRender.dayNotice.eta.none",
+	dayNoticeNoteSuffix: "notifRender.dayNotice.noteSuffix",
 
 	msgSuffix: "notifRender.msgSuffix",
 	tagUrgent: "notifRender.tag.urgent",
@@ -112,6 +131,17 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.revertApproved": "{0} confirmou a reversão da troca do dia {1}. O calendário voltou ao normal.{2}",
 		"notifRender.revertRejected": "{0} recusou reverter a troca do dia {1}.{2} A troca permanece ativa.",
 		"notifRender.revertCancelled": "O pedido de reversão da troca do dia {0} foi cancelado.",
+		"notifRender.title.dayNotice": "Aviso de imprevisto",
+		"notifRender.dayNotice.info": "{0} avisou que {1}{2}.{3}",
+		"notifRender.dayNotice.pickup": "{0} avisou que {1}{2} e precisa que alguém busque a criança.{3}",
+		"notifRender.dayNotice.keep": "{0} avisou que {1}{2} e precisa que alguém fique com a criança hoje.{3}",
+		"notifRender.dayNotice.reason.delay": "vai atrasar",
+		"notifRender.dayNotice.reason.medical": "teve um imprevisto médico",
+		"notifRender.dayNotice.reason.traffic": "está preso no trânsito",
+		"notifRender.dayNotice.reason.other": "teve um imprevisto",
+		"notifRender.dayNotice.eta.minutes": " (cerca de {0} min)",
+		"notifRender.dayNotice.eta.none": " (sem previsão)",
+		"notifRender.dayNotice.noteSuffix": " \"{0}\"",
 		"notifRender.msgSuffix": " Mensagem: {0}",
 		"notifRender.tag.urgent": "URGENTE: ",
 		"notifRender.tag.overdue": "ATRASADO: ",
@@ -144,6 +174,17 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.revertApproved": "{0} confirmed the revert of the swap for {1}. The calendar is back to normal.{2}",
 		"notifRender.revertRejected": "{0} declined to revert the swap for {1}.{2} The swap stays active.",
 		"notifRender.revertCancelled": "The revert request for the swap on {0} was cancelled.",
+		"notifRender.title.dayNotice": "Notice about today",
+		"notifRender.dayNotice.info": "{0} let you know they {1}{2}.{3}",
+		"notifRender.dayNotice.pickup": "{0} let you know they {1}{2} and need someone to collect the child.{3}",
+		"notifRender.dayNotice.keep": "{0} let you know they {1}{2} and need someone to keep the child today.{3}",
+		"notifRender.dayNotice.reason.delay": "are running late",
+		"notifRender.dayNotice.reason.medical": "have a medical emergency",
+		"notifRender.dayNotice.reason.traffic": "are stuck in traffic",
+		"notifRender.dayNotice.reason.other": "ran into a problem",
+		"notifRender.dayNotice.eta.minutes": " (about {0} min)",
+		"notifRender.dayNotice.eta.none": " (no estimate)",
+		"notifRender.dayNotice.noteSuffix": " \"{0}\"",
 		"notifRender.msgSuffix": " Message: {0}",
 		"notifRender.tag.urgent": "URGENT: ",
 		"notifRender.tag.overdue": "OVERDUE: ",
@@ -309,6 +350,52 @@ export function renderPush(
 			titleKey = K.titleRevertCancelled;
 			body = fmt(lang, K.revertCancelled, [date]);
 			break;
+
+		// F-52. The reason and the estimate are VALUES, woven into the request's
+		// own template — the same composition `noticeSentence` does in Dart, which
+		// is why the push and the row the reader then opens say the same thing.
+		// An unknown `reason` or `request` is a FUTURE writer's, and a push that
+		// cannot be built is DROPPED rather than guessed: the person still gets
+		// the notification in the app.
+		case "day_notice": {
+			const reasonKey = ({
+				atraso: K.dayNoticeReasonDelay,
+				medico: K.dayNoticeReasonMedical,
+				transito: K.dayNoticeReasonTraffic,
+				outro: K.dayNoticeReasonOther,
+			} as Record<string, string>)[params["reason"] ?? ""];
+			const templateKey = ({
+				info: K.dayNoticeInfo,
+				pickup: K.dayNoticePickup,
+				keep: K.dayNoticeKeep,
+			} as Record<string, string>)[kind ?? ""];
+			if (reasonKey === undefined || templateKey === undefined) return null;
+
+			const eta = params["eta"];
+			// Absent is a VALUE here, not a gap: it is what tells the reader
+			// nobody knows when this ends, and it is the state in which somebody
+			// may offer to take the day.
+			const etaClause = eta === undefined || eta === ""
+				? fmt(lang, K.dayNoticeEtaNone)
+				: fmt(lang, K.dayNoticeEtaMinutes, [eta]);
+
+			// The sender's own line is QUOTED, never labelled: "Mensagem" belongs
+			// to F-44 and "Observação" to the day note, and an aviso borrowing
+			// either word is the blurring U-34 exists to stop.
+			const noteText = params["note"];
+			const noteSuffix = !noteText || noteText.trim() === ""
+				? ""
+				: fmt(lang, K.dayNoticeNoteSuffix, [noteText]);
+
+			titleKey = K.titleDayNotice;
+			body = fmt(lang, templateKey, [
+				name ?? otherCap(),
+				fmt(lang, reasonKey),
+				etaClause,
+				noteSuffix,
+			]);
+			break;
+		}
 
 		default:
 			return null;

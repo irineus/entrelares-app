@@ -21,6 +21,8 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 
 import 'calendar_slice_test.dart';
+import 'notifications_test.dart' show notifApp;
+import 'package:entrelares_app/services/notification_badge.dart';
 
 final _pt = Localization(AppLanguage.ptBr);
 
@@ -359,6 +361,8 @@ void main() {
     });
   });
 
+  group('"Para você" (PR 3)', paraVoceTests);
+
   // The cap is stated before it blocks — a limit that only announces itself by
   // refusing reads as a bug.
   testWidgets('the cap is said, then it blocks', (tester) async {
@@ -381,5 +385,65 @@ void main() {
         find.widgetWithText(FilledButton, _pt[KApp.noticeSend]));
     expect(send.onPressed, isNull);
     expect(ds.sentNotices, isEmpty);
+  });
+}
+
+// ── "Para você" (PR 3) ──────────────────────────────────────────────────────
+//
+// A push of type `day_notice` lands on this tab — `PushRouting.landingFor`
+// routes by TYPE alone, on both channels. So an aviso that reaches a phone and
+// is NOT listed here is precisely the empty-tab defect that rule exists to
+// prevent: a person taps a notice saying somebody needs them and arrives at
+// "nada pendente para você".
+void paraVoceTests() {
+  testWidgets('an open aviso is listed in "Para você" and counted on the tab',
+      (tester) async {
+    final ds = FakeCustodyDataSource(
+        members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)])
+      ..dayNotices = [_notice(id: 9, sender: 2, request: 'pickup')];
+    await tester.pumpWidget(notifApp(ds, NotificationBadge(ds)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('day-notice-9')), findsOneWidget);
+    expect(find.textContaining('(1)'), findsWidgets);
+  });
+
+  // "Só avisando" asks nothing, so it is not something waiting on this reader.
+  // It is never pushed either — the trigger filters the kind — and the two
+  // rules have to agree or the tab fills with rows nobody can act on.
+  testWidgets('an info aviso is not something waiting on you', (tester) async {
+    final ds = FakeCustodyDataSource(
+        members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)])
+      ..dayNotices = [_notice(id: 9, sender: 2, request: 'info')];
+    await tester.pumpWidget(notifApp(ds, NotificationBadge(ds)));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('day-notice-9')), findsNothing);
+  });
+
+  testWidgets('my own aviso is not waiting on me either', (tester) async {
+    final ds = FakeCustodyDataSource(
+        members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)])
+      ..dayNotices = [_notice(id: 9, sender: 1, request: 'keep')];
+    await tester.pumpWidget(notifApp(ds, NotificationBadge(ds)));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('day-notice-9')), findsNothing);
+  });
+
+  testWidgets('tapping it answers it', (tester) async {
+    final ds = FakeCustodyDataSource(
+        members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)])
+      ..dayNotices = [_notice(id: 9, sender: 2, request: 'keep')];
+    await tester.pumpWidget(notifApp(ds, NotificationBadge(ds)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('day-notice-9')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(_pt[KApp.noticeAnswerKeeping]));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.widgetWithText(FilledButton, _pt[KApp.noticeAnswerSend]));
+    await tester.pumpAndSettle();
+
+    expect(ds.answeredNotices.single.outcome, 'keeping');
   });
 }

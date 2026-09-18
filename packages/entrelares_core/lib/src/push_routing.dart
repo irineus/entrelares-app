@@ -38,6 +38,13 @@ abstract final class PushRouting {
     'swap_requested',
     'revert_requested',
     'auto_reminder',
+    // F-52. Only the avisos that ASK for something are ever pushed — the
+    // trigger filters on `params.kind`, so a courtesy note, an answer and a
+    // cancellation never reach a phone. That filter is what makes this entry
+    // safe: routing is by TYPE alone, so every `day_notice` that arrives here
+    // is one with an open question on it, and "Para você" is where the answer
+    // is given.
+    'day_notice',
   };
 
   /// Where a push of [type] should land. Unknown types go to Todas: a

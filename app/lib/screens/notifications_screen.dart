@@ -4,6 +4,7 @@ import '../widgets/ui/ui.dart';
 import '../theme/tokens.dart';
 
 import 'package:entrelares_db_contracts/models/app_notification.dart';
+import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
 import '../services/connectivity_status.dart';
@@ -13,6 +14,7 @@ import '../services/push_service.dart';
 import '../widgets/account_button.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
+import 'notice_sheet.dart';
 import 'frozen_day_sheet.dart';
 
 /// The Notifications page — port of `Notifications.razor`: three tabs
@@ -104,6 +106,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<Member> _allProfiles = const [];
   Member? _ownProfile;
   List<SwapRequest> _incoming = const [];
+
+  /// F-52: the avisos about TODAY that are still open, are somebody else's and
+  /// ASK for something. They sit in "Para você" because that is the tab a push
+  /// of this type opens — `PushRouting.landingFor` routes by type alone, so a
+  /// notice that arrives on this phone and is not listed here is exactly the
+  /// empty-tab defect that rule exists to prevent.
+  List<DayNotice> _openNotices = const [];
   List<SwapRequest> _sent = const [];
   List<AppNotification> _history = const [];
 
@@ -175,6 +184,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           me == null ? <SwapRequest>[] : await widget.dataSource.fetchPendingForMe(me.id);
       final sent =
           me == null ? <SwapRequest>[] : await widget.dataSource.fetchSentRequests(me.id);
+      // Best-effort: the notifications page must not fail to open because an
+      // aviso could not be counted.
+      var notices = <DayNotice>[];
+      if (me != null) {
+        try {
+          notices = [
+            for (final n in await widget.dataSource
+                .fetchDayNotices(DateTime.now()))
+              if (n.isOpen &&
+                  n.senderProfileId != me.id &&
+                  NoticeRequest.fromWire(n.request) != null &&
+                  NoticeRequest.fromWire(n.request) != NoticeRequest.info)
+                n
+          ];
+        } catch (_) {/* keep the page */}
+      }
       final history = me == null
           ? <AppNotification>[]
           : await widget.dataSource.fetchNotifications(me.id);
@@ -183,6 +208,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _allProfiles = profiles;
         _ownProfile = me;
         _incoming = incoming;
+        _openNotices = notices;
         _sent = sent;
         _history = history;
         _loading = false;
@@ -254,9 +280,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               options: [
                 (
                   value: _Tab.incoming,
-                  label: _incoming.isEmpty
+                  // F-52: an aviso waiting on an answer counts here too — the
+                  // number on the tab is "things asking something of you", and
+                  // leaving it out would put a row in a tab that claims to be
+                  // empty.
+                  label: _incoming.isEmpty && _openNotices.isEmpty
                       ? l[K.notifTabIncoming]
-                      : '${l[K.notifTabIncoming]} (${_incoming.length})'
+                      : '${l[K.notifTabIncoming]} '
+                          '(${_incoming.length + _openNotices.length})'
                 ),
                 (value: _Tab.sent, label: l[K.notifTabSent]),
                 (value: _Tab.history, label: l[K.notifTabHistory]),
@@ -544,16 +575,90 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // ── "Para você" ────────────────────────────────────────────────────────────
 
   Widget _incomingTab(Localization l) {
-    if (_incoming.isEmpty) return _empty(Icons.task_alt, K.notifEmptyIncoming, l);
+    if (_incoming.isEmpty && _openNotices.isEmpty) {
+      return _empty(Icons.task_alt, K.notifEmptyIncoming, l);
+    }
     final now = DateTime.now();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
+        // F-52 first, and not by accident: an aviso is about RIGHT NOW, and a
+        // swap request has 48 h. Sorting by urgency here means sorting by
+        // what the reader can still do something about.
+        for (final notice in _openNotices) _noticeRow(notice, l),
         for (final req in _incoming) _incomingRow(req, now, l),
         const SizedBox(height: 12),
         ..._pushFooter(l),
       ],
     );
+  }
+
+  /// F-52 — an open aviso, in the tab its push opens. The sentence is the one
+  /// `noticeSentence` composes, the same the card's strip and the notification
+  /// show; a second copy of it here is how "30 min" on one screen and "sem
+  /// previsão" on another both end up well-formed and disagreeing.
+  Widget _noticeRow(DayNotice notice, Localization l) {
+    final reason = NoticeReason.fromWire(notice.reason);
+    final request = NoticeRequest.fromWire(notice.request);
+    if (reason == null || request == null) return const SizedBox.shrink();
+    final theme = Theme.of(context).textTheme;
+    final sentence = noticeSentence(
+      l: l,
+      senderName: _nameOf(notice.senderProfileId) ??
+          l[K.notifRenderFbOtherCap],
+      reason: reason,
+      etaMinutes: notice.etaMinutes,
+      request: request,
+      note: notice.note,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.sm + Spacing.xs, vertical: Spacing.sm - 2),
+      child: AppCard(
+        key: ValueKey('day-notice-${notice.id}'),
+        onTap: () => _answerNotice(notice, sentence),
+        padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.md, vertical: Spacing.sm + Spacing.xs),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _rowHeader(l[K.notifRenderTitleDayNotice], [
+                    _statusBadge(l[KApp.noticeAnswerTitle],
+                        tone: context.tokens.warning),
+                  ]),
+                  const SizedBox(height: Spacing.xs),
+                  Text(sentence, style: theme.bodySmall),
+                ],
+              ),
+            ),
+            const SizedBox(width: Spacing.xs),
+            Icon(Icons.chevron_right,
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _answerNotice(DayNotice notice, String sentence) async {
+    final outcome = await showAnswerNoticeSheet(
+      context: context,
+      dataSource: widget.dataSource,
+      notice: notice,
+      sentence: sentence,
+    );
+    if (outcome == null || !mounted) return;
+    await _loadAll();
+    if (!mounted) return;
+    showAppSnack(
+        context,
+        AppL10n.of(context).l[outcome == NoticeOutcome.keeping
+            ? KApp.noticeAnsweredKeeping
+            : KApp.noticeAnsweredHelping]);
   }
 
   Widget _incomingRow(SwapRequest req, DateTime now, Localization l) {

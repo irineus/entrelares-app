@@ -113,7 +113,7 @@ const FIREBASE_CONFIG = {
 // service worker, which cannot call Dart. `push_routing_worker_mirror_test`
 // reads THIS file and compares it against `PushRouting.landingFor` for every
 // pushable type, so the two cannot drift.
-const ACTIONABLE_TYPES = ['swap_requested', 'revert_requested', 'auto_reminder'];
+const ACTIONABLE_TYPES = ['swap_requested', 'revert_requested', 'auto_reminder', 'day_notice'];
 
 /// Where a tapped notification lands — the same URL `main.dart` builds for the
 /// Android tap, which is what makes the two channels agree: the Notificações
