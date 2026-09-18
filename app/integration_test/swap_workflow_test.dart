@@ -297,7 +297,13 @@ void main() {
 
     await tester.tap(find.text(l[K.navNotificationsShort]));
     await tester.pumpAndSettle(const Duration(seconds: 8));
-    expect(find.text(l[K.notifPageTitle]), findsOneWidget);
+    // U-34: the tab and its screen's title are the same word, so the title is
+    // looked for where a title lives.
+    expect(
+        find.descendant(
+            of: find.byType(AppBar),
+            matching: find.text(l[K.notifPageTitle])),
+        findsOneWidget);
     // U-42 acceptance: the list carries NO action button of its own.
     expect(find.text(l[K.frozenApprove]), findsNothing);
     expect(find.text(l[K.frozenRejectAction]), findsNothing);

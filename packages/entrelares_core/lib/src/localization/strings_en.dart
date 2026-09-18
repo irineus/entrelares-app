@@ -106,7 +106,7 @@ abstract final class StringsEn {
     K.navCalendar: 'Calendar',
     K.navFamily: 'Family',
     K.navNotifications: 'Notifications',
-    K.navNotificationsShort: 'Alerts',
+    K.navNotificationsShort: 'Notifications',
     K.navNotificationsOnePending: 'Notifications, {0} pending',
     K.navNotificationsManyPending: 'Notifications, {0} pending',
     K.navReports: 'Reports',
@@ -761,7 +761,7 @@ abstract final class StringsEn {
     K.notifFilterAria: 'Notification filter',
     K.notifTabIncoming: 'For you',
     K.notifTabSent: 'Sent',
-    K.notifTabHistory: 'History',
+    K.notifTabHistory: 'All',
     K.notifEmptyIncoming: 'No requests waiting for you.',
     K.notifEmptySent: 'No requests sent.',
     K.notifEmptyHistory: 'No notifications yet.',
@@ -1069,6 +1069,6 @@ abstract final class StringsEn {
     K.tourWizardTitle: 'The rotation wizard',
     K.tourWizardBody: 'It fills a whole month from a pattern — every other week, alternating weekends, whatever your routine is. This is how you leave an empty calendar behind. It lives in the calendar\'s ⋮ menu, under "Rotation wizard".',
     K.tourNotificationsTitle: 'Requests arrive here',
-    K.tourNotificationsBody: 'When the other person asks for a swap, the notice shows up on this tab with a counter. It is also where your sent requests and the history live.',
+    K.tourNotificationsBody: 'When the other person asks for a swap, the notification shows up on this tab with a counter. It is also where your sent requests and every notification you received live.',
   };
 }

@@ -106,7 +106,9 @@ abstract final class StringsPtBr {
     K.navCalendar: 'Calendário',
     K.navFamily: 'Família',
     K.navNotifications: 'Notificações',
-    K.navNotificationsShort: 'Avisos',
+    // U-34: the tab says the word its screen's title says — and "Aviso" stays
+    // free for F-52. The shell keeps the label inside its slot at large text.
+    K.navNotificationsShort: 'Notificações',
     K.navNotificationsOnePending: 'Notificações, {0} pendente',
     K.navNotificationsManyPending: 'Notificações, {0} pendentes',
     K.navReports: 'Relatórios',
@@ -761,7 +763,9 @@ abstract final class StringsPtBr {
     K.notifFilterAria: 'Filtro de notificações',
     K.notifTabIncoming: 'Para você',
     K.notifTabSent: 'Enviadas',
-    K.notifTabHistory: 'Histórico',
+    // U-34: "Histórico" is the audit trail (Relatórios, the PDF); this tab is
+    // every notification the reader received.
+    K.notifTabHistory: 'Todas',
     K.notifEmptyIncoming: 'Nenhuma solicitação pendente para você.',
     K.notifEmptySent: 'Nenhuma solicitação enviada.',
     K.notifEmptyHistory: 'Nenhuma notificação ainda.',
@@ -1069,6 +1073,6 @@ abstract final class StringsPtBr {
     K.tourWizardTitle: 'O assistente de rotação',
     K.tourWizardBody: 'Preenche um mês inteiro a partir de um padrão — semana sim, semana não; fins de semana alternados; o que a sua rotina for. É por aqui que se sai de um calendário vazio. Fica no menu ⋮ do calendário, em "Assistente de rotação".',
     K.tourNotificationsTitle: 'Os pedidos chegam aqui',
-    K.tourNotificationsBody: 'Quando a outra pessoa pede uma troca, o aviso aparece nesta aba com um contador. É também onde ficam os seus pedidos enviados e o histórico.',
+    K.tourNotificationsBody: 'Quando a outra pessoa pede uma troca, a notificação aparece nesta aba com um contador. É também onde ficam os seus pedidos enviados e todas as notificações que você recebeu.',
   };
 }

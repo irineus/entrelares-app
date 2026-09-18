@@ -17,7 +17,7 @@ import 'frozen_day_sheet.dart';
 
 /// The Notifications page — port of `Notifications.razor`: three tabs
 /// ("Para você" = open requests where I am the approver, "Enviadas" = my
-/// newest 100 requests, "Histórico" = my newest 100 notification rows,
+/// newest 100 requests, "Todas" = my newest 100 notification rows,
 /// rebuilt in the READER's language by the NotificationRenderer). Opening the
 /// page marks everything read (web parity — one bulk PATCH); the F-45 diff
 /// list arrives with the audit mirror in lote 6 (decision 19/08/2026).
@@ -563,7 +563,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  // ── "Histórico" ────────────────────────────────────────────────────────────
+  // ── "Todas" ────────────────────────────────────────────────────────────
 
   Widget _historyTab(Localization l) {
     if (_history.isEmpty) return _empty(Icons.notifications_none, K.notifEmptyHistory, l);

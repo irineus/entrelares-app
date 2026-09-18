@@ -601,7 +601,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _push.onOpen = (data) {
       if (_phase != _AuthPhase.authed) return;
       // The tab is chosen from the notice's TYPE (PushRouting): a receipt lands
-      // on Histórico, which always holds the row that was tapped, while a
+      // on Todas, which always holds the row that was tapped, while a
       // request awaiting this person lands on "Para você". The notification id
       // rides along so a SECOND tap re-applies the tab — the screen's State
       // survives inside the shell branch.

@@ -16,7 +16,7 @@ import 'custody_data_source.dart';
 ///   file whose field names changed with the reader's language would be
 ///   useless to whoever receives it. Only `lgpdNote` follows the language.
 /// * **Notification text is rendered through the same [NotificationRenderer]
-///   the Histórico tab uses**, so the export and the app can never disagree
+///   the Todas tab uses**, so the export and the app can never disagree
 ///   about what an event said.
 ///
 /// Assembly is pure on purpose: the payload can be asserted without a backend,
@@ -114,7 +114,7 @@ abstract final class ExportService {
       'notifications': [
         for (final notification in bundle.notifications)
           {
-            // The SAME renderer the Histórico tab uses — stored title/message
+            // The SAME renderer the Todas tab uses — stored title/message
             // are the fallback for rows written before the params existed.
             'title': NotificationRenderer.title(notification.type,
                 notification.paramsJson, notification.title, l),

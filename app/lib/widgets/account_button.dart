@@ -48,7 +48,7 @@ enum _AccountAction { profile, ptBr, en, signOut }
 ///
 /// It replaces four loose icons on the calendar's app bar (which had pushed the
 /// month name into an ellipsis) and closes a real defect: `onSignOut` was a
-/// parameter of `CalendarScreen`, so a reader sitting on Família, Avisos or
+/// parameter of `CalendarScreen`, so a reader sitting on Família, Notificações or
 /// Relatórios had no way to leave the app.
 ///
 /// Renders nothing at all when no [AccountScope] is above it — the sign-in
