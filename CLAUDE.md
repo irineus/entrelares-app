@@ -115,7 +115,7 @@ chores that are not backlog items.
 ## Build & test
 ```
 cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
-# Nesse lane moram os oito ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21 + F-60): rótulos
+# Nesse lane moram os nove ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21 + F-60 + F-68): rótulos
 # de papel em inglês, formato de data dos e-mails, a chave `lang` do redirect de reset,
 # a cobertura de `params` de todo writer de notificação, o catálogo de push
 # (F-09: o texto do push é montado no servidor, então `_shared/push.ts` duplica de
@@ -133,15 +133,19 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # `_shared/i18n.ts` podia seguir prometendo 24h enquanto o app dizia o instante, as duas
 # frases bem formadas e o build calado; o espelho lê os TRÊS lados fora do Dart, o corpo
 # VIVO de `auto_approve_expired` inclusive, e recusa janela citada numa FRASE — o
-# `interval '48 hours'` ao lado dela é a regra, que o item não tocou). Cinco leem
+# `interval '48 hours'` ao lado dela é a regra, que o item não tocou), e os números da porta
+# de suporte (F-68: tamanho da mensagem, os limites por hora/dia e as cinco categorias moram
+# em `send-support-request/index.ts`; o espelho lê esse arquivo e o CHECK da migração —
+# errar aqui recusa depois do Enviar justamente quem já estava travado). Cinco leem
 # supabase/functions/_shared/i18n.ts e supabase/migrations — as duplicações que
 # existem de propósito porque Deno não chama Dart; o sexto lê um service worker, o
-# sétimo uma Edge Function e o oitavo um catálogo de e-mail ao lado de uma migração,
+# sétimo uma Edge Function, o oitavo um catálogo de e-mail ao lado de uma migração e o
+# nono uma Edge Function ao lado de uma migração,
 # pela mesma razão em outras linguagens. Um espelho que
 # ninguém confere apodrece calado, e é o lane mais barato do run.
 # Fora de mirrors/, no mesmo lane, a guarda do U-26 (email_layout_guard_test): todo e-mail
-# sai de supabase/functions/_shared/email_layout.ts, e a suíte lê esse arquivo e os três
-# send-*: estilo só na tabela literal `S`, `color` E `background-color` em toda entrada,
+# sai de supabase/functions/_shared/email_layout.ts, e a suíte lê esse arquivo e os quatro
+# send-* (o send-support-request desde o F-68): estilo só na tabela literal `S`, `color` E `background-color` em toda entrada,
 # contraste AA, nenhuma superfície escura e nenhum `style=` num remetente. O
 # no_color_literal_test só lê o lib/ do Flutter; sem esta, um #212529 voltaria calado.
 # Também fora de mirrors/, desde o U-34 (18/09/2026), vocabulary_test lê os DOIS catálogos

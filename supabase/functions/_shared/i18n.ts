@@ -914,3 +914,68 @@ export function langFromRedirect(redirectTo: string | null | undefined): Lang | 
     return null;
   }
 }
+
+// ── F-68: Help & contact ─────────────────────────────────────────────────────
+//
+// Two messages per request. The one to the TEAM is always PT-BR (the team reads
+// Portuguese); only the category label and the field names live here, the rest
+// is the person's own text. The CONFIRMATION goes to the person, in their
+// language — and it never echoes the message back: on the signed-out path the
+// reply address is whatever was typed, so an echo would turn the form into a
+// relay that sends a stranger's text from our domain to anybody. The request
+// number and the promise are all it carries.
+//
+// The promise ("até 2 dias úteis") is the owner's (21/09/2026). Changing it is a
+// product decision, not a copy edit.
+
+export type SupportCategory = "question" | "problem" | "suggestion" | "privacy" | "other";
+
+/** The team's label for each category — PT-BR only, it goes to the inbox. */
+export const SUPPORT_CATEGORY_LABEL: Record<SupportCategory, string> = {
+  question: "Dúvida",
+  problem: "Problema ou erro",
+  suggestion: "Sugestão",
+  privacy: "Privacidade e dados",
+  other: "Outro",
+};
+
+export interface SupportStrings {
+  categoryLabel: Record<SupportCategory, string>;
+  subjConfirmation: (id: number) => string;
+  confirmationHeading: string;
+  confirmationIntro: (category: string, id: number) => string;
+  confirmationPromise: string;
+  confirmationReply: string;
+  confirmationIgnore: string;
+}
+
+const SUPPORT: Record<Lang, SupportStrings> = {
+  "pt-BR": {
+    categoryLabel: SUPPORT_CATEGORY_LABEL,
+    subjConfirmation: (id) => `Recebemos sua mensagem (#${id})`,
+    confirmationHeading: "Recebemos sua mensagem",
+    confirmationIntro: (category, id) =>
+      `Sua mensagem ao Entrelares chegou, na categoria <strong>${category}</strong>. O número do pedido é <strong>#${id}</strong>.`,
+    confirmationPromise: "Respondemos em até <strong>2 dias úteis</strong>, por este mesmo endereço de e-mail.",
+    confirmationReply: "Se quiser acrescentar algo, responda a este e-mail citando o número do pedido.",
+    confirmationIgnore: "Se não foi você quem escreveu, ignore esta mensagem — nada muda na sua conta.",
+  },
+  en: {
+    categoryLabel: {
+      question: "Question",
+      problem: "Problem or error",
+      suggestion: "Suggestion",
+      privacy: "Privacy and data",
+      other: "Other",
+    },
+    subjConfirmation: (id) => `We received your message (#${id})`,
+    confirmationHeading: "We received your message",
+    confirmationIntro: (category, id) =>
+      `Your message to Entrelares arrived, under <strong>${category}</strong>. The request number is <strong>#${id}</strong>.`,
+    confirmationPromise: "We reply within <strong>2 business days</strong>, to this same e-mail address.",
+    confirmationReply: "If you want to add something, reply to this e-mail quoting the request number.",
+    confirmationIgnore: "If you did not write to us, ignore this message — nothing changes on your account.",
+  },
+};
+
+export const support = (lang: Lang): SupportStrings => SUPPORT[lang];

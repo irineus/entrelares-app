@@ -54,6 +54,7 @@ export 'src/settings_rules.dart';
 export 'src/sign_in_methods.dart';
 export 'src/store_billing_rules.dart';
 export 'src/sudo_rules.dart';
+export 'src/support_rules.dart';
 export 'src/swap_notifications.dart';
 export 'src/swap_rules.dart';
 export 'src/swap_snapshot.dart';

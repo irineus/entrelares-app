@@ -112,6 +112,16 @@ serve(async (req: Request) => {
       invitationsPurged = (invData as number) ?? 0;
     }
 
+    // ── 1c'. Retention (F-68): support requests older than 12 months ────────
+    // The period privacidade.html §3 promises. Independent, like the two above.
+    let supportPurged = 0;
+    const { data: supData, error: supError } = await supabase.rpc("purge_old_support_requests");
+    if (supError) {
+      console.error(`[purge-deleted] support retention rpc failed — ${supError.message}`);
+    } else {
+      supportPurged = (supData as number) ?? 0;
+    }
+
     // ── 1d. Premium grace warnings (S-15/B-3, sent once) ────────────────────
     // The Terms promise an e-mail before the downgrade. The RPC already wrote the
     // in-app notice and stamped the marker inside its own transaction, so the
@@ -198,13 +208,14 @@ serve(async (req: Request) => {
       }
     }
 
-    console.log(`[purge-deleted] done — accounts=${rows.length} families=${familiesPurged} reminders=${reminders} oldNotifications=${notificationsPurged} staleInvitations=${invitationsPurged} graceWarnings=${graceWarnings} failed=${failed}`);
+    console.log(`[purge-deleted] done — accounts=${rows.length} families=${familiesPurged} reminders=${reminders} oldNotifications=${notificationsPurged} staleInvitations=${invitationsPurged} oldSupportRequests=${supportPurged} graceWarnings=${graceWarnings} failed=${failed}`);
     return json({
       purged: rows.length - failed,
       families: familiesPurged,
       reminders,
       oldNotifications: notificationsPurged,
       staleInvitations: invitationsPurged,
+      oldSupportRequests: supportPurged,
       graceWarnings,
       failed,
     });

@@ -37,6 +37,7 @@ const _senders = [
   'supabase/functions/send-swap-email/index.ts',
   'supabase/functions/send-account-email/index.ts',
   'supabase/functions/send-auth-email/index.ts',
+  'supabase/functions/send-support-request/index.ts',
 ];
 
 /// WCAG AA for body text. Every pair in the layer clears it, headings included,

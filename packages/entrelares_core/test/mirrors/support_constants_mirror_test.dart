@@ -1,0 +1,82 @@
+/// F-68 — the numbers of the support door are declared ONCE, in
+/// `supabase/functions/send-support-request/index.ts`, and copied into
+/// `SupportRules` so the form can refuse and explain without a round-trip.
+/// This suite reads that file and fails when the copies drift.
+///
+/// Why it earns its place, in the terms of the mirrors beside it: Deno cannot
+/// call Dart, and every drift here is SILENT. Lower the server's minimum and the
+/// form keeps refusing a message the server would take; raise the maximum on
+/// the client alone and a long report is typed, sent and answered
+/// `invalid_message` — after the person wrote it. Change the limit and the
+/// screen keeps promising a number the server no longer honours. The person
+/// affected is, by construction, someone who was already stuck.
+library;
+
+import 'package:entrelares_core/entrelares_core.dart';
+import 'package:test/test.dart';
+
+import 'repo_files.dart';
+
+const _functionPath = 'supabase/functions/send-support-request/index.ts';
+
+int _readTsNumber(String name) {
+  final match = RegExp('const\\s+${RegExp.escape(name)}\\s*=\\s*(\\d+)\\s*;')
+      .firstMatch(repoFile(_functionPath));
+  expect(match, isNotNull,
+      reason: '`const $name = <number>` not found in $_functionPath. If it was '
+          'renamed, rename it here too — these numbers have exactly one home.');
+  return int.parse(match!.group(1)!);
+}
+
+void main() {
+  test('the message bounds are the same on both sides', () {
+    expect(SupportRules.messageMinChars, _readTsNumber('MESSAGE_MIN_CHARS'));
+    expect(SupportRules.messageMaxChars, _readTsNumber('MESSAGE_MAX_CHARS'));
+    expect(SupportRules.emailMaxChars, _readTsNumber('EMAIL_MAX_CHARS'));
+  });
+
+  test('the limits are the same on both sides', () {
+    expect(SupportRules.anonHourlyLimit, _readTsNumber('ANON_HOURLY_LIMIT'));
+    expect(SupportRules.anonDailyLimit, _readTsNumber('ANON_DAILY_LIMIT'));
+    expect(SupportRules.memberHourlyLimit, _readTsNumber('MEMBER_HOURLY_LIMIT'));
+    expect(SupportRules.memberDailyLimit, _readTsNumber('MEMBER_DAILY_LIMIT'));
+  });
+
+  test('the function still hands the limits to the RPC', () {
+    // Agreeing constants are worth nothing if a literal was typed into the call.
+    final source = repoFile(_functionPath);
+    expect(source,
+        contains('p_hour_limit: byProfile ? MEMBER_HOURLY_LIMIT : ANON_HOURLY_LIMIT'));
+    expect(source,
+        contains('p_day_limit: byProfile ? MEMBER_DAILY_LIMIT : ANON_DAILY_LIMIT'));
+  });
+
+  test('the categories are the same set on both sides', () {
+    final match = RegExp(r'const CATEGORIES: SupportCategory\[\] = \[([^\]]*)\]')
+        .firstMatch(repoFile(_functionPath));
+    expect(match, isNotNull, reason: 'CATEGORIES not found in $_functionPath.');
+    final server = RegExp(r'"(\w+)"')
+        .allMatches(match!.group(1)!)
+        .map((m) => m.group(1))
+        .toList();
+    expect(server, SupportCategory.values.map((c) => c.wire).toList());
+  });
+
+  test('the database CHECK accepts exactly those categories', () {
+    // The third copy: `support_requests.category`. A category the client offers
+    // and the CHECK refuses turns into a 500 after the person pressed Send.
+    final migration = repoFile(
+        'supabase/migrations/20260921130000_f68_support_requests.sql');
+    final check = RegExp(r"category IN \(([^)]*)\)").firstMatch(migration);
+    expect(check, isNotNull);
+    final values =
+        RegExp(r"'(\w+)'").allMatches(check!.group(1)!).map((m) => m.group(1));
+    expect(values.toList(), SupportCategory.values.map((c) => c.wire).toList());
+  });
+
+  test('the privacy category goes to the inbox the function uses', () {
+    final source = repoFile(_functionPath);
+    expect(source, contains('"${SupportRules.privacyEmail}"'));
+    expect(source, contains('"${SupportRules.supportEmail}"'));
+  });
+}
