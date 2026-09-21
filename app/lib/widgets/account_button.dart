@@ -18,11 +18,16 @@ class AccountScope extends InheritedWidget {
 
   final VoidCallback onOpenProfile;
 
+  /// F-68: "Ajuda e contato", one tap from every tab. Null in hosts that
+  /// predate it — the item simply does not appear.
+  final VoidCallback? onOpenHelp;
+
   const AccountScope({
     super.key,
     required this.identity,
     required this.onSignOut,
     required this.onOpenProfile,
+    this.onOpenHelp,
     required super.child,
   });
 
@@ -39,10 +44,11 @@ class AccountScope extends InheritedWidget {
   bool updateShouldNotify(AccountScope oldWidget) =>
       identity != oldWidget.identity ||
       onSignOut != oldWidget.onSignOut ||
-      onOpenProfile != oldWidget.onOpenProfile;
+      onOpenProfile != oldWidget.onOpenProfile ||
+      onOpenHelp != oldWidget.onOpenHelp;
 }
 
-enum _AccountAction { profile, ptBr, en, signOut }
+enum _AccountAction { profile, help, ptBr, en, signOut }
 
 /// U-28 — the account entry point, in the app bar of every tab.
 ///
@@ -90,6 +96,7 @@ class AppAccountButton extends StatelessWidget {
           ),
           onSelected: (action) => switch (action) {
             _AccountAction.profile => scope.onOpenProfile(),
+            _AccountAction.help => scope.onOpenHelp?.call(),
             _AccountAction.ptBr => app.setLanguage(AppLanguage.ptBr),
             _AccountAction.en => app.setLanguage(AppLanguage.en),
             _AccountAction.signOut => scope.onSignOut(),
@@ -110,6 +117,19 @@ class AppAccountButton extends StatelessWidget {
                 title: Text(l[K.navProfile]),
               ),
             ),
+            // F-68: the owner found the profile row too deep to be the only
+            // door — whoever is stuck does not scroll a settings page looking
+            // for help. Here it is one tap away from every tab.
+            if (scope.onOpenHelp != null)
+              PopupMenuItem(
+                value: _AccountAction.help,
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.help_outline),
+                  title: Text(l[KApp.helpTitle]),
+                ),
+              ),
             const PopupMenuDivider(),
             // U-13's picker, which used to live as its own icon on the calendar
             // app bar. The current language is DISABLED rather than hidden:
