@@ -425,7 +425,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   onboarding: _onboarding,
                   tourKeys: _tourKeys,
                   onOpenFamily: () => _router.go('/family'),
-                  onOpenNotifications: () => _router.go('/notifications')),
+                  onOpenNotifications: () => _router.go('/notifications'),
+                  onOpenPlan: () => _router.go('/family/plan')),
             ),
           ]),
           // U-35: the branch's navigator reports to the roster's observer, so

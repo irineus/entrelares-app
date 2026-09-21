@@ -345,10 +345,14 @@ class AppSheetConfirmation extends StatelessWidget {
     required String noLabel,
     required VoidCallback onNo,
     bool busy = false,
+    IconData icon = Icons.warning_amber_rounded,
+    List<Widget> details = const [],
   }) =>
       AppSheetConfirmation(
         key: key,
         message: message,
+        icon: icon,
+        details: details,
         actions: _HalfAndHalf(
           yesLabel: yesLabel,
           onYes: onYes,
