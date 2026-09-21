@@ -280,7 +280,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.run-e2e)
     needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     concurrency:
       group: e2e-${{ github.ref }}
       cancel-in-progress: true
@@ -354,11 +354,20 @@ jobs:
       # reaches the fixture through --dart-define only (e2e_emulator_run.sh
       # reads it from the step env). The script bounds each suite, streams its
       # progress and, on a red, takes the screenshot and the logcat before the
-      # action kills the emulator (T-77) — the per-step ceiling is there so a
-      # hang outside the script still fails THIS step, not the whole job.
-      - name: E2E — two-user swap flow on an emulator
+      # action kills the emulator (T-77) — the step ceiling (two 15-min suites
+      # plus boot and install) is there so a hang outside the script still
+      # fails THIS step, not the whole job.
+      #
+      # ONE emulator for both suites (21/09/2026). Each suite used to get its
+      # own step, and so its own boot of the same AVD: the second one —
+      # account_flows_test — hung in `setUpAll` in 6 of 7 runs from 16 to
+      # 21/09, with the app off screen and not one request reaching the dev
+      # project (the script's header has the evidence). Each suite is still
+      # its own `flutter test`, so a failure still names which surface broke
+      # and the two families still never share a run id.
+      - name: E2E — swap, account and family flows on an emulator
         uses: reactivecircus/android-emulator-runner@v2
-        timeout-minutes: 22
+        timeout-minutes: 40
         env:
           E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
           E2E_PACK: ${{ inputs.e2e-pack || 'p0' }}
@@ -369,25 +378,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           working-directory: app
-          script: bash ../.github/e2e_emulator_run.sh integration_test/swap_workflow_test.dart
-
-      # Lote 4 — the account/family pack. A separate emulator step rather than
-      # one file with both, so a failure names which surface broke and the two
-      # families never share a run id.
-      - name: E2E — account and family flows on an emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        timeout-minutes: 22
-        env:
-          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
-          E2E_PACK: ${{ inputs.e2e-pack || 'p0' }}
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          working-directory: app
-          script: bash ../.github/e2e_emulator_run.sh integration_test/account_flows_test.dart
+          script: bash ../.github/e2e_emulator_run.sh integration_test/swap_workflow_test.dart integration_test/account_flows_test.dart
 
       # Only the screenshots: the repo is public, and the logcat already went
       # to the masked job log.
