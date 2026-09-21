@@ -217,10 +217,11 @@ say which one is blocking: sweep the whole list.
   | Data type | Collected? | Shared? | Purpose | Notes — what in the code makes it true |
   |---|---|---|---|---|
   | Personal info → Name | Yes — required, linked | No | App functionality | `profiles.name`, shown to the family |
-  | Personal info → Email address | Yes — required, linked | No | App functionality | GoTrue login + the transactional e-mails (`send-*-email`) |
+  | Personal info → Email address | Yes — required, linked | No | App functionality | GoTrue login + the transactional e-mails (`send-*-email`); since F-68 also the reply address of a support request (`support_requests.reply_email`, typed by a signed-out person) |
   | Personal info → User IDs | Yes — required, linked | No | App functionality | the account id (`auth.uid()` / `profiles.id`); Play's own example of a User ID is *"an account ID"* |
   | Financial info → Purchase history | Yes — required, linked | No | App functionality | `billing-store-verify` writes `subscriptions.store_purchase_token` and the `billing_events` ledger; the RTDN webhook writes the lifecycle. **Marked 25/08/2026** — the store rail is LIVE since 23/08 |
-  | Messages → Other in-app messages | Yes — optional, linked | No | App functionality | F-44 `request_message` / `approval_note` / `rejection_reason`: free text one caregiver writes, the server stores, the OTHER caregiver reads — inside the app, the e-mail and the push |
+  | Messages → Other in-app messages | Yes — optional, linked | No | App functionality | F-44 `request_message` / `approval_note` / `rejection_reason`: free text one caregiver writes, the server stores, the OTHER caregiver reads — inside the app, the e-mail and the push. Since **F-68** also the *Ajuda e contato* message (`send-support-request` → `support_requests.message`, 12-month retention), read by the team |
+| App info and performance → Other app performance data | Yes — optional, linked | No | App functionality | F-68: only when *Incluir informações técnicas* stays ticked — app version, channel, OS/browser family, language, the route with no query (`support_requests.diagnostics`, the function keeps five keys and drops the rest) |
   | App activity → Other user-generated content | Yes — optional, linked | No | App functionality | `care_schedules.notes` (the day note) and `families.name` — Play's own example of this row is *"notes"* |
   | App activity → App interactions | Yes — not linked | No | Analytics | Umami (`analytics_service.dart`): cookieless, no device id, paths sanitized by `sanitizeAnalyticsPath`; dev flavour sends nothing |
   | App info and performance → Crash logs | Yes — not linked | No | Analytics | T-66 crash sink (Sentry): exception type, scrubbed message, stack, release/environment/channel — no user, no breadcrumbs, no route args (`crash_rules.dart`) |
@@ -229,7 +230,7 @@ say which one is blocking: sweep the whole list.
   | Contacts, photos, files, health, calendar (device), precise location | No | — | — | never requested; the "calendar" is ours, not the device's |
   **"Shared" is No on every row on purpose.** Play's definition of sharing excludes transfers to a
   *service provider* processing on the developer's behalf, and that is what every operator in
-  the policy's §7 is (Supabase, Resend, Cloudflare, Google — Fonts, FCM, Play —, Umami, Sentry,
+  the policy's §7 is (Supabase, Resend, Cloudflare, Google — Fonts, FCM, Play, Gmail —, Umami, Sentry,
   Asaas). Nothing goes to a third party for its own purposes; §4 of the policy says the same.
   **The offline copy of the calendar adds NO row (T-18, 14/09/2026).** The Android app keeps the
   last-read current month, the 90-day upcoming window, that month's open requests and the family's

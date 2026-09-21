@@ -54,6 +54,7 @@ import 'suites/rls_hardening.dart';
 import 'suites/schedule_range.dart';
 import 'suites/session_has_password.dart';
 import 'suites/sudo_elevation.dart';
+import 'suites/support_request.dart';
 import 'suites/swap_message.dart';
 import 'suites/test_recipient_suppression.dart';
 
@@ -130,6 +131,9 @@ void main() {
   pushSubscriptionsTests(fx);
   emailQuotaGateTests(fx);
   testRecipientSuppressionTests(fx);
+  // F-68: the support door — who the reply goes to, the limit, retention,
+  // and a table no client can read.
+  supportRequestTests(fx);
   e2eDateAllocatorTests(fx);
   premiumEntitlementTests(fx);
   billingCheckoutTests(fx);
