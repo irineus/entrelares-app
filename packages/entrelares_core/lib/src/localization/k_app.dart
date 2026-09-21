@@ -305,7 +305,7 @@ abstract final class KApp {
   static const String noticeConsequenceInfo = 'app.notice.consequence.info';
   static const String noticeConsequencePickup = 'app.notice.consequence.pickup';
   static const String noticeConsequenceKeep = 'app.notice.consequence.keep';
-  static const String noticeConsequenceKeepBlocked = 'app.notice.consequence.keepBlocked';
+  static const String noticeConsequenceKeepClearsEta = 'app.notice.consequence.keepClearsEta';
   static const String noticeConsequenceKeepNotMyDay = 'app.notice.consequence.keepNotMyDay';
   static const String noticeNoteLabel = 'app.notice.noteLabel';
   static const String noticeNoteHint = 'app.notice.noteHint';
@@ -507,7 +507,7 @@ abstract final class KApp {
     noticeConsequenceInfo,
     noticeConsequencePickup,
     noticeConsequenceKeep,
-    noticeConsequenceKeepBlocked,
+    noticeConsequenceKeepClearsEta,
     noticeConsequenceKeepNotMyDay,
     noticeNoteLabel,
     noticeNoteHint,
@@ -786,9 +786,9 @@ abstract final class StringsAppPtBr {
             'aceitar, uma troca já aprovada passa o dia de hoje para essa '
             'pessoa, sem precisar de outra confirmação sua. Você verá quem '
             'aceitou, e a troca fica no histórico.',
-    KApp.noticeConsequenceKeepBlocked:
-        'Com uma previsão de tempo, ninguém pode assumir o dia. Escolha '
-            '"Sem previsão" se você precisa que alguém fique com a criança.',
+    KApp.noticeConsequenceKeepClearsEta:
+        'Escolher esta opção tira a previsão de tempo: um atraso com hora '
+            'marcada não passa o dia para ninguém.',
     KApp.noticeConsequenceKeepNotMyDay:
         'Só quem está com o dia de hoje pode oferecê-lo. Hoje o dia é de '
             'outra pessoa.',
@@ -1072,9 +1072,9 @@ abstract final class StringsAppEn {
             'accepts, an already-approved swap moves today to them, with no '
             'further confirmation from you. You will see who accepted, and '
             'the swap stays in the history.',
-    KApp.noticeConsequenceKeepBlocked:
-        'With a stated estimate nobody can take over the day. Choose "No '
-            'estimate" if you need someone to keep the child.',
+    KApp.noticeConsequenceKeepClearsEta:
+        'Choosing this clears the estimate: a delay with a time on it does '
+            'not hand the day to anyone.',
     KApp.noticeConsequenceKeepNotMyDay:
         'Only the carer whose day it is can offer it. Today belongs to '
             'someone else.',

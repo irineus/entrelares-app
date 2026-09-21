@@ -171,6 +171,31 @@ List<NoticeRequest> noticeRequestsFor({
       if (senderId == dayParentId && etaMinutes == null) NoticeRequest.keep,
     ];
 
+/// Whether [request] may be CHOSEN on the sheet — which is a different
+/// question from whether it may be SENT, and the difference is the point
+/// (owner, 20/09/2026).
+///
+/// [noticeRequestAllowed] answers "is this payload legal", and the database
+/// enforces exactly that. But two of its conditions are not the same kind of
+/// thing:
+///
+/// * a stated estimate is something the sender can change **here and now** —
+///   so the sheet does not refuse, it CLEARS the estimate and grants the
+///   request. Blocking it made the reader hunt for a control above the one
+///   they were looking at, and the owner read the explanation and still asked
+///   why it was blocked;
+/// * the day belonging to somebody else is **not fixable from this sheet** at
+///   all. There the row stays disabled with its reason, because enabling it
+///   would walk the person into a refusal the server has to make.
+///
+/// So: info and pickup always; keep only for the carer whose day it is.
+bool noticeRequestSelectable({
+  required NoticeRequest request,
+  required int senderId,
+  required int? dayParentId,
+}) =>
+    request != NoticeRequest.keep || senderId == dayParentId;
+
 /// Whether [request] may be sent as described — the same predicate the
 /// database enforces, mirrored here so the sheet can disable rather than let
 /// the server refuse (the client MIRRORS, the database ENFORCES).

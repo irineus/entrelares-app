@@ -95,31 +95,37 @@ class _NoticeSheetState extends State<_NoticeSheet> {
 
   bool get _mineToday => widget.myProfileId == widget.dayParentId;
 
-  bool _allowed(NoticeRequest request) => noticeRequestAllowed(
+  /// Whether the row can be TAPPED. Not the same as whether the payload is
+  /// legal: an estimate is fixed by the tap itself (see [_choose]), while
+  /// somebody else's day cannot be fixed from here at all.
+  bool _selectable(NoticeRequest request) => noticeRequestSelectable(
         request: request,
         senderId: widget.myProfileId,
         dayParentId: widget.dayParentId,
-        etaMinutes: _eta,
       );
 
-  /// Why [NoticeRequest.keep] is not on offer, or null when it is. The two
-  /// reasons are different facts and must not collapse into one sentence: an
-  /// estimate is something the sender can change here and now; somebody else's
-  /// day is not.
-  String? _keepBlockedReason(Localization l) {
-    if (_allowed(NoticeRequest.keep)) return null;
-    return _mineToday
-        ? l[KApp.noticeConsequenceKeepBlocked]
-        : l[KApp.noticeConsequenceKeepNotMyDay];
+  /// Choosing a request may CORRECT the estimate rather than be refused by it
+  /// (owner, 20/09/2026). Asking for someone to keep the child and having
+  /// stated a deadline are contradictory, and the person who just tapped said
+  /// which of the two they meant — so the estimate gives way, not the request.
+  /// The reverse move lives in [_setEta], and the two together are what keeps
+  /// the pair honest whichever end the reader starts from.
+  void _choose(NoticeRequest request) {
+    setState(() {
+      _request = request;
+      if (request == NoticeRequest.keep) _eta = null;
+    });
   }
 
+  /// The other half of the pair (owner, 20/09/2026). Stating an estimate while
+  /// asking for somebody to KEEP the child is the same contradiction read from
+  /// the other end, so the same rule applies in reverse: the tap wins and the
+  /// request gives way. It falls to `pickup` rather than to `info` because what
+  /// the sender wanted was help, and only the scope of the help changed.
   void _setEta(int? eta) {
     setState(() {
       _eta = eta;
-      // Stating an estimate takes the day off the table. Falling back to
-      // `pickup` rather than to `info` keeps what the sender actually wanted —
-      // help — and the disabled row says why the stronger ask went away.
-      if (_request == NoticeRequest.keep && !_allowed(NoticeRequest.keep)) {
+      if (eta != null && _request == NoticeRequest.keep) {
         _request = NoticeRequest.pickup;
       }
     });
@@ -227,8 +233,8 @@ class _NoticeSheetState extends State<_NoticeSheet> {
                 label: _requestLabel(l, request),
                 consequence: _consequence(l, request),
                 selected: _request == request,
-                enabled: !_saving && _allowed(request),
-                onSelected: () => setState(() => _request = request),
+                enabled: !_saving && _selectable(request),
+                onSelected: () => _choose(request),
               ),
           ],
         ),
@@ -253,14 +259,24 @@ class _NoticeSheetState extends State<_NoticeSheet> {
     );
   }
 
-  /// The disabled row's sentence is the REASON it is disabled; an available
-  /// one's is what will happen if it is chosen.
+  /// Every row says what its tap will DO. For `keep` that is three different
+  /// sentences, and which one shows is the whole of this item's care:
+  ///
+  /// * the day is somebody else's — the row is disabled and says so, because
+  ///   nothing the reader does on this sheet can change it;
+  /// * an estimate is set — the tap will CLEAR it, so the row says that. It is
+  ///   what the tap does, not why it is refused;
+  /// * otherwise — the full consequence: an already-approved swap, no second
+  ///   confirmation, and where it will be readable afterwards.
   String _consequence(Localization l, NoticeRequest request) =>
       switch (request) {
         NoticeRequest.info => l[KApp.noticeConsequenceInfo],
         NoticeRequest.pickup => l[KApp.noticeConsequencePickup],
-        NoticeRequest.keep =>
-          _keepBlockedReason(l) ?? l[KApp.noticeConsequenceKeep],
+        NoticeRequest.keep when !_mineToday =>
+          l[KApp.noticeConsequenceKeepNotMyDay],
+        NoticeRequest.keep when _eta != null =>
+          l[KApp.noticeConsequenceKeepClearsEta],
+        NoticeRequest.keep => l[KApp.noticeConsequenceKeep],
       };
 
   String _reasonLabel(Localization l, NoticeReason reason) => l[switch (reason) {
