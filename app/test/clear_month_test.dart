@@ -28,9 +28,10 @@ Future<void> openMenu(WidgetTester tester) async {
 DateTime get endOfMonth => DateTime(today.year, today.month + 1, 0);
 
 void main() {
-  testWidgets('without admin mode the menu has no "Limpar mês"',
-      (tester) async {
-    final ds = FakeCustodyDataSource(members: [anaAdmin, bruno], days: []);
+  // F-67 Part B: an ADMIN with the mode off sees the item (picking it asks),
+  // so the reader with no "Limpar mês" is a member who is not an admin.
+  testWidgets('a non-admin sees no "Limpar mês"', (tester) async {
+    final ds = FakeCustodyDataSource(members: [bruno, anaAdmin], days: []);
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
 

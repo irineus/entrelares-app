@@ -51,6 +51,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:entrelares_app/screens/calendar_screen.dart';
+import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_app/screens/custom_roles_screen.dart';
 import 'package:entrelares_app/screens/day_sheet.dart';
 import 'package:entrelares_app/screens/family_plan_screen.dart';
@@ -488,6 +489,31 @@ void main() {
       await _measure(tester, 'day sheet summary');
       await cal.tapSheet(tester, find.byKey(daySheetEditKey));
       await _measure(tester, 'day sheet editor');
+    });
+
+    // F-67 Part B: the past day's door for an admin and the question it
+    // raises, pinned in the action row — the U-38 place, at 1.3× too.
+    _scene('past day, admin mode offered', (tester, dark) async {
+      if (cal.today.day == 1) return; // yesterday is last month
+      final yesterday = cal.today.day - 1;
+      final ds = cal.FakeCustodyDataSource(
+        members: [
+          const Member(
+              id: 1,
+              fullName: 'Ana Souza',
+              colorSlot: 1,
+              userId: 'u1',
+              isAdmin: true),
+          cal.bruno,
+        ],
+        days: [cal.row(1, cal.dayOfMonth(yesterday), 1)],
+      );
+      await tester.pumpWidget(_calendar(ds, dark: dark));
+      await tester.pumpAndSettle();
+      await cal.openDay(tester, yesterday);
+      await _measure(tester, 'past day with the admin door');
+      await cal.tapSheet(tester, find.byKey(daySheetCorrectPlanKey));
+      await _measure(tester, 'admin mode offer');
     });
 
     _scene('frozen day sheet', (tester, dark) async {

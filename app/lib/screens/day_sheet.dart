@@ -5,7 +5,9 @@ import '../theme/tokens.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
+import '../services/admin_mode.dart';
 import '../services/custody_data_source.dart';
+import '../widgets/admin_mode_offer.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/slot_pill.dart';
 
@@ -17,6 +19,10 @@ enum DaySheetOutcome { saved, cleared, swapRequested, revertRequested }
 /// U-25: the pencil that turns the summary into the editor — keyed so a flow
 /// test reaches it without a localized finder.
 const daySheetEditKey = Key('day-sheet-edit');
+
+/// F-67 Part B: "Corrigir o planejamento" on a past day, for an admin with the
+/// mode off — the door the mode used to hide behind an unlabelled shield.
+const daySheetCorrectPlanKey = Key('day-sheet-correct-plan');
 
 /// The day sheet — a native modal bottom sheet (owner directive: use the
 /// platform where it improves on the web's inline panel). Since lote 2 this is
@@ -47,6 +53,7 @@ Future<DaySheetOutcome?> showDaySheet({
   required DateTime today,
   required CustodyDataSource dataSource,
   bool adminBypass = false,
+  AdminModeOfferer? adminOffer,
   int? ownProfileId,
   Member? myProfile,
   List<Member> allProfiles = const [],
@@ -66,6 +73,7 @@ Future<DaySheetOutcome?> showDaySheet({
       today: today,
       dataSource: dataSource,
       adminBypass: adminBypass,
+      adminOffer: adminOffer,
       ownProfileId: ownProfileId,
       myProfile: myProfile,
       allProfiles: allProfiles,
@@ -86,6 +94,10 @@ class _DaySheet extends StatefulWidget {
   final DateTime today;
   final CustodyDataSource dataSource;
   final bool adminBypass;
+
+  /// F-67 Part B: non-null only when the reader is an admin — the sheet then
+  /// ASKS where it would otherwise hide or refuse (see [AdminModeAction]).
+  final AdminModeOfferer? adminOffer;
   final int? ownProfileId;
 
   /// The signed-in member and the FULL profile roster (inactive included) —
@@ -116,6 +128,7 @@ class _DaySheet extends StatefulWidget {
     required this.today,
     required this.dataSource,
     required this.adminBypass,
+    this.adminOffer,
     required this.ownProfileId,
     required this.myProfile,
     required this.allProfiles,
@@ -141,6 +154,16 @@ class _DaySheetState extends State<_DaySheet> {
   String? _error;
   bool _showAdminConfirm = false;
   bool _adminConfirmed = false;
+
+  /// F-14 bypass as THIS sheet sees it: the calendar's answer when the sheet
+  /// opened, turned true when the admin accepts the F-67 offer here — the
+  /// sheet stays open and carries the action through instead of making the
+  /// reader close it, find the shield and come back.
+  late bool _bypass = widget.adminBypass;
+
+  /// F-67 Part B: the question on screen, and what to do on "Ativar".
+  AdminModeAction? _offering;
+  VoidCallback? _afterOffer;
 
   /// U-25: the editor is on screen. Starts false on an assigned day (the
   /// summary) and true on an empty one, where the only thing to do is assign.
@@ -187,11 +210,11 @@ class _DaySheetState extends State<_DaySheet> {
   }
 
   bool get _saveBlocked => isSaveDayBlocked(
-      adminBypass: widget.adminBypass, isPast: _isPast, isFrozen: _isFrozen);
+      adminBypass: _bypass, isPast: _isPast, isFrozen: _isFrozen);
 
   /// F-40 proactive mirror: the admin override cannot reach this far back.
   bool get _beyondRetroReach =>
-      widget.adminBypass &&
+      _bypass &&
       _isPast &&
       widget.isPremium != null &&
       !isWithinAdminRetroactiveReach(
@@ -205,7 +228,7 @@ class _DaySheetState extends State<_DaySheet> {
   /// S-09: the planned parent of an assigned day is locked for non-admins.
   bool get _scheduledLocked =>
       widget.day != null && widget.day!.scheduledParentId != 0 &&
-      !widget.adminBypass;
+      !_bypass;
 
   /// F-44: mirrors the save's workflow detection so the message field only
   /// appears when saving will open a swap or revert request (mirror of
@@ -281,6 +304,65 @@ class _DaySheetState extends State<_DaySheet> {
     _revertNotesChoice = null;
     _revertSnapshotText = null;
     _revertCurrentText = null;
+  }
+
+  /// F-67 Part B: what an admin with the mode off is offered for [action]
+  /// here. [AdminModeOfferKind.none] for everyone else — including every
+  /// non-admin, who has no offerer at all.
+  AdminModeOfferKind _offerKind(AdminModeAction action,
+          {Iterable<DateTime> dates = const []}) =>
+      widget.adminOffer == null || widget.offline
+          ? AdminModeOfferKind.none
+          : adminModeOfferFor(
+              action: action,
+              isAdmin: true,
+              adminModeActive: _bypass,
+              today: widget.today,
+              isPremium: widget.isPremium,
+              overrideFreeDays: widget.settings.overrideFreeDays,
+              overridePremiumMonths: widget.settings.overridePremiumMonths,
+              dates: dates,
+            );
+
+  bool _canOffer(AdminModeAction action) =>
+      _offerKind(action) == AdminModeOfferKind.offer;
+
+  /// The past day's own answer: offer, gate or the limit sentence.
+  AdminModeOfferKind get _pastDayOffer => _isPast
+      ? _offerKind(AdminModeAction.editPastDay, dates: [widget.date])
+      : AdminModeOfferKind.none;
+
+  void _ask(AdminModeAction action, VoidCallback resume) => setState(() {
+        _error = null;
+        _offering = action;
+        _afterOffer = resume;
+      });
+
+  void _acceptOffer() {
+    final action = _offering;
+    final resume = _afterOffer;
+    if (action == null) return;
+    widget.adminOffer?.accept(action);
+    setState(() {
+      _bypass = true;
+      _offering = null;
+      _afterOffer = null;
+    });
+    resume?.call();
+  }
+
+  void _declineOffer() {
+    final action = _offering;
+    if (action != null) widget.adminOffer?.decline(action);
+    setState(() {
+      _offering = null;
+      _afterOffer = null;
+    });
+  }
+
+  void _openPlan() {
+    Navigator.of(context).pop();
+    widget.adminOffer?.openPlan();
   }
 
   void _cancelEdit() {
@@ -477,7 +559,7 @@ class _DaySheetState extends State<_DaySheet> {
   Future<void> _clearDay() async {
     final existing = widget.day;
     if (existing == null ||
-        isClearDayBlocked(adminBypass: widget.adminBypass) ||
+        isClearDayBlocked(adminBypass: _bypass) ||
         _saving ||
         _deleting) {
       return;
@@ -608,7 +690,15 @@ class _DaySheetState extends State<_DaySheet> {
       // raised takes the action row's place — both where the reader can see
       // them from the pinned "Salvar" they just tapped.
       error: _error,
-      confirmation: editing ? _confirmation(l) : null,
+      confirmation: _offering != null
+          ? AdminModeOfferConfirmation(
+              action: _offering!,
+              onActivate: _acceptOffer,
+              onCancel: _declineOffer,
+            )
+          : editing
+              ? _confirmation(l)
+              : null,
       primaryLabel: !editing ? null : l[K.commonSave],
       onPrimary: _scheduledParentId == null || _deleting || _beyondRetroReach
           ? null
@@ -616,19 +706,40 @@ class _DaySheetState extends State<_DaySheet> {
       secondaryLabel: !editing ? null : l[K.commonCancel],
       onSecondary: _deleting ? null : _cancelEdit,
       busy: _saving,
-      extraAction: !editing ||
-              widget.day == null ||
-              isClearDayBlocked(adminBypass: widget.adminBypass)
-          ? null
-          : AppSheetDangerAction(
-              label: l[K.editorClearDay],
-              busy: _deleting,
-              onPressed: _saving ? null : _clearDay,
-            ),
+      extraAction: !editing
+          ? _correctPlanAction(l)
+          : widget.day == null ||
+                  (isClearDayBlocked(adminBypass: _bypass) &&
+                      !_canOffer(AdminModeAction.clearDay))
+              ? null
+              : AppSheetDangerAction(
+                  label: l[K.editorClearDay],
+                  busy: _deleting,
+                  onPressed: _saving
+                      ? null
+                      : isClearDayBlocked(adminBypass: _bypass)
+                          ? () => _ask(AdminModeAction.clearDay, _clearDay)
+                          : _clearDay,
+                ),
       children: [
         if (!editing) _summary(l, day, assignment),
         if (editing) ..._form(l),
       ],
+    );
+  }
+
+  /// F-67 Part B: the past day's door for an admin with the mode off. The
+  /// SECONDARY look on purpose: when the relato (Part A) lands beside it, the
+  /// primary belongs to "Relatar o que aconteceu", and a correction of the
+  /// plan must not read as the way to tell what happened.
+  Widget? _correctPlanAction(Localization l) {
+    if (!_readOnly || _pastDayOffer != AdminModeOfferKind.offer) return null;
+    return OutlinedButton.icon(
+      key: daySheetCorrectPlanKey,
+      icon: const Icon(Icons.shield_outlined),
+      label: Text(l[KApp.adminOfferCorrectPlan]),
+      onPressed: () => _ask(
+          AdminModeAction.editPastDay, () => setState(() => _editing = true)),
     );
   }
 
@@ -743,7 +854,7 @@ class _DaySheetState extends State<_DaySheet> {
       widgets.add(_banner(l[KApp.offlineWriteBlocked],
           icon: Icons.cloud_off_outlined));
     }
-    if (widget.adminBypass && (_isPast || isApprovedSwapDay(assignment))) {
+    if (_bypass && (_isPast || isApprovedSwapDay(assignment))) {
       widgets.add(_banner(l[K.editorAdminOverride],
           icon: Icons.shield_outlined, tone: context.tokens.danger));
       if (_beyondRetroReach) {
@@ -761,6 +872,31 @@ class _DaySheetState extends State<_DaySheet> {
     } else if (_isPast) {
       widgets.add(
           _banner(l[K.editorPastReadonly], icon: Icons.lock_outline));
+      // F-67 Part B: an admin whose mode would NOT reach this day is told
+      // why instead of being asked — Premium would (the U-49 gate, with its
+      // CTA), or nothing would (the F-40 limit sentence).
+      final canOpenPlan = widget.adminOffer?.onOpenPlan != null;
+      switch (_pastDayOffer) {
+        case AdminModeOfferKind.gate:
+          widgets.add(AppBanner(
+            tone: context.tokens.info,
+            icon: Icons.lock_outline,
+            message: l.format(KApp.editorRetroBeyondFree, [
+              widget.settings.overrideFreeDays,
+              widget.settings.overridePremiumMonths,
+            ]),
+            actionLabel: canOpenPlan ? l[K.famSeePremium] : null,
+            actionIcon: canOpenPlan ? Icons.auto_awesome : null,
+            onAction: canOpenPlan ? _openPlan : null,
+          ));
+        case AdminModeOfferKind.outOfWindow:
+          widgets.add(_banner(
+              l.format(KApp.editorRetroBeyondPremium,
+                  [widget.settings.overridePremiumMonths]),
+              icon: Icons.error_outline));
+        case AdminModeOfferKind.none || AdminModeOfferKind.offer:
+          break;
+      }
     } else if (_isFrozen) {
       widgets.add(
           _banner(l[K.editorFrozenReadonly], icon: Icons.lock_outline));
@@ -800,7 +936,10 @@ class _DaySheetState extends State<_DaySheet> {
             _memberChip(m.id, _chipLabel(m, l),
                 selected: _scheduledParentId == m.id,
                 onSelected: _scheduledLocked
-                    ? null
+                    ? (_canOffer(AdminModeAction.changePlannedParent)
+                        ? (id) => _ask(AdminModeAction.changePlannedParent,
+                            () => setState(() => _scheduledParentId = id))
+                        : null)
                     : (id) => setState(() => _scheduledParentId = id)),
         ],
       ),

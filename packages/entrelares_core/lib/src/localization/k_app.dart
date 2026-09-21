@@ -392,6 +392,26 @@ abstract final class KApp {
   static const String noticeAnsweredKeeping = 'app.notice.answeredKeeping';
   static const String noticeErrAnswer = 'app.notice.errAnswer';
 
+  // ── F-67 Part B: the admin mode offered where it is needed ──
+  // One sentence per place an ADMIN with the mode off reaches for something
+  // only the mode allows (`AdminModeAction`); each names the action, so the
+  // question is never a generic "are you sure". The past-day one also says
+  // what the F-61 record will print, so the plan editor is not used to tell a
+  // story.
+  static const String adminOfferEditPastDay = 'app.adminOffer.editPastDay';
+  static const String adminOfferClearDay = 'app.adminOffer.clearDay';
+  static const String adminOfferChangePlanned =
+      'app.adminOffer.changePlanned';
+  static const String adminOfferBulkClear = 'app.adminOffer.bulkClear';
+  static const String adminOfferBulkOverwrite =
+      'app.adminOffer.bulkOverwrite';
+  static const String adminOfferWizardReplace =
+      'app.adminOffer.wizardReplace';
+  static const String adminOfferClearMonth = 'app.adminOffer.clearMonth';
+  static const String adminOfferHow = 'app.adminOffer.how';
+  static const String adminOfferCorrectPlan = 'app.adminOffer.correctPlan';
+  static const String adminOfferBulkBanner = 'app.adminOffer.bulkBanner';
+
   /// See `K.allKeys`.
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -625,6 +645,16 @@ abstract final class KApp {
     noticeAnsweredHelping,
     noticeAnsweredKeeping,
     noticeErrAnswer,
+    adminOfferEditPastDay,
+    adminOfferClearDay,
+    adminOfferChangePlanned,
+    adminOfferBulkClear,
+    adminOfferBulkOverwrite,
+    adminOfferWizardReplace,
+    adminOfferClearMonth,
+    adminOfferHow,
+    adminOfferCorrectPlan,
+    adminOfferBulkBanner,
   ];
 }
 
@@ -971,6 +1001,31 @@ abstract final class StringsAppPtBr {
     KApp.noticeAnsweredHelping: 'Resposta enviada.',
     KApp.noticeAnsweredKeeping: 'O dia de hoje passou para você.',
     KApp.noticeErrAnswer: 'Não foi possível responder ao aviso.',
+    KApp.adminOfferEditPastDay:
+        'Corrigir um dia que já passou exige o modo administrador. A correção '
+            'fica registrada como feita pelo administrador, no histórico e no '
+            'relatório.',
+    KApp.adminOfferClearDay:
+        'Limpar um dia já planejado exige o modo administrador.',
+    KApp.adminOfferChangePlanned:
+        'Mudar quem está planejado num dia já atribuído exige o modo '
+            'administrador.',
+    KApp.adminOfferBulkClear:
+        'Limpar dias planejados exige o modo administrador.',
+    KApp.adminOfferBulkOverwrite:
+        'Aplicar esta edição aos dias que já passaram e a quem está planejado '
+            'nos dias já atribuídos exige o modo administrador.',
+    KApp.adminOfferWizardReplace:
+        'Substituir os dias já planejados exige o modo administrador.',
+    KApp.adminOfferClearMonth:
+        'Limpar o mês exige o modo administrador.',
+    KApp.adminOfferHow:
+        'Ativar agora? Enquanto ele estiver ligado, uma faixa no topo da tela '
+            'mostra isso, com o botão Sair.',
+    KApp.adminOfferCorrectPlan: 'Corrigir o planejamento',
+    KApp.adminOfferBulkBanner:
+        'Sem o modo administrador, esta edição pula os dias que já passaram e '
+            'mantém quem está planejado nos dias já atribuídos.',
   };
 }
 
@@ -1312,5 +1367,30 @@ abstract final class StringsAppEn {
     KApp.noticeAnsweredHelping: 'Answer sent.',
     KApp.noticeAnsweredKeeping: 'Today has moved to you.',
     KApp.noticeErrAnswer: 'The notice could not be answered.',
+    KApp.adminOfferEditPastDay:
+        'Correcting a day that has passed needs administrator mode. The '
+            'correction is recorded as made by the administrator, in the '
+            'history and in the report.',
+    KApp.adminOfferClearDay:
+        'Clearing a day that is already planned needs administrator mode.',
+    KApp.adminOfferChangePlanned:
+        'Changing who is planned on a day already assigned needs '
+            'administrator mode.',
+    KApp.adminOfferBulkClear:
+        'Clearing planned days needs administrator mode.',
+    KApp.adminOfferBulkOverwrite:
+        'Applying this edit to days that have passed, and to who is planned '
+            'on days already assigned, needs administrator mode.',
+    KApp.adminOfferWizardReplace:
+        'Replacing the days already planned needs administrator mode.',
+    KApp.adminOfferClearMonth:
+        'Clearing the month needs administrator mode.',
+    KApp.adminOfferHow:
+        'Turn it on now? While it is on, a strip at the top of the screen '
+            'says so, with the Exit button.',
+    KApp.adminOfferCorrectPlan: 'Correct the plan',
+    KApp.adminOfferBulkBanner:
+        'Without administrator mode, this edit skips the days that have '
+            'passed and keeps who is planned on days already assigned.',
   };
 }

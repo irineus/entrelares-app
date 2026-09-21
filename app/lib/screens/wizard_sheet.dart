@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
+import '../services/admin_mode.dart';
 import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
 import '../theme/tokens.dart';
+import '../widgets/admin_mode_offer.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/cycle_strip.dart';
 
@@ -33,6 +35,7 @@ Future<bool?> showWizardSheet({
   DateTime? maxScheduleDate,
   required bool isFreeTier,
   bool adminBypass = false,
+  AdminModeOfferer? adminOffer,
   AnalyticsService? analytics,
   DateTime? initialStart,
 }) {
@@ -45,6 +48,7 @@ Future<bool?> showWizardSheet({
       maxScheduleDate: maxScheduleDate,
       isFreeTier: isFreeTier,
       adminBypass: adminBypass,
+      adminOffer: adminOffer,
       analytics: analytics,
       initialStart: initialStart,
     ),
@@ -63,6 +67,10 @@ class _WizardSheet extends StatefulWidget {
   /// non-admin); this only decides whether to ASK.
   final bool adminBypass;
 
+  /// F-67 Part B: non-null only for an admin — the replace is then SHOWN with
+  /// the mode off, and ticking it asks to turn the mode on.
+  final AdminModeOfferer? adminOffer;
+
   /// T-37 — optional: the activation signal never gates the generation.
   final AnalyticsService? analytics;
 
@@ -79,6 +87,7 @@ class _WizardSheet extends StatefulWidget {
     required this.maxScheduleDate,
     required this.isFreeTier,
     required this.adminBypass,
+    this.adminOffer,
     this.analytics,
     this.initialStart,
   });
@@ -110,6 +119,11 @@ class _WizardSheetState extends State<_WizardSheet> {
   /// planned days the range holds NOW (one read, before the confirmation);
   /// `_replaceConfirmed` is consumed by the generation that follows the yes.
   bool _replaceExisting = false;
+
+  /// F-14 bypass as THIS sheet sees it — turned true by the F-67 offer, so
+  /// the cycle already typed survives the answer.
+  late bool _bypass = widget.adminBypass;
+  bool _offering = false;
   bool _showReplaceConfirm = false;
   bool _replaceConfirmed = false;
   int _replaceCount = 0;
@@ -207,7 +221,7 @@ class _WizardSheetState extends State<_WizardSheet> {
           ),
       ];
 
-      final replaceRange = widget.adminBypass && _replaceExisting
+      final replaceRange = _bypass && _replaceExisting
           ? wizardReplaceRange(start: _startDate, end: clampResult.end)
           : null;
 
@@ -297,7 +311,25 @@ class _WizardSheetState extends State<_WizardSheet> {
       // since U-38 literally, in the row's own place, where "Gerar" was
       // tapped. It used to open at the TOP of the form, out of sight of
       // anyone who had scrolled down to the options.
-      confirmation: _showReplaceConfirm ? _replaceConfirmation(l) : null,
+      confirmation: _offering
+          ? AdminModeOfferConfirmation(
+              action: AdminModeAction.wizardReplace,
+              onActivate: () {
+                widget.adminOffer?.accept(AdminModeAction.wizardReplace);
+                setState(() {
+                  _offering = false;
+                  _bypass = true;
+                  _replaceExisting = true;
+                });
+              },
+              onCancel: () {
+                widget.adminOffer?.decline(AdminModeAction.wizardReplace);
+                setState(() => _offering = false);
+              },
+            )
+          : _showReplaceConfirm
+              ? _replaceConfirmation(l)
+              : null,
       primaryLabel: _completed ? l[K.wizClose] : l[K.wizGenerate],
       onPrimary: _completed
           ? () => Navigator.of(context).pop(true)
@@ -563,7 +595,8 @@ class _WizardSheetState extends State<_WizardSheet> {
       // The bulk sheet's own checkbox shape (label + hint), so the two places
       // that rewrite planned days look like one feature. The hint says what
       // is kept, because the server keeps it whatever the box says.
-      if (widget.adminBypass) ...[
+      // F-67 Part B: an admin with the mode off sees it too — ticking it asks.
+      if (_bypass || widget.adminOffer != null) ...[
         AppCard(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -575,7 +608,12 @@ class _WizardSheetState extends State<_WizardSheet> {
                 value: _replaceExisting,
                 onChanged: _generating
                     ? null
-                    : (v) => setState(() => _replaceExisting = v ?? false),
+                    : (v) => v == true && !_bypass
+                        ? setState(() {
+                            _errorMessage = null;
+                            _offering = true;
+                          })
+                        : setState(() => _replaceExisting = v ?? false),
               ),
               Expanded(
                 child: Column(

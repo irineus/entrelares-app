@@ -5,7 +5,9 @@ import '../theme/tokens.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
+import '../services/admin_mode.dart';
 import '../services/custody_data_source.dart';
+import '../widgets/admin_mode_offer.dart';
 import '../widgets/app_l10n.dart';
 
 /// The bulk-edit sheet (F-11/S-09/T-27) — the biggest screen of lote 2,
@@ -26,6 +28,9 @@ Future<String?> showBulkSheet({
   required DateTime today,
   required CustodyDataSource dataSource,
   required bool adminBypass,
+  AdminModeOfferer? adminOffer,
+  bool? isPremium,
+  PublicSettings settings = PublicSettings.unloaded,
   Iterable<DateTime> frozenDates = const [],
   Member? myProfile,
   List<Member> allProfiles = const [],
@@ -39,6 +44,9 @@ Future<String?> showBulkSheet({
       today: today,
       dataSource: dataSource,
       adminBypass: adminBypass,
+      adminOffer: adminOffer,
+      isPremium: isPremium,
+      settings: settings,
       frozenDates: frozenDates,
       myProfile: myProfile,
       allProfiles: allProfiles,
@@ -53,6 +61,13 @@ class _BulkSheet extends StatefulWidget {
   final DateTime today;
   final CustodyDataSource dataSource;
   final bool adminBypass;
+
+  /// F-67 Part B: non-null only for an admin. With the F-40 inputs, it lets
+  /// the sheet ASK where the mode is off: "Limpar dias", and the past days
+  /// and assigned planned parents the edit would otherwise leave alone.
+  final AdminModeOfferer? adminOffer;
+  final bool? isPremium;
+  final PublicSettings settings;
 
   /// F-12: the month's frozen dates — days with an open swap request never
   /// join the bulk write set (wired since lote 3).
@@ -70,6 +85,9 @@ class _BulkSheet extends StatefulWidget {
     required this.today,
     required this.dataSource,
     required this.adminBypass,
+    this.adminOffer,
+    this.isPremium,
+    this.settings = PublicSettings.unloaded,
     required this.frozenDates,
     required this.myProfile,
     required this.allProfiles,
@@ -114,6 +132,12 @@ class _BulkSheetState extends State<_BulkSheet> {
 
   bool _saving = false;
   bool _showDeleteAllConfirm = false;
+
+  /// F-14 bypass as THIS sheet sees it — turned true by the F-67 offer, so
+  /// the selection and the draft survive the answer.
+  late bool _bypass = widget.adminBypass;
+  AdminModeAction? _offering;
+  VoidCallback? _afterOffer;
   bool _showOverwriteConfirm = false;
   bool _overwriteConfirmed = false;
   int _overwriteCount = 0;
@@ -134,6 +158,69 @@ class _BulkSheetState extends State<_BulkSheet> {
   int get _assignedCount => widget.selectedDays
       .where((d) => (_existingFor(d)?.scheduledParentId ?? 0) != 0)
       .length;
+
+  AdminModeOfferKind _offerKind(AdminModeAction action,
+          {Iterable<DateTime> dates = const []}) =>
+      widget.adminOffer == null
+          ? AdminModeOfferKind.none
+          : adminModeOfferFor(
+              action: action,
+              isAdmin: true,
+              adminModeActive: _bypass,
+              today: widget.today,
+              isPremium: widget.isPremium,
+              overrideFreeDays: widget.settings.overrideFreeDays,
+              overridePremiumMonths: widget.settings.overridePremiumMonths,
+              dates: dates,
+            );
+
+  /// F-67 Part B: the mode would change what this edit does — a past day it
+  /// would skip is inside the admin's F-40 reach, or an assigned day ahead
+  /// would keep its planned parent. A past day beyond reach is not a reason
+  /// to ask: the mode would skip it too (the trigger refuses it).
+  bool get _offerOverwrite {
+    if (widget.adminOffer == null || _bypass) return false;
+    final past = [
+      for (final d in widget.selectedDays)
+        if (isDayInPast(d, widget.today)) d,
+    ];
+    if (past.isNotEmpty &&
+        _offerKind(AdminModeAction.bulkOverwrite, dates: past) ==
+            AdminModeOfferKind.offer) {
+      return true;
+    }
+    return widget.selectedDays.any((d) =>
+        !isDayInPast(d, widget.today) &&
+        (_existingFor(d)?.scheduledParentId ?? 0) != 0);
+  }
+
+  void _ask(AdminModeAction action, VoidCallback resume) => setState(() {
+        _error = null;
+        _offering = action;
+        _afterOffer = resume;
+      });
+
+  void _acceptOffer() {
+    final action = _offering;
+    final resume = _afterOffer;
+    if (action == null) return;
+    widget.adminOffer?.accept(action);
+    setState(() {
+      _bypass = true;
+      _offering = null;
+      _afterOffer = null;
+    });
+    resume?.call();
+  }
+
+  void _declineOffer() {
+    final action = _offering;
+    if (action != null) widget.adminOffer?.decline(action);
+    setState(() {
+      _offering = null;
+      _afterOffer = null;
+    });
+  }
 
   @override
   void initState() {
@@ -184,7 +271,7 @@ class _BulkSheetState extends State<_BulkSheet> {
     );
     return actual ??
         bulkDayScheduled(
-          overwriteScheduled: widget.adminBypass,
+          overwriteScheduled: _bypass,
           existing: existing,
           bulkScheduledParentId: _scheduledParentId,
         );
@@ -210,7 +297,7 @@ class _BulkSheetState extends State<_BulkSheet> {
     final eligibility = bulkEligibleDays(
       selectedDates: widget.selectedDays,
       today: widget.today,
-      adminBypass: widget.adminBypass,
+      adminBypass: _bypass,
       frozenDates: widget.frozenDates,
       existingFor: _existingFor,
       clearScheduledParent: true,
@@ -260,7 +347,7 @@ class _BulkSheetState extends State<_BulkSheet> {
       final eligibility = bulkEligibleDays(
         selectedDates: widget.selectedDays,
         today: widget.today,
-        adminBypass: widget.adminBypass,
+        adminBypass: _bypass,
         frozenDates: widget.frozenDates,
         existingFor: _existingFor,
         clearScheduledParent: false,
@@ -290,7 +377,7 @@ class _BulkSheetState extends State<_BulkSheet> {
         existingFor: _existingFor,
         bulkScheduledParentId: _scheduledParentId,
       );
-      if (widget.adminBypass && overwriteCount > 0 && !_overwriteConfirmed) {
+      if (_bypass && overwriteCount > 0 && !_overwriteConfirmed) {
         setState(() {
           _saving = false;
           _overwriteCount = overwriteCount;
@@ -325,7 +412,7 @@ class _BulkSheetState extends State<_BulkSheet> {
         final existing = existingRow == null ? null : _fields(existingRow);
 
         final dayScheduled = bulkDayScheduled(
-          overwriteScheduled: widget.adminBypass,
+          overwriteScheduled: _bypass,
           existing: existing,
           bulkScheduledParentId: _scheduledParentId,
         );
@@ -560,7 +647,13 @@ class _BulkSheetState extends State<_BulkSheet> {
       // action row's place — the batch is saved from the pinned row, and both
       // used to appear at the end of this long form.
       error: _error,
-      confirmation: _confirmation(l),
+      confirmation: _offering != null
+          ? AdminModeOfferConfirmation(
+              action: _offering!,
+              onActivate: _acceptOffer,
+              onCancel: _declineOffer,
+            )
+          : _confirmation(l),
       primaryLabel: l[K.commonSave],
       onPrimary: _scheduledParentId == 0 ? null : _save,
       secondaryLabel: l[K.commonCancel],
@@ -569,16 +662,40 @@ class _BulkSheetState extends State<_BulkSheet> {
       // U-38: "Limpar dias" left the planned parent's label row, where it was
       // a small red text button beside a dropdown, for the frame's one
       // destructive slot. Clearing assigned days stays admin-only (S-09).
-      extraAction: !widget.adminBypass
+      extraAction: !_bypass &&
+              _offerKind(AdminModeAction.bulkClearDays) !=
+                  AdminModeOfferKind.offer
           ? null
           : AppSheetDangerAction(
               key: const Key('bulkClearDays'),
               label: l[K.bulkClearDaysAction],
               onPressed: _saving
                   ? null
-                  : () => setState(() => _showDeleteAllConfirm = true),
+                  : _bypass
+                      ? () => setState(() => _showDeleteAllConfirm = true)
+                      // F-67: the mode first, then the sheet's own
+                      // "apagar N dias?" — activating never deletes.
+                      : () => _ask(AdminModeAction.bulkClearDays,
+                          () => setState(() => _showDeleteAllConfirm = true)),
             ),
       children: [
+                // F-67 Part B: what the edit will leave alone without the
+                // mode, said BEFORE the save — the summary toast used to be
+                // the first place an admin learned the past days were
+                // skipped.
+                if (_offerOverwrite) ...[
+                  AppBanner(
+                    key: const Key('bulkAdminOffer'),
+                    tone: context.tokens.info,
+                    icon: Icons.shield_outlined,
+                    message: l[KApp.adminOfferBulkBanner],
+                    actionLabel: l[K.navAdminEnter],
+                    onAction: _saving
+                        ? null
+                        : () => _ask(AdminModeAction.bulkOverwrite, () {}),
+                  ),
+                  const SizedBox(height: Spacing.sm),
+                ],
                 // U-29: this sheet had missed the U-28 QA pass — bare
                 // underline `DropdownButton`s, loose labels and no grouping,
                 // exactly what the day sheet and the wizard were converted
@@ -611,7 +728,7 @@ class _BulkSheetState extends State<_BulkSheet> {
                             : (v) =>
                                 setState(() => _scheduledParentId = v ?? 0),
                       ),
-                      if (!widget.adminBypass && _assignedCount > 0)
+                      if (!_bypass && _assignedCount > 0)
                         Padding(
                           padding: const EdgeInsets.only(top: Spacing.xs),
                           child: Row(

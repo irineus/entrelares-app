@@ -21,6 +21,7 @@ import '../services/offline_cache.dart';
 import '../theme/slot_pattern.dart';
 import '../theme/tokens.dart';
 import '../widgets/account_button.dart';
+import '../widgets/admin_mode_offer.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
 import '../widgets/slot_pill.dart';
@@ -110,6 +111,10 @@ class CalendarScreen extends StatefulWidget {
   /// appears once per install.
   final VoidCallback? onOpenNotifications;
 
+  /// F-67 Part B: the free-tier gate on a past day beyond the 7-day reach
+  /// sends the admin to `/family/plan` (U-49). Null leaves it a sentence.
+  final VoidCallback? onOpenPlan;
+
   const CalendarScreen(
       {super.key,
       required this.dataSource,
@@ -120,7 +125,8 @@ class CalendarScreen extends StatefulWidget {
       this.tourKeys,
       this.analytics,
       this.onOpenFamily,
-      this.onOpenNotifications});
+      this.onOpenNotifications,
+      this.onOpenPlan});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -215,6 +221,22 @@ class _CalendarScreenState extends State<CalendarScreen>
   bool get _adminBypass => isAdminBypass(
       adminModeActive: widget.adminMode.isActive,
       isAdmin: _ownProfile?.isAdmin ?? false);
+
+  /// F-67 Part B: handed to the sheets ONLY for a real admin — a sheet with
+  /// no offerer never asks, which is the whole "a non-admin never sees the
+  /// question" rule.
+  AdminModeOfferer? get _adminOfferer => _ownProfile?.isAdmin == true
+      ? AdminModeOfferer(
+          adminMode: widget.adminMode,
+          analytics: widget.analytics,
+          onOpenPlan: widget.onOpenPlan)
+      : null;
+
+  /// The F-40 entitlement the day sheet's gate reads: null when the read
+  /// failed, so no client-side limit is guessed.
+  bool? get _isPremiumForGate => _entitlementFailed
+      ? null
+      : Family.isPremiumFamily(_family, DateTime.now().toUtc());
 
   // ── Bulk selection (U-11): long-press arms it; the ☑️ button is the
   //    accessible entry point. Mirror of Home.razor's selection state.
@@ -856,6 +878,9 @@ class _CalendarScreenState extends State<CalendarScreen>
       today: _today,
       dataSource: widget.dataSource,
       adminBypass: _adminBypass,
+      adminOffer: _adminOfferer,
+      isPremium: _isPremiumForGate,
+      settings: _settings,
       frozenDates: [for (final r in _frozenByIso.values) r.scheduleDate],
       myProfile: _ownProfile,
       allProfiles: _members,
@@ -983,6 +1008,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       // F-51: the "substituir" checkbox is an admin-mode power, like every
       // other clear of a planned day.
       adminBypass: _adminBypass,
+      adminOffer: _adminOfferer,
       analytics: widget.analytics,
     );
     if (generated == true) _load(silent: true);
@@ -997,6 +1023,21 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// rules spared. U-27: the confirming action first, the way out after it.
   Future<void> _clearMonth() async {
     if (_refuseWriteOffline()) return;
+    // F-67 Part B: offered to an admin with the mode off. Yes turns it on
+    // and carries on into the month's own "apagar N dias?" — activating the
+    // mode never deletes anything by itself.
+    final offerer = _adminOfferer;
+    if (!_adminBypass) {
+      if (offerer == null) return;
+      final yes =
+          await showAdminModeOfferDialog(context, AdminModeAction.clearMonth);
+      if (!yes) {
+        offerer.decline(AdminModeAction.clearMonth);
+        return;
+      }
+      offerer.accept(AdminModeAction.clearMonth);
+      if (!mounted) return;
+    }
     final l = AppL10n.of(context).l;
     final range = monthClearRange(visibleMonth: _visibleMonth, today: _today);
     if (range == null) return;
@@ -1069,13 +1110,12 @@ class _CalendarScreenState extends State<CalendarScreen>
       today: _today,
       dataSource: widget.dataSource,
       adminBypass: _adminBypass,
+      adminOffer: _adminOfferer,
       ownProfileId: _ownProfile?.id,
       // F-40 proactive gate wants the REAL entitlement (fail-closed mirror);
       // when the read failed it gets null and the gate steps aside — the
       // trigger's own refusal propagates instead of a wrongful client block.
-      isPremium: _entitlementFailed
-          ? null
-          : Family.isPremiumFamily(_family, DateTime.now().toUtc()),
+      isPremium: _isPremiumForGate,
       settings: _settings,
       frozenDates: [for (final r in _frozenByIso.values) r.scheduleDate],
       myProfile: _ownProfile,
@@ -1595,6 +1635,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                 setState(() => _selectionArmed = true),
               _CalendarAction.notice => _openNoticeFromMenu(),
               _CalendarAction.clearMonth => _clearMonth(),
+              _CalendarAction.adminMode => widget.adminMode.toggle(),
             },
             itemBuilder: (context) => [
               PopupMenuItem(
@@ -1635,7 +1676,27 @@ class _CalendarScreenState extends State<CalendarScreen>
               // the same gate as "Limpar dia" and "Apagar dias"), and only
               // while the displayed month still has days ahead: the past is
               // never offered, not even to an admin.
-              if (_adminBypass &&
+              // F-67 Part B (owner, 21/09/2026): the shield's own words. The
+              // icon stays — it is a mode and its glyph is the state — but a
+              // tooltip is a long-press nobody performs (U-36), so the menu
+              // carries the same toggle with its text.
+              if (_ownProfile?.isAdmin == true)
+                PopupMenuItem(
+                  value: _CalendarAction.adminMode,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(widget.adminMode.isActive
+                        ? Icons.shield
+                        : Icons.shield_outlined),
+                    title: Text(l[widget.adminMode.isActive
+                        ? K.navAdminExit
+                        : K.navAdminEnter]),
+                  ),
+                ),
+              // F-67 Part B: an admin with the mode off sees it too, and is
+              // asked to turn the mode on when picking it.
+              if (_ownProfile?.isAdmin == true &&
                   monthClearRange(
                           visibleMonth: _visibleMonth, today: _today) !=
                       null) ...[
@@ -1889,7 +1950,7 @@ class _CalendarScreenState extends State<CalendarScreen>
 }
 
 /// U-36 — the items of the calendar's ⋮ menu. F-51 adds `clearMonth` here.
-enum _CalendarAction { wizard, selectDays, notice, clearMonth }
+enum _CalendarAction { wizard, selectDays, notice, adminMode, clearMonth }
 
 /// The today card's outline while it loads — the same card, the same two
 /// bands, the same heights, so nothing moves when the real one arrives.

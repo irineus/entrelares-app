@@ -142,9 +142,11 @@ Future<void> tapReplaceCheckbox(WidgetTester tester) async {
 }
 
 void f51ReplaceTests() {
-  testWidgets('F-51: without admin mode the wizard offers no replace — the '
-      'additive path is untouched', (tester) async {
-    final ds = FakeCustodyDataSource(members: [anaAdmin, bruno], days: []);
+  // F-67 Part B: an ADMIN with the mode off now sees the box (ticking it
+  // asks) — so the "no replace" reader is a member who is not an admin.
+  testWidgets('F-51: a non-admin is offered no replace — the additive path '
+      'is untouched', (tester) async {
+    final ds = FakeCustodyDataSource(members: [bruno, anaAdmin], days: []);
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
 
