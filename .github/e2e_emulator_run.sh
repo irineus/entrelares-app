@@ -35,6 +35,11 @@
 # the app's process state: whether it was frozen, killed or never came to the
 # front is then in the log, not in a guess.
 #
+# Dispatch 1 of that fix (21/09/2026) corrected the diagnosis: with the freezer
+# off (read back: use_freezer=false) the FIRST suite hung and the second passed.
+# The process was alive and in front (adj 0) the whole time — not frozen — and
+# Play services died 12 s into its setUpAll. See `wait_for_settled_system`.
+#
 # Usage (from app/): bash ../.github/e2e_emulator_run.sh integration_test/<a>.dart [integration_test/<b>.dart …]
 # Env: E2E_SUPABASE_SERVICE_ROLE_KEY (secret), E2E_PACK (p0|full),
 #      E2E_TEST_TIMEOUT (per suite, default 15m).
@@ -46,8 +51,44 @@ package="com.entrelares.flutter" # the dev flavour's applicationId
 diag="build/e2e-diag"
 mkdir -p "$diag"
 
+gms_pid() {
+  "$adb" shell pidof com.google.android.gms.persistent 2>/dev/null | tr -d '\r'
+}
+
+# The system settles AFTER `sys.boot_completed`, not at it. Dispatch 1 of #230
+# (run 35619769483): the first suite started 1:45 after boot, its process sat
+# alive at adj 0 for 13 minutes without sending one request or firing one
+# 45-s timeout, and 12 s after it started Google Play services died
+# (`com.google.android.gms` / `.persistent` "has died"), in the middle of the
+# post-boot storm (ANRs of ext.services and cellbroadcastreceiver). Since
+# Flutter 3.29 Dart runs ON the Android main thread, so a main-thread binder
+# call into a service that is dying holds the whole isolate — the same
+# silence, whichever suite happens to be first on a fresh boot. So the first
+# suite waits for the broadcast queue to drain and for Play services to keep
+# the SAME pid for 90 s (at most 6 min, then it runs anyway and says so).
+wait_for_settled_system() {
+  "$adb" shell am wait-for-broadcast-idle >/dev/null 2>&1 || true
+  local stable=0 last="" pid
+  for _ in $(seq 1 36); do
+    pid="$(gms_pid)"
+    if [ -n "$pid" ] && [ "$pid" = "$last" ]; then
+      stable=$((stable + 10))
+    else
+      stable=0
+    fi
+    last="$pid"
+    if [ "$stable" -ge 90 ]; then
+      echo "system settled: Play services pid $pid stable for ${stable}s"
+      return 0
+    fi
+    sleep 10
+  done
+  echo "::warning::Play services did not hold one pid for 90 s within 6 min (last: ${last:-none}); running anyway."
+}
+
 prepare_device() {
   "$adb" wait-for-device
+  wait_for_settled_system
   "$adb" uninstall "$package" >/dev/null 2>&1 || true
   "$adb" shell settings put global cached_apps_freezer disabled || true
   echo "freezer: $("$adb" shell settings get global cached_apps_freezer | tr -d '\r')" \
@@ -75,6 +116,20 @@ collect_evidence() {
   echo "::group::logcat (flutter, ActivityManager, AndroidRuntime; last 400 lines) — $name"
   "$adb" logcat -d -s flutter:V ActivityManager:I AndroidRuntime:E DEBUG:E | tail -n 400 || true
   echo "::endgroup::"
+  # Where the app's MAIN thread is — the thread Dart runs on. The google_apis
+  # image lets adbd run as root, which `debuggerd -j` needs; last, because the
+  # adbd restart drops the connection for a moment.
+  local pid
+  pid="$("$adb" shell pidof "$package" 2>/dev/null | tr -d '\r')"
+  if [ -n "$pid" ]; then
+    echo "::group::java stacks of $package (pid $pid), main thread first — $name"
+    "$adb" root >/dev/null 2>&1 || true
+    "$adb" wait-for-device
+    "$adb" shell debuggerd -j "$pid" 2>/dev/null \
+      | awk '/^"main"/{p=1} p{print} /^$/{if(p) exit}' | head -n 80 || true
+    "$adb" shell debuggerd -j "$pid" 2>/dev/null | grep -E '^"' | head -n 40 || true
+    echo "::endgroup::"
+  fi
 }
 
 overall=0

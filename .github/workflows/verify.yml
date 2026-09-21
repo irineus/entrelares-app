@@ -280,7 +280,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.run-e2e)
     needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 65
     concurrency:
       group: e2e-${{ github.ref }}
       cancel-in-progress: true
@@ -354,7 +354,8 @@ jobs:
       # reaches the fixture through --dart-define only (e2e_emulator_run.sh
       # reads it from the step env). The script bounds each suite, streams its
       # progress and, on a red, takes the screenshot and the logcat before the
-      # action kills the emulator (T-77) — the step ceiling (two 15-min suites
+      # action kills the emulator (T-77) — the step ceiling (a settle wait of up to
+      # 6 min, two 15-min suites
       # plus boot and install) is there so a hang outside the script still
       # fails THIS step, not the whole job.
       #
@@ -367,7 +368,7 @@ jobs:
       # and the two families still never share a run id.
       - name: E2E — swap, account and family flows on an emulator
         uses: reactivecircus/android-emulator-runner@v2
-        timeout-minutes: 40
+        timeout-minutes: 45
         env:
           E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
           E2E_PACK: ${{ inputs.e2e-pack || 'p0' }}
