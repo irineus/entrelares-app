@@ -540,6 +540,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   badge: _badge,
                   connectivity: appConnectivity,
                   push: _push,
+                  installFacts: _browserFacts,
+                  analytics: _analytics,
                   landing: switch (state.uri.queryParameters['tab']) {
                     'incoming' => NotificationLanding.incoming,
                     'history' => NotificationLanding.history,
@@ -608,9 +610,22 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// gives.
   final _installHint = ValueNotifier<InstallHintBanner?>(null);
 
+  /// What the browser says about itself (U-51's seam), read ONCE: the shell
+  /// strip and the Notificações step (U-54) must agree on the same answer.
+  /// Null in the native app.
+  late final BrowserInstallFacts? _browserFacts =
+      kIsWeb ? readBrowserInstallFacts() : null;
+
   /// Where a dismissal of the hint is remembered — per BROWSER, like the
   /// handoff's: it is that Safari that keeps the app as a tab.
   static const String _installHintDismissedKey = 'app.installHint.dismissed';
+
+  /// U-54: how many times, and when last. The U-51 bool above is only read,
+  /// as one undated dismissal — never written again.
+  static const String _installHintDismissCountKey =
+      'app.installHint.dismissCount';
+  static const String _installHintLastDismissedKey =
+      'app.installHint.lastDismissedAt';
 
   /// U-23 — the checklist/tour state and the shared registry of tour targets
   /// (they live in two different subtrees: the tab bar and the calendar).
@@ -895,15 +910,19 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// that the T-65 widget test's order (shell first, answer second) stays the
   /// order this code can be exercised in.
   ///
-  /// Once per authenticated session and never after a dismissal. The
-  /// impression is counted so T-75 can read how many iPhone readers were
-  /// shown the door before it measures who walked through it.
+  /// Once per authenticated session. U-54: a dismissal snoozes it for
+  /// [InstallHintRules.snooze], and the third one is final
+  /// ([InstallHintDismissals]). The impression is counted so T-75 can read how
+  /// many iPhone readers were shown the door before it measures who walked
+  /// through it.
   void _resolveInstallHint() {
     if (!kIsWeb || _installHint.value != null) return;
-    final facts = readBrowserInstallFacts();
+    final facts = _browserFacts;
     if (facts == null) return;
-    final dismissed = widget.prefs.getBool(_installHintDismissedKey) ?? false;
-    if (!InstallHintRules.shouldHint(facts, dismissed: dismissed)) return;
+    if (!InstallHintRules.shouldHint(facts,
+        dismissals: _installHintDismissals(), now: DateTime.now())) {
+      return;
+    }
     _installHint.value = InstallHintBanner(
       onOpen: () => unawaited(_analytics.trackEvent('install-hint-open')),
       onDismiss: _dismissInstallHint,
@@ -911,9 +930,25 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     unawaited(_analytics.trackEvent('install-hint-view'));
   }
 
+  /// The dismissals this browser remembers. U-51 wrote only a bool; it reads
+  /// here as one dismissal with no date, which snoozes nothing.
+  InstallHintDismissals _installHintDismissals() {
+    final prefs = widget.prefs;
+    final count = prefs.getInt(_installHintDismissCountKey) ??
+        ((prefs.getBool(_installHintDismissedKey) ?? false) ? 1 : 0);
+    final lastMs = prefs.getInt(_installHintLastDismissedKey);
+    return InstallHintDismissals(
+      count: count,
+      last: lastMs == null ? null : DateTime.fromMillisecondsSinceEpoch(lastMs),
+    );
+  }
+
   void _dismissInstallHint() {
     _installHint.value = null;
-    unawaited(widget.prefs.setBool(_installHintDismissedKey, true));
+    final next = _installHintDismissals().next(DateTime.now());
+    unawaited(widget.prefs.setInt(_installHintDismissCountKey, next.count));
+    unawaited(widget.prefs.setInt(
+        _installHintLastDismissedKey, next.last!.millisecondsSinceEpoch));
     unawaited(_analytics.trackEvent('install-hint-dismiss'));
   }
 

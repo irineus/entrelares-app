@@ -64,8 +64,10 @@ class PushService extends ChangeNotifier {
     }();
   }
 
-  /// Whether this BUILD has a push transport at all — false on the web. Read
-  /// by the U-23 checklist, which must not offer a step it cannot finish.
+  /// Whether this BUILD has a push transport at all — on the web, whether the
+  /// environment carries a Firebase Web config (T-62); whether THIS browser
+  /// can use it is [state]'s business (an iPhone tab has no `PushManager`).
+  /// Read by the U-23 checklist, which must not offer a step it cannot finish.
   bool get supported => _messaging.supported;
 
   bool get _usable => _messaging.supported && _ready;

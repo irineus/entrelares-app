@@ -663,6 +663,55 @@ void main() {
       await _measure(tester, 'notifications, push sheet');
     });
 
+    // U-54: an iPhone in Safari gets an actionable banner above the list, and
+    // it opens the U-51 install sheet; an installed iPhone that refused gets
+    // the Ajustes path as the quiet line after the list.
+    _scene('notifications, iPhone push steps', (tester, dark) async {
+      const iphoneUa = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) '
+          'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 '
+          'Mobile/15E148 Safari/604.1';
+      final ds =
+          cal.FakeCustodyDataSource(members: [cal.ana, cal.bruno], days: []);
+      await tester.pumpWidget(
+        _host(
+          NotificationsScreen(
+              dataSource: ds,
+              badge: NotificationBadge(ds),
+              installFacts: const BrowserInstallFacts(
+                  userAgent: iphoneUa, maxTouchPoints: 5)),
+          dark: dark,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(NotificationsScreen.pushInstallKey), findsOneWidget);
+      await _measure(tester, 'notifications, iPhone install step');
+
+      await tester.tap(find.text(pt[KApp.pushInstallHow]));
+      await tester.pumpAndSettle();
+      await _measure(tester, 'notifications, iPhone install sheet');
+
+      final push = PushService(ds,
+          messaging: psh.FakeMessaging(current: PushPermission.denied));
+      await tester.runAsync(() => push.start(1));
+      await tester.pumpWidget(
+        _host(
+          NotificationsScreen(
+              key: const ValueKey('installed'),
+              dataSource: ds,
+              badge: NotificationBadge(ds),
+              push: push,
+              installFacts: const BrowserInstallFacts(
+                  userAgent: iphoneUa,
+                  maxTouchPoints: 5,
+                  navigatorStandalone: true)),
+          dark: dark,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(pt[KApp.pushHintReallowIos]), findsOneWidget);
+      await _measure(tester, 'notifications, iPhone re-allow line');
+    });
+
     _scene('profile', (tester, dark) async {
       final ds = prof.source();
       await tester.pumpWidget(

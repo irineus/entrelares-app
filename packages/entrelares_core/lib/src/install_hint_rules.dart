@@ -98,9 +98,11 @@ abstract final class InstallHintRules {
   static bool isStandalone(BrowserInstallFacts facts) =>
       facts.navigatorStandalone || facts.displayModeStandalone;
 
-  /// The whole decision.
-  static bool shouldHint(BrowserInstallFacts facts, {required bool dismissed}) {
-    if (dismissed) return false;
+  /// Safari proper on an iPhone or iPad, still in a tab: the one browser
+  /// whose steps the sheet gives, on the one device where the gesture exists.
+  /// Shared with `PushNudgeRules` (U-54), which offers the same sheet from
+  /// the Notificações screen.
+  static bool canInstall(BrowserInstallFacts facts) {
     if (isStandalone(facts)) return false;
     if (!isAppleTouchDevice(
         userAgent: facts.userAgent, maxTouchPoints: facts.maxTouchPoints)) {
@@ -108,4 +110,54 @@ abstract final class InstallHintRules {
     }
     return isSafari(facts.userAgent);
   }
+
+  /// U-54 — how long a dismissal keeps the shell strip away.
+  ///
+  /// U-51 dismissed it for good, and for an iPhone reader that was the end of
+  /// every path to push: family 19's father (Safari, iOS 18.7, no device
+  /// registered) had nothing left pointing at the Home Screen. The strip now
+  /// comes back [snooze] after a dismissal, [maxDismissals] times at most;
+  /// after that only the Notificações screen still offers the sheet (owner,
+  /// 21/09/2026).
+  static const Duration snooze = Duration(days: 14);
+  static const int maxDismissals = 3;
+
+  /// Whether the dismissals so far keep the strip quiet at [now].
+  ///
+  /// A dismissal with no date is one U-51 recorded (a bare "dismissed" flag):
+  /// it counts toward [maxDismissals] but snoozes nothing, so those readers see
+  /// the strip once more — they are exactly the ones this item exists for.
+  static bool isQuiet(InstallHintDismissals dismissals, DateTime now) {
+    if (dismissals.count >= maxDismissals) return true;
+    final last = dismissals.last;
+    if (dismissals.count == 0 || last == null) return false;
+    return now.difference(last) < snooze;
+  }
+
+  /// The whole decision.
+  static bool shouldHint(
+    BrowserInstallFacts facts, {
+    InstallHintDismissals dismissals = InstallHintDismissals.none,
+    required DateTime now,
+  }) {
+    if (isQuiet(dismissals, now)) return false;
+    return canInstall(facts);
+  }
+}
+
+/// U-54 — what this browser remembers about dismissing the strip.
+class InstallHintDismissals {
+  final int count;
+
+  /// When the latest dismissal happened. Null with a positive [count] means
+  /// the dismissal predates U-54 and has no date.
+  final DateTime? last;
+
+  const InstallHintDismissals({this.count = 0, this.last});
+
+  static const none = InstallHintDismissals();
+
+  /// The record after one more dismissal at [now].
+  InstallHintDismissals next(DateTime now) =>
+      InstallHintDismissals(count: count + 1, last: now);
 }

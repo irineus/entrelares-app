@@ -9,6 +9,8 @@
 /// file's.
 library;
 
+import 'push_nudge_rules.dart';
+
 /// GUID segments — the only dynamic route id (`/family/profile/{id}`) — are
 /// masked so no pseudonymous identifier travels as part of a URL.
 final _guidSegment = RegExp(
@@ -58,15 +60,23 @@ String analyticsChannel({required bool isWeb}) => isWeb ? 'web' : 'store';
 
 /// Props every funnel step carries. Central so no call site can slip a PII key
 /// in: channel always, and cycle/outcome/mode only where the step knows them.
+///
+/// U-54: [platform] and [step] are ENUMS, not strings — the push nudge's two
+/// dimensions are a closed set by type, so no call site can put a user agent
+/// or a device id where the platform goes.
 Map<String, Object> analyticsFunnelProps({
   required String channel,
   String? cycle,
   String? outcome,
   String? mode,
+  PushNudgePlatform? platform,
+  PushNudgeStep? step,
 }) =>
     {
       'channel': channel,
       'cycle': ?cycle,
       'outcome': ?outcome,
       'mode': ?mode,
+      'platform': ?platform?.analyticsValue,
+      'step': ?step?.analyticsValue,
     };
