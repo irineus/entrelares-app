@@ -55,6 +55,7 @@ import 'package:entrelares_app/screens/custom_roles_screen.dart';
 import 'package:entrelares_app/screens/day_sheet.dart';
 import 'package:entrelares_app/screens/family_plan_screen.dart';
 import 'package:entrelares_app/screens/family_screen.dart';
+import 'package:entrelares_app/screens/help_screen.dart';
 import 'package:entrelares_app/screens/home_shell.dart';
 import 'package:entrelares_app/screens/login_screen.dart';
 import 'package:entrelares_app/screens/notifications_screen.dart';
@@ -70,6 +71,7 @@ import 'package:entrelares_app/services/notification_badge.dart';
 import 'package:entrelares_app/services/push_messaging.dart';
 import 'package:entrelares_app/services/push_service.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
+import 'package:entrelares_app/services/support_service.dart';
 import 'package:entrelares_app/theme/app_theme.dart';
 import 'package:entrelares_app/theme/tokens.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
@@ -429,6 +431,8 @@ void main() {
             prefs: prefs,
             googleEnabled: Future.value(true),
             onSignInWithGoogle: () async {},
+            // F-68: the help link is on the first screen everybody meets.
+            onHelp: () {},
           ),
           dark: dark,
         ),
@@ -663,6 +667,7 @@ void main() {
             // this the gate would measure a page the app does not ship, and
             // the segmented control's targets and contrast would go unread.
             appearance: Appearance(),
+            onOpenHelp: () {},
           ),
           dark: dark,
         ),
@@ -678,6 +683,63 @@ void main() {
           find.text(pt[KApp.appearanceLabel]), 200.0);
       await tester.pumpAndSettle();
       await _measure(tester, 'profile, appearance');
+
+      // F-68: the help row is the last thing on the page.
+      await tester.scrollUntilVisible(find.text(pt[KApp.helpTitle]), 200.0);
+      await tester.pumpAndSettle();
+      await _measure(tester, 'profile, help row');
+    });
+
+    // F-68: "Ajuda e contato", signed out (the heavier variant: it has the
+    // e-mail field), with the technical preview open and an error banner up.
+    _scene('help', (tester, dark) async {
+      await tester.pumpWidget(
+        _host(
+          HelpScreen(
+            accountEmail: null,
+            diagnostics: const {
+              'appVersion': '2.7.5+125',
+              'channel': 'web-installed',
+              'platform': 'Android · Samsung Internet',
+              'language': 'pt-BR',
+              'route': '/family/profile',
+            },
+            onSend: (_) async =>
+                const SupportResult(SupportOutcome.rateLimited),
+            onClose: () {},
+            openMail: (_) async {},
+          ),
+          dark: dark,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _measure(tester, 'help');
+
+      final list = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(
+          find.text(pt[KApp.helpDiagPreview]), 200.0, scrollable: list);
+      await tester.tap(find.text(pt[KApp.helpDiagPreview]));
+      await tester.pumpAndSettle();
+      await _measure(tester, 'help, technical preview');
+
+      await tester.enterText(
+          find.descendant(
+              of: find.byKey(HelpScreen.messageKey),
+              matching: find.byType(EditableText)),
+          'Uma mensagem longa o bastante.');
+      await tester.enterText(
+          find.descendant(
+              of: find.byKey(HelpScreen.emailKey),
+              matching: find.byType(EditableText)),
+          'ana@exemplo.com');
+      await tester.scrollUntilVisible(
+          find.byKey(HelpScreen.sendKey), 200.0, scrollable: list);
+      await tester.tap(find.byKey(HelpScreen.sendKey));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+          find.byKey(HelpScreen.mailtoKey), 200.0, scrollable: list);
+      await tester.pumpAndSettle();
+      await _measure(tester, 'help, refused + mailto');
     });
 
     _scene('the three report tabs', (tester, dark) async {

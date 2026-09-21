@@ -11,6 +11,8 @@
 /// copies drift.
 library;
 
+import 'analytics_rules.dart';
+
 /// What a message is about. [wire] is the value the function and the
 /// `support_requests.category` CHECK accept; renaming one orphans nothing in
 /// the database, but the function would answer `invalid_category`.
@@ -95,4 +97,79 @@ abstract final class SupportRules {
       _ => status == 429 ? SupportOutcome.rateLimited : SupportOutcome.failed,
     };
   }
+}
+
+/// F-68 — the technical block a support request carries when the person keeps
+/// *Incluir informações técnicas* ticked. The form previews EXACTLY this map,
+/// and the function keeps these five keys and drops anything else.
+///
+/// Coarse on purpose: an OS family and a browser family ("iOS · Safari"), never
+/// a user-agent string, a model or a version — enough to reproduce a layout
+/// defect, too little to fingerprint anybody. The route goes through the
+/// analytics sanitizer, so an invite token or a recovery hash in the address
+/// never reaches an inbox, and ids become `:id`.
+abstract final class SupportDiagnostics {
+  static const String channelStore = 'store';
+  static const String channelWeb = 'web';
+
+  /// The web channel opened from the Home Screen (U-51's door on an iPhone).
+  static const String channelWebInstalled = 'web-installed';
+
+  static String channel({required bool isWeb, required bool standalone}) =>
+      !isWeb ? channelStore : (standalone ? channelWebInstalled : channelWeb);
+
+  /// "OS · browser" from a web user agent, or the OS alone for the native app
+  /// ([nativeOs] = Flutter's target platform name, e.g. `android`).
+  static String platformLabel({String? userAgent, String? nativeOs}) {
+    if (userAgent == null || userAgent.isEmpty) {
+      return switch ((nativeOs ?? '').toLowerCase()) {
+        'android' => 'Android',
+        'ios' => 'iOS',
+        _ => nativeOs == null || nativeOs.isEmpty ? '—' : nativeOs,
+      };
+    }
+    final ua = userAgent;
+    final os = ua.contains('iPhone') || ua.contains('iPad')
+        ? 'iOS'
+        : ua.contains('Android')
+            ? 'Android'
+            : ua.contains('CrOS')
+                ? 'ChromeOS'
+                : ua.contains('Windows')
+                    ? 'Windows'
+                    : ua.contains('Macintosh')
+                        ? 'macOS'
+                        : ua.contains('Linux')
+                            ? 'Linux'
+                            : null;
+    final browser = ua.contains('Edg/') || ua.contains('EdgiOS')
+        ? 'Edge'
+        : ua.contains('SamsungBrowser')
+            ? 'Samsung Internet'
+            : ua.contains('Firefox/') || ua.contains('FxiOS')
+                ? 'Firefox'
+                : ua.contains('CriOS') || ua.contains('Chrome/')
+                    ? 'Chrome'
+                    : ua.contains('Safari/')
+                        ? 'Safari'
+                        : null;
+    return [os ?? '—', ?browser].join(' · ');
+  }
+
+  /// The block, in the order the preview lists it. Keys are the function's
+  /// `DIAGNOSTIC_KEYS`.
+  static Map<String, String> build({
+    required String appVersion,
+    required String channel,
+    required String platform,
+    required String language,
+    required String route,
+  }) =>
+      {
+        'appVersion': appVersion,
+        'channel': channel,
+        'platform': platform,
+        'language': language,
+        'route': sanitizeAnalyticsPath(route),
+      };
 }

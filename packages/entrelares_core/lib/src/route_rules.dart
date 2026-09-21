@@ -54,6 +54,11 @@ abstract final class RouteRules {
 
   static const String home = '/';
 
+  /// F-68: "Ajuda e contato". Public AND reachable signed in — deliberately
+  /// NOT in [anonymousOnlyRoutes], because the person who most needs it may be
+  /// either side of the login (`/update-password`'s shape).
+  static const String help = '/help';
+
   /// Reachable without a session. `/update-password` is here even though the
   /// recovery visitor is technically authenticated: opening it anonymously
   /// shows the web's own "invalid session" message instead of bouncing.
@@ -62,6 +67,7 @@ abstract final class RouteRules {
     register,
     resetPassword,
     updatePassword,
+    help,
   };
 
   /// Screens an authenticated visitor has no business on: a sign-up form
