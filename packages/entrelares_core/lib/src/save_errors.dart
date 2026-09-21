@@ -12,6 +12,7 @@ library;
 
 import 'dart:convert';
 
+import 'connectivity_rules.dart';
 import 'localization/k_app.dart';
 import 'localization/localization.dart';
 
@@ -99,6 +100,21 @@ final _postgrestToString =
   return (code: null, message: null);
 }
 
+/// True when [code] is a bare HTTP 5xx status: a proxy or gateway between the
+/// reader and PostgREST answered, not PostgREST.
+///
+/// postgrest-dart puts the HTTP status in `code` only when the body is NOT
+/// PostgREST's JSON; PostgREST's own errors carry a SQLSTATE or a `PGRST…`
+/// code, even its 503 for "database unreachable" (`PGRST001`/`PGRST002`) —
+/// and that one stays reported, because it is OUR stack failing.
+///
+/// Found 21/09/2026: an Android save came back `code: 504, details: Gateway
+/// Timeout` with an empty body, and the production edge logs held no trace of
+/// the write at all. It was reported as "unexplained", at high priority, for a
+/// failure the fallback sentence already described correctly.
+bool _isGatewayStatus(String? code) =>
+    code != null && RegExp(r'^5\d\d$').hasMatch(code.trim());
+
 /// T-66 — what to do when this function could NOT explain an error.
 ///
 /// **Only the fallback is worth reporting, and that is the whole design.** A
@@ -133,6 +149,14 @@ SaveErrorObserver? saveErrorObserver;
 String translateSaveError(String raw, String fallback, Localization l) {
   final fields = _errorFields(raw);
   final message = fields.message;
+
+  // The request never got an answer from our server: the fallback is the
+  // honest sentence, and there is nothing here the crash sink could act on.
+  // Checked before the pass-through, because a gateway's error PAGE is the
+  // message in this shape, and it may carry an accent.
+  if (isNetworkFailure(raw) || _isGatewayStatus(fields.code)) {
+    return fallback;
+  }
 
   if (fields.code == '23505') {
     if (message != null &&
