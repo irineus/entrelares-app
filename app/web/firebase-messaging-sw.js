@@ -113,13 +113,18 @@ const FIREBASE_CONFIG = {
 // service worker, which cannot call Dart. `push_routing_worker_mirror_test`
 // reads THIS file and compares it against `PushRouting.landingFor` for every
 // pushable type, so the two cannot drift.
-const ACTIONABLE_TYPES = ['swap_requested', 'revert_requested', 'auto_reminder', 'day_notice'];
+const ACTIONABLE_TYPES = ['swap_requested', 'revert_requested', 'auto_reminder'];
+// F-52: one type, four wordings. Only the two that ASK for something leave
+// the reader with anything to do; the rest are news and belong in "Todas".
+const ACTIONABLE_KINDS = ['pickup', 'keep'];
 
 /// Where a tapped notification lands — the same URL `main.dart` builds for the
 /// Android tap, which is what makes the two channels agree: the Notificações
 /// screen reads `tab` and `n` from the query string either way.
 function landingUrl(data) {
-  const tab = ACTIONABLE_TYPES.includes(data.type) ? 'incoming' : 'history';
+  const actionable = ACTIONABLE_TYPES.includes(data.type) ||
+    (data.type === 'day_notice' && ACTIONABLE_KINDS.includes(data.kind));
+  const tab = actionable ? 'incoming' : 'history';
   const id = data.notificationId || '';
   const query = id ? `?tab=${tab}&n=${encodeURIComponent(id)}` : `?tab=${tab}`;
   return new URL(`/notifications${query}`, self.location.origin).href;

@@ -161,6 +161,41 @@ void main() {
       }
     });
 
+    // F-52 — the assertion that exists because its defect SHIPPED, twice, and
+    // was silent both times.
+    //
+    // `day_notice` carries SIX wordings under one type. The first version hid
+    // three of them behind a `kind` filter in the trigger, so they never
+    // reached this module and nobody noticed there was no copy for them here.
+    // When the filter was dropped — so that a courtesy aviso could finally
+    // reach a phone — those three arrived at `renderPush` for the first time,
+    // matched no template, and were dropped as "unrenderable payload". The
+    // notification, the badge and the screen were all fine; only the
+    // interruption was missing, and the only trace was a log line nobody
+    // reads.
+    //
+    // The catalog mirror above cannot catch this: it compares strings that
+    // EXIST on both sides, and the failure was a wording that existed on
+    // neither. This reads the closed sets the database writes from — the two
+    // core enums — and requires the Deno branch to name every one of them.
+    test('every day_notice kind the database can write has push copy', () {
+      final source = _pushSource();
+      final kinds = [
+        ...NoticeRequest.values.map((r) => r.wire),
+        ...NoticeOutcome.values.map((o) => o.wire),
+      ];
+      expect(kinds, hasLength(6),
+          reason: 'the enums moved; this gate counts on covering both');
+
+      for (final kind in kinds) {
+        expect(source, contains('$kind:'),
+            reason: 'push.ts has no branch for the `$kind` wording of '
+                '`day_notice`. The trigger sends it, renderPush returns null, '
+                'and the push is dropped with a log line — the person simply '
+                'is not interrupted, and nothing is red.');
+      }
+    });
+
     test('the renderer reads params the writers actually send', () {
       // `renderPush` refuses anything without `params.date`, so a pushable type
       // whose writer never sets one would be dropped on every single send —

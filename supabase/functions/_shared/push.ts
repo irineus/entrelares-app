@@ -41,12 +41,13 @@ export const PUSH_TYPES: readonly string[] = [
 	"revert_approved",
 	"revert_rejected",
 	"revert_cancelled",
-	// F-52. Only the avisos that ASK for something reach this module at all: the
-	// trigger filters `params.kind` to `pickup` and `keep` before it calls, so a
-	// courtesy note, an answer and a cancellation stay in-app. That split cannot
-	// live here — `landingFor` routes by TYPE, so every pushable `day_notice`
-	// lands on "Para você", and a receipt landing there would show an empty tab,
-	// which is the exact defect PushRouting exists to prevent.
+	// F-52. All four wordings of an aviso reach a phone. The FIRST version cut
+	// three of them, because routing was by TYPE alone and a courtesy note would
+	// have landed on "Para você" without being listed there. The owner sent two
+	// courtesy avisos on the first real round and nothing rang: "vou atrasar 15
+	// minutes" is the most common one there is. So the payload carries `kind` now
+	// and both channels route on it — asking goes to "Para você", telling goes to
+	// "Todas", where the row always is.
 	"day_notice",
 ];
 
@@ -92,6 +93,16 @@ const K = {
 	dayNoticeEtaMinutes: "notifRender.dayNotice.eta.minutes",
 	dayNoticeEtaNone: "notifRender.dayNotice.eta.none",
 	dayNoticeNoteSuffix: "notifRender.dayNotice.noteSuffix",
+	// The two answers and the withdrawal. They were the three wordings the old
+	// trigger filter hid: it never let them reach this module, so nobody noticed
+	// there was no copy for them here. Dropping the filter without writing these
+	// turned a silent NON-push into a silent UNRENDERABLE one.
+	titleDayNoticeHelping: "notifRender.title.dayNoticeHelping",
+	titleDayNoticeKeeping: "notifRender.title.dayNoticeKeeping",
+	titleDayNoticeCancelled: "notifRender.title.dayNoticeCancelled",
+	dayNoticeHelping: "notifRender.dayNotice.helping",
+	dayNoticeKeeping: "notifRender.dayNotice.keeping",
+	dayNoticeCancelled: "notifRender.dayNotice.cancelled",
 
 	msgSuffix: "notifRender.msgSuffix",
 	tagUrgent: "notifRender.tag.urgent",
@@ -142,6 +153,12 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.dayNotice.eta.minutes": " (cerca de {0} min)",
 		"notifRender.dayNotice.eta.none": " (sem previsão)",
 		"notifRender.dayNotice.noteSuffix": " \"{0}\"",
+		"notifRender.title.dayNoticeHelping": "Alguém vai ajudar",
+		"notifRender.title.dayNoticeKeeping": "O dia de hoje mudou de responsável",
+		"notifRender.title.dayNoticeCancelled": "Aviso cancelado",
+		"notifRender.dayNotice.helping": "{0} vai ajudar agora.{1}",
+		"notifRender.dayNotice.keeping": "{0} vai ficar com a criança hoje. O dia de hoje passou para {0}.{1}",
+		"notifRender.dayNotice.cancelled": "{0} cancelou o aviso de hoje.",
 		"notifRender.msgSuffix": " Mensagem: {0}",
 		"notifRender.tag.urgent": "URGENTE: ",
 		"notifRender.tag.overdue": "ATRASADO: ",
@@ -185,6 +202,12 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.dayNotice.eta.minutes": " (about {0} min)",
 		"notifRender.dayNotice.eta.none": " (no estimate)",
 		"notifRender.dayNotice.noteSuffix": " \"{0}\"",
+		"notifRender.title.dayNoticeHelping": "Someone is helping",
+		"notifRender.title.dayNoticeKeeping": "Today changed carer",
+		"notifRender.title.dayNoticeCancelled": "Notice cancelled",
+		"notifRender.dayNotice.helping": "{0} is coming to help now.{1}",
+		"notifRender.dayNotice.keeping": "{0} will keep the child today. Today has moved to {0}.{1}",
+		"notifRender.dayNotice.cancelled": "{0} cancelled today's notice.",
 		"notifRender.msgSuffix": " Message: {0}",
 		"notifRender.tag.urgent": "URGENT: ",
 		"notifRender.tag.overdue": "OVERDUE: ",
@@ -358,6 +381,32 @@ export function renderPush(
 		// cannot be built is DROPPED rather than guessed: the person still gets
 		// the notification in the app.
 		case "day_notice": {
+			// The three wordings that are NEWS rather than a request: they carry no
+			// reason and no estimate, only who acted. They are handled first, and
+			// they earn a push for the same reason the aviso does — somebody is
+			// waiting on an answer, and "o dia de hoje mudou de responsável" is the
+			// one fact the sender must not learn late.
+			const answerKey = ({
+				helping: K.dayNoticeHelping,
+				keeping: K.dayNoticeKeeping,
+				cancelled: K.dayNoticeCancelled,
+			} as Record<string, string>)[kind ?? ""];
+			if (answerKey !== undefined) {
+				const answerNote = params["note"];
+				// `cancelled` takes no note, and its template has no {1}; passing one
+				// extra argument to `fmt` is inert, so the three share one call.
+				const answerSuffix = !answerNote || answerNote.trim() === ""
+					? ""
+					: fmt(lang, K.dayNoticeNoteSuffix, [answerNote]);
+				titleKey = kind === "helping"
+					? K.titleDayNoticeHelping
+					: kind === "keeping"
+					? K.titleDayNoticeKeeping
+					: K.titleDayNoticeCancelled;
+				body = fmt(lang, answerKey, [name ?? otherCap(), answerSuffix]);
+				break;
+			}
+
 			const reasonKey = ({
 				atraso: K.dayNoticeReasonDelay,
 				medico: K.dayNoticeReasonMedical,

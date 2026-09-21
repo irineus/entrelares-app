@@ -101,6 +101,46 @@ void main() {
       );
     });
 
+    // Selectable and sendable are DIFFERENT questions (owner, 20/09/2026).
+    // An estimate is fixed by the tap that needs it gone; somebody else's day
+    // is not fixable from the sheet at all, so only that one disables a row.
+    test('what may be CHOSEN is wider than what may be SENT', () {
+      // Mine, with an estimate: not sendable as described, but the row is
+      // tappable — the tap clears the estimate.
+      expect(
+        noticeRequestAllowed(
+            request: NoticeRequest.keep,
+            senderId: 1,
+            dayParentId: 1,
+            etaMinutes: 15),
+        isFalse,
+      );
+      expect(
+        noticeRequestSelectable(
+            request: NoticeRequest.keep, senderId: 1, dayParentId: 1),
+        isTrue,
+      );
+
+      // Somebody else's day: neither, and no tap changes it.
+      expect(
+        noticeRequestSelectable(
+            request: NoticeRequest.keep, senderId: 2, dayParentId: 1),
+        isFalse,
+      );
+
+      // The other two are always both.
+      for (final request in [NoticeRequest.info, NoticeRequest.pickup]) {
+        for (final sender in [1, 2]) {
+          expect(
+            noticeRequestSelectable(
+                request: request, senderId: sender, dayParentId: 1),
+            isTrue,
+            reason: '$request, sender $sender',
+          );
+        }
+      }
+    });
+
     test('noticeRequestAllowed agrees with the list it is built from', () {
       for (final sender in [1, 2]) {
         for (final eta in [null, 15]) {

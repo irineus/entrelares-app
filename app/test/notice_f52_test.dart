@@ -113,7 +113,12 @@ void main() {
   });
 
   group('the sheet says what each choice will do', () {
-    testWidgets('an estimate blocks "ficar com a criança" AND explains it',
+    // The owner met this row with an estimate set, read the sentence that
+    // explained the block, and still asked why he could not ask for someone to
+    // keep the child (20/09/2026). The row was right and the person was not
+    // wrong — an explanation pointing at a control ABOVE the one being read is
+    // a chore, not an answer. So the tap now CORRECTS the estimate.
+    testWidgets('choosing "ficar com a criança" clears the estimate itself',
         (tester) async {
       final ds = FakeCustodyDataSource(
           members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)]);
@@ -121,19 +126,27 @@ void main() {
       await tester.pumpAndSettle();
       await _openNoticeSheet(tester);
 
-      // The sheet opens on the shortest estimate, so the day is NOT on offer
-      // and the row says exactly why rather than disappearing.
-      expect(find.text(_pt[KApp.noticeRequestKeep]), findsOneWidget);
-      expect(find.text(_pt[KApp.noticeConsequenceKeepBlocked]), findsOneWidget);
+      // The sheet opens on the shortest estimate, so the row announces what
+      // its tap will DO rather than why it is refused.
+      expect(find.text(_pt[KApp.noticeConsequenceKeepClearsEta]),
+          findsOneWidget);
       expect(find.text(_pt[KApp.noticeConsequenceKeep]), findsNothing);
 
-      // "Sem previsão" is what unlocks it — and then the consequence becomes
-      // the promise the owner asked to be spelled out: an already-approved
-      // swap, with no second confirmation.
-      await tester.tap(find.widgetWithText(ChoiceChip, _pt[KApp.noticeEtaNone]));
+      await tester.tap(find.text(_pt[KApp.noticeRequestKeep]));
       await tester.pumpAndSettle();
+
+      // "Sem previsão" selected itself, and the row now carries the full
+      // promise: an already-approved swap, with no second confirmation.
+      final semPrevisao = tester.widget<ChoiceChip>(
+          find.widgetWithText(ChoiceChip, _pt[KApp.noticeEtaNone]));
+      expect(semPrevisao.selected, isTrue);
       expect(find.text(_pt[KApp.noticeConsequenceKeep]), findsOneWidget);
-      expect(find.text(_pt[KApp.noticeConsequenceKeepBlocked]), findsNothing);
+      expect(find.text(_pt[KApp.noticeConsequenceKeepClearsEta]), findsNothing);
+
+      await tester.tap(find.widgetWithText(FilledButton, _pt[KApp.noticeSend]));
+      await tester.pumpAndSettle();
+      expect(ds.sentNotices.single.request, 'keep');
+      expect(ds.sentNotices.single.etaMinutes, isNull);
     });
 
     // Today is Bruno's. Ana may warn (she collects next), but the day is not
@@ -154,11 +167,23 @@ void main() {
       await tester.pumpAndSettle();
       await _openNoticeSheet(tester);
 
+      // The one block that survives, because no tap on this sheet can fix it:
+      // the day is not this person's to offer, and the server refuses. It says
+      // so with or without an estimate.
+      expect(
+          find.text(_pt[KApp.noticeConsequenceKeepNotMyDay]), findsOneWidget);
       await tester.tap(find.widgetWithText(ChoiceChip, _pt[KApp.noticeEtaNone]));
       await tester.pumpAndSettle();
       expect(
           find.text(_pt[KApp.noticeConsequenceKeepNotMyDay]), findsOneWidget);
       expect(find.text(_pt[KApp.noticeConsequenceKeep]), findsNothing);
+
+      // And tapping it changes nothing: a disabled row is not a way in.
+      await tester.tap(find.text(_pt[KApp.noticeRequestKeep]));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, _pt[KApp.noticeSend]));
+      await tester.pumpAndSettle();
+      expect(ds.sentNotices.single.request, isNot('keep'));
     });
 
     // Selecting the day-offering request and THEN stating an estimate must not

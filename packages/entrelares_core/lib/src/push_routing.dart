@@ -38,21 +38,33 @@ abstract final class PushRouting {
     'swap_requested',
     'revert_requested',
     'auto_reminder',
-    // F-52. Only the avisos that ASK for something are ever pushed — the
-    // trigger filters on `params.kind`, so a courtesy note, an answer and a
-    // cancellation never reach a phone. That filter is what makes this entry
-    // safe: routing is by TYPE alone, so every `day_notice` that arrives here
-    // is one with an open question on it, and "Para você" is where the answer
-    // is given.
-    'day_notice',
   };
 
-  /// Where a push of [type] should land. Unknown types go to Todas: a
+  /// F-52 — the `kind`s of a `day_notice` that leave the reader with something
+  /// to DO. The others (a courtesy note, an answer, a cancellation) are news,
+  /// and news belongs in "Todas", where the row always is.
+  ///
+  /// **Why routing had to learn a second dimension** (18/09/2026). It used to
+  /// take a type alone, so `day_notice` had to be all-actionable or
+  /// all-receipt. Picking "actionable" meant a courtesy note would open an
+  /// empty "Para você"; the first version avoided that by refusing to push a
+  /// courtesy note at all — and the owner's first real round sent exactly
+  /// that, twice, and no phone rang. "Vou atrasar 15 minutos" is the most
+  /// common aviso there is and the one whose whole value is arriving before
+  /// the other person leaves the house. So the payload carries `kind` now and
+  /// both channels read it, which costs one field and settles the question in
+  /// the only place where the answer is actually known.
+  static const Set<String> _actionableNoticeKinds = {'pickup', 'keep'};
+
+  /// Where a push of [type] (and, for F-52, [kind]) should land. Unknown
+  /// types and kinds go to Todas: a
   /// future writer's notice is a receipt until someone decides otherwise, and
   /// the wrong guess in that direction merely shows a full list instead of an
   /// empty one.
-  static NotificationLanding landingFor(String? type) =>
-      _actionable.contains(type)
+  static NotificationLanding landingFor(String? type, {String? kind}) =>
+      _actionable.contains(type) ||
+              (type == 'day_notice' &&
+                  _actionableNoticeKinds.contains(kind))
           ? NotificationLanding.incoming
           : NotificationLanding.history;
 }

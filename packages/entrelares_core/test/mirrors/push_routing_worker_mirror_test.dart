@@ -56,6 +56,8 @@ void main() {
   late String worker;
   late List<String> actionableInJs;
 
+  late List<String> actionableKindsInJs;
+
   setUp(() {
     worker = repoFile(_worker);
     actionableInJs = _stringList(
@@ -63,7 +65,21 @@ void main() {
       RegExp(r'const ACTIONABLE_TYPES = \[([^\]]*)\]'),
       _worker,
     );
+    // F-52: the second dimension. One type carries four wordings, and only two
+    // of them leave the reader with something to do.
+    actionableKindsInJs = _stringList(
+      worker,
+      RegExp(r'const ACTIONABLE_KINDS = \[([^\]]*)\]'),
+      _worker,
+    );
   });
+
+  /// What the JS would decide for a payload, read from the worker's own lists.
+  NotificationLanding jsLanding(String type, String? kind) =>
+      actionableInJs.contains(type) ||
+              (type == 'day_notice' && actionableKindsInJs.contains(kind))
+          ? NotificationLanding.incoming
+          : NotificationLanding.history;
 
   test('the worker sends every pushable type to the tab Dart would', () {
     // The authority on WHICH types can arrive at all. Reading it here rather
@@ -75,24 +91,68 @@ void main() {
       _sender,
     );
 
+    // Every kind either channel could meet: the two that are actionable, the
+    // F-52 wordings that are not, and ABSENT — the shape every pre-F-52 type
+    // sends. Comparing the PAIR is the point: routing by type alone is what
+    // forced the first version to choose one tab for four different notices,
+    // and it chose by not pushing three of them.
+    final kinds = <String?>[
+      null,
+      ...actionableKindsInJs,
+      'info',
+      'cancelled',
+      'helping',
+      'keeping',
+    ];
+
     for (final type in pushTypes) {
-      final dart = PushRouting.landingFor(type);
-      final js = actionableInJs.contains(type)
-          ? NotificationLanding.incoming
-          : NotificationLanding.history;
-      expect(js, dart,
-          reason: 'the web worker lands `$type` on $js and the app lands it '
-              'on $dart — one of the two channels opens the wrong tab, and '
-              'neither of them errors while doing it');
+      for (final kind in kinds) {
+        final dart = PushRouting.landingFor(type, kind: kind);
+        final js = jsLanding(type, kind);
+        expect(js, dart,
+            reason: 'the web worker lands `$type`/`${kind ?? '(sem kind)'}` on '
+                '$js and the app lands it on $dart — one of the two channels '
+                'opens the wrong tab, and neither of them errors while doing '
+                'it');
+      }
     }
   });
 
-  test('an unknown type falls to Todas on both sides', () {
+  test('an unknown type or kind falls to Todas on both sides', () {
     // The rule that makes a future writer's notice harmless: the wrong guess
     // in this direction shows a full list instead of an empty one.
     const unknown = 'some_type_no_release_has_shipped_yet';
     expect(PushRouting.landingFor(unknown), NotificationLanding.history);
     expect(actionableInJs, isNot(contains(unknown)));
+
+    // A future `kind` on a type that HAS kinds is the same case, and the one
+    // that would otherwise route on a guess.
+    expect(PushRouting.landingFor('day_notice', kind: 'some_future_kind'),
+        NotificationLanding.history);
+    expect(actionableKindsInJs, isNot(contains('some_future_kind')));
+  });
+
+  // The half that is easy to lose in a refactor: a courtesy aviso must NOT
+  // land on "Para você", because it is not listed there — and a request MUST,
+  // because that is where it is answered.
+  test('F-52 · a courtesy aviso and a request land on different tabs', () {
+    expect(PushRouting.landingFor('day_notice', kind: 'info'),
+        NotificationLanding.history);
+    expect(PushRouting.landingFor('day_notice', kind: 'cancelled'),
+        NotificationLanding.history);
+    expect(PushRouting.landingFor('day_notice', kind: 'pickup'),
+        NotificationLanding.incoming);
+    expect(PushRouting.landingFor('day_notice', kind: 'keep'),
+        NotificationLanding.incoming);
+  });
+
+  // The payload has to actually CARRY the kind, or both sides read null and
+  // every aviso quietly becomes a receipt.
+  test('the sender puts the kind in the payload', () {
+    expect(repoFile('supabase/functions/send-push-notification/index.ts'),
+        contains('kind:'),
+        reason: 'the FCM data payload no longer carries `kind`, so both '
+            'channels would route every aviso as a receipt — silently');
   });
 
   test('the worker builds the URL the Notificações route actually reads', () {
