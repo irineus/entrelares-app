@@ -30,11 +30,20 @@ void main() {
   });
 
   group('anonymous phase', () {
-    test('the four public screens are reachable', () {
+    test('every public screen is reachable', () {
       for (final location in RouteRules.publicRoutes) {
         expect(RouteRules.redirect(phase: AuthPhase.anon, location: location),
             isNull);
       }
+    });
+
+    test('F-68: /help is public — and stays reachable once signed in', () {
+      expect(RouteRules.redirect(phase: AuthPhase.anon, location: RouteRules.help),
+          isNull);
+      expect(
+          RouteRules.redirect(phase: AuthPhase.authed, location: RouteRules.help),
+          isNull);
+      expect(RouteRules.anonymousOnlyRoutes, isNot(contains(RouteRules.help)));
     });
 
     test('anything guarded goes to login', () {

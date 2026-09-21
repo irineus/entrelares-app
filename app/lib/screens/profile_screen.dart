@@ -67,6 +67,10 @@ class ProfileScreen extends StatefulWidget {
   /// simply has no Aparência card, and the production routes always pass one.
   final Appearance? appearance;
 
+  /// F-68: opens "Ajuda e contato". Null in scenes that predate it — the row
+  /// simply does not render there, like [onReopenOnboarding].
+  final VoidCallback? onOpenHelp;
+
   const ProfileScreen({
     super.key,
     required this.dataSource,
@@ -77,6 +81,7 @@ class ProfileScreen extends StatefulWidget {
     this.onOpenFamily,
     this.onReopenOnboarding,
     this.appearance,
+    this.onOpenHelp,
   });
 
   @override
@@ -455,6 +460,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
             const SizedBox(height: 24),
             _leaveSection(l),
+          ],
+          // F-68: for every reader of a profile, own or not — the person who
+          // needs help is not always on their own page.
+          if (widget.onOpenHelp != null) ...[
+            const SizedBox(height: 24),
+            Card(
+              key: const ValueKey('profile-help-row'),
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                onTap: widget.onOpenHelp,
+                leading: const Icon(Icons.help_outline),
+                title: Text(l[KApp.helpTitle]),
+                subtitle: Text(l[KApp.helpProfileRowSub]),
+                trailing: const Icon(Icons.chevron_right),
+              ),
+            ),
           ],
           const SizedBox(height: 24),
           _legalFooter(l),

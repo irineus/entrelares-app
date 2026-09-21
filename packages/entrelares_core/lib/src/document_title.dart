@@ -46,6 +46,8 @@ abstract final class DocumentTitle {
         return segments.length == 1 ? K.resetPageTitle : K.notFoundTitle;
       case 'update-password':
         return segments.length == 1 ? K.updatePwdPageTitle : K.notFoundTitle;
+      case 'help':
+        return segments.length == 1 ? KApp.helpTitle : K.notFoundTitle;
       case 'onboarding':
         return segments.length == 1 ? KApp.onbFounderTitle : K.notFoundTitle;
       case 'leaving':
@@ -107,6 +109,7 @@ abstract final class DocumentTitle {
     RouteRules.resetPassword,
     RouteRules.updatePassword,
     RouteRules.onboarding,
+    RouteRules.help,
     FamilyLifecycleRules.leavingRoute,
     FamilyLifecycleRules.policyUpdateRoute,
     '/premium/retorno',

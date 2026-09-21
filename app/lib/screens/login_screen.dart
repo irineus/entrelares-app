@@ -45,6 +45,10 @@ class LoginScreen extends StatefulWidget {
   /// Opens `/register` — live since lote 4.
   final VoidCallback onSignUp;
 
+  /// F-68: opens "Ajuda e contato" — the door for whoever cannot get in.
+  /// Null keeps the screen as it was for callers that predate it.
+  final VoidCallback? onHelp;
+
   /// S-01 throttle state store — the web keeps it in sessionStorage; local
   /// prefs here so a process restart does not reset the clock.
   final SharedPreferences prefs;
@@ -64,6 +68,7 @@ class LoginScreen extends StatefulWidget {
       required this.prefs,
       this.googleEnabled,
       this.onSignInWithGoogle,
+      this.onHelp,
       this.expiredReason = SessionExpiredReason.none});
 
   @override
@@ -301,6 +306,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
+                if (widget.onHelp != null)
+                  TextButton(
+                    key: const ValueKey('login-help-link'),
+                    onPressed: widget.onHelp,
+                    child: Text(l[KApp.helpLoginLink]),
+                  ),
                 const SizedBox(height: 8),
                 // U-28: ONE line, always. As a `Wrap` of two default-padded
                 // `TextButton`s the pair broke in two on a phone and left the

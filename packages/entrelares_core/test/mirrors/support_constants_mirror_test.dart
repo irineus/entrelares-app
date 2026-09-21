@@ -79,4 +79,17 @@ void main() {
     expect(source, contains('"${SupportRules.privacyEmail}"'));
     expect(source, contains('"${SupportRules.supportEmail}"'));
   });
+
+  test('the diagnostics keys are the ones the function keeps', () {
+    // A key the client adds and the function does not list is dropped on the
+    // server — the preview would then promise something that never arrives.
+    final match = RegExp(r'const DIAGNOSTIC_KEYS = \[([^\]]*)\]')
+        .firstMatch(repoFile(_functionPath));
+    expect(match, isNotNull);
+    final server =
+        RegExp(r'"(\w+)"').allMatches(match!.group(1)!).map((m) => m.group(1));
+    final client = SupportDiagnostics.build(
+        appVersion: '', channel: '', platform: '', language: '', route: '/');
+    expect(client.keys.toList(), server.toList());
+  });
 }

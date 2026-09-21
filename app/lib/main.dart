@@ -16,6 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'deep_link_urls.dart';
 import 'env.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
+import 'screens/help_screen.dart';
 import 'screens/calendar_screen.dart';
 import 'screens/custom_roles_screen.dart';
 import 'screens/family_admin_mode_screen.dart';
@@ -55,6 +56,7 @@ import 'services/push_service.dart';
 import 'services/session_gate.dart';
 import 'services/store_billing.dart';
 import 'services/sudo_service.dart';
+import 'services/support_service.dart';
 import 'services/supabase_custody_data_source.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_l10n.dart';
@@ -200,6 +202,15 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   late Localization _l;
   final _refresh = _RouterRefresh();
   _AuthPhase _phase = _AuthPhase.gate;
+
+  /// F-68: the screen "Ajuda e contato" was opened from, for its diagnostics —
+  /// the route is sanitized in core before it can leave the device.
+  String? _helpFrom;
+
+  void _openHelp({required String from}) {
+    _helpFrom = from;
+    _router.push('/help');
+  }
   SessionExpiredReason _expiredReason = SessionExpiredReason.none;
 
   /// True while a sign-out the USER asked for is in flight. Without it the
@@ -260,6 +271,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           onSignIn: _signIn,
           onForgotPassword: () => _router.go('/reset-password'),
           onSignUp: () => _router.go('/register'),
+          onHelp: () => _openHelp(from: '/login'),
           prefs: widget.prefs,
           expiredReason: _expiredReason,
           // F-57: the button exists only where the project's GoTrue says the
@@ -306,6 +318,31 @@ class _EntrelaresAppState extends State<EntrelaresApp>
               redirectTo: DeepLinkUrls.updatePasswordFor(_l.current)),
           onBackToLogin: () => _router.go('/login'),
         ),
+      ),
+      // F-68: "Ajuda e contato" — public AND signed in (RouteRules.help), so it
+      // sits outside the shell like the auth screens: it has to render with no
+      // family and no tabs.
+      GoRoute(
+        path: '/help',
+        builder: (context, _) {
+          final signedIn = _phase == _AuthPhase.authed;
+          return HelpScreen(
+            accountEmail: signedIn ? _client.auth.currentUser?.email : null,
+            diagnostics: currentSupportDiagnostics(
+              appVersion: Env.appVersion,
+              language: _l.current.code,
+              route: _helpFrom ?? (signedIn ? '/' : '/login'),
+            ),
+            onSend: SupportService(_client).send,
+            onClose: () {
+              if (_router.canPop()) {
+                _router.pop();
+              } else {
+                _router.go(signedIn ? '/family/profile' : '/login');
+              }
+            },
+          );
+        },
       ),
       GoRoute(
         path: '/update-password',
@@ -471,6 +508,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                       _router.go('/leaving');
                     },
                     appearance: widget.appearance,
+                    onOpenHelp: () => _openHelp(from: '/family/profile'),
                   ),
                   routes: [
                     GoRoute(

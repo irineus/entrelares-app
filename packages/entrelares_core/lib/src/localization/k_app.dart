@@ -253,6 +253,41 @@ abstract final class KApp {
   //    behind them. Row TITLES reuse what already names the thing (the
   //    danger zone's `K.famDelReqTitle`); these are the words the split added.
   static const String famPlanRow = 'app.fam.planRow';
+
+  // F-68 — Help & contact.
+  static const String helpTitle = 'app.help.title';
+  static const String helpProfileRowSub = 'app.help.profileRowSub';
+  static const String helpLoginLink = 'app.help.loginLink';
+  static const String helpIntro = 'app.help.intro';
+  static const String helpCategoryLabel = 'app.help.categoryLabel';
+  static const String helpCatQuestion = 'app.help.cat.question';
+  static const String helpCatProblem = 'app.help.cat.problem';
+  static const String helpCatSuggestion = 'app.help.cat.suggestion';
+  static const String helpCatPrivacy = 'app.help.cat.privacy';
+  static const String helpCatOther = 'app.help.cat.other';
+  static const String helpMessageLabel = 'app.help.messageLabel';
+  static const String helpMessageHint = 'app.help.messageHint';
+  static const String helpMessageTooShort = 'app.help.messageTooShort';
+  static const String helpEmailLabel = 'app.help.emailLabel';
+  static const String helpEmailInvalid = 'app.help.emailInvalid';
+  static const String helpReplyTo = 'app.help.replyTo';
+  static const String helpDiagLabel = 'app.help.diagLabel';
+  static const String helpDiagHelper = 'app.help.diagHelper';
+  static const String helpDiagPreview = 'app.help.diagPreview';
+  static const String helpDiagVersion = 'app.help.diag.version';
+  static const String helpDiagChannel = 'app.help.diag.channel';
+  static const String helpDiagPlatform = 'app.help.diag.platform';
+  static const String helpDiagLanguage = 'app.help.diag.language';
+  static const String helpDiagRoute = 'app.help.diag.route';
+  static const String helpSend = 'app.help.send';
+  static const String helpSentTitle = 'app.help.sentTitle';
+  static const String helpSentBody = 'app.help.sentBody';
+  static const String helpBack = 'app.help.back';
+  static const String helpErrRateLimited = 'app.help.err.rateLimited';
+  static const String helpErrSendFailed = 'app.help.err.sendFailed';
+  static const String helpErrOffline = 'app.help.err.offline';
+  static const String helpErrFailed = 'app.help.err.failed';
+  static const String helpMailtoLead = 'app.help.mailtoLead';
   static const String famPlanRowFree = 'app.fam.planRowFree';
   static const String famPlanRowTrialOne = 'app.fam.planRowTrialOne';
   static const String famPlanRowTrialMany = 'app.fam.planRowTrialMany';
@@ -474,6 +509,39 @@ abstract final class KApp {
     offlineMonthNotLoaded,
     offlineWriteBlocked,
     famPlanRow,
+    helpTitle,
+    helpProfileRowSub,
+    helpLoginLink,
+    helpIntro,
+    helpCategoryLabel,
+    helpCatQuestion,
+    helpCatProblem,
+    helpCatSuggestion,
+    helpCatPrivacy,
+    helpCatOther,
+    helpMessageLabel,
+    helpMessageHint,
+    helpMessageTooShort,
+    helpEmailLabel,
+    helpEmailInvalid,
+    helpReplyTo,
+    helpDiagLabel,
+    helpDiagHelper,
+    helpDiagPreview,
+    helpDiagVersion,
+    helpDiagChannel,
+    helpDiagPlatform,
+    helpDiagLanguage,
+    helpDiagRoute,
+    helpSend,
+    helpSentTitle,
+    helpSentBody,
+    helpBack,
+    helpErrRateLimited,
+    helpErrSendFailed,
+    helpErrOffline,
+    helpErrFailed,
+    helpMailtoLead,
     famPlanRowFree,
     famPlanRowTrialOne,
     famPlanRowTrialMany,
@@ -739,6 +807,39 @@ abstract final class StringsAppPtBr {
         'Sem conexão — conecte-se para fazer alterações. Nada foi enviado.',
     // ── U-35 Família split ──
     KApp.famPlanRow: 'Plano e pagamento',
+    KApp.helpTitle: 'Ajuda e contato',
+    KApp.helpProfileRowSub: 'Tire uma dúvida ou conte um problema',
+    KApp.helpLoginLink: 'Precisa de ajuda?',
+    KApp.helpIntro: 'Escreva para a equipe do Entrelares — uma dúvida, um problema, uma sugestão. A resposta chega por e-mail.',
+    KApp.helpCategoryLabel: 'Sobre o quê?',
+    KApp.helpCatQuestion: 'Dúvida',
+    KApp.helpCatProblem: 'Problema ou erro',
+    KApp.helpCatSuggestion: 'Sugestão',
+    KApp.helpCatPrivacy: 'Privacidade e dados',
+    KApp.helpCatOther: 'Outro',
+    KApp.helpMessageLabel: 'Mensagem',
+    KApp.helpMessageHint: 'Conte o que aconteceu ou o que você quer saber.',
+    KApp.helpMessageTooShort: 'Escreva pelo menos {0} caracteres.',
+    KApp.helpEmailLabel: 'Seu e-mail, para a resposta',
+    KApp.helpEmailInvalid: 'Informe um e-mail válido.',
+    KApp.helpReplyTo: 'A resposta vai para {0}.',
+    KApp.helpDiagLabel: 'Incluir informações técnicas',
+    KApp.helpDiagHelper: 'Ajuda a entender um problema. Nunca inclui o seu calendário nem dados da família.',
+    KApp.helpDiagPreview: 'Ver o que será enviado',
+    KApp.helpDiagVersion: 'Versão',
+    KApp.helpDiagChannel: 'Canal',
+    KApp.helpDiagPlatform: 'Sistema',
+    KApp.helpDiagLanguage: 'Idioma',
+    KApp.helpDiagRoute: 'Tela',
+    KApp.helpSend: 'Enviar',
+    KApp.helpSentTitle: 'Mensagem enviada',
+    KApp.helpSentBody: 'Pedido #{0}. Respondemos em até 2 dias úteis, no e-mail {1}.',
+    KApp.helpBack: 'Voltar',
+    KApp.helpErrRateLimited: 'Você enviou várias mensagens em pouco tempo. Tente de novo mais tarde, ou escreva direto para {0}.',
+    KApp.helpErrSendFailed: 'Não conseguimos entregar sua mensagem agora. Escreva direto para {0}.',
+    KApp.helpErrOffline: 'Sem conexão. A mensagem não foi enviada — tente de novo quando tiver sinal.',
+    KApp.helpErrFailed: 'Não foi possível enviar. Tente de novo, ou escreva para {0}.',
+    KApp.helpMailtoLead: 'Prefere escrever por e-mail?',
     KApp.famPlanRowFree: 'Gratuito',
     KApp.famPlanRowTrialOne: 'Avaliação Premium — {0} dia restante',
     KApp.famPlanRowTrialMany: 'Avaliação Premium — {0} dias restantes',
@@ -1025,6 +1126,39 @@ abstract final class StringsAppEn {
         'Offline — connect to make changes. Nothing was sent.',
     // ── U-35 Família split ──
     KApp.famPlanRow: 'Plan and payment',
+    KApp.helpTitle: 'Help & contact',
+    KApp.helpProfileRowSub: 'Ask a question or report a problem',
+    KApp.helpLoginLink: 'Need help?',
+    KApp.helpIntro: 'Write to the Entrelares team — a question, a problem, a suggestion. The reply arrives by e-mail.',
+    KApp.helpCategoryLabel: 'What is it about?',
+    KApp.helpCatQuestion: 'Question',
+    KApp.helpCatProblem: 'Problem or error',
+    KApp.helpCatSuggestion: 'Suggestion',
+    KApp.helpCatPrivacy: 'Privacy and data',
+    KApp.helpCatOther: 'Other',
+    KApp.helpMessageLabel: 'Message',
+    KApp.helpMessageHint: 'Tell us what happened or what you want to know.',
+    KApp.helpMessageTooShort: 'Write at least {0} characters.',
+    KApp.helpEmailLabel: 'Your e-mail, for the reply',
+    KApp.helpEmailInvalid: 'Enter a valid e-mail.',
+    KApp.helpReplyTo: 'The reply goes to {0}.',
+    KApp.helpDiagLabel: 'Include technical information',
+    KApp.helpDiagHelper: 'Helps us understand a problem. It never includes your calendar or family data.',
+    KApp.helpDiagPreview: 'See what will be sent',
+    KApp.helpDiagVersion: 'Version',
+    KApp.helpDiagChannel: 'Channel',
+    KApp.helpDiagPlatform: 'System',
+    KApp.helpDiagLanguage: 'Language',
+    KApp.helpDiagRoute: 'Screen',
+    KApp.helpSend: 'Send',
+    KApp.helpSentTitle: 'Message sent',
+    KApp.helpSentBody: 'Request #{0}. We reply within 2 business days, to {1}.',
+    KApp.helpBack: 'Back',
+    KApp.helpErrRateLimited: 'You sent several messages in a short time. Try again later, or write directly to {0}.',
+    KApp.helpErrSendFailed: 'We could not deliver your message right now. Write directly to {0}.',
+    KApp.helpErrOffline: 'No connection. The message was not sent — try again when you have signal.',
+    KApp.helpErrFailed: 'It could not be sent. Try again, or write to {0}.',
+    KApp.helpMailtoLead: 'Prefer to write by e-mail?',
     KApp.famPlanRowFree: 'Free',
     KApp.famPlanRowTrialOne: 'Premium trial — {0} day left',
     KApp.famPlanRowTrialMany: 'Premium trial — {0} days left',
