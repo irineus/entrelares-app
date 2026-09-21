@@ -34,12 +34,32 @@ import '_helpers.dart';
 ///   so no client can write, edit or delete a notice directly;
 /// * **one outcome per notice**, by UNIQUE — two carers answering in the same
 ///   second is the case, not the corner case.
+/// Today as the SERVER sees it, which is not the same as today as the RUNNER
+/// sees it.
+///
+/// Every F-52 rule is anchored on `(now() AT TIME ZONE 'America/Sao_Paulo')`,
+/// and the gate's own `today()` reads `DateTime.now()` — the runner's clock,
+/// which on GitHub is UTC. Between 00:00 and 03:00 UTC the twodisagree by a
+/// day, and this suite then plants "today" on one date while the RPC looks at
+/// another: nobody is an end of anything and every assertion collapses at once.
+/// It passed for three days and broke at 00:39 UTC, which is the shape of the
+/// bug worth naming — a suite that is right only during office hours.
+///
+/// Brazil has had no daylight saving since 2019, so the offset is a constant.
+/// If that ever changes this helper is wrong for a two-hour window and the
+/// suite FAILS there — loudly, never silently green, which is the only property
+/// that matters for a fixed offset in a test.
+DateTime saoPauloToday() {
+  final sp = DateTime.now().toUtc().subtract(const Duration(hours: 3));
+  return DateTime(sp.year, sp.month, sp.day);
+}
+
 void dayNoticeTests(GateFixture fx) {
   /// Today's row for [carerId], in the throwaway family that owns it.
   Future<void> planToday(int familyId, int carerId) async {
     await fx.service.from('care_schedules').insert({
       'family_id': familyId,
-      'schedule_date': isoDate(today()),
+      'schedule_date': isoDate(saoPauloToday()),
       'scheduled_parent_id': carerId,
     });
   }
@@ -47,7 +67,7 @@ void dayNoticeTests(GateFixture fx) {
   Future<void> planTomorrow(int familyId, int carerId) async {
     await fx.service.from('care_schedules').insert({
       'family_id': familyId,
-      'schedule_date': isoDate(addDays(today(), 1)),
+      'schedule_date': isoDate(addDays(saoPauloToday(), 1)),
       'scheduled_parent_id': carerId,
     });
   }
@@ -83,7 +103,7 @@ void dayNoticeTests(GateFixture fx) {
               .limit(1))
           .single;
       expect(row['sender_profile_id'], fam.adminProfile.id);
-      expect(row['schedule_date'], isoDate(today()));
+      expect(row['schedule_date'], isoDate(saoPauloToday()));
       expect(row['reason'], 'transito');
       expect(row['eta_minutes'], 30);
       expect(row['request'], 'info');
@@ -229,7 +249,7 @@ void dayNoticeTests(GateFixture fx) {
       expect(params['kind'], 'keep');
       expect(params['reason'], 'medico');
       expect(params['name'], fam.adminProfile.fullName);
-      expect(params['date'], isoDate(today()));
+      expect(params['date'], isoDate(saoPauloToday()));
       expect(params['note'], 'no pronto-socorro');
       // jsonb_strip_nulls: an absent estimate is ABSENT, not JSON null, so the
       // renderer's own fallback applies rather than a key holding nothing.
@@ -301,7 +321,7 @@ void dayNoticeTests(GateFixture fx) {
               .from('care_schedules')
               .select()
               .eq('family_id', fam.familyId)
-              .eq('schedule_date', isoDate(today()))
+              .eq('schedule_date', isoDate(saoPauloToday()))
               .limit(1))
           .single;
       expect(day['actual_parent_id'], isNull);
@@ -350,7 +370,7 @@ void dayNoticeTests(GateFixture fx) {
               .from('care_schedules')
               .select()
               .eq('family_id', fam.familyId)
-              .eq('schedule_date', isoDate(today()))
+              .eq('schedule_date', isoDate(saoPauloToday()))
               .limit(1))
           .single;
       expect(day['actual_parent_id'], fam.memberProfile.id);
@@ -384,7 +404,7 @@ void dayNoticeTests(GateFixture fx) {
           .from('activity_logs')
           .select()
           .eq('family_id', fam.familyId)
-          .eq('affected_date', isoDate(today()))
+          .eq('affected_date', isoDate(saoPauloToday()))
           .order('id', ascending: false)
           .limit(1);
       expect(logs, isNotEmpty);
@@ -453,7 +473,7 @@ void dayNoticeTests(GateFixture fx) {
       await expectRejected(() async {
         await fam.admin.from('day_notices').insert({
           'family_id': fam.familyId,
-          'schedule_date': isoDate(today()),
+          'schedule_date': isoDate(saoPauloToday()),
           'sender_profile_id': fam.adminProfile.id,
           'reason': 'outro',
           'request': 'info',
