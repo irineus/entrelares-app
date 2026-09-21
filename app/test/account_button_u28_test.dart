@@ -19,6 +19,7 @@ Widget _scoped({
   AccountIdentity? identity,
   Future<void> Function()? onSignOut,
   VoidCallback? onOpenProfile,
+  VoidCallback? onOpenHelp,
   AppLanguage language = AppLanguage.ptBr,
   Future<void> Function(AppLanguage)? setLanguage,
 }) =>
@@ -31,6 +32,7 @@ Widget _scoped({
           identity: identity ?? AccountIdentity(),
           onSignOut: onSignOut ?? () async {},
           onOpenProfile: onOpenProfile ?? () {},
+          onOpenHelp: onOpenHelp,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Tab'),
@@ -75,6 +77,24 @@ void main() {
       await tester.tap(find.text(_l[K.navProfile]));
       await tester.pumpAndSettle();
       expect(opened, isTrue);
+    });
+
+    testWidgets('F-68: opens "Ajuda e contato" from any tab', (tester) async {
+      var opened = false;
+      await tester.pumpWidget(_scoped(onOpenHelp: () => opened = true));
+      await tester.tap(find.byType(AppAccountButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_l[KApp.helpTitle]));
+      await tester.pumpAndSettle();
+      expect(opened, isTrue);
+    });
+
+    testWidgets('F-68: a host without the callback shows no help item',
+        (tester) async {
+      await tester.pumpWidget(_scoped());
+      await tester.tap(find.byType(AppAccountButton));
+      await tester.pumpAndSettle();
+      expect(find.text(_l[KApp.helpTitle]), findsNothing);
     });
 
     testWidgets('switching language goes through the app-level setter',

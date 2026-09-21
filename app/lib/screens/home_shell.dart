@@ -83,6 +83,9 @@ class HomeShell extends StatelessWidget {
 
   final VoidCallback onOpenProfile;
 
+  /// F-68: forwarded to the account menu.
+  final VoidCallback? onOpenHelp;
+
   /// S-11: the live family-deletion request, if there is one. The banner sits
   /// above every tab because the deadline applies to the whole app, and it is
   /// the only way a member who never opens Família learns their family is
@@ -129,6 +132,7 @@ class HomeShell extends StatelessWidget {
       required this.identity,
       required this.onSignOut,
       required this.onOpenProfile,
+      this.onOpenHelp,
       this.deletionBanner,
       this.appHandoff,
       this.installHint,
@@ -168,6 +172,7 @@ class HomeShell extends StatelessWidget {
             identity: identity,
             onSignOut: onSignOut,
             onOpenProfile: onOpenProfile,
+            onOpenHelp: onOpenHelp,
             child: shell,
           );
           return Column(

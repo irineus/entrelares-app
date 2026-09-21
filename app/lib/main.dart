@@ -405,6 +405,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
             // four tabs — it used to be a CalendarScreen parameter only.
             onSignOut: _signOut,
             onOpenProfile: () => _router.go('/family/profile'),
+            onOpenHelp: () => _openHelp(
+                from: _router.routeInformationProvider.value.uri.path),
             deletionBanner: _deletionBanner,
             appHandoff: _appHandoff,
             installHint: _installHint,

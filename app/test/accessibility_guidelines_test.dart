@@ -74,6 +74,7 @@ import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/services/support_service.dart';
 import 'package:entrelares_app/theme/app_theme.dart';
 import 'package:entrelares_app/theme/tokens.dart';
+import 'package:entrelares_app/widgets/account_button.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/google_sign_in_button.dart';
 import 'package:entrelares_core/entrelares_core.dart';
@@ -535,6 +536,7 @@ void main() {
               identity: AccountIdentity(),
               onSignOut: () async {},
               onOpenProfile: () {},
+              onOpenHelp: () {},
               badge: NotificationBadge(ds),
             ),
             branches: [
@@ -574,6 +576,13 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _measure(tester, 'shell + calendar');
+
+      // F-68: the account menu now carries "Ajuda e contato" — measured OPEN,
+      // since a closed menu has none of its items in the tree.
+      await tester.tap(find.byType(AppAccountButton).first);
+      await tester.pumpAndSettle();
+      expect(find.text(pt[KApp.helpTitle]), findsOneWidget);
+      await _measure(tester, 'account menu');
     });
 
     _scene('family roster and the rename row', (tester, dark) async {
