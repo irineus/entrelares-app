@@ -210,6 +210,11 @@ void main() {
         expect(add,
             contains(l == pt ? 'Adicionar à Tela de Início' : 'Add to Home Screen'));
         expect(add, endsWith(l == pt ? '<strong>Adicionar</strong>.' : '<strong>Add</strong>.'));
+        // U-54 (21/09/2026): Apple's current guide (iOS 27 and 26) turns on
+        // "Open as Web App" before Add — without it the icon opens Safari,
+        // not the standalone app, and web push never exists there.
+        expect(add,
+            contains(l == pt ? 'Abrir como App da Web' : 'Open as Web App'));
       }
     });
   });

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
@@ -7,6 +9,7 @@ import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
+import '../services/analytics_service.dart';
 import '../services/connectivity_status.dart';
 import '../services/custody_data_source.dart';
 import '../services/notification_badge.dart';
@@ -14,6 +17,7 @@ import '../services/push_service.dart';
 import '../widgets/account_button.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
+import '../widgets/install_hint_sheet.dart';
 import 'notice_sheet.dart';
 import 'frozen_day_sheet.dart';
 
@@ -55,12 +59,22 @@ class NotificationsScreen extends StatefulWidget {
   /// `showFrozenDaySheet`). Null in tests that do not exercise it.
   final ConnectivityStatus? connectivity;
 
+  /// U-54: what the browser said about itself (U-51's seam), or null in the
+  /// native app. With the push state it picks the ONE next step this device
+  /// can take ([PushNudgeRules]).
+  final BrowserInstallFacts? installFacts;
+
+  /// U-54: the nudge's impressions and taps, and the enable result.
+  final AnalyticsService? analytics;
+
   const NotificationsScreen(
       {super.key,
       required this.dataSource,
       required this.badge,
       this.connectivity,
       this.push,
+      this.installFacts,
+      this.analytics,
       this.landing,
       this.landingNonce});
 
@@ -70,6 +84,9 @@ class NotificationsScreen extends StatefulWidget {
   static const pushStatusKey = Key('push-status');
   static const pushDisableKey = Key('push-disable');
   static const pushFooterKey = Key('push-footer');
+
+  /// U-54: the iPhone-in-Safari step, above the list.
+  static const pushInstallKey = Key('push-install');
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -122,6 +139,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.initState();
     _applyLanding();
     widget.push?.addListener(_onPushChanged);
+    _trackNudgeView();
     _init();
   }
 
@@ -145,7 +163,45 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// that settles after this screen mounted (the service is still reading the
   /// permission) has to move it — not wait for the next unrelated rebuild.
   void _onPushChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    _trackNudgeView();
+  }
+
+  /// U-54 — the next step toward push for THIS device, and only for the
+  /// member holding it: nothing here is ever shown about another member.
+  PushNudgeStep get _nudge =>
+      PushNudgeRules.step(state: _pushState, facts: widget.installFacts);
+
+  PushNudgePlatform get _platform =>
+      PushNudgeRules.platform(widget.installFacts);
+
+  /// One impression per app session (T-76), fired where the answer is KNOWN,
+  /// never from `build`. The two "unsupported" steps are left out on purpose:
+  /// `unsupported` is also the service's state BEFORE it settles, so counting
+  /// them would count a phone that is about to say `off`. Every step counted
+  /// here is one the service only reaches by settling — or, on an iPhone
+  /// tab, one that cannot change.
+  void _trackNudgeView() {
+    final analytics = widget.analytics;
+    final step = _nudge;
+    if (analytics == null) return;
+    if (step == PushNudgeStep.none ||
+        step == PushNudgeStep.unsupportedHere ||
+        step == PushNudgeStep.unsupportedBrowser) {
+      return;
+    }
+    unawaited(analytics.trackEventOnce('push-nudge-view',
+        props: analyticsFunnelProps(
+            channel: analytics.channel, platform: _platform, step: step)));
+  }
+
+  void _trackNudgeClick(PushNudgeStep step) {
+    final analytics = widget.analytics;
+    if (analytics == null) return;
+    unawaited(analytics.trackEvent('push-nudge-click',
+        props: analyticsFunnelProps(
+            channel: analytics.channel, platform: _platform, step: step)));
   }
 
   /// F-09 — a tapped notification chooses the tab.
@@ -297,7 +353,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               onChanged: (v) => setState(() => _tab = v),
             ),
           ),
-          if (_pushState == PushState.off) _pushCard(l),
+          if (_nudge == PushNudgeStep.enable) _pushCard(l),
+          if (_nudge == PushNudgeStep.install) _installCard(l),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
@@ -381,6 +438,29 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
+  /// U-54 — Safari on an iPhone or iPad, still in a tab. It has a button, so
+  /// it sits where the U-43 card sits: over the list it promises. It opens the
+  /// U-51 sheet, whatever became of the shell strip.
+  ///
+  /// The sentence states Apple's CONDITION, never that our delivery works on
+  /// an iPhone — T-75 measures that on a real device (owner, 21/09/2026).
+  Widget _installCard(Localization l) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, Spacing.sm),
+      child: AppBanner(
+        key: NotificationsScreen.pushInstallKey,
+        tone: context.tokens.info,
+        icon: Icons.add_to_home_screen,
+        message: l[KApp.pushHintInstallIos],
+        actionLabel: l[KApp.pushInstallHow],
+        onAction: () {
+          _trackNudgeClick(PushNudgeStep.install);
+          showInstallHintSheet(context);
+        },
+      ),
+    );
+  }
+
   /// U-43 — push is ON: the state and the way out, two taps from any tab.
   Future<void> _openPushSheet(Localization l) async {
     final disable = await showAppSheet<bool>(
@@ -407,11 +487,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// No button on purpose: the OS will not show the dialog again, so a button
   /// here would do nothing when pressed — the failure that makes an app look
   /// broken while it behaves exactly as designed.
+  ///
+  /// U-54: the line now says WHERE to go on this device — the Android
+  /// Settings path, the iPhone's Ajustes path or the site permission beside
+  /// the address — each read from the vendor's own guide (see the catalog).
   List<Widget> _pushFooter(Localization l) {
-    final hint = switch (_pushState) {
-      PushState.blocked => l[KApp.pushHintBlocked],
-      PushState.unsupported => l[KApp.pushHintUnsupported],
-      PushState.on || PushState.off => null,
+    final hint = switch (_nudge) {
+      PushNudgeStep.needsSafari => l[KApp.pushHintNeedsSafari],
+      PushNudgeStep.reallowApp => l[KApp.pushHintReallowApp],
+      PushNudgeStep.reallowIos => l[KApp.pushHintReallowIos],
+      PushNudgeStep.reallowBrowser => l[KApp.pushHintReallowBrowser],
+      PushNudgeStep.unsupportedHere => l[KApp.pushHintUnsupportedHere],
+      PushNudgeStep.unsupportedBrowser => l[KApp.pushHintUnsupported],
+      PushNudgeStep.none ||
+      PushNudgeStep.enable ||
+      PushNudgeStep.install =>
+        null,
     };
     if (hint == null) return const [];
     final muted = context.tokens.textMuted;
@@ -445,7 +536,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (push == null) return;
 
     if (on) {
+      _trackNudgeClick(PushNudgeStep.enable);
       final result = await push.enable();
+      final analytics = widget.analytics;
+      if (analytics != null) {
+        unawaited(analytics.trackEvent('push-enable-result',
+            props: analyticsFunnelProps(
+                channel: analytics.channel,
+                platform: _platform,
+                outcome: PushNudgeRules.enableOutcome(result))));
+      }
       if (!mounted) return;
       setState(() {});
       // The message reads off the RESULTING state, never off the fact that a

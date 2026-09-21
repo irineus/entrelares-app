@@ -156,12 +156,14 @@ void main() {
     (
       'blocked',
       () => FakeMessaging(current: PushPermission.denied),
-      KApp.pushHintBlocked
+      // U-54: with no browser facts this is the native app, so the line
+      // names the Android Settings path.
+      KApp.pushHintReallowApp
     ),
     (
       'unsupported',
       () => FakeMessaging(supported: false),
-      KApp.pushHintUnsupported
+      KApp.pushHintUnsupportedHere
     ),
   ]) {
     testWidgets('$name: the explanation is the LAST item of the list, with no '
@@ -191,7 +193,7 @@ void main() {
 
     expect(find.text(_pt[K.notifEmptyIncoming]), findsOneWidget);
     expect(_footer, findsOneWidget);
-    expect(find.text(_pt[KApp.pushHintUnsupported]), findsOneWidget);
+    expect(find.text(_pt[KApp.pushHintUnsupportedHere]), findsOneWidget);
   });
 
   testWidgets('a state that settles AFTER the screen mounted moves the control',

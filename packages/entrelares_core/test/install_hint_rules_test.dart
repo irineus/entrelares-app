@@ -51,8 +51,11 @@ BrowserInstallFacts facts(
       displayModeStandalone: displayModeStandalone,
     );
 
-bool hint(BrowserInstallFacts f, {bool dismissed = false}) =>
-    InstallHintRules.shouldHint(f, dismissed: dismissed);
+final now = DateTime(2026, 9, 21, 12);
+
+bool hint(BrowserInstallFacts f,
+        {InstallHintDismissals dismissals = InstallHintDismissals.none}) =>
+    InstallHintRules.shouldHint(f, dismissals: dismissals, now: now);
 
 void main() {
   group('who gets the hint', () {
@@ -82,8 +85,12 @@ void main() {
       expect(hint(facts(iphoneSafari, displayModeStandalone: true)), isFalse);
     });
 
-    test('a browser that dismissed it', () {
-      expect(hint(facts(iphoneSafari), dismissed: true), isFalse);
+    test('a browser that dismissed it within the snooze', () {
+      final yesterday = now.subtract(const Duration(days: 1));
+      expect(
+          hint(facts(iphoneSafari),
+              dismissals: InstallHintDismissals(count: 1, last: yesterday)),
+          isFalse);
     });
 
     test('a Mac in Safari — same UA as an iPad, no touch', () {
@@ -121,6 +128,45 @@ void main() {
       // Every fact defaults to its fail-closed value: an empty UA and no touch
       // count is "do not hint", never an error.
       expect(hint(const BrowserInstallFacts(userAgent: '')), isFalse);
+    });
+  });
+
+  group('U-54 — the strip comes back, and then it stops', () {
+    InstallHintDismissals dismissed(int count, Duration ago) =>
+        InstallHintDismissals(count: count, last: now.subtract(ago));
+
+    test('14 days after a dismissal it is back', () {
+      expect(hint(facts(iphoneSafari), dismissals: dismissed(1, const Duration(days: 13, hours: 23))),
+          isFalse);
+      expect(hint(facts(iphoneSafari), dismissals: dismissed(1, const Duration(days: 14))),
+          isTrue);
+      expect(hint(facts(iphoneSafari), dismissals: dismissed(2, const Duration(days: 30))),
+          isTrue);
+    });
+
+    test('the third dismissal is final, however long ago', () {
+      expect(hint(facts(iphoneSafari), dismissals: dismissed(3, const Duration(days: 400))),
+          isFalse);
+    });
+
+    test('a U-51 dismissal has no date and snoozes nothing', () {
+      // The bare "dismissed" flag U-51 wrote: those readers are exactly who
+      // the item is for, so they see the strip once more — and it counts.
+      const legacy = InstallHintDismissals(count: 1);
+      expect(hint(facts(iphoneSafari), dismissals: legacy), isTrue);
+      final after = legacy.next(now);
+      expect(after.count, 2);
+      expect(after.last, now);
+      expect(hint(facts(iphoneSafari), dismissals: after), isFalse);
+    });
+
+    test('the snooze never shows the strip to a device that cannot install', () {
+      expect(hint(facts(chromeIos), dismissals: dismissed(1, const Duration(days: 20))),
+          isFalse);
+      expect(
+          hint(facts(iphoneSafari, navigatorStandalone: true),
+              dismissals: dismissed(1, const Duration(days: 20))),
+          isFalse);
     });
   });
 

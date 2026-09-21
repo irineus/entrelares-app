@@ -173,8 +173,22 @@ abstract final class KApp {
   static const String pushTitle = 'app.push.title';
   static const String pushHintOff = 'app.push.hintOff';
   static const String pushHintOn = 'app.push.hintOn';
-  static const String pushHintBlocked = 'app.push.hintBlocked';
   static const String pushHintUnsupported = 'app.push.hintUnsupported';
+  // ── U-54 — the one next step for a device without push (PushNudgeRules).
+  //    The iPhone lines state Apple's CONDITION (a web app receives
+  //    notifications only from the Home Screen — Apple's own guide, below),
+  //    never that our delivery works there: T-75 measures that. The re-allow
+  //    paths were read on 21/09/2026 from each vendor's own guide:
+  //    support.apple.com/pt-br/guide/iphone/iph7c3d96bab/ios (iOS 27/26),
+  //    support.google.com/android/answer/9079661 and
+  //    support.google.com/chrome/answer/3220216. Re-check there first. ──
+  static const String pushHintInstallIos = 'app.push.hintInstallIos';
+  static const String pushInstallHow = 'app.push.installHow';
+  static const String pushHintNeedsSafari = 'app.push.hintNeedsSafari';
+  static const String pushHintReallowApp = 'app.push.hintReallowApp';
+  static const String pushHintReallowIos = 'app.push.hintReallowIos';
+  static const String pushHintReallowBrowser = 'app.push.hintReallowBrowser';
+  static const String pushHintUnsupportedHere = 'app.push.hintUnsupportedHere';
   static const String pushEnable = 'app.push.enable';
   static const String pushDisable = 'app.push.disable';
   /// U-43: the app-bar icon that replaces the card once push is on — its
@@ -232,7 +246,11 @@ abstract final class KApp {
   //    Apple's own iOS 26 guide on 11/09/2026
   //    (support.apple.com/pt-br/guide/iphone/iph42ab2f3a7/ios): the Share
   //    button is not always in view, the list must be SCROLLED, and the flow
-  //    ends on "Adicionar". Re-check there before changing a word. ──
+  //    ends on "Adicionar". U-54 (21/09/2026) re-read Apple's current guide,
+  //    iOS 27 and 26 alike (support.apple.com/pt-br/guide/iphone/iphea86e5236/ios):
+  //    before "Adicionar" it now says to turn on "Abrir como App da Web" —
+  //    without it the icon opens Safari, not the standalone app, and there is
+  //    no push. Re-check there before changing a word. ──
   static const String installHintBanner = 'app.installHint.banner';
   static const String installHintHow = 'app.installHint.how';
   static const String installHintDismiss = 'app.installHint.dismiss';
@@ -455,8 +473,14 @@ abstract final class KApp {
     pushTitle,
     pushHintOff,
     pushHintOn,
-    pushHintBlocked,
     pushHintUnsupported,
+    pushHintInstallIos,
+    pushInstallHow,
+    pushHintNeedsSafari,
+    pushHintReallowApp,
+    pushHintReallowIos,
+    pushHintReallowBrowser,
+    pushHintUnsupportedHere,
     pushEnable,
     pushDisable,
     pushStatusOnTooltip,
@@ -716,12 +740,33 @@ abstract final class StringsAppPtBr {
         'Receba uma notificação quando alguém pedir uma troca ou responder a sua — '
             'mesmo com o app fechado.',
     KApp.pushHintOn: 'Este aparelho recebe notificações de trocas e prazos.',
-    KApp.pushHintBlocked:
-        'As notificações estão bloqueadas para o Entrelares nas configurações '
-            'do seu aparelho. Libere-as por lá para voltar a recebê-las.',
     KApp.pushHintUnsupported:
         'Notificações no celular funcionam no aplicativo instalado. Aqui no '
             'navegador, você continua vendo tudo nesta tela e por e-mail.',
+    KApp.pushHintInstallIos:
+        'No iPhone, as notificações só funcionam com o Entrelares na Tela de '
+            'Início.',
+    KApp.pushInstallHow: 'Como instalar',
+    KApp.pushHintNeedsSafari:
+        'No iPhone, as notificações só funcionam com o Entrelares na Tela de '
+            'Início. Para instalar, abra este endereço no Safari — os passos '
+            'que mostramos são os dele.',
+    KApp.pushHintReallowApp:
+        'As notificações do Entrelares estão bloqueadas neste aparelho. Para '
+            'liberar: abra Configurações > Notificações > Notificações de apps, '
+            'toque em Entrelares e ative as notificações. Os nomes podem variar '
+            'conforme o fabricante.',
+    KApp.pushHintReallowIos:
+        'As notificações do Entrelares estão bloqueadas neste iPhone. Para '
+            'liberar: abra Ajustes > Notificações, toque em Entrelares e ative '
+            'Permitir Notificações.',
+    KApp.pushHintReallowBrowser:
+        'As notificações do Entrelares estão bloqueadas neste navegador. Para '
+            'liberar: toque no ícone à esquerda do endereço, ative Notificações '
+            'e recarregue a página.',
+    KApp.pushHintUnsupportedHere:
+        'Este aparelho não recebe notificações do Entrelares. Você continua '
+            'vendo tudo nesta tela e por e-mail.',
     KApp.pushEnable: 'Ativar notificações',
     KApp.pushDisable: 'Desativar',
     KApp.pushStatusOnTooltip: 'Notificações no celular: ativadas',
@@ -796,7 +841,8 @@ abstract final class StringsAppPtBr {
             '<strong>⋯</strong> e escolha <strong>Compartilhar</strong>.',
     KApp.installHintStepAdd:
         '<strong>Role a lista</strong> até <strong>Adicionar à Tela de '
-            'Início</strong> e toque em <strong>Adicionar</strong>.',
+            'Início</strong>, ative <strong>Abrir como App da Web</strong> (se '
+            'aparecer) e toque em <strong>Adicionar</strong>.',
     KApp.installHintNote:
         'Os nomes dos botões podem variar um pouco conforme a versão do iOS.',
     KApp.offlineStrip: 'Sem conexão · dados de {0}',
@@ -1037,12 +1083,33 @@ abstract final class StringsAppEn {
         'Get a notification when someone asks for a swap, or answers yours — even '
             'with the app closed.',
     KApp.pushHintOn: 'This device receives swap and deadline notifications.',
-    KApp.pushHintBlocked:
-        'Notifications are blocked for Entrelares in your device settings. '
-            'Allow them there to start receiving them again.',
     KApp.pushHintUnsupported:
         'Phone notifications work in the installed app. Here in the browser you '
             'still see everything on this screen and by e-mail.',
+    KApp.pushHintInstallIos:
+        'On iPhone, notifications only work with Entrelares on your Home '
+            'Screen.',
+    KApp.pushInstallHow: 'How to install',
+    KApp.pushHintNeedsSafari:
+        'On iPhone, notifications only work with Entrelares on your Home '
+            'Screen. To install it, open this address in Safari — the steps we '
+            "show are Safari's.",
+    KApp.pushHintReallowApp:
+        'Notifications from Entrelares are blocked on this device. To allow '
+            'them: open Settings > Notifications > App notifications, tap '
+            'Entrelares and turn notifications on. Names may vary by '
+            'manufacturer.',
+    KApp.pushHintReallowIos:
+        'Notifications from Entrelares are blocked on this iPhone. To allow '
+            'them: open Settings > Notifications, tap Entrelares and turn on '
+            'Allow Notifications.',
+    KApp.pushHintReallowBrowser:
+        'Notifications from Entrelares are blocked in this browser. To allow '
+            'them: tap the icon to the left of the address, turn Notifications '
+            'on and reload the page.',
+    KApp.pushHintUnsupportedHere:
+        'This device does not receive notifications from Entrelares. You still '
+            'see everything on this screen and by e-mail.',
     KApp.pushEnable: 'Turn notifications on',
     KApp.pushDisable: 'Turn off',
     KApp.pushStatusOnTooltip: 'Phone notifications: on',
@@ -1115,7 +1182,8 @@ abstract final class StringsAppEn {
             'choose <strong>Share</strong>.',
     KApp.installHintStepAdd:
         '<strong>Scroll the list</strong> to <strong>Add to Home '
-            'Screen</strong> and tap <strong>Add</strong>.',
+            'Screen</strong>, turn on <strong>Open as Web App</strong> (if it '
+            'shows) and tap <strong>Add</strong>.',
     KApp.installHintNote:
         'Button names may vary slightly with your iOS version.',
     KApp.offlineStrip: 'Offline · data from {0}',

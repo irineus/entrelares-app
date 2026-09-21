@@ -42,6 +42,7 @@ export 'src/localization/strings_en.dart';
 export 'src/localization/strings_pt_br.dart';
 export 'src/policy_versions.dart';
 export 'src/push_enrollment.dart';
+export 'src/push_nudge_rules.dart';
 export 'src/push_routing.dart';
 export 'src/quick_swap_rules.dart';
 export 'src/report_rules.dart';
