@@ -234,6 +234,48 @@ void main() {
               'bury the signal under correct behaviour');
     });
 
+    // 21/09/2026 — the Sentry event that opened this: the write never reached
+    // the production edge, and a gateway answered 504 with an empty body.
+    test('stays QUIET on a gateway 5xx — no answer from our server', () {
+      for (final code in ['502', '503', '504']) {
+        final raw = 'PostgrestException(message: , code: $code, details: '
+            'Gateway Timeout, hint: null)';
+        expect(translateSaveError(raw, _fallback, _pt), _fallback);
+      }
+
+      expect(seen, isEmpty);
+    });
+
+    test('a gateway error PAGE never reaches the reader, accent or not', () {
+      const raw = 'PostgrestException(message: <html><body>Serviço '
+          'indisponível</body></html>, code: 503, details: Service '
+          'Unavailable, hint: null)';
+
+      expect(translateSaveError(raw, _fallback, _pt), _fallback);
+      expect(seen, isEmpty);
+    });
+
+    test('stays QUIET when the transport failed before any answer', () {
+      translateSaveError(
+          'ClientException with SocketException: Failed host lookup',
+          _fallback,
+          _pt);
+      translateSaveError(
+          'TimeoutException after 0:00:30.000000', _fallback, _pt);
+
+      expect(seen, isEmpty);
+    });
+
+    test("PostgREST's OWN 503 is still reported — that is our stack failing",
+        () {
+      translateSaveError(
+          postgrest('Could not connect to the database', 'PGRST001'),
+          _fallback,
+          _pt);
+
+      expect(seen, hasLength(1));
+    });
+
     test('an observer that throws never costs the reader their message', () {
       saveErrorObserver = (_, _) => throw StateError('sink is down');
 
