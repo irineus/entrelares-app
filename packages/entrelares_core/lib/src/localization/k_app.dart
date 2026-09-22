@@ -412,6 +412,15 @@ abstract final class KApp {
   static const String adminOfferCorrectPlan = 'app.adminOffer.correctPlan';
   static const String adminOfferBulkBanner = 'app.adminOffer.bulkBanner';
 
+  // ── F-67 Part A: the relato do dia ──
+  // "Relato" is this item's word (owner, 21/09/2026): Histórico is the audit
+  // trail, Observação the plan note, Aviso the F-52 notice, Mensagem the swap
+  // message. Every sentence about a relato is a dated fact — the F-61 rule.
+  static const String dayAccountErrEmpty = 'app.dayAccount.errEmpty';
+  static const String dayAccountErrTooLong = 'app.dayAccount.errTooLong';
+  static const String dayAccountByline = 'app.dayAccount.byline';
+  static const String dayAccountCorrected = 'app.dayAccount.corrected';
+
   /// See `K.allKeys`.
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -655,6 +664,10 @@ abstract final class KApp {
     adminOfferHow,
     adminOfferCorrectPlan,
     adminOfferBulkBanner,
+    dayAccountErrEmpty,
+    dayAccountErrTooLong,
+    dayAccountByline,
+    dayAccountCorrected,
   ];
 }
 
@@ -1026,6 +1039,10 @@ abstract final class StringsAppPtBr {
     KApp.adminOfferBulkBanner:
         'Sem o modo administrador, esta edição pula os dias que já passaram e '
             'mantém quem está planejado nos dias já atribuídos.',
+    KApp.dayAccountErrEmpty: 'Escreva o que aconteceu.',
+    KApp.dayAccountErrTooLong: 'O relato é limitado a {0} caracteres.',
+    KApp.dayAccountByline: 'Registrado por {0} em {1} às {2}',
+    KApp.dayAccountCorrected: 'Corrigido em {0} às {1}',
   };
 }
 
@@ -1392,5 +1409,9 @@ abstract final class StringsAppEn {
     KApp.adminOfferBulkBanner:
         'Without administrator mode, this edit skips the days that have '
             'passed and keeps who is planned on days already assigned.',
+    KApp.dayAccountErrEmpty: 'Write what happened.',
+    KApp.dayAccountErrTooLong: 'A day account is limited to {0} characters.',
+    KApp.dayAccountByline: 'Recorded by {0} on {1} at {2}',
+    KApp.dayAccountCorrected: 'Corrected on {0} at {1}',
   };
 }

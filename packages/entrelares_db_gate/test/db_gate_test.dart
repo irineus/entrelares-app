@@ -23,6 +23,7 @@ import 'suites/caregiver_gate.dart';
 import 'suites/claim_invitation.dart';
 import 'suites/consent_and_retention.dart';
 import 'suites/custom_role.dart';
+import 'suites/day_account.dart';
 import 'suites/day_notice.dart';
 import 'suites/day_protection.dart';
 import 'suites/e2e_date_allocator.dart';
@@ -104,6 +105,7 @@ void main() {
   // F-52: the aviso de imprevisto — who may send one, who may offer the DAY,
   // the daily cap, and the append-only shape the record rests on.
   dayNoticeTests(fx);
+  dayAccountTests(fx);
   resolutionLogLinkTests(fx);
   accountDeletionTests(fx);
   familyDeletionTests(fx);

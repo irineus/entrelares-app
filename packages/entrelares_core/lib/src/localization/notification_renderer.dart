@@ -244,6 +244,16 @@ abstract final class NotificationRenderer {
           note: p['note'],
         );
 
+      // ── Relato do dia (F-67) ──
+      // In-app only. `kind` says whether it is a first account or a
+      // correction; an unknown one falls back like every other discriminator.
+      case 'day_account' when date != null && kind == 'new':
+        return l.format(K.notifRenderDayAccountNew,
+            [name ?? l[K.notifRenderFbOtherCap], date]);
+      case 'day_account' when date != null && kind == 'correction':
+        return l.format(K.notifRenderDayAccountCorrection,
+            [name ?? l[K.notifRenderFbOtherCap], date]);
+
       // ── E-mail quota (F-38) ──
       case 'email_cap_reached':
         return switch (p['tier']) {
@@ -379,6 +389,11 @@ abstract final class NotificationRenderer {
           'reminder' => K.notifRenderTitleFamilyDeletionNear,
           _ => null,
         },
+      // F-67: one heading for both kinds — the body says which it is.
+      'day_account' => p['date'] != null &&
+              (kind == 'new' || kind == 'correction')
+          ? K.notifRenderTitleDayAccount
+          : null,
       'billing' =>
         kind == 'grace_warning' ? K.notifRenderTitleBillingGrace : null,
       // F-52: three request kinds share one heading — the body is what says
