@@ -270,7 +270,9 @@ chamadas.
 **`main` é produção.** Não há branch de QA: um merge em `main` publica `web.entrelares.app` pelo job
 `deploy-web`, e a QA que antes acontecia depois do merge tem de acontecer **antes** — no gate verde
 do PR, e num build de flavor dev quando a mudança precisa de aparelho real (`workflow_dispatch` →
-`build-apk`). O canal Android é a exceção: só sai quando o owner promove um bundle no Play Console.
+`build-apk`). O canal Android sobe sozinho para a **Internal testing** no merge que bumpa a versão
+(job `play-internal`, T-79); **Production** só sai quando o owner dispara o `play-promote` e aprova o run
+no Environment `play-production` — e o `promote` exige as notas em `store/release-notes/<versionCode>/`.
 
 **Por isso o Entrelares NÃO copia o merge automático do Gestão** (lá `develop` é do CI e `main` é do
 dono; aqui só existe `main`, e ela é o dono).

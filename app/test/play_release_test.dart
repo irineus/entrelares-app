@@ -30,12 +30,15 @@ String _job(String workflow, String name) {
   return lines.sublist(start, end == -1 ? lines.length : end).join('\n');
 }
 
-/// One lane's body in the Fastfile.
+/// One lane's body in the Fastfile, up to its own `end` — NOT to the next
+/// lane, whose header comments (Production, for `promote`) would otherwise be
+/// read as this lane's code.
 String _lane(String fastfile, String name) {
   final start = fastfile.indexOf('lane :$name do');
   expect(start, isNot(-1), reason: 'lane $name exists');
-  final next = fastfile.indexOf(RegExp(r'\n  lane :'), start + 1);
-  return fastfile.substring(start, next == -1 ? fastfile.length : next);
+  final end = fastfile.indexOf(RegExp(r'\r?\n  end\r?\n'), start);
+  expect(end, isNot(-1), reason: 'lane $name closes at two spaces');
+  return fastfile.substring(start, end);
 }
 
 void main() {
@@ -157,6 +160,82 @@ void main() {
       expect(File('../Gemfile.lock').readAsStringSync(),
           contains('    fastlane ($pin)'));
     });
+  });
+
+  group('play-promote — Production, only by the owner', () {
+    late String workflow;
+
+    setUp(() => workflow =
+        _code(File('../.github/workflows/play-promote.yml').readAsStringSync()));
+
+    test('nothing starts it but a manual dispatch', () {
+      final on = workflow.substring(
+          workflow.indexOf('\non:'), workflow.indexOf('\npermissions:'));
+      expect(on, contains('workflow_dispatch:'));
+      for (final trigger in ['push:', 'pull_request', 'schedule:', 'workflow_run']) {
+        expect(on, isNot(contains(trigger)),
+            reason: "Production is the owner's decision (22/09/2026); "
+                "`$trigger` would make it an event's");
+      }
+    });
+
+    test("the run waits for the owner's approval, from main only", () {
+      expect(workflow, contains('environment: play-production'),
+          reason: "the Environment's required reviewer IS the approval");
+      expect(workflow, contains("if: github.ref_name == 'main'"));
+      expect(workflow, contains('cancel-in-progress: false'));
+    });
+
+    test('free-text inputs never reach the shell as code', () {
+      final run = workflow.substring(workflow.indexOf('fastlane android promote'));
+      expect(run, isNot(contains(r'${{')),
+          reason: 'inputs go through `env:`; interpolated into `run:` they '
+              'are a shell injection');
+    });
+
+    test('the lane promotes from Internal, the one testing track', () {
+      final promote = _lane(_fastfile().readAsStringSync(), 'promote');
+      expect(promote, contains('track: "internal"'));
+      expect(promote, contains('track_promote_to: "production"'));
+      expect(promote, contains('release_notes_metadata(code)'),
+          reason: 'a promotion carries its notes, or it does not happen');
+    });
+  });
+
+  group('release notes (store/release-notes/<versionCode>/)', () {
+    // Checked on the way IN, in the PR that writes them — the promotion lane
+    // refuses the same things, but only after the owner has dispatched it.
+    final root = Directory('../store/release-notes');
+    final folders = root.existsSync()
+        ? (root.listSync().whereType<Directory>().toList()
+          ..sort((a, b) => a.path.compareTo(b.path)))
+        : <Directory>[];
+
+    test('every folder is a versionCode', () {
+      for (final dir in folders) {
+        final name = dir.uri.pathSegments.where((s) => s.isNotEmpty).last;
+        expect(RegExp(r'^[1-9]\d*$').hasMatch(name), isTrue,
+            reason: '$name is not a versionCode');
+      }
+    });
+
+    for (final dir in folders) {
+      final name = dir.uri.pathSegments.where((s) => s.isNotEmpty).last;
+      test("$name carries both languages, within Play's 500 characters", () {
+        final files = dir.listSync().whereType<File>().map((f) =>
+            f.uri.pathSegments.last).toSet();
+        expect(files, {'pt-BR.txt', 'en-US.txt'},
+            reason: 'Play shows the notes per language; a missing one '
+                'refuses the promotion after the owner dispatched it');
+        for (final lang in files) {
+          final text =
+              File('${dir.path}/$lang').readAsStringSync().trim();
+          expect(text, isNotEmpty, reason: '$name/$lang is empty');
+          expect(text.length, lessThanOrEqualTo(500),
+              reason: '$name/$lang has ${text.length} characters');
+        }
+      });
+    }
   });
 
   group('release signing', () {

@@ -326,18 +326,35 @@ calendar time, so recruit testers early rather than when a build is ready.
 > `backlog/` stopped being the record on 07/09/2026 (T-63). The account-deletion URL of §4 is one
 > of its checkboxes, tracked as **S-19**.
 
-## 6 · Publishing a new Android build
+## 6 · Publishing a new Android build — the pipeline (T-79, 22/09/2026)
 
-```
-cd app && fvm flutter build appbundle --flavor prod --release
-```
+No `.aab` is built on anyone's machine any more. Two steps, one of them the owner's:
+
+1. **Merge → Internal testing, automatically.** The `play-internal` job of `verify.yml` runs
+   after the three gates and `db-prod`. It compares the pubspec `versionCode` with every Play
+   track: a NEW code is built (`flutter build appbundle --release --flavor prod`, upload key
+   from the `play-internal` Environment) and sent to **Internal testing**, the ONE testing
+   track (owner, 22/09/2026 — no Google review per release, up to 100 testers by e-mail list).
+   An EQUAL code uploads nothing and says so; a LOWER one fails `main` and names both numbers.
+   Closed testing – Alpha receives nothing any more.
+2. **Owner → Production.** Actions → **play-promote** → *Run workflow* on `main`, then
+   **Approve** the run on the `play-production` Environment. `promote` sends the build Internal
+   holds (or a given `version_code`) to Production at a `fraction` — below 1 is a staged
+   rollout — with no rebuild; `rollout` moves the fraction (1 completes it); `halt` pauses it
+   (give the fraction that is live); a halted rollout resumes by promoting again. `dry_run`
+   validates with Play and commits nothing.
+
+**Release notes are required at promotion, and only there** (owner, 22/09/2026). Before the
+dispatch, a small PR adds `store/release-notes/<versionCode>/pt-BR.txt` and `en-US.txt`, at most
+**500 characters** each (Play's limit), describing what changed in the APP since the build
+Production has now: leave out docs, CI, web-only and server-only changes. `play_release_test`
+checks every folder on the way in, and the lane refuses a promotion without both files.
 
 - `--flavor prod` is not optional: it is what selects the production Supabase project **and** the
-  `com.entrelares.app` application id. A flavour-less build resolves to dev by construction
-  (`CLAUDE.md` → *Locked decisions*).
-- **Release signing** comes from the git-ignored `app/android/key.properties`
-  (T-55): `prod.*` must be the PRODUCT's upload keystore. Without the file a release build fails
-  fast, on purpose.
+  `com.entrelares.app` application id. A flavour-less build resolves to dev by construction.
+- **Release signing** reads `prod.*` from `app/android/key.properties`, which the job writes for
+  its own lifetime from the Environment secrets; each flavour signs by its OWN entries (T-79), so
+  a local fallback build (the command above, with the owner's full file) still works unchanged.
 - **Version**: `version:` in `pubspec.yaml` feeds both halves — the name (`2.0.0`) and the build
   number after `+`, which becomes Android's `versionCode`. **Every upload needs a higher
   `versionCode` than the last**, and a code is burned by the UPLOAD, not by the rollout.
@@ -346,6 +363,8 @@ cd app && fvm flutter build appbundle --flavor prod --release
   Per MERGED PR: MINOR when it delivers a backlog item, PATCH for fixes/polish, MAJOR only by
   owner decision, and `+N` rises on every merge to `main` — the full text lives as the
   comment above `version:` in the pubspec, next to the number it governs.
+- The pipeline authenticates with its OWN service account (`PLAY_RELEASE_SERVICE_ACCOUNT`,
+  release permissions on this package only), never with the billing one below.
 - The Play Billing side of the account (products, RTDN, the service account the server uses to
   verify a purchase) is configured once, in [`supabase/README.md`](../supabase/README.md) §9-bis.
 
