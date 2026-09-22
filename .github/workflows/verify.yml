@@ -6,10 +6,14 @@
 # `entrelares-app`) and `web-e2e` (the flow gate that replaces the Playwright
 # suite dying with the Blazor client). `deploy-web` waits on all three, plus
 # `db-prod` — T-29's order, migrations → functions → app.
-# The APK build and the E2E emulator lane stay OUT of the gate on purpose: both
-# are minutes-expensive and the account's 2000 min/mo are shared with the
-# product repos (same constraint that shaped T-50). The E2E lane runs daily on
-# a schedule and on demand; an APK comes from workflow_dispatch.
+# The E2E emulator lane stays OUT of the gate on purpose: it is slow and flaky
+# on shared runner hosts (T-77), so it runs daily on a schedule and on demand.
+# (The old reason — "the account's 2000 min/mo" — was stale: the repo is
+# PUBLIC, and standard GitHub-hosted runners carry no minute quota there;
+# corrected by T-79.)
+# T-79 added the Android channel at the bottom: `play-internal` uploads the
+# prod AAB to the Play Internal testing track on every merge that bumps the
+# versionCode. Production is a separate, owner-approved dispatch.
 name: verify
 
 # A change that touches ONLY markdown runs nothing (`paths-ignore`, 29/08/2026).
@@ -52,8 +56,7 @@ on:
   pull_request:
     paths-ignore: ['**/*.md']
   # T-53 lote 3: the E2E lane runs on a schedule, not on every push — an
-  # emulator run costs ~10-15 min of the account-wide 2000 min/mo (the same
-  # constraint that keeps the APK build out of the gate). 06:10 UTC daily.
+  # emulator run costs ~10-15 min per run. 06:10 UTC daily.
   schedule:
     - cron: "10 6 * * *"
   workflow_dispatch:
@@ -413,11 +416,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      # Stage 3: flavors are mandatory. CI builds the DEV flavor only, and
-      # DEBUG only: release signing reads the T-55 keystores from a local
-      # key.properties (never in the repo nor in CI), so release builds are
-      # local-by-construction — a release task here would fail fast on the
-      # missing file.
+      # Stage 3: flavors are mandatory. This job builds the DEV flavor, DEBUG
+      # only — no keystore here. The one release build CI makes is
+      # `play-internal`'s, with the upload key from its Environment (T-79).
       - name: Build debug APK (dev flavor, arm64)
         working-directory: app
         run: flutter build apk --debug --flavor dev --split-per-abi --target-platform android-arm64
@@ -785,6 +786,115 @@ jobs:
           echo "### Canal web: build OK, publicação PULADA" >> "$GITHUB_STEP_SUMMARY"
           echo "Faltam os secrets \`CLOUDFLARE_API_TOKEN\` e \`CLOUDFLARE_ACCOUNT_ID\` neste repo (e o projeto Pages \`entrelares-web\`)." >> "$GITHUB_STEP_SUMMARY"
 
+  # ── T-79 — the Android channel, published from here ─────────────────────
+  # Until 22/09/2026 every `.aab` was built on the owner's machine and uploaded
+  # by hand. Now a merge that bumps the version puts THAT versionCode on the
+  # Play **Internal testing** track with no human action — the ONE testing
+  # track (owner, 22/09/2026): no Google review per release, minutes to the
+  # tester list. Production is NOT reached from here: it is a separate
+  # dispatch, approved by the owner on the `play-production` Environment.
+  #
+  # Behind the SAME three gates as the web channel, plus `db-prod`: a build
+  # whose schema failed to apply must not reach a phone either. NOT behind
+  # `deploy-web`: a red there is usually the edge (T-73), which says nothing
+  # about an Android binary, and holding one channel hostage to the other's
+  # CDN is a coupling nobody asked for.
+  #
+  # The upload key lives in the `play-internal` Environment, whose deployment
+  # branch rule is `main` alone — the repo is PUBLIC, and that rule, not the
+  # job's `if`, is what keeps a same-repo PR branch from reading the key.
+  play-internal:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
+    needs: [verify, db-gate, web-e2e, db-prod]
+    runs-on: ubuntu-latest
+    environment: play-internal
+    timeout-minutes: 30
+    # Queue, never cancel: an edit interrupted between upload and commit is
+    # discarded by Play, but a cancelled run reports nothing about it.
+    concurrency:
+      group: play-internal
+      cancel-in-progress: false
+    # Job level, like `deploy-web`: each step's `if` reads it.
+    env:
+      PLAY_RELEASE_SERVICE_ACCOUNT: ${{ secrets.PLAY_RELEASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Say why nothing went to Play
+        if: env.PLAY_RELEASE_SERVICE_ACCOUNT == ''
+        run: |
+          echo "### Android: build NÃO enviado à Play" >> "$GITHUB_STEP_SUMMARY"
+          echo "Falta o secret \`PLAY_RELEASE_SERVICE_ACCOUNT\` no Environment \`play-internal\` (T-79). O canal Android segue no último bundle enviado." >> "$GITHUB_STEP_SUMMARY"
+      - uses: ruby/setup-ruby@v1
+        if: env.PLAY_RELEASE_SERVICE_ACCOUNT != ''
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: Read the versionCode from the pubspec
+        if: env.PLAY_RELEASE_SERVICE_ACCOUNT != ''
+        id: version
+        run: |
+          set -euo pipefail
+          line=$(grep -E '^version: ' app/pubspec.yaml)
+          code="${line##*+}"
+          [[ "$code" =~ ^[0-9]+$ ]] || { echo "::error::no versionCode in '$line'"; exit 1; }
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+      - name: Is this versionCode new to Play?
+        if: env.PLAY_RELEASE_SERVICE_ACCOUNT != ''
+        id: guard
+        run: bundle exec fastlane android version_guard version_code:${{ steps.version.outputs.code }}
+      - name: Read Flutter version from .fvmrc
+        if: steps.guard.outputs.upload == 'true'
+        id: fvm
+        run: echo "version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        if: steps.guard.outputs.upload == 'true'
+        with:
+          flutter-version: ${{ steps.fvm.outputs.version }}
+          channel: stable
+          cache: true
+      - uses: actions/setup-java@v4
+        if: steps.guard.outputs.upload == 'true'
+        with:
+          distribution: temurin
+          java-version: "17"
+      # The upload key exists on disk for the length of this job and nowhere
+      # else: outside the checkout, removed by the last step whatever happens.
+      # Only the `prod.*` entries — the Gradle file signs per flavor (T-79),
+      # so the dev keystore never travels with the publishing one.
+      - name: Materialize the upload key
+        if: steps.guard.outputs.upload == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            [ -n "${!name}" ] || { echo "::error::secret for $name is empty in the play-internal Environment"; exit 1; }
+          done
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          {
+            echo "prod.storeFile=$RUNNER_TEMP/upload.jks"
+            echo "prod.storePassword=$STORE_PASSWORD"
+            echo "prod.keyAlias=$KEY_ALIAS"
+            echo "prod.keyPassword=$KEY_PASSWORD"
+          } > app/android/key.properties
+      - name: Build the prod AAB
+        if: steps.guard.outputs.upload == 'true'
+        working-directory: app
+        run: flutter build appbundle --release --flavor prod
+      - name: Upload to Internal testing
+        if: steps.guard.outputs.upload == 'true'
+        run: bundle exec fastlane android beta aab:app/build/app/outputs/bundle/prodRelease/app-prod-release.aab
+      - name: Say what reached Internal testing
+        if: steps.guard.outputs.upload == 'true'
+        run: |
+          echo "Enviado: \`$(grep -E '^version: ' app/pubspec.yaml | cut -d' ' -f2)\` na Internal testing. Produção só pelo workflow \`play-promote\`, com a sua aprovação." >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove the upload key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks" app/android/key.properties
+
   # ── T-68 — a failed publish reaching a human ────────────────────────────
   # `main` is production and there is no rollback, so the loud failure is
   # already covered: a merge that breaks reaches users as a broken app. The
@@ -810,7 +920,7 @@ jobs:
       always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref_name == 'main'
       && contains(needs.*.result, 'failure')
-    needs: [verify, db-gate, web-e2e, db-prod, deploy-web]
+    needs: [verify, db-gate, web-e2e, db-prod, deploy-web, play-internal]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -837,7 +947,14 @@ jobs:
           jobs=$(printf '%s' "$NEEDS" \
             | jq -r 'to_entries | map(select(.value.result == "failure") | .key) | join(", ")')
           echo "jobs=$jobs" >> "$GITHUB_OUTPUT"
-          if [ "$PUBLISHED" = "true" ]; then
+          # T-79: `play-internal` alone red means the WEB channel is fine —
+          # every message below would otherwise blame web.entrelares.app.
+          if [ "$jobs" = "play-internal" ]; then android_only=true; else android_only=false; fi
+          echo "android_only=$android_only" >> "$GITHUB_OUTPUT"
+          if [ "$android_only" = "true" ]; then
+            echo "### 🚨 \`main\` vermelha — o Android NÃO subiu para a Internal testing" >> "$GITHUB_STEP_SUMMARY"
+            echo "O canal web não é afetado. O merge \`${GITHUB_SHA:0:7}\` não chegou à Play; o passo vermelho de \`play-internal\` diz por quê." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$PUBLISHED" = "true" ]; then
             echo "### 🚨 \`main\` vermelha — o canal PUBLICOU, mas serve script que a CSP recusa" >> "$GITHUB_STEP_SUMMARY"
             echo "Falharam: \`$jobs\`. O merge \`${GITHUB_SHA:0:7}\` chegou a \`web.entrelares.app\`; o passo *Refuse a served script the CSP would block* diz qual script." >> "$GITHUB_STEP_SUMMARY"
           else
@@ -854,7 +971,8 @@ jobs:
             "${{ steps.failed.outputs.jobs }}" \
             "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             "$GITHUB_SHA" \
-            "$PUBLISHED"
+            "$PUBLISHED" \
+            "${{ steps.failed.outputs.android_only }}"
       # The durable record. An e-mail is read once and scrolls away; this stays
       # OPEN until a human closes it, which is what a "production is not
       # publishing" item needs. `always()` so a Sentry outage does not take the
@@ -864,6 +982,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           FAILED_JOBS: ${{ steps.failed.outputs.jobs }}
+          ANDROID_ONLY: ${{ steps.failed.outputs.android_only }}
         run: |
           set -euo pipefail
           short="${GITHUB_SHA:0:7}"
@@ -875,6 +994,17 @@ jobs:
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "Nova tentativa, mesma falha: \`$jobs\` — $run_url"
             echo "Registro atualizado: #$existing"
+          elif [ "$ANDROID_ONLY" = "true" ]; then
+            gh issue create \
+              --title "$marker — o Android não subiu para a Internal testing" \
+              --body "$(printf '%s\n' \
+                "O merge \`$short\` foi para \`main\`, o canal web seguiu normalmente, e **o build Android não chegou à faixa Internal testing** da Play." \
+                "" \
+                "- Job vermelho: \`play-internal\` — o passo vermelho diz por quê (versionCode menor que o da Play, secret faltando no Environment \`play-internal\`, recusa da Play)." \
+                "- Run: $run_url" \
+                "- Nenhum usuário da Production é afetado: ela só muda pelo workflow \`play-promote\`." \
+                "" \
+                "Fechar esta issue quando um run verde em \`main\` tiver enviado o versionCode (o sumário do job o nomeia)." )"
           elif [ "$PUBLISHED" = "true" ]; then
             gh issue create \
               --title "$marker — o canal publicou, mas serve script que a CSP recusa" \

@@ -186,6 +186,15 @@ O `Variant: prodRelease` tem que imprimir a impressão SHA-256 que o
 `app/web/.well-known/assetlinks.json` declara para `com.entrelares.app`.
 Se divergir, o build sai assinado com a chave errada e a Play recusa o upload.
 
+**Cada flavor assina com as SUAS entradas (T-79, 22/09/2026).** O Gradle não pergunta mais
+se o `key.properties` existe, e sim se as entradas `dev.*` / `prod.*` estão nele: um build
+release de um flavor sem entradas falha rápido, com erro claro. O motivo é o CI. Desde o
+T-79 a chave de upload tem uma **segunda cópia**, como secret do Environment `play-internal`
+do GitHub (deploy só a partir de `main`). O job `play-internal` escreve um `key.properties`
+**só com `prod.*`**, dura o tempo do job e é apagado no fim. A keystore dev nunca viaja com
+a de publicação. `~/keystores/` segue sendo a origem; se a chave de upload for trocada, o
+secret é trocado junto (o handoff do T-79 diz de onde sai cada valor).
+
 ## i18n (U-13/U-24 — lote 1)
 
 Bilíngue por leitor (PT-BR / EN), portado do app web:

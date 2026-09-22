@@ -19,11 +19,19 @@ plugins {
 // `entrelares-app/store/`, which T-56 archived, and a publishing key cannot
 // depend on a clone nobody keeps any more (moved 25/08/2026).
 val keyPropertiesFile = rootProject.file("key.properties")
-val hasKeyProperties = keyPropertiesFile.exists()
 val keyProperties = Properties().apply {
-    if (hasKeyProperties) {
+    if (keyPropertiesFile.exists()) {
         FileInputStream(keyPropertiesFile).use { load(it) }
     }
+}
+// T-79: a flavor is signed when ITS entries are present, not when the file is.
+// The owner's machine carries both; the `play-internal` CI job materializes a
+// key.properties with the `prod.*` upload key ONLY (the dev keystore never
+// travels with the publishing one), and the PR preview job with `dev.*` only.
+// Requiring both would make each job either fail at configuration or carry a
+// key it has no business holding.
+val signedFlavors = listOf("dev", "prod").filter {
+    keyProperties.getProperty("$it.storeFile") != null
 }
 
 android {
@@ -45,14 +53,12 @@ android {
     }
 
     signingConfigs {
-        if (hasKeyProperties) {
-            for (flavor in listOf("dev", "prod")) {
-                create(flavor) {
-                    storeFile = file(keyProperties.getProperty("$flavor.storeFile"))
-                    storePassword = keyProperties.getProperty("$flavor.storePassword")
-                    keyAlias = keyProperties.getProperty("$flavor.keyAlias")
-                    keyPassword = keyProperties.getProperty("$flavor.keyPassword")
-                }
+        for (flavor in signedFlavors) {
+            create(flavor) {
+                storeFile = file(keyProperties.getProperty("$flavor.storeFile"))
+                storePassword = keyProperties.getProperty("$flavor.storePassword")
+                keyAlias = keyProperties.getProperty("$flavor.keyAlias")
+                keyPassword = keyProperties.getProperty("$flavor.keyPassword")
             }
         }
     }
@@ -69,7 +75,7 @@ android {
             // device (and its launcher label tells them apart).
             applicationId = "com.entrelares.flutter"
             manifestPlaceholders["appName"] = "Entrelares Dev"
-            if (hasKeyProperties) {
+            if ("dev" in signedFlavors) {
                 signingConfig = signingConfigs.getByName("dev")
             }
         }
@@ -80,7 +86,7 @@ android {
             // key.properties MUST be the product's upload keystore).
             applicationId = "com.entrelares.app"
             manifestPlaceholders["appName"] = "Entrelares"
-            if (hasKeyProperties) {
+            if ("prod" in signedFlavors) {
                 signingConfig = signingConfigs.getByName("prod")
             }
         }
@@ -97,15 +103,17 @@ android {
     }
 }
 
-// Fail fast: without key.properties a release build would come out unsigned
-// (flavors carry no signingConfig), which only surfaces at install time.
-if (!hasKeyProperties) {
+// Fail fast: a release build of a flavor with no signing entries would come
+// out unsigned (the flavor carries no signingConfig), which only surfaces at
+// install time — or, for the Play upload, as a rejection after the build.
+for (flavor in listOf("dev", "prod").filterNot { it in signedFlavors }) {
+    val variant = flavor.replaceFirstChar { it.uppercase() } + "Release"
     tasks.configureEach {
-        if (name.contains("Release")) {
+        if (name.contains(variant)) {
             doFirst {
                 throw GradleException(
-                    "key.properties not found at ${keyPropertiesFile.path} — " +
-                        "release builds require the T-55 keystores. " +
+                    "No `$flavor.*` signing entries in ${keyPropertiesFile.path} — " +
+                        "a $flavor release build requires its T-55 keystore. " +
                         "See README 'Assinatura (release)'."
                 )
             }

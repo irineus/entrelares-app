@@ -1010,7 +1010,7 @@ void main() {
         return condition.toString();
       }
 
-      for (final name in ['db-prod', 'deploy-web', 'ops-alert']) {
+      for (final name in ['db-prod', 'deploy-web', 'play-internal', 'ops-alert']) {
         final condition = jobIf(name);
         expect(condition, contains("github.event_name == 'push'"),
             reason: name);
