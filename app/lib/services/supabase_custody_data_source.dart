@@ -8,6 +8,7 @@ import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_deletion.dart';
@@ -889,6 +890,49 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   // ── F-52 aviso de imprevisto ──
+
+  // ── F-67 relato do dia ──
+
+  @override
+  Future<List<DayAccount>> fetchDayAccounts(
+      DateTime start, DateTime end) async {
+    final rows = await _client
+        .from('day_accounts')
+        .select()
+        .gte('account_date', CareSchedule.isoDate(start))
+        .lte('account_date', CareSchedule.isoDate(end))
+        .order('account_date')
+        .order('created_at');
+    return rows.map(DayAccount.fromJson).toList();
+  }
+
+  @override
+  Future<int> addDayAccount({
+    required DateTime date,
+    required String body,
+    int? correctsId,
+  }) async {
+    final id = await _client.rpc<dynamic>('add_day_account', params: {
+      'p_date': CareSchedule.isoDate(date),
+      'p_body': body,
+      'p_corrects_id': correctsId,
+    });
+    return id as int;
+  }
+
+  @override
+  Future<int> countDayAccountsWrittenToday(int authorId) async {
+    // The RPC counts by the day written in São Paulo (UTC−3, no daylight
+    // saving since 2019): that day starts at 03:00 UTC.
+    final sp = DateTime.now().toUtc().subtract(const Duration(hours: 3));
+    final start = DateTime.utc(sp.year, sp.month, sp.day, 3);
+    final rows = await _client
+        .from('day_accounts')
+        .select('id')
+        .eq('author_profile_id', authorId)
+        .gte('created_at', start.toIso8601String());
+    return rows.length;
+  }
 
   @override
   Future<List<DayNotice>> fetchDayNotices(DateTime date) async {

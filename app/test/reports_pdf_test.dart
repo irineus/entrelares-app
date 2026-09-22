@@ -230,6 +230,7 @@ void main() {
       Map<int, SwapOrigin> origins = const {},
       List<AuditLogView> logs = const [],
       Localization? localization,
+      List<ReportDayAccount> dayAccounts = const [],
     }) {
       final loc = localization ?? l;
       return buildCustodyReport(
@@ -265,8 +266,56 @@ void main() {
         l: loc,
         resolutionOrigins: origins,
         includeAcceptedFutureSwaps: future,
+        dayAccounts: dayAccounts,
       );
     }
+
+    // F-67: section 4 prints both dates, the author and the text; a corrected
+    // relato keeps its text and says when it was corrected.
+    test('section 4 prints the relatos with both dates, corrections kept',
+        () async {
+      final text = await render(
+          report(dayAccounts: [
+            ReportDayAccount(
+              accountDate: DateTime(2026, 8, 10),
+              writtenAtLocal: DateTime(2026, 8, 11, 9, 30),
+              authorName: 'Ana Souza',
+              body: 'buscou no aeroporto',
+              correctedAtLocal: DateTime(2026, 8, 11, 10, 15),
+            ),
+            ReportDayAccount(
+              accountDate: DateTime(2026, 8, 10),
+              writtenAtLocal: DateTime(2026, 8, 11, 10, 15),
+              authorName: 'Ana Souza',
+              body: 'buscou no aeroporto as 17h',
+              isCorrection: true,
+            ),
+          ]),
+          l);
+      // The page text is laid out word by word, so the assertions read words.
+      expect(text, contains('Relatos'));
+      expect(text, contains('aeroporto'));
+      expect(text, contains('17h'));
+      expect(text, contains(l.formatDate(DateTime(2026, 8, 10))));
+      expect(text, contains('Souza'));
+    });
+
+    test('section 4 says so when the period has no relato', () async {
+      // "Nenhum" also opens other sections' empty lines, so the proof is the
+      // difference: one more of them when section 4 has nothing to print.
+      int nenhum(String text) => 'Nenhum'.allMatches(text).length;
+      final empty = await render(report(), l);
+      final full = await render(
+          report(dayAccounts: [
+            ReportDayAccount(
+                accountDate: DateTime(2026, 8, 10),
+                writtenAtLocal: DateTime(2026, 8, 11, 9),
+                authorName: 'Ana Souza',
+                body: 'texto'),
+          ]),
+          l);
+      expect(nenhum(empty), nenhum(full) + 1);
+    });
 
     test('carries the caregiver table and the honest copy', () async {
       final text = await render(report(), l);

@@ -420,6 +420,28 @@ abstract final class KApp {
   static const String dayAccountErrTooLong = 'app.dayAccount.errTooLong';
   static const String dayAccountByline = 'app.dayAccount.byline';
   static const String dayAccountCorrected = 'app.dayAccount.corrected';
+  static const String dayAccountSection = 'app.dayAccount.section';
+  static const String dayAccountAction = 'app.dayAccount.action';
+  static const String dayAccountFieldLabel = 'app.dayAccount.fieldLabel';
+  static const String dayAccountFieldHint = 'app.dayAccount.fieldHint';
+  static const String dayAccountAppendOnly = 'app.dayAccount.appendOnly';
+  static const String dayAccountSave = 'app.dayAccount.save';
+  static const String dayAccountCorrect = 'app.dayAccount.correct';
+  static const String dayAccountCorrecting = 'app.dayAccount.correcting';
+  static const String dayAccountOutOfWindow = 'app.dayAccount.outOfWindow';
+  static const String dayAccountCapLeftOne = 'app.dayAccount.capLeftOne';
+  static const String dayAccountCapLeftMany = 'app.dayAccount.capLeftMany';
+  static const String dayAccountCapReached = 'app.dayAccount.capReached';
+  static const String dayAccountSaved = 'app.dayAccount.saved';
+  static const String dayAccountErrSave = 'app.dayAccount.errSave';
+  static const String dayAccountErrLoad = 'app.dayAccount.errLoad';
+  static const String dayAccountAuditNew = 'app.dayAccount.auditNew';
+  static const String dayAccountAuditCorrection = 'app.dayAccount.auditCorrection';
+  static const String pdfDayAccountsSection = 'app.dayAccount.pdfSection';
+  static const String pdfDayAccountsLead = 'app.dayAccount.pdfLead';
+  static const String pdfDayAccountsEmpty = 'app.dayAccount.pdfEmpty';
+  static const String pdfDayAccountLine = 'app.dayAccount.pdfLine';
+  static const String pdfDayAccountCorrectionLine = 'app.dayAccount.pdfCorrectionLine';
 
   /// See `K.allKeys`.
   static const List<String> allKeys = [
@@ -668,6 +690,28 @@ abstract final class KApp {
     dayAccountErrTooLong,
     dayAccountByline,
     dayAccountCorrected,
+    dayAccountSection,
+    dayAccountAction,
+    dayAccountFieldLabel,
+    dayAccountFieldHint,
+    dayAccountAppendOnly,
+    dayAccountSave,
+    dayAccountCorrect,
+    dayAccountCorrecting,
+    dayAccountOutOfWindow,
+    dayAccountCapLeftOne,
+    dayAccountCapLeftMany,
+    dayAccountCapReached,
+    dayAccountSaved,
+    dayAccountErrSave,
+    dayAccountErrLoad,
+    dayAccountAuditNew,
+    dayAccountAuditCorrection,
+    pdfDayAccountsSection,
+    pdfDayAccountsLead,
+    pdfDayAccountsEmpty,
+    pdfDayAccountLine,
+    pdfDayAccountCorrectionLine,
   ];
 }
 
@@ -1043,6 +1087,50 @@ abstract final class StringsAppPtBr {
     KApp.dayAccountErrTooLong: 'O relato é limitado a {0} caracteres.',
     KApp.dayAccountByline: 'Registrado por {0} em {1} às {2}',
     KApp.dayAccountCorrected: 'Corrigido em {0} às {1}',
+    KApp.dayAccountSection:
+        'Relatos do dia',
+    KApp.dayAccountAction:
+        'Relatar o que aconteceu',
+    KApp.dayAccountFieldLabel:
+        'O que aconteceu',
+    KApp.dayAccountFieldHint:
+        'Quem buscou, a que horas, onde deixou',
+    KApp.dayAccountAppendOnly:
+        'Um relato não pode ser editado nem apagado depois de registrado. Para corrigir, registre uma correção: o texto anterior continua no registro, marcado como corrigido.',
+    KApp.dayAccountSave:
+        'Registrar relato',
+    KApp.dayAccountCorrect:
+        'Corrigir',
+    KApp.dayAccountCorrecting:
+        'Correção do relato registrado em {0}',
+    KApp.dayAccountOutOfWindow:
+        'Relatos podem ser registrados até {0} dias depois do dia.',
+    KApp.dayAccountCapLeftOne:
+        'Você ainda pode registrar 1 relato hoje.',
+    KApp.dayAccountCapLeftMany:
+        'Você ainda pode registrar {0} relatos hoje.',
+    KApp.dayAccountCapReached:
+        'Você já registrou {0} relatos hoje. O limite volta amanhã.',
+    KApp.dayAccountSaved:
+        'Relato registrado.',
+    KApp.dayAccountErrSave:
+        'Não foi possível registrar o relato.',
+    KApp.dayAccountErrLoad:
+        'Não foi possível carregar os relatos deste dia.',
+    KApp.dayAccountAuditNew:
+        '{0} registrou um relato',
+    KApp.dayAccountAuditCorrection:
+        '{0} corrigiu um relato',
+    KApp.pdfDayAccountsSection:
+        '4. Relatos do dia',
+    KApp.pdfDayAccountsLead:
+        'Relatos registrados pelos responsáveis depois do dia a que se referem. Um relato não altera o planejamento. Uma correção é um novo relato, e o texto corrigido continua neste documento.',
+    KApp.pdfDayAccountsEmpty:
+        'Nenhum relato do dia no período.',
+    KApp.pdfDayAccountLine:
+        'Sobre {0} — registrado por {1} em {2}.',
+    KApp.pdfDayAccountCorrectionLine:
+        'Sobre {0} — correção registrada por {1} em {2}.',
   };
 }
 
@@ -1413,5 +1501,49 @@ abstract final class StringsAppEn {
     KApp.dayAccountErrTooLong: 'A day account is limited to {0} characters.',
     KApp.dayAccountByline: 'Recorded by {0} on {1} at {2}',
     KApp.dayAccountCorrected: 'Corrected on {0} at {1}',
+    KApp.dayAccountSection:
+        'Day accounts',
+    KApp.dayAccountAction:
+        'Report what happened',
+    KApp.dayAccountFieldLabel:
+        'What happened',
+    KApp.dayAccountFieldHint:
+        'Who picked up, at what time, where they left',
+    KApp.dayAccountAppendOnly:
+        'A day account cannot be edited or deleted once recorded. To correct it, record a correction: the earlier text stays on the record, marked as corrected.',
+    KApp.dayAccountSave:
+        'Record account',
+    KApp.dayAccountCorrect:
+        'Correct',
+    KApp.dayAccountCorrecting:
+        'Correction of the account recorded on {0}',
+    KApp.dayAccountOutOfWindow:
+        'Day accounts can be recorded up to {0} days after the day.',
+    KApp.dayAccountCapLeftOne:
+        'You can still record 1 day account today.',
+    KApp.dayAccountCapLeftMany:
+        'You can still record {0} day accounts today.',
+    KApp.dayAccountCapReached:
+        'You have already recorded {0} day accounts today. The limit resets tomorrow.',
+    KApp.dayAccountSaved:
+        'Day account recorded.',
+    KApp.dayAccountErrSave:
+        'The day account could not be recorded.',
+    KApp.dayAccountErrLoad:
+        'The day accounts of this day could not be loaded.',
+    KApp.dayAccountAuditNew:
+        '{0} recorded a day account',
+    KApp.dayAccountAuditCorrection:
+        '{0} corrected a day account',
+    KApp.pdfDayAccountsSection:
+        '4. Day accounts',
+    KApp.pdfDayAccountsLead:
+        'Accounts recorded by the caregivers after the day they are about. A day account does not change the plan. A correction is a new account, and the corrected text stays in this document.',
+    KApp.pdfDayAccountsEmpty:
+        'No day accounts in the period.',
+    KApp.pdfDayAccountLine:
+        'About {0} — recorded by {1} on {2}.',
+    KApp.pdfDayAccountCorrectionLine:
+        'About {0} — correction recorded by {1} on {2}.',
   };
 }

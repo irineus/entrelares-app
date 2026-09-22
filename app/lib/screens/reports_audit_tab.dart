@@ -5,6 +5,7 @@ import '../theme/tokens.dart';
 
 import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
+import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
@@ -60,6 +61,10 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   List<AccountLog> _account = const [];
   Family? _family;
 
+  /// F-67: the relatos whose DAY falls in the month/year period — the same
+  /// "by affected date" reading those tabs give the calendar changes.
+  List<DayAccount> _dayAccounts = const [];
+
   /// F-45: log id → the request whose resolution produced that log.
   Map<int, SwapOrigin> _origins = const {};
 
@@ -85,6 +90,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
       _hasMore = false;
       _activity = const [];
       _account = const [];
+      _dayAccounts = const [];
       _origins = const {};
       _expandedBatches.clear();
     });
@@ -93,6 +99,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
       final roles = await widget.dataSource.fetchRoles();
       var activity = const <ActivityLog>[];
       var account = const <AccountLog>[];
+      var dayAccounts = const <DayAccount>[];
       var hasMore = false;
       Family? family = _family;
 
@@ -111,6 +118,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
           final (start, end) = _period;
           activity =
               await widget.dataSource.fetchActivityLogsForPeriod(start, end);
+          dayAccounts = await widget.dataSource.fetchDayAccounts(start, end);
       }
 
       final origins = await _originsFor(activity);
@@ -120,6 +128,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
         _roles = roles;
         _activity = activity;
         _account = account;
+        _dayAccounts = dayAccounts;
         _family = family;
         _origins = origins;
         _hasMore = hasMore;
@@ -337,8 +346,66 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
 
   // ── The calendar trail ────────────────────────────────────────────────────
 
-  List<Widget> _scheduleTimeline(Localization l) {
+  List<Widget> _scheduleTimeline(Localization l) => [
+        ..._calendarChanges(l),
+        ..._dayAccountTimeline(l),
+      ];
+
+  /// F-67: the period's relatos as entries of their own kind, after the
+  /// calendar changes — the day each is ABOUT on the first line, the instant
+  /// it was WRITTEN as the entry's timestamp. A corrected one is struck and
+  /// says when it was corrected; both stay, because the record is the record.
+  List<Widget> _dayAccountTimeline(Localization l) {
+    if (_dayAccounts.isEmpty) return const [];
+    final entries = [
+      for (final a in _dayAccounts)
+        (
+          id: a.id,
+          authorId: a.authorProfileId,
+          correctsId: a.correctsId,
+          createdAt: a.createdAt,
+        ),
+    ];
+    final superseded = supersededDayAccountIds(entries);
+    final ordered = [..._dayAccounts]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final textTheme = Theme.of(context).textTheme;
+    return [
+      const SizedBox(height: 12),
+      Text(l[KApp.dayAccountSection], style: textTheme.titleSmall),
+      const SizedBox(height: Spacing.xs),
+      for (final a in ordered)
+        _item(
+          badge: AuditBadge.created,
+          icon: Icons.notes,
+          children: [
+            Text(l.format(K.auditDayLabel, [l.formatDate(a.accountDate)]),
+                style: textTheme.labelSmall),
+            Text(l.format(
+                a.correctsId == null
+                    ? KApp.dayAccountAuditNew
+                    : KApp.dayAccountAuditCorrection,
+                [_nameOf(a.authorProfileId, l[K.auditSystemTrigger])])),
+            Text(a.body,
+                style: superseded.contains(a.id)
+                    ? textTheme.bodySmall?.copyWith(
+                        decoration: TextDecoration.lineThrough,
+                        color: context.tokens.textMuted)
+                    : textTheme.bodySmall),
+            if (correctionOf(a.id, entries) case final fix?)
+              Text(dayAccountCorrectedLine(l, correctedAt: fix.createdAt),
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: context.tokens.textMuted)),
+          ],
+          timestamp: l.formatDateTime(a.createdAt.toLocal()),
+        ),
+    ];
+  }
+
+  List<Widget> _calendarChanges(Localization l) {
     if (_activity.isEmpty) {
+      // A period with relatos and no calendar change is not "empty".
+      if (_dayAccounts.isNotEmpty) return const [];
       return [
         _emptyState(Icons.history, l[K.auditEmptyTitle], l[K.auditEmptyBody])
       ];

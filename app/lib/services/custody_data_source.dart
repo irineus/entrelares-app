@@ -11,6 +11,7 @@ import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_deletion.dart';
@@ -224,6 +225,28 @@ abstract class CustodyDataSource {
   /// when there is nothing to restore FROM (no approved swap on the date, no
   /// snapshot reference, or an old_data-less snapshot).
   Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate);
+
+  // ── F-67 relato do dia ──
+
+  /// The family's relatos whose DAY falls in [start]…[end] (inclusive), by
+  /// day and then by the instant written — the day sheet reads one day, the
+  /// Histórico and the F-33 document a period.
+  Future<List<DayAccount>> fetchDayAccounts(DateTime start, DateTime end);
+
+  /// Records a relato about [date] (or a correction of [correctsId]) and
+  /// returns its id. Every rule — the window, the author, the length, the
+  /// correction target, the daily cap — is the database's; the sheet mirrors
+  /// them only to refuse upfront.
+  Future<int> addDayAccount({
+    required DateTime date,
+    required String body,
+    int? correctsId,
+  });
+
+  /// How many relatos [authorId] has written TODAY in `America/Sao_Paulo` —
+  /// the day the RPC's daily cap counts — so the sheet can say how many are
+  /// left before the database says no.
+  Future<int> countDayAccountsWrittenToday(int authorId);
 
   // ── F-52 aviso de imprevisto ──
 

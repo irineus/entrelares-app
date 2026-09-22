@@ -48,6 +48,27 @@ CaregiverStat _statOf(List<CaregiverStat> stats, int id) =>
     stats.firstWhere((s) => s.profileId == id);
 
 void main() {
+  // F-67: section 4 reads by the day told, then by the instant written.
+  test('relatos are ordered by day, then by the instant written', () {
+    final a = ReportDayAccount(
+        accountDate: DateTime(2026, 8, 12),
+        writtenAtLocal: DateTime(2026, 8, 13, 9),
+        authorName: 'A',
+        body: 'a');
+    final b = ReportDayAccount(
+        accountDate: DateTime(2026, 8, 10),
+        writtenAtLocal: DateTime(2026, 8, 14, 9),
+        authorName: 'B',
+        body: 'b');
+    final c = ReportDayAccount(
+        accountDate: DateTime(2026, 8, 10),
+        writtenAtLocal: DateTime(2026, 8, 11, 9),
+        authorName: 'C',
+        body: 'c');
+    expect(reportDayAccountsInOrder([a, b, c]).map((r) => r.body),
+        ['c', 'b', 'a']);
+  });
+
   // F-63: the address the PDF prints is a claim about the landing. Two ways
   // it silently goes wrong were already paid for there: a `.html` answers 307
   // (L-23), and a query never reaches the pageview (L-27).

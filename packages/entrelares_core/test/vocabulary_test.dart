@@ -120,6 +120,42 @@ void main() {
     }
   });
 
+  // F-67 (21/09/2026, owner): "Relato do dia" is the fourth term beside
+  // Observação do dia, Aviso and Mensagem — what happened on a day that has
+  // passed, appended and never edited. Same shape as the aviso: an ADDRESS
+  // (the key prefix) and the half that rots in silence (the surface still
+  // says it). "Relatório" (the PDF) is a different word and stays free.
+  const accountPrefixes = [
+    'app.dayAccount.',
+    'notifRender.dayAccount.',
+    'notifRender.title.dayAccount',
+  ];
+
+  test('"relato" names the F-67 relato do dia, and nothing else', () {
+    final pt = catalogs['pt-BR']!;
+    final word =
+        RegExp(r'\brelat(o|os|ar|ou|ado|ada)\b', caseSensitive: false);
+    for (final key in [...K.allKeys, ...KApp.allKeys]) {
+      if (accountPrefixes.any(key.startsWith)) continue;
+      expect(word.hasMatch(pt[key]), isFalse,
+          reason: '$key says "${pt[key]}"');
+    }
+  });
+
+  test('the F-67 surface calls itself a relato', () {
+    final pt = catalogs['pt-BR']!;
+    final word = RegExp(r'\brelat', caseSensitive: false);
+    for (final key in [
+      KApp.dayAccountSection,
+      KApp.dayAccountAction,
+      KApp.dayAccountSave,
+      KApp.pdfDayAccountsSection,
+      K.notifRenderTitleDayAccount,
+    ]) {
+      expect(word.hasMatch(pt[key]), isTrue, reason: '$key says "${pt[key]}"');
+    }
+  });
+
   // `scheduled_parent` is "planejado" / "planned" — the word the day sheet, the
   // onboarding, the wizard and the PDF already used. Three stragglers said
   // "agendado"; what is left of that word is a DATE something is set for
@@ -127,7 +163,7 @@ void main() {
   test('the planned carer is "planejado", never "agendado"', () {
     const dated = {K.layoutFamilyDeletionRequester, K.premScheduledStatus};
     final pt = catalogs['pt-BR']!;
-    final word = RegExp(r'agendad[oa]s?', caseSensitive: false);
+    final word = RegExp(r'agendad[oa]s?', caseSensitive: false);
     for (final key in [...K.allKeys, ...KApp.allKeys]) {
       if (dated.contains(key)) continue;
       expect(word.hasMatch(pt[key]), isFalse,

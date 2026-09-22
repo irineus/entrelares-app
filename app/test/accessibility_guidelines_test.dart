@@ -51,6 +51,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:entrelares_app/screens/calendar_screen.dart';
+import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_app/screens/custom_roles_screen.dart';
 import 'package:entrelares_app/screens/day_sheet.dart';
@@ -514,6 +515,31 @@ void main() {
       await _measure(tester, 'past day with the admin door');
       await cal.tapSheet(tester, find.byKey(daySheetCorrectPlanKey));
       await _measure(tester, 'admin mode offer');
+    });
+
+    // F-67 Part A: a past day's relatos and the relato editor.
+    _scene('past day, relatos and the relato editor', (tester, dark) async {
+      if (cal.today.day == 1) return; // yesterday is last month
+      final yesterday = cal.today.day - 1;
+      final ds = cal.FakeCustodyDataSource(
+        members: [cal.ana, cal.bruno],
+        days: [cal.row(1, cal.dayOfMonth(yesterday), 2)],
+      )..dayAccounts = [
+          DayAccount(
+            id: 1,
+            familyId: 1,
+            accountDate: cal.dayOfMonth(yesterday),
+            authorProfileId: 1,
+            body: 'Bruno buscou no aeroporto às 17h e deixou em casa às 19h20.',
+            createdAt: DateTime.now().toUtc(),
+          ),
+        ];
+      await tester.pumpWidget(_calendar(ds, dark: dark));
+      await tester.pumpAndSettle();
+      await cal.openDay(tester, yesterday);
+      await _measure(tester, 'past day with a relato');
+      await cal.tapSheet(tester, find.text(pt[KApp.dayAccountAction]));
+      await _measure(tester, 'relato editor');
     });
 
     _scene('frozen day sheet', (tester, dark) async {
