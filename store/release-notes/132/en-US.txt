@@ -1,0 +1,1 @@
+This version changes nothing you see in the app. It completes the new release pipeline: fixes now reach your phone through Play as soon as they are ready, with no manual step, and each version rolls out gradually so any problem shows up early.
