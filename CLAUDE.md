@@ -159,6 +159,11 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # sobrevivente é o tooltip que fecha uma faixa). Um segundo teste prende a metade que
 # apodrece calada: a superfície do F-52 tem de continuar se chamando aviso, senão o
 # glossário aponta para o vazio e o primeiro teste fica verde sobre nada.
+# Desde o F-67 (21/09/2026) "relato" tem a mesma forma: é o relato do dia (o que aconteceu
+# num dia que já passou, anexado e nunca editado), endereço `app.dayAccount.*` e
+# `notifRender.*dayAccount*`, e a superfície tem de continuar dizendo-o; "relatório" (o PDF)
+# é outra palavra e segue livre. No mesmo item a regex do "agendado" deixou de ter dois
+# bytes de backspace no lugar do \b — por meses ela não casava com nada.
 # String nova com uma dessas palavras derruba o lane core; as exceções são presas pelo nome
 # da chave. O glossário do produto mora na subpágina Design system and UX.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
