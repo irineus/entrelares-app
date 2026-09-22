@@ -8,6 +8,7 @@ import 'package:printing/printing.dart';
 
 import '../env.dart';
 import 'package:entrelares_db_contracts/models/account_log.dart';
+import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import '../services/custody_data_source.dart';
@@ -156,6 +157,11 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         accountEvents = await widget.dataSource
             .fetchAccountLogsByAction(caregiverTimelineActions);
       } catch (_) {/* section 2 prints its empty line */}
+      // F-67: section 4, the same contract — a failure costs its lines.
+      var dayAccounts = const <DayAccount>[];
+      try {
+        dayAccounts = await widget.dataSource.fetchDayAccounts(start, end);
+      } catch (_) {/* section 4 prints its empty line */}
 
       String roleLabelOf(int profileId) {
         for (final m in members) {
@@ -212,6 +218,23 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               targetProfileId: e.targetProfileId,
               newValue: e.newValue,
               createdAtLocal: e.createdAt.toLocal(),
+            ),
+        ],
+        dayAccounts: [
+          for (final a in dayAccounts)
+            ReportDayAccount(
+              accountDate: a.accountDate,
+              writtenAtLocal: a.createdAt.toLocal(),
+              authorName: [
+                for (final m in members)
+                  if (m.id == a.authorProfileId) m.fullName
+              ].firstOrNull ?? l[K.pdfDocSystem],
+              body: a.body,
+              isCorrection: a.correctsId != null,
+              correctedAtLocal: [
+                for (final c in dayAccounts)
+                  if (c.correctsId == a.id) c.createdAt.toLocal()
+              ].firstOrNull,
             ),
         ],
       );

@@ -15,6 +15,7 @@ import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_invitation.dart';
@@ -391,6 +392,52 @@ class FakeCustodyDataSource implements CustodyDataSource {
   @override
   Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate) async =>
       preEditNotes;
+
+  // ── F-67 ──
+  /// Every relato the fake knows about; [addDayAccount] appends to it the way
+  /// the RPC would, authored by the first member (the signed-in one).
+  List<DayAccount> dayAccounts = [];
+  Object? throwOnDayAccount;
+  int writtenToday = 0;
+
+  @override
+  Future<List<DayAccount>> fetchDayAccounts(
+      DateTime start, DateTime end) async {
+    final from = DateTime(start.year, start.month, start.day);
+    final to = DateTime(end.year, end.month, end.day);
+    return [
+      for (final a in dayAccounts)
+        if (!a.accountDate.isBefore(from) && !a.accountDate.isAfter(to)) a,
+    ]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  }
+
+  @override
+  Future<int> addDayAccount({
+    required DateTime date,
+    required String body,
+    int? correctsId,
+  }) async {
+    if (throwOnDayAccount != null) throw throwOnDayAccount!;
+    final id = 900 + dayAccounts.length;
+    dayAccounts = [
+      ...dayAccounts,
+      DayAccount(
+        id: id,
+        familyId: 1,
+        accountDate: DateTime(date.year, date.month, date.day),
+        authorProfileId: members.first.id,
+        body: body.trim(),
+        correctsId: correctsId,
+        createdAt: DateTime.now().toUtc(),
+      ),
+    ];
+    writtenToday++;
+    return id;
+  }
+
+  @override
+  Future<int> countDayAccountsWrittenToday(int authorId) async =>
+      writtenToday;
 
   // ── F-52 ──
   /// Every aviso the fake knows about, newest first — the calendar reads it

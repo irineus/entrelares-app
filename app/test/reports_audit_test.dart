@@ -19,6 +19,7 @@ import 'package:entrelares_app/screens/reports_audit_tab.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource;
+import 'package:entrelares_db_contracts/models/day_account.dart';
 
 const roleMother = Role(id: 1, roleName: 'mother');
 const roleFather = Role(id: 2, roleName: 'father');
@@ -326,6 +327,50 @@ void main() {
   });
 
   group('the period tabs', () {
+    // F-67: the relatos of the period are entries of their own kind — the
+    // day they are about, who wrote them, the text; a corrected one struck,
+    // saying when. Recentes pages the calendar changes and stays as it was.
+    testWidgets('Por Mês lists the relatos of the month, both texts of a '
+        'correction included', (tester) async {
+      final ds = source()
+        ..dayAccounts = [
+          DayAccount(
+              id: 1,
+              familyId: 7,
+              accountDate: DateTime(2026, 8, 10),
+              authorProfileId: 1,
+              body: 'buscou as 17h',
+              createdAt: DateTime.utc(2026, 8, 11, 12)),
+          DayAccount(
+              id: 2,
+              familyId: 7,
+              accountDate: DateTime(2026, 8, 10),
+              authorProfileId: 1,
+              body: 'buscou as 17h30',
+              correctsId: 1,
+              createdAt: DateTime.utc(2026, 8, 11, 13)),
+        ];
+      await pumpAudit(tester, ds);
+      expect(find.text('buscou as 17h'), findsNothing,
+          reason: 'Recentes does not carry them');
+
+      await tester.tap(find.text(l[K.repByMonth]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[KApp.dayAccountSection]), findsOne);
+      expect(find.text(l.format(KApp.dayAccountAuditNew, ['Ana Souza'])),
+          findsOne);
+      expect(
+          find.text(l.format(KApp.dayAccountAuditCorrection, ['Ana Souza'])),
+          findsOne);
+      final old = tester.widget<Text>(find.text('buscou as 17h'));
+      expect(old.style?.decoration, TextDecoration.lineThrough);
+      expect(find.text('buscou as 17h30'), findsOne);
+      expect(find.textContaining('Corrigido em'), findsOne);
+      // A month with relatos and no calendar change is not "empty".
+      expect(find.text(l[K.auditEmptyTitle]), findsNothing);
+    });
+
     testWidgets('Por Mês reads the month, Por Ano the year', (tester) async {
       final ds = source(logs: [activity(id: 1)]);
       await pumpAudit(tester, ds);

@@ -410,6 +410,38 @@ abstract final class ReportLanding {
 /// The assembled consolidated history report (F-33). Pure data built by
 /// [buildCustodyReport] from the family's own RLS-scoped reads; the renderer
 /// only lays it out.
+/// F-67: one relato do dia as section 4 of the document prints it — the day
+/// it is ABOUT, the instant it was WRITTEN, the author, and, on a relato some
+/// later one corrects, the instant of that correction. Both texts stay: the
+/// record keeps what was said first.
+class ReportDayAccount {
+  final DateTime accountDate;
+  final DateTime writtenAtLocal;
+  final String authorName;
+  final String body;
+  final bool isCorrection;
+  final DateTime? correctedAtLocal;
+
+  const ReportDayAccount({
+    required this.accountDate,
+    required this.writtenAtLocal,
+    required this.authorName,
+    required this.body,
+    this.isCorrection = false,
+    this.correctedAtLocal,
+  });
+}
+
+/// The relatos of a period in the order the document reads them: by the day
+/// they are about, and within a day by the instant they were written.
+List<ReportDayAccount> reportDayAccountsInOrder(
+        Iterable<ReportDayAccount> accounts) =>
+    accounts.toList()
+      ..sort((a, b) {
+        final byDay = dateOnly(a.accountDate).compareTo(dateOnly(b.accountDate));
+        return byDay != 0 ? byDay : a.writtenAtLocal.compareTo(b.writtenAtLocal);
+      });
+
 class CustodyReport {
   final String familyName;
 
@@ -438,6 +470,10 @@ class CustodyReport {
   /// when the account trail was not supplied (the section then says so).
   final List<CaregiverTimeline> caregiverTimelines;
 
+  /// F-67: section 4 — the relatos do dia of the period, already in reading
+  /// order ([reportDayAccountsInOrder]).
+  final List<ReportDayAccount> dayAccounts;
+
   const CustodyReport({
     required this.familyName,
     required this.childName,
@@ -451,6 +487,7 @@ class CustodyReport {
     required this.auditEntries,
     required this.includesFutureSwaps,
     this.caregiverTimelines = const [],
+    this.dayAccounts = const [],
   });
 
   int get totalDays =>
@@ -485,6 +522,9 @@ CustodyReport buildCustodyReport({
   // origins — absent, section 2 prints its empty line and the rest stands.
   List<CaregiverAccountView> accounts = const [],
   List<AccountEventView> accountEvents = const [],
+  // F-67: section 4. Enrichment like the others — absent, it prints its
+  // empty line.
+  List<ReportDayAccount> dayAccounts = const [],
 }) {
   final stats = caregiverStats(
     members: members,
@@ -530,6 +570,7 @@ CustodyReport buildCustodyReport({
             generatedAtLocal: generatedAtLocal,
             l: l,
           ),
+    dayAccounts: reportDayAccountsInOrder(dayAccounts),
   );
 }
 

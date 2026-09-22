@@ -4,11 +4,13 @@ import '../widgets/ui/ui.dart';
 import '../theme/tokens.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import '../services/admin_mode.dart';
 import '../services/custody_data_source.dart';
 import '../widgets/admin_mode_offer.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/app_snack.dart';
 import '../widgets/slot_pill.dart';
 
 /// What the sheet did — the caller picks the toast, mirroring the web's four
@@ -23,6 +25,11 @@ const daySheetEditKey = Key('day-sheet-edit');
 /// F-67 Part B: "Corrigir o planejamento" on a past day, for an admin with the
 /// mode off — the door the mode used to hide behind an unlabelled shield.
 const daySheetCorrectPlanKey = Key('day-sheet-correct-plan');
+
+/// F-67 Part A: the relato's text field, and the "Corrigir" of one relato
+/// (suffixed with its id).
+const daySheetReportFieldKey = Key('day-sheet-report-field');
+String daySheetCorrectAccountKey(int id) => 'day-sheet-correct-account-$id';
 
 /// The day sheet — a native modal bottom sheet (owner directive: use the
 /// platform where it improves on the web's inline panel). Since lote 2 this is
@@ -165,6 +172,24 @@ class _DaySheetState extends State<_DaySheet> {
   AdminModeAction? _offering;
   VoidCallback? _afterOffer;
 
+  // ── F-67 Part A: the relatos of a past day ──
+  /// Null while loading (or when the day is not past), then the day's list.
+  List<DayAccount>? _accounts;
+  bool _accountsFailed = false;
+
+  /// The relato editor is on screen — a third mode beside the summary and the
+  /// plan editor, and never at the same time as either.
+  bool _reporting = false;
+
+  /// The relato being corrected, or null for a first account.
+  DayAccount? _correcting;
+  late final TextEditingController _accountBody;
+  bool _savingAccount = false;
+
+  /// Relatos this author wrote today (the RPC's cap counts these) — null
+  /// until read; a failed read just skips the "N left" line.
+  int? _writtenToday;
+
   /// U-25: the editor is on screen. Starts false on an assigned day (the
   /// summary) and true on an empty one, where the only thing to do is assign.
   late bool _editing;
@@ -186,6 +211,45 @@ class _DaySheetState extends State<_DaySheet> {
   late Future<int?> _prevEffective;
 
   bool get _isPast => isDayInPast(widget.date, widget.today);
+
+  /// F-67: an active member with an account, a day inside D-1 … D-30, and a
+  /// connection. The RPC is the enforcement.
+  bool get _canWriteAccount {
+    final me = widget.myProfile;
+    return me != null &&
+        !widget.offline &&
+        canWriteDayAccount(
+          hasAccount: (me.userId ?? '').isNotEmpty,
+          hasLeft: me.hasLeft,
+          date: widget.date,
+          today: widget.today,
+          maxDaysBack: widget.settings.dayAccountMaxDaysBack,
+        );
+  }
+
+  /// The day is past but outside the window, for someone who could otherwise
+  /// write — the one case the sheet explains instead of offering.
+  bool get _accountWindowClosed {
+    final me = widget.myProfile;
+    return _isPast &&
+        me != null &&
+        (me.userId ?? '').isNotEmpty &&
+        !me.hasLeft &&
+        !isDayAccountDate(
+            widget.date, widget.today, widget.settings.dayAccountMaxDaysBack);
+  }
+
+  List<DayAccountEntry> get _entries => [
+        for (final a in _accounts ?? const <DayAccount>[])
+          (
+            id: a.id,
+            authorId: a.authorProfileId,
+            correctsId: a.correctsId,
+            createdAt: a.createdAt,
+          ),
+      ];
+
+  int get _capLeft => widget.settings.dayAccountDailyCap - (_writtenToday ?? 0);
 
   /// Nothing planned: no row, or a row that names nobody.
   bool get _isEmptyDay {
@@ -265,7 +329,9 @@ class _DaySheetState extends State<_DaySheet> {
     super.initState();
     _notes = TextEditingController();
     _swapMessage = TextEditingController();
+    _accountBody = TextEditingController();
     _resetDraft();
+    if (_isPast) _loadAccounts();
     _editing = !_readOnly && _isEmptyDay;
     _startedInSummary = !_editing;
     final previous = widget.previousDay;
@@ -365,6 +431,91 @@ class _DaySheetState extends State<_DaySheet> {
     widget.adminOffer?.openPlan();
   }
 
+  // ── F-67 Part A ──
+
+  Future<void> _loadAccounts() async {
+    try {
+      final rows =
+          await widget.dataSource.fetchDayAccounts(widget.date, widget.date);
+      if (!mounted) return;
+      setState(() {
+        _accounts = rows;
+        _accountsFailed = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _accounts = const [];
+        _accountsFailed = true;
+      });
+    }
+  }
+
+  Future<void> _startReport({DayAccount? correcting}) async {
+    setState(() {
+      _error = null;
+      _reporting = true;
+      _correcting = correcting;
+      _accountBody.text = correcting?.body ?? '';
+    });
+    final me = widget.myProfile;
+    if (me == null) return;
+    try {
+      final n = await widget.dataSource.countDayAccountsWrittenToday(me.id);
+      if (mounted) setState(() => _writtenToday = n);
+    } catch (_) {
+      // The line is a courtesy; the RPC still says no at the cap.
+    }
+  }
+
+  void _cancelReport() => setState(() {
+        _reporting = false;
+        _correcting = null;
+        _error = null;
+        _accountBody.clear();
+      });
+
+  Future<void> _saveAccount() async {
+    if (_savingAccount) return;
+    final l = AppL10n.of(context).l;
+    final maxChars = widget.settings.dayAccountMaxChars;
+    final errorKey = dayAccountBodyErrorKey(_accountBody.text, maxChars);
+    if (errorKey != null) {
+      setState(() => _error = l.format(errorKey, [maxChars]));
+      return;
+    }
+    setState(() {
+      _savingAccount = true;
+      _error = null;
+    });
+    try {
+      await widget.dataSource.addDayAccount(
+        date: widget.date,
+        body: normalizeDayAccountBody(_accountBody.text),
+        correctsId: _correcting?.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _savingAccount = false;
+        _reporting = false;
+        _correcting = null;
+        _accountBody.clear();
+        _writtenToday = (_writtenToday ?? 0) + 1;
+      });
+      showAppSnack(context, l[KApp.dayAccountSaved]);
+      await _loadAccounts();
+    } catch (e) {
+      if (!mounted) return;
+      final raw = e.toString();
+      setState(() {
+        _savingAccount = false;
+        _error = isSessionExpired(raw)
+            ? sessionExpiredMessage(l)
+            : translateSaveError(raw, l[KApp.dayAccountErrSave], l);
+      });
+    }
+  }
+
   void _cancelEdit() {
     if (!_startedInSummary) {
       Navigator.of(context).pop();
@@ -380,6 +531,7 @@ class _DaySheetState extends State<_DaySheet> {
   void dispose() {
     _notes.dispose();
     _swapMessage.dispose();
+    _accountBody.dispose();
     super.dispose();
   }
 
@@ -650,13 +802,21 @@ class _DaySheetState extends State<_DaySheet> {
     final day = widget.day;
     final assignment = _assignment;
 
-    final banners = _guardBanners(l, assignment);
+    // F-67: the guards are about the PLAN; while a relato is being written
+    // "Dia passado — apenas visualização" would contradict the field under it.
+    final banners =
+        _reporting ? const <Widget>[] : _guardBanners(l, assignment);
     // U-28 QA: the day is READ-ONLY here, and the owner's review said the
     // stripped-down version of this sheet was the best thing on the screen.
     // U-25 made that version the DEFAULT: every assigned day opens as it, and
     // the form is one pencil away wherever a save is possible.
     final readOnly = _readOnly;
-    final editing = _editing && !readOnly;
+    final editing = _editing && !readOnly && !_reporting;
+    final reporting = _reporting;
+    // F-67: on a past day inside the window the summary's primary is the
+    // relato — the one door every active member has; "Corrigir o
+    // planejamento" (Part B) stays the secondary, admin-only one.
+    final offerReport = !editing && !reporting && _isPast && _canWriteAccount;
     return AppSheetFrame(
       title: _capitalize('${formatHandoffDate(widget.date, l)} · '
           '${daysUntilLabel(widget.date, widget.today, l)}'),
@@ -664,7 +824,7 @@ class _DaySheetState extends State<_DaySheet> {
       onClose: () => Navigator.of(context).pop(),
       closeLabel: l[K.commonClose],
       headerActions: [
-        if (!readOnly && !editing)
+        if (!readOnly && !editing && !reporting)
           IconButton(
             key: daySheetEditKey,
             icon: const Icon(Icons.edit_outlined),
@@ -699,14 +859,34 @@ class _DaySheetState extends State<_DaySheet> {
           : editing
               ? _confirmation(l)
               : null,
-      primaryLabel: !editing ? null : l[K.commonSave],
-      onPrimary: _scheduledParentId == null || _deleting || _beyondRetroReach
+      primaryLabel: reporting
+          ? l[KApp.dayAccountSave]
+          : offerReport
+              ? l[KApp.dayAccountAction]
+              : !editing
+                  ? null
+                  : l[K.commonSave],
+      onPrimary: reporting
+          ? (_writtenToday != null && _capLeft <= 0 ? null : _saveAccount)
+          : offerReport
+              ? () => _startReport()
+              : _scheduledParentId == null || _deleting || _beyondRetroReach
+                  ? null
+                  : _save,
+      secondaryLabel: reporting
+          ? l[K.commonCancel]
+          : !editing
+              ? null
+              : l[K.commonCancel],
+      onSecondary: reporting
+          ? (_savingAccount ? null : _cancelReport)
+          : _deleting
+              ? null
+              : _cancelEdit,
+      busy: _saving || _savingAccount,
+      extraAction: reporting
           ? null
-          : _save,
-      secondaryLabel: !editing ? null : l[K.commonCancel],
-      onSecondary: _deleting ? null : _cancelEdit,
-      busy: _saving,
-      extraAction: !editing
+          : !editing
           ? _correctPlanAction(l)
           : widget.day == null ||
                   (isClearDayBlocked(adminBypass: _bypass) &&
@@ -722,10 +902,144 @@ class _DaySheetState extends State<_DaySheet> {
                           : _clearDay,
                 ),
       children: [
-        if (!editing) _summary(l, day, assignment),
+        if (reporting)
+          ..._reportForm(l)
+        else if (!editing) ...[
+          _summary(l, day, assignment),
+          ..._accountsSection(l),
+        ],
         if (editing) ..._form(l),
       ],
     );
+  }
+
+  /// F-67: the day's relatos under the summary, in the order they were
+  /// written; a corrected one stays, in the undone style, with the instant
+  /// of its correction. Read by everyone who can open the day.
+  List<Widget> _accountsSection(Localization l) {
+    if (!_isPast) return const [];
+    final accounts = _accounts;
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    final entries = _entries;
+    final superseded = supersededDayAccountIds(entries);
+    final ordered =
+        dayAccountsInOrder(accounts ?? const <DayAccount>[], (a) => a.createdAt);
+    return [
+      if (accounts != null && (accounts.isNotEmpty || _accountsFailed)) ...[
+        const SizedBox(height: Spacing.md),
+        Text(l[KApp.dayAccountSection],
+            style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
+        const SizedBox(height: Spacing.xs),
+      ],
+      if (_accountsFailed)
+        Text(l[KApp.dayAccountErrLoad],
+            style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+      for (final a in ordered)
+        _accountTile(l, a, entries, superseded.contains(a.id)),
+      if (_accountWindowClosed) ...[
+        const SizedBox(height: Spacing.sm),
+        Text(
+            l.format(KApp.dayAccountOutOfWindow,
+                [widget.settings.dayAccountMaxDaysBack]),
+            style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+      ],
+    ];
+  }
+
+  Widget _accountTile(Localization l, DayAccount a,
+      List<DayAccountEntry> entries, bool isSuperseded) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    final entry = entries.firstWhere((e) => e.id == a.id);
+    final correction = correctionOf(a.id, entries);
+    final canCorrect = canCorrectDayAccount(
+      entry: entry,
+      sameDay: entries,
+      myProfileId: widget.myProfile?.id,
+      canWrite: _canWriteAccount,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.sm),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // What colour alone would say (U-32): a corrected text is struck
+            // AND says so in words, on the line under it.
+            Text(a.body,
+                style: isSuperseded
+                    ? textTheme.bodyMedium?.copyWith(
+                        color: tokens.textMuted,
+                        decoration: TextDecoration.lineThrough)
+                    : textTheme.bodyMedium),
+            const SizedBox(height: Spacing.xs),
+            Text(
+                dayAccountByline(l,
+                    authorName: _nameOf(a.authorProfileId),
+                    writtenAt: a.createdAt),
+                style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+            if (correction != null)
+              Text(dayAccountCorrectedLine(l, correctedAt: correction.createdAt),
+                  style:
+                      textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+            if (canCorrect)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: Key(daySheetCorrectAccountKey(a.id)),
+                  onPressed: () => _startReport(correcting: a),
+                  child: Text(l[KApp.dayAccountCorrect]),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// F-67: the relato editor — one field, and the sentence that says what
+  /// cannot be undone BEFORE the tap, not after it.
+  List<Widget> _reportForm(Localization l) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    final correcting = _correcting;
+    final capLeft = _capLeft;
+    return [
+      if (correcting != null) ...[
+        Text(
+            l.format(KApp.dayAccountCorrecting,
+                [l.formatDateTime(correcting.createdAt.toLocal())]),
+            style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
+        const SizedBox(height: Spacing.sm),
+      ],
+      AppTextField(
+        key: daySheetReportFieldKey,
+        label: l[KApp.dayAccountFieldLabel],
+        hint: l[KApp.dayAccountFieldHint],
+        controller: _accountBody,
+        maxLines: 6,
+        maxLength: widget.settings.dayAccountMaxChars,
+        keyboardType: TextInputType.multiline,
+        autofocus: true,
+      ),
+      const SizedBox(height: Spacing.sm),
+      Text(l[KApp.dayAccountAppendOnly],
+          style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+      // Said before it blocks (the F-52 shape): the last three are counted
+      // out loud, and the cap itself replaces the save.
+      if (_writtenToday != null && capLeft <= 3) ...[
+        const SizedBox(height: Spacing.sm),
+        Text(
+            capLeft <= 0
+                ? l.format(KApp.dayAccountCapReached,
+                    [widget.settings.dayAccountDailyCap])
+                : capLeft == 1
+                    ? l[KApp.dayAccountCapLeftOne]
+                    : l.format(KApp.dayAccountCapLeftMany, [capLeft]),
+            style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+      ],
+    ];
   }
 
   /// F-67 Part B: the past day's door for an admin with the mode off. The

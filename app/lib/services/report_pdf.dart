@@ -94,6 +94,8 @@ Future<Uint8List> buildReportPdf(
         ..._caregiversSection(report, l),
         pw.SizedBox(height: 14),
         ..._historySection(report, l),
+        pw.SizedBox(height: 14),
+        ..._dayAccountsSection(report, l),
         pw.SizedBox(height: 16),
         pw.Divider(color: PdfColors.grey400),
         _paragraph(
@@ -299,6 +301,58 @@ List<pw.Widget> _historySection(CustodyReport report, Localization l) => [
                       '${change.label}: ${_changeValue(change)}',
                       style: const pw.TextStyle(fontSize: 8.5),
                     ),
+                  ),
+              ],
+            ),
+          ),
+    ];
+
+/// F-67: section 4 — every relato with both dates and its author; a
+/// corrected one keeps its text, greyed, with the instant of the correction,
+/// because the document is the record and the record keeps what was said.
+List<pw.Widget> _dayAccountsSection(CustodyReport report, Localization l) => [
+      _sectionTitle(l[KApp.pdfDayAccountsSection]),
+      _paragraph(l[KApp.pdfDayAccountsLead], size: 8.5),
+      pw.SizedBox(height: 4),
+      if (report.dayAccounts.isEmpty)
+        _paragraph(l[KApp.pdfDayAccountsEmpty])
+      else
+        for (final a in report.dayAccounts)
+          pw.Container(
+            margin: const pw.EdgeInsets.only(bottom: 8),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  l.format(
+                      a.isCorrection
+                          ? KApp.pdfDayAccountCorrectionLine
+                          : KApp.pdfDayAccountLine,
+                      [
+                        l.formatDate(a.accountDate),
+                        a.authorName,
+                        l.formatDateTime(a.writtenAtLocal),
+                      ]),
+                  style: pw.TextStyle(
+                      fontSize: 9, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(left: 10, top: 2),
+                  child: pw.Text(a.body,
+                      style: pw.TextStyle(
+                          fontSize: 8.5,
+                          color: a.correctedAtLocal == null
+                              ? PdfColors.black
+                              : PdfColors.grey700)),
+                ),
+                if (a.correctedAtLocal != null)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(left: 10, top: 1),
+                    child: pw.Text(
+                        dayAccountCorrectedLine(l,
+                            correctedAt: a.correctedAtLocal!),
+                        style: const pw.TextStyle(
+                            fontSize: 8.5, color: PdfColors.grey800)),
                   ),
               ],
             ),
