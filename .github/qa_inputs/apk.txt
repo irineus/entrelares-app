@@ -1,0 +1,17 @@
+# T-79 — what goes INSIDE the Android APK (owner, 22/09/2026: the criterion is
+# mechanical, never a judgement call). A PR touching one of these gets a dev
+# APK through Firebase App Distribution; anything else — docs, tests, CI,
+# web-only, server-only — builds none. A server change already reaches the dev
+# project through the PR's own `db-gate`.
+#
+# A line ending in `/` is a PREFIX; any other line is ONE exact file.
+app/lib/
+app/android/
+app/assets/
+app/pubspec.yaml
+app/pubspec.lock
+packages/entrelares_core/lib/
+packages/entrelares_core/pubspec.yaml
+packages/entrelares_db_contracts/lib/
+packages/entrelares_db_contracts/pubspec.yaml
+.fvmrc

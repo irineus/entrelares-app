@@ -269,8 +269,11 @@ chamadas.
 
 **`main` é produção.** Não há branch de QA: um merge em `main` publica `web.entrelares.app` pelo job
 `deploy-web`, e a QA que antes acontecia depois do merge tem de acontecer **antes** — no gate verde
-do PR, e num build de flavor dev quando a mudança precisa de aparelho real (`workflow_dispatch` →
-`build-apk`). O canal Android sobe sozinho para a **Internal testing** no merge que bumpa a versão
+do PR, e no próprio aparelho: desde o T-79 todo PR que muda o que entra no build (listas em
+`.github/qa_inputs/`) entrega, contra o banco de QA, um APK dev pelo Firebase App Distribution e um web
+de QA em `pr-<N>.entrelares-web-qa.pages.dev` — o job `qa-preview` comenta os dois links no PR; a
+segunda conta de um teste com dois responsáveis entra por esse web. O `main` fica servido no banco de
+QA em `qa.entrelares.app` (job `qa-web`). O canal Android sobe sozinho para a **Internal testing** no merge que bumpa a versão
 (job `play-internal`, T-79); **Production** só sai quando o owner dispara o `play-promote` e aprova o run
 no Environment `play-production` — e o `promote` exige as notas em `store/release-notes/<versionCode>/`.
 

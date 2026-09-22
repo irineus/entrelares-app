@@ -7,6 +7,9 @@
 #   owner dispatch → approval on `play-production` → `play-promote` workflow:
 #       android promote        — Internal → Production, staged; rollout; halt
 #
+#   pull request that changes the APK → `qa-preview` job:
+#       android preview        — dev APK → Firebase App Distribution
+#
 # Lanes are named per platform with the SAME names (`beta`, `promote`), so T-40
 # adds `ios beta` (TestFlight internal) and `ios promote` (App Store phased
 # release) beside these and the workflow only switches the platform.
@@ -21,6 +24,13 @@ opt_out_usage
 default_platform(:android)
 
 PLAY_PACKAGE = "com.entrelares.app"
+
+# The dev flavour's Firebase Android app (`com.entrelares.flutter` in project
+# `entrelares-dev`) — PUBLIC, it ships inside every dev APK's
+# google-services.json, and `play_release_test` pins the two together.
+FIREBASE_DEV_ANDROID_APP = "1:51960618124:android:88c998a8647c0d471dafa9"
+# The App Distribution tester group, by ALIAS (created once in the console).
+QA_TESTER_GROUP = "qa"
 
 # Every track a versionCode can already live on. Internal is the ONE testing
 # track (owner, 22/09/2026); alpha/beta stay in the list because the Closed
@@ -263,5 +273,28 @@ platform :android do
     else
       UI.user_error!("action must be promote, rollout or halt — got '#{action}'")
     end
+  end
+
+  # A PR's dev APK on the owner's phone, through Firebase App Distribution on
+  # the DEV project — the build a PR is tested with BEFORE the merge (QA
+  # happens before `main`, §4). The dev flavour (`com.entrelares.flutter`,
+  # "Entrelares Dev") against the dev database, installed beside the store
+  # app. The second caregiver of a two-account test signs in on the PR's QA
+  # web deploy, not in a second APK (owner, 22/09/2026).
+  desc "Distribute a PR's dev APK through Firebase App Distribution"
+  lane :preview do |options|
+    apk = File.expand_path(options[:apk].to_s, File.expand_path("..", __dir__))
+    UI.user_error!("APK not found at #{apk}") unless File.file?(apk)
+    credential = ENV["FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT"].to_s
+    UI.user_error!("FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT is empty") if credential.strip.empty?
+
+    firebase_app_distribution(
+      app: FIREBASE_DEV_ANDROID_APP,
+      android_artifact_type: "APK",
+      android_artifact_path: apk,
+      groups: QA_TESTER_GROUP,
+      release_notes: options[:notes].to_s,
+      service_credentials_json_data: credential
+    )
   end
 end

@@ -895,6 +895,211 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks" app/android/key.properties
 
+  # ── T-79 — the QA channel: a PR tested on a real phone BEFORE the merge ──
+  # §4: "QA happens BEFORE the merge". Until now that meant a debug APK by hand
+  # (`build-apk`) and no web build on the dev project at all. A PR that changes
+  # what goes inside a build now delivers, against the DEV database:
+  #   · a dev APK (`com.entrelares.flutter`, "Entrelares Dev") to the owner's
+  #     phone through Firebase App Distribution — when `.github/qa_inputs/apk.txt`
+  #     matches;
+  #   · its own QA web deploy, `pr-<N>.entrelares-web-qa.pages.dev` — when
+  #     `.github/qa_inputs/web.txt` matches — where the SECOND caregiver of a
+  #     two-account test signs in (owner, 22/09/2026).
+  # Mechanical, by path: docs, tests, CI and server-only PRs build nothing.
+  #
+  # Behind `verify` AND `db-gate`: the build talks to the dev project, and it is
+  # `db-gate` that brings this PR's migrations and functions there first.
+  # Same-repo PRs only — a fork receives no secrets, by GitHub's design, and
+  # these secrets (the dev keystore, the App Distribution account, Cloudflare)
+  # are repo-level on purpose: an Environment limited to `main` is exactly what
+  # a PR must NOT be able to reach, and none of them publishes to users.
+  qa-preview:
+    if: >-
+      github.event_name == 'pull_request'
+      && !github.event.pull_request.draft
+      && github.event.pull_request.head.repo.full_name == github.repository
+    needs: [verify, db-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # Only the latest push of a PR is worth a phone notification.
+    concurrency:
+      group: qa-preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      QA_ALIAS: pr-${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: What does this PR change inside a build?
+        id: inputs
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          echo "apk=$(bash .github/qa_inputs.sh .github/qa_inputs/apk.txt "$BASE_SHA")" >> "$GITHUB_OUTPUT"
+          echo "web=$(bash .github/qa_inputs.sh .github/qa_inputs/web.txt "$BASE_SHA")" >> "$GITHUB_OUTPUT"
+      - name: Read Flutter version from .fvmrc
+        if: steps.inputs.outputs.apk == 'true' || steps.inputs.outputs.web == 'true'
+        id: fvm
+        run: echo "version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        if: steps.inputs.outputs.apk == 'true' || steps.inputs.outputs.web == 'true'
+        with:
+          flutter-version: ${{ steps.fvm.outputs.version }}
+          channel: stable
+          cache: true
+
+      # ── the dev APK ──
+      - uses: actions/setup-java@v4
+        if: steps.inputs.outputs.apk == 'true' && env.FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT != ''
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: ruby/setup-ruby@v1
+        if: steps.inputs.outputs.apk == 'true' && env.FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT != ''
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      # The DEV keystore only — the sideload key the owner's installed dev app
+      # already carries, so each PR build updates it in place. Never the
+      # upload key: that one lives in the `play-internal` Environment.
+      - name: Materialize the dev signing key
+        if: steps.inputs.outputs.apk == 'true' && env.FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT != ''
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_DEV_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_DEV_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_DEV_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_DEV_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            [ -n "${!name}" ] || { echo "::error::repo secret for $name is empty (T-79)"; exit 1; }
+          done
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/dev.jks"
+          {
+            echo "dev.storeFile=$RUNNER_TEMP/dev.jks"
+            echo "dev.storePassword=$STORE_PASSWORD"
+            echo "dev.keyAlias=$KEY_ALIAS"
+            echo "dev.keyPassword=$KEY_PASSWORD"
+          } > app/android/key.properties
+      - name: Build the dev APK (release, arm64)
+        if: steps.inputs.outputs.apk == 'true' && env.FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT != ''
+        working-directory: app
+        run: flutter build apk --release --flavor dev --target-platform android-arm64
+      - name: Send it to the owner's phone
+        if: steps.inputs.outputs.apk == 'true' && env.FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT != ''
+        id: apk
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          version=$(grep -E '^version: ' app/pubspec.yaml | cut -d' ' -f2)
+          notes="PR #$PR_NUMBER — $PR_TITLE (${GITHUB_SHA:0:7}, $version)"
+          bundle exec fastlane android preview \
+            apk:app/build/app/outputs/flutter-apk/app-dev-release.apk \
+            "notes:$notes"
+          echo "sent=$version" >> "$GITHUB_OUTPUT"
+      - name: Remove the dev signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/dev.jks" app/android/key.properties
+
+      # ── the QA web ──
+      # No `--dart-define=APP_ENV=prod`, on purpose and by construction: on the
+      # web the define is the ONLY thing selecting production, so without it
+      # this bundle talks to the DEV project. `play_release_test` refuses a QA
+      # deploy that carries it — or that names the production Pages project.
+      - name: Build web (dev config)
+        if: steps.inputs.outputs.web == 'true' && env.CLOUDFLARE_API_TOKEN != ''
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build web --release --no-web-resources-cdn
+          printf '%s' "$GITHUB_SHA" > build/web/build-id.txt
+      - name: Publish the PR's QA web
+        if: steps.inputs.outputs.web == 'true' && env.CLOUDFLARE_API_TOKEN != ''
+        id: web
+        run: |
+          set -euo pipefail
+          npm install -g wrangler
+          bash .github/qa_pages_project.sh
+          (cd app && wrangler pages deploy build/web --project-name=entrelares-web-qa --branch="$QA_ALIAS" --commit-dirty=true)
+          SMOKE_ATTEMPTS=12 bash .github/smoke_web.sh "https://$QA_ALIAS.entrelares-web-qa.pages.dev" "$GITHUB_SHA"
+          echo "url=https://$QA_ALIAS.entrelares-web-qa.pages.dev" >> "$GITHUB_OUTPUT"
+
+      # One comment per PR, edited on every push, so the phone link is always
+      # the latest — and it says what was NOT built, and why.
+      - name: Tell the PR where to test
+        if: always() && steps.inputs.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK_CHANGED: ${{ steps.inputs.outputs.apk }}
+          WEB_CHANGED: ${{ steps.inputs.outputs.web }}
+          APK_SENT: ${{ steps.apk.outputs.sent }}
+          WEB_URL: ${{ steps.web.outputs.url }}
+        run: bash .github/qa_comment.sh
+
+  # The QA web's FIXED address: `main`, built against the dev project, at
+  # `qa.entrelares.app` (owner, 22/09/2026) — the host the landing's PREVIEW
+  # deploy points its app links at, so a landing change is tested end to end
+  # without touching production, and the host a dev build's invitation,
+  # recovery and confirmation links open (`Env.dev.webOrigin`). Proved on the
+  # project's own `pages.dev` address; the custom domain is attached once, by
+  # the owner, and only WARNED about here — a missing DNS record must not turn
+  # `main` red.
+  qa-web:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
+    needs: [verify, db-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: qa-web
+      cancel-in-progress: true
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read Flutter version from .fvmrc
+        id: fvm
+        run: echo "version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.fvm.outputs.version }}
+          channel: stable
+          cache: true
+      - name: Build web (dev config)
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build web --release --no-web-resources-cdn
+          printf '%s' "$GITHUB_SHA" > build/web/build-id.txt
+      - name: Publish the QA web
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          set -euo pipefail
+          npm install -g wrangler
+          bash .github/qa_pages_project.sh
+          (cd app && wrangler pages deploy build/web --project-name=entrelares-web-qa --branch=main --commit-dirty=true)
+          bash .github/smoke_web.sh "https://entrelares-web-qa.pages.dev" "$GITHUB_SHA"
+      - name: Is qa.entrelares.app serving it too?
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          served=$(curl -sS --max-time 20 -H 'Cache-Control: no-cache' "https://qa.entrelares.app/build-id.txt?cb=$(date +%s)" 2>/dev/null | tr -d '\r\n' || true)
+          if [ "$served" = "$GITHUB_SHA" ]; then
+            echo "\`qa.entrelares.app\` serve \`${GITHUB_SHA:0:7}\`." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning title=qa.entrelares.app::o domínio não serve este commit — anexe-o ao projeto Pages entrelares-web-qa (T-79)"
+            echo "⚠️ \`qa.entrelares.app\` NÃO serve este commit — o domínio ainda não está anexado ao projeto \`entrelares-web-qa\`, ou a borda ainda não virou." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   # ── T-68 — a failed publish reaching a human ────────────────────────────
   # `main` is production and there is no rollback, so the loud failure is
   # already covered: a merge that breaks reaches users as a broken app. The

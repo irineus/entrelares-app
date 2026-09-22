@@ -18,6 +18,7 @@ class Env {
     this.umamiWebsiteId = '',
     required this.analyticsHostname,
     required this.webHostname,
+    required this.webOrigin,
     required this.androidPackage,
     this.webPush = WebPushConfig.none,
     this.sentryDsn = '',
@@ -55,8 +56,24 @@ class Env {
   /// **dev is synthetic on purpose** — since the Blazor shutdown (T-56) there is
   /// no dev web deployment at all, so naming any real host here would name one
   /// that is either dead or somebody else's. It used to say `qa.entrelares.app`,
-  /// which stopped resolving the day that Pages project was deleted.
+  /// which stopped resolving the day that Pages project was deleted. T-79
+  /// brought that host back as the QA web build — as [webOrigin], where links
+  /// need a REAL host; this label stays synthetic, since analytics is off on dev
+  /// by decision and a real name here would only invite a dev series.
   final String webHostname;
+
+  /// T-79: where THIS environment's web app is SERVED — the origin every link
+  /// the app hands to a human is built on: the invitation link, the password
+  /// recovery and the sign-up confirmation (`DeepLinkUrls`). Unlike
+  /// [webHostname] this one is real on both sides: production is
+  /// `web.entrelares.app`, and dev is `qa.entrelares.app`, the QA web build
+  /// `verify.yml` publishes from `main` against the dev project.
+  ///
+  /// It used to be ONE constant for both, and a dev invitation then sent the
+  /// second caregiver to the PRODUCTION web, where the token does not exist —
+  /// the exact test (two accounts, one of them on the web) the QA channel was
+  /// built for.
+  final String webOrigin;
 
   /// T-48: the Android `applicationId` of THIS variant. Only the Play
   /// "manage subscription" deep link reads it, and pointing it at the wrong
@@ -96,6 +113,7 @@ class Env {
     analyticsHostname: 'dev.app.entrelares.app',
     // Synthetic, like its sibling above — see the field's doc.
     webHostname: 'dev.web.entrelares.app',
+    webOrigin: 'https://qa.entrelares.app',
     androidPackage: 'com.entrelares.flutter',
     // T-62 armed 08/09/2026. There is no dev WEB deployment — since the Blazor
     // shutdown the only build that resolves to this environment on the web is a
@@ -132,6 +150,7 @@ class Env {
     umamiWebsiteId: '6fdd6c5a-4bce-449f-8188-3b7399a859d8',
     analyticsHostname: 'app.entrelares.app',
     webHostname: 'web.entrelares.app',
+    webOrigin: 'https://web.entrelares.app',
     androidPackage: 'com.entrelares.app',
     // T-62 armed 08/09/2026 — the web channel's push is LIVE from this line.
     // Half the go-live is here; the other half is the identical object in
@@ -172,7 +191,7 @@ class Env {
   /// Mirrors `pubspec.yaml`'s `version:` — the web's `AppVersion.Display`.
   /// Only the F-17 export reads it, and a stale value there would misdate an
   /// LGPD record, so `env_version_test.dart` fails the build if the two drift.
-  static const String appVersion = '2.7.11+131';
+  static const String appVersion = '2.8.0+132';
 }
 
 /// T-62 — the PUBLIC Firebase Web config of one environment, plus its VAPID

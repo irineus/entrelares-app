@@ -1,0 +1,3 @@
+# T-79 — PR device builds go to Firebase App Distribution (project
+# `entrelares-dev`). Pinned exactly, like fastlane itself.
+gem "fastlane-plugin-firebase_app_distribution", "1.0.0"
