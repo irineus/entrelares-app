@@ -1,0 +1,124 @@
+# T-79 — the Android release pipeline, driven from `.github/workflows/verify.yml`.
+#
+#   merge to main → gates → `play-internal` job:
+#       android version_guard  — is the pubspec versionCode new to Play?
+#       android beta           — upload the prod AAB to Internal testing
+#
+# Lanes are named per platform with the SAME names (`beta`, `promote`), so T-40
+# adds `ios beta` (TestFlight internal) and `ios promote` (App Store phased
+# release) beside these and the workflow only switches the platform.
+#
+# Run from the repository root (`bundle exec fastlane android <lane>`); every
+# path below is resolved against it, never against the caller's cwd.
+
+# No usage metrics leave the runner: nothing this pipeline does is fastlane's
+# business, and it costs nothing to say so.
+opt_out_usage
+
+default_platform(:android)
+
+PLAY_PACKAGE = "com.entrelares.app"
+
+# Every track a versionCode can already live on. Internal is the ONE testing
+# track (owner, 22/09/2026); alpha/beta stay in the list because the Closed
+# testing – Alpha track carried every bundle up to 2.6.x, and a code already
+# used there is used for good — Play refuses a repeat on any track.
+PLAY_TRACKS = %w[internal alpha beta production].freeze
+
+# The release service account, as an Environment secret. A DEDICATED account
+# with release permissions on this package only — not `PLAY_SERVICE_ACCOUNT`,
+# the billing one the Edge Functions use (owner, 22/09/2026): revoking one must
+# not take the other down, and a runner compromise must not read finances.
+def play_key
+  data = ENV["PLAY_RELEASE_SERVICE_ACCOUNT"].to_s
+  if data.strip.empty?
+    UI.user_error!(
+      "PLAY_RELEASE_SERVICE_ACCOUNT is empty — the job should have disarmed " \
+      "before reaching fastlane (see the `play-internal` job)."
+    )
+  end
+  data
+end
+
+# One line in the run summary AND in the log. PT-BR, like the other summaries
+# of this workflow: a human reads it at whatever hour it fires.
+def summary(line)
+  path = ENV["GITHUB_STEP_SUMMARY"].to_s
+  File.open(path, "a") { |f| f.puts(line) } unless path.empty?
+  UI.message(line)
+end
+
+def step_output(key, value)
+  path = ENV["GITHUB_OUTPUT"].to_s
+  File.open(path, "a") { |f| f.puts("#{key}=#{value}") } unless path.empty?
+end
+
+platform :android do
+  # Decides whether this merge carries a NEW Android build.
+  #
+  #   pubspec >  highest on Play → upload=true
+  #   pubspec == highest on Play → upload=false, quietly: a server-only or docs
+  #                                merge, or a republish dispatch of a commit
+  #                                already uploaded — nothing new to send
+  #   pubspec <  highest on Play → FAIL, naming both numbers and the track:
+  #                                two parallel sessions took the same bump
+  #                                (memory: sessoes-paralelas-worktree), or a
+  #                                bundle went up by hand. Silently skipping
+  #                                would ship a merge that never reaches Android.
+  desc "Compare the pubspec versionCode against every Play track"
+  lane :version_guard do |options|
+    code = Integer(options[:version_code].to_s, 10)
+
+    held = PLAY_TRACKS.to_h do |track|
+      codes = google_play_track_version_codes(
+        package_name: PLAY_PACKAGE,
+        track: track,
+        json_key_data: play_key
+      )
+      [track, codes.max || 0]
+    end
+    top_track, top = held.max_by { |_, c| c }
+    listing = held.map { |t, c| "#{t}=#{c.zero? ? '—' : c}" }.join(", ")
+
+    if code > top
+      step_output("upload", "true")
+      summary("### Android: versionCode `#{code}` é novo — sobe para a Internal testing")
+      summary("Na Play agora: #{listing}.")
+    elsif code == top
+      step_output("upload", "false")
+      summary("### Android: nada a subir — a Play já tem o versionCode `#{code}` (faixa `#{top_track}`)")
+      summary("Merge sem bump de versão (servidor, docs, CI) ou republicação de um commit já enviado. Na Play: #{listing}.")
+    else
+      UI.user_error!(
+        "versionCode #{code} do pubspec é MENOR que o #{top} que a Play já tem " \
+        "na faixa #{top_track} (#{listing}). Duas entregas pegaram o mesmo " \
+        "bump, ou um bundle subiu à mão: suba o pubspec para acima de #{top} " \
+        "(as DUAS metades + Env.appVersion) num PR novo."
+      )
+    end
+  end
+
+  # Upload the prod AAB to Internal testing, released to the tester list at
+  # once: Internal has no Google review per release, so it is minutes from
+  # merge to the owner's phone. Nothing else is touched — no listing, no
+  # images, no release notes (those are required at PROMOTION, owner
+  # 22/09/2026, and ride that lane).
+  desc "Upload the prod AAB to the Internal testing track"
+  lane :beta do |options|
+    aab = File.expand_path(options[:aab].to_s, File.expand_path("..", __dir__))
+    UI.user_error!("AAB not found at #{aab}") unless File.file?(aab)
+
+    upload_to_play_store(
+      package_name: PLAY_PACKAGE,
+      track: "internal",
+      release_status: "completed",
+      aab: aab,
+      json_key_data: play_key,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+end

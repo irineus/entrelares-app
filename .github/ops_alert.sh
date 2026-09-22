@@ -28,10 +28,14 @@ set -euo pipefail
 dsn="${1:?usage: ops_alert.sh <dsn> <failed jobs> <run url> <sha>}"
 jobs="${2:?usage: ops_alert.sh <dsn> <failed jobs> <run url> <sha>}"
 run_url="${3:?usage: ops_alert.sh <dsn> <failed jobs> <run url> <sha>}"
-sha="${4:?usage: ops_alert.sh <dsn> <failed jobs> <run url> <sha> [published]}"
+sha="${4:?usage: ops_alert.sh <dsn> <failed jobs> <run url> <sha> [published] [android_only]}"
 # T-73: `true` when `smoke_web.sh` proved the commit is served, so the red came
 # from a check AFTER the publish. Absent means what it always meant.
 published="${5:-}"
+# T-79: `true` when `play-internal` is the ONLY red job — the web channel
+# published, and naming web.entrelares.app would send the reader to the wrong
+# console.
+android_only="${6:-}"
 
 # https://<key>@<host>/<project>
 key="${dsn#https://}"; key="${key%%@*}"
@@ -43,7 +47,10 @@ short="${sha:0:7}"
 
 # PT-BR because a human reads it at whatever hour it fires, and this repo already
 # writes its run summaries that way. Code and comments stay English.
-if [ "$published" = "true" ]; then
+if [ "$android_only" = "true" ]; then
+  title="main vermelha em $short: $jobs — o Android não subiu para a Internal testing"
+  consequence="O canal web NÃO foi afetado. A faixa Internal testing da Play segue com o build anterior; a Production só muda pelo play-promote, então nenhum usuário foi afetado."
+elif [ "$published" = "true" ]; then
   title="main vermelha em $short: $jobs — web.entrelares.app publicou, mas serve script que a CSP recusa"
   consequence="O merge CHEGOU a web.entrelares.app. A página servida carrega um script que a própria CSP bloqueia — injeção de borda até prova em contrário (T-73)."
 else

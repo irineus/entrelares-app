@@ -1,0 +1,4 @@
+# T-79 — the Play package. Credentials are NEVER here: the service account
+# arrives as `PLAY_RELEASE_SERVICE_ACCOUNT`, an Environment secret that only
+# `main` can read (see the Fastfile).
+package_name("com.entrelares.app")
