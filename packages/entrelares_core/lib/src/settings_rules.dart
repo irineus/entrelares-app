@@ -65,6 +65,11 @@ class PublicSettings {
   int get overrideFreeDays => _int('override_free_days', 7);
   int get overridePremiumMonths => _int('override_premium_months', 6);
 
+  // F-67 relato do dia — the RPC reads the same three keys.
+  int get dayAccountMaxDaysBack => _int('day_account.max_days_back', 30);
+  int get dayAccountMaxChars => _int('day_account.max_chars', 1000);
+  int get dayAccountDailyCap => _int('day_account.daily_cap', 10);
+
   // T-39 billing (F-48 promotional prices: 549, not 490 — Asaas refuses
   // Pix/boleto charges under R$ 5,00). Enabled=false shows the waitlist.
   bool get billingEnabled => parseBoolSetting(values, 'billing.enabled', false);

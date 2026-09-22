@@ -849,6 +849,10 @@ abstract final class K {
   static const String notifRenderTitleDayNoticeKeeping = 'notifRender.title.dayNoticeKeeping';
   static const String notifRenderDayNoticeHelping = 'notifRender.dayNotice.helping';
   static const String notifRenderDayNoticeKeeping = 'notifRender.dayNotice.keeping';
+  // F-67: the relato do dia — in-app only, never a push (F-09's ten types).
+  static const String notifRenderTitleDayAccount = 'notifRender.title.dayAccount';
+  static const String notifRenderDayAccountNew = 'notifRender.dayAccount.new';
+  static const String notifRenderDayAccountCorrection = 'notifRender.dayAccount.correction';
 
   // ── E-mail quota (F-38) + billing grace (S-15) ──
   static const String notifRenderTitleEmailCapPremium = 'notifRender.title.emailCapPremium';
@@ -1919,6 +1923,9 @@ abstract final class K {
     notifRenderTitleDayNoticeKeeping,
     notifRenderDayNoticeHelping,
     notifRenderDayNoticeKeeping,
+    notifRenderTitleDayAccount,
+    notifRenderDayAccountNew,
+    notifRenderDayAccountCorrection,
     notifRenderTitleEmailCapPremium,
     notifRenderTitleEmailCapFree,
     notifRenderTitleEmailCapLast,
