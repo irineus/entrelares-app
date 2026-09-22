@@ -1,0 +1,84 @@
+# T-79 — Production for the Android channel, and ONLY from here.
+#
+# `verify.yml` puts every new versionCode on Play's Internal testing track on
+# merge; users get it only when the owner dispatches this workflow AND approves
+# the run on the `play-production` Environment (required reviewer = owner,
+# deployment branch = `main`). That approval is the owner's decision that used
+# to be a manual upload in the Play Console — the same decision, one click,
+# and now the exact binary the testers had (nothing is rebuilt).
+#
+# Actions (see `fastlane/Fastfile`, lane `android promote`):
+#   promote — Internal → Production at `fraction` (< 1 = staged rollout). Also
+#             how a HALTED rollout resumes: promoting again replaces it.
+#   rollout — move a staged rollout already in Production (1 completes it).
+#   halt    — stop a staged rollout; `fraction` is the one currently live.
+# `promote` refuses a versionCode without `store/release-notes/<code>/` in
+# both languages — write them in a PR first.
+#
+# Run it with `dry_run` first when unsure: Play validates the whole edit and
+# nothing is committed.
+name: play-promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "promote (Internal → Production) · rollout (move the fraction) · halt (pause)"
+        type: choice
+        options: [promote, rollout, halt]
+        default: promote
+      version_code:
+        description: "versionCode (blank on promote = the build Internal holds now)"
+        type: string
+        required: false
+      fraction:
+        description: "Share of users: 0.1 = 10%, 1 = everyone. On halt, the fraction currently live."
+        type: choice
+        options: ["0.05", "0.1", "0.2", "0.5", "1"]
+        default: "0.2"
+      dry_run:
+        description: "Validate with Play, commit nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    # The Environment's branch rule already refuses any other ref; this `if`
+    # says so in the run list instead of as a rejected deployment.
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: play-production
+    timeout-minutes: 15
+    # One edit on the Production track at a time, never interrupted.
+    concurrency:
+      group: play-production
+      cancel-in-progress: false
+    env:
+      PLAY_RELEASE_SERVICE_ACCOUNT: ${{ secrets.PLAY_RELEASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run without the service account
+        if: env.PLAY_RELEASE_SERVICE_ACCOUNT == ''
+        run: |
+          echo "::error::PLAY_RELEASE_SERVICE_ACCOUNT is missing from the play-production Environment (T-79)."
+          exit 1
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      # Inputs through the environment, never interpolated into the script:
+      # `version_code` is free text, and `${{ }}` inside `run:` is a shell
+      # injection waiting for a typo.
+      - name: Steer the Production track
+        env:
+          ACTION: ${{ inputs.action }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          FRACTION: ${{ inputs.fraction }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: >-
+          bundle exec fastlane android promote
+          "action:$ACTION" "version_code:$VERSION_CODE"
+          "fraction:$FRACTION" "dry_run:$DRY_RUN"

@@ -4,6 +4,9 @@
 #       android version_guard  — is the pubspec versionCode new to Play?
 #       android beta           — upload the prod AAB to Internal testing
 #
+#   owner dispatch → approval on `play-production` → `play-promote` workflow:
+#       android promote        — Internal → Production, staged; rollout; halt
+#
 # Lanes are named per platform with the SAME names (`beta`, `promote`), so T-40
 # adds `ios beta` (TestFlight internal) and `ios promote` (App Store phased
 # release) beside these and the workflow only switches the platform.
@@ -51,6 +54,45 @@ end
 def step_output(key, value)
   path = ENV["GITHUB_OUTPUT"].to_s
   File.open(path, "a") { |f| f.puts("#{key}=#{value}") } unless path.empty?
+end
+
+# The release notes of one versionCode, in `store/release-notes/<code>/`, one
+# file per Play language. Required at PROMOTION only (owner, 22/09/2026): the
+# Internal testers are the owner, and a note per bump would be written for
+# nobody. They go in a small PR BEFORE the promotion dispatch, and
+# `play_release_test` checks every folder on the way in.
+require "fileutils"
+require "tmpdir"
+
+RELEASE_NOTES_DIR = File.expand_path("../store/release-notes", __dir__)
+RELEASE_NOTE_LANGUAGES = %w[pt-BR en-US].freeze
+RELEASE_NOTE_LIMIT = 500 # Play's own limit, per language
+
+# Lays the notes out the way supply reads them —
+# `<metadata>/<lang>/changelogs/<code>.txt` — in a scratch folder, so the
+# repository keeps the one shape humans edit. Refuses, before anything reaches
+# Play, a promotion whose notes are missing, empty or over the limit.
+def release_notes_metadata(code)
+  source = File.join(RELEASE_NOTES_DIR, code.to_s)
+  metadata = Dir.mktmpdir("release-notes-")
+  RELEASE_NOTE_LANGUAGES.each do |lang|
+    path = File.join(source, "#{lang}.txt")
+    unless File.file?(path)
+      UI.user_error!(
+        "No release notes at store/release-notes/#{code}/#{lang}.txt — write " \
+        "both languages in a PR before promoting #{code}."
+      )
+    end
+    text = File.read(path, encoding: "UTF-8").strip
+    UI.user_error!("#{path} is empty") if text.empty?
+    if text.length > RELEASE_NOTE_LIMIT
+      UI.user_error!("#{path} has #{text.length} characters; Play takes #{RELEASE_NOTE_LIMIT}")
+    end
+    dir = File.join(metadata, lang, "changelogs")
+    FileUtils.mkdir_p(dir)
+    File.write(File.join(dir, "#{code}.txt"), text)
+  end
+  metadata
 end
 
 platform :android do
@@ -120,5 +162,106 @@ platform :android do
       skip_upload_images: true,
       skip_upload_screenshots: true
     )
+  end
+
+  # Production, only ever from here, and only through the `play-promote`
+  # workflow — whose job sits behind the `play-production` Environment, so it
+  # runs after the OWNER approves it (owner, 22/09/2026). Nothing is rebuilt:
+  # the exact binary the testers had on Internal is the one users get.
+  #
+  #   action:promote  version_code:<n, blank = what Internal holds> fraction:<0..1]
+  #       Internal → Production at that fraction (< 1 is a staged rollout,
+  #       1 is everyone), with the release notes of that versionCode. Also the
+  #       way to RESUME after a halt: supply's rollout update only finds a
+  #       release that is in progress, and promoting again replaces the halted
+  #       one — usually with the fixed build Internal holds by then.
+  #   action:rollout  version_code:<n> fraction:<0..1]
+  #       move a staged rollout already in Production (1 completes it).
+  #   action:halt     version_code:<n> fraction:<the current one>
+  #       stop a staged rollout where it is. Play keeps the fraction on a halted
+  #       release, so it has to be the one that is live.
+  #
+  # dry_run:true validates the whole edit with Play and commits nothing.
+  desc "Promote a versionCode from Internal testing to Production, or steer its rollout"
+  lane :promote do |options|
+    action = options[:action].to_s
+    fraction = options[:fraction].to_s.empty? ? nil : Float(options[:fraction].to_s)
+    dry_run = options[:dry_run].to_s == "true"
+    unless fraction.nil? || (fraction > 0 && fraction <= 1)
+      UI.user_error!("fraction must be in (0, 1] — got #{fraction}")
+    end
+
+    code = options[:version_code].to_s.strip
+    if code.empty?
+      UI.user_error!("#{action} needs an explicit version_code") unless action == "promote"
+      on_internal = google_play_track_version_codes(
+        package_name: PLAY_PACKAGE, track: "internal", json_key_data: play_key
+      )
+      UI.user_error!("Internal testing holds no build to promote") if on_internal.empty?
+      code = on_internal.max.to_s
+    end
+    code = Integer(code, 10)
+
+    common = {
+      package_name: PLAY_PACKAGE,
+      json_key_data: play_key,
+      version_code: code,
+      validate_only: dry_run,
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    }
+
+    case action
+    when "promote"
+      UI.user_error!("promote needs a fraction") if fraction.nil?
+      notes = release_notes_metadata(code)
+      live = google_play_track_version_codes(
+        package_name: PLAY_PACKAGE, track: "production", json_key_data: play_key
+      ).max || 0
+      if code <= live
+        UI.user_error!(
+          "versionCode #{code} is not newer than the #{live} already in " \
+          "Production — nothing to promote. To move a rollout that is already " \
+          "there, dispatch action=rollout."
+        )
+      end
+      upload_to_play_store(
+        **common,
+        track: "internal",
+        track_promote_to: "production",
+        track_promote_release_status: "completed",
+        rollout: fraction.to_s,
+        skip_upload_changelogs: false,
+        metadata_path: notes,
+        # supply attaches release notes only to the version codes it was
+        # handed; a promote uploads no binary, so the code is handed here. It
+        # does NOT retain anything in the promote path — read in supply's
+        # uploader (2.240.1, `perform_upload`).
+        version_codes_to_retain: [code]
+      )
+      summary(
+        "### Android: `#{code}` #{dry_run ? 'VALIDADO (dry run) para' : 'promovido à'} " \
+        "Production — #{(fraction * 100).round(1)}% dos usuários"
+      )
+    when "rollout", "halt"
+      UI.user_error!("#{action} needs the fraction") if fraction.nil?
+      upload_to_play_store(
+        **common,
+        track: "production",
+        rollout: fraction.to_s,
+        release_status: action == "halt" ? "halted" : "inProgress",
+        skip_upload_changelogs: true
+      )
+      verb = action == "halt" ? "PAUSADO em" : "rollout em"
+      summary(
+        "### Android: `#{code}` na Production — #{dry_run ? '(dry run) ' : ''}" \
+        "#{verb} #{(fraction * 100).round(1)}%"
+      )
+    else
+      UI.user_error!("action must be promote, rollout or halt — got '#{action}'")
+    end
   end
 end
