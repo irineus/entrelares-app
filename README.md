@@ -148,8 +148,14 @@ sessão cloud (regra permanente 1). O `key.properties` tem entradas **por flavor
 # dev — keystore dedicado de sideload (T-55), gerado em 19/08/2026. Para
 # recriar do zero (PowerShell — a pasta primeiro, o keytool não a cria):
 #   New-Item -ItemType Directory -Force "$env:USERPROFILE\keystores"
-#   keytool -genkey -v -keystore "$env:USERPROFILE\keystores\entrelares-app.jks" -keyalg RSA -keysize 2048 -validity 10000 -alias entrelares
-dev.storeFile=C:/Users/irineu/keystores/entrelares-app.jks
+#   keytool -genkey -v -keystore "$env:USERPROFILE\keystores\entrelares-flutter.jks" -keyalg RSA -keysize 2048 -validity 10000 -alias entrelares
+# O NOME DO ARQUIVO é anterior ao T-69 e NÃO acompanhou o rename do repo: a
+# keystore de sideload é `entrelares-flutter.jks`. Este bloco dizia
+# `entrelares-app.jks`, que nunca existiu em ~/keystores — e mandar alguém lê-lo
+# para um secret do CI é um FileNotFoundException com nome plausível (T-79,
+# 22/09/2026). `entrelares-app.jks` é mais um dos "entrelares-app" que não são o
+# repositório (Decisões vigentes §1).
+dev.storeFile=C:/Users/irineu/keystores/entrelares-flutter.jks
 dev.storePassword=...
 dev.keyAlias=entrelares
 dev.keyPassword=...
