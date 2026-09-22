@@ -1,0 +1,16 @@
+# T-79 — what goes inside the WEB bundle. A PR touching one of these gets its
+# own QA web deploy (`pr-<N>.entrelares-web-qa.pages.dev`, dev project), where
+# the second caregiver of a two-account test signs in (owner, 22/09/2026).
+# The APK list without `app/android/`, plus `app/web/`.
+#
+# A line ending in `/` is a PREFIX; any other line is ONE exact file.
+app/lib/
+app/web/
+app/assets/
+app/pubspec.yaml
+app/pubspec.lock
+packages/entrelares_core/lib/
+packages/entrelares_core/pubspec.yaml
+packages/entrelares_db_contracts/lib/
+packages/entrelares_db_contracts/pubspec.yaml
+.fvmrc
