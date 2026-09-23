@@ -147,6 +147,10 @@ void platformOperatorTests(GateFixture fx) {
       await expectRejected(() => fx.founder.from('platform_operators').select());
       await expectRejected(
           () => fx.founder.from('operator_audit_logs').select());
+      // F-69: the last-active helper is SECURITY DEFINER with no client
+      // grant — callable, it would hand any member the other's last use.
+      await expectRejected(() => fx.founder.rpc<dynamic>('member_last_active',
+          params: {'p_profile_id': fx.memberProfile.id}));
     });
 
     // ── Sudo on writes ───────────────────────────────────────────────────
@@ -384,6 +388,17 @@ void platformOperatorTests(GateFixture fx) {
             (familyA['members'] as List).map((m) => (m as Map)['email']);
         expect(emails, contains(fx.founderProfile.email));
         expect(emails, contains(fx.memberProfile.email));
+
+        // F-69: the dates the console sorts by. The founder has signed in
+        // (this fixture's clients did), so GoTrue has a last sign-in, and the
+        // last-active rule falls back to the session until T-78 has a row.
+        final founder = (familyA['members'] as List)
+            .cast<Map<String, dynamic>>()
+            .firstWhere((m) => m['id'] == fx.founderProfile.id);
+        expect(founder['created_at'], isNotNull);
+        expect(founder['last_sign_in_at'], isNotNull);
+        expect(founder['last_active_day'], isNotNull);
+        expect(founder['last_active_source'], isIn(['activity', 'auth_sessions']));
 
         expect(
             (await auditRows(fx.founderProfile.userId!))
