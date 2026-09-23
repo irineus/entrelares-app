@@ -35,6 +35,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
 
   /// T-37: optional by construction — the workflow must work with analytics
   /// off (dev flavor, tests), and an event may never change what is written.
+  @override
   final AnalyticsService? analytics;
 
   SupabaseCustodyDataSource(this._client,
@@ -594,7 +595,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     // T-37: core-engagement signal (no PII — only the scenario). Fired AFTER
     // the workflow completed, and never awaited: analytics can neither delay
     // nor break a swap.
-    unawaited(analytics?.trackEvent('swap_requested', props: {
+    unawaited(analytics?.trackEvent(AnalyticsEvents.swapRequested, props: {
           'scenario': approverId == proposedActualParentId ? 'A' : 'B',
         }) ??
         Future<void>.value());
@@ -646,6 +647,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     );
     await _insertNotifications(drafts, swapRequestId);
     await _sendSwapEmail(swapRequestId, 'approved');
+    _trackAnswer('approved', 'swap');
   }
 
   @override
@@ -670,6 +672,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     );
     await _insertNotifications(drafts, swapRequestId);
     await _sendSwapEmail(swapRequestId, 'rejected');
+    _trackAnswer('rejected', 'swap');
   }
 
   @override
@@ -691,6 +694,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     );
     await _insertNotifications(drafts, swapRequestId);
     await _sendSwapEmail(swapRequestId, 'cancelled');
+    _trackAnswer('cancelled', 'swap');
   }
 
   @override
@@ -845,6 +849,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     );
     await _insertNotifications(drafts, swapRequestId);
     await _sendSwapEmail(swapRequestId, 'revert_approved');
+    _trackAnswer('approved', 'revert');
   }
 
   @override
@@ -869,6 +874,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     );
     await _insertNotifications(drafts, swapRequestId);
     await _sendSwapEmail(swapRequestId, 'revert_rejected');
+    _trackAnswer('rejected', 'revert');
   }
 
   @override
@@ -890,7 +896,16 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     );
     await _insertNotifications(drafts, swapRequestId);
     await _sendSwapEmail(swapRequestId, 'revert_cancelled');
+    _trackAnswer('cancelled', 'revert');
   }
+
+  /// T-78: `swap-answered`, fired after the workflow completed — the
+  /// `swap_requested` shape: never awaited, so analytics can neither delay nor
+  /// break an answer.
+  void _trackAnswer(String action, String kind) => unawaited(analytics
+          ?.trackEvent(AnalyticsEvents.swapAnswered,
+              props: {'action': action, 'kind': kind}) ??
+      Future<void>.value());
 
   @override
   Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate) async {
@@ -930,6 +945,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       'p_body': body,
       'p_corrects_id': correctsId,
     });
+    unawaited(analytics?.trackEvent(AnalyticsEvents.dayAccountSaved,
+            props: {'correction': correctsId != null ? 'yes' : 'no'}) ??
+        Future<void>.value());
     return id as int;
   }
 
@@ -976,6 +994,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       'p_request': request,
       'p_note': note,
     });
+    unawaited(analytics?.trackEvent(AnalyticsEvents.dayNoticeSent, props: {
+          'reason': reason,
+          'request': request,
+          'eta': etaMinutes != null ? 'yes' : 'none',
+        }) ??
+        Future<void>.value());
     return id as int;
   }
 
@@ -990,6 +1014,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       'p_outcome': outcome,
       'p_note': note,
     });
+    unawaited(analytics?.trackEvent(AnalyticsEvents.dayNoticeAnswered,
+            props: {'outcome': outcome}) ??
+        Future<void>.value());
     return swapId as int?;
   }
 

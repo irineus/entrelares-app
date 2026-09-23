@@ -215,7 +215,7 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                             // (T-37), told apart by `gate`.
                             : () {
                                 widget.analytics?.trackEvent(
-                                    'premium-gate-click',
+                                    AnalyticsEvents.premiumGateClick,
                                     props: {'gate': 'custom-roles'});
                                 widget.onSeePremium!();
                               },

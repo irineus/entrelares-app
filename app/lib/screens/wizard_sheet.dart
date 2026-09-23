@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
@@ -155,6 +157,10 @@ class _WizardSheetState extends State<_WizardSheet> {
   @override
   void initState() {
     super.initState();
+    // T-78: pairs with `wizard_completed` — the drop between them is the
+    // wizard's own funnel.
+    unawaited(widget.analytics?.trackEvent(AnalyticsEvents.wizardStarted) ??
+        Future<void>.value());
     final floor = dateOnly(widget.today);
     final wanted = widget.initialStart;
     _startDate =
@@ -304,7 +310,7 @@ class _WizardSheetState extends State<_WizardSheet> {
             widget.isFreeTier ? K.wizDoneClampedFree : K.wizDoneClampedMax];
       }
       // T-37: the key activation moment — a family generated its base plan.
-      widget.analytics?.trackEvent('wizard_completed', props: {
+      widget.analytics?.trackEvent(AnalyticsEvents.wizardCompleted, props: {
         'created': created > 0 ? 'yes' : 'none',
         'replaced': replaceRange != null ? 'yes' : 'no',
         // U-55: whether the plan was born with a handoff time.

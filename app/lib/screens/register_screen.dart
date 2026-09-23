@@ -184,7 +184,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     // T-37: funnel entry — the sign-up TYPE and nothing else.
-    widget.analytics?.trackEvent('signup_started',
+    widget.analytics?.trackEvent(AnalyticsEvents.signupStarted,
         props: {'type': _isInvited ? 'invitee' : 'founder'});
 
     if (_isInvited) {
@@ -206,7 +206,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       if (!mounted) return;
       // T-37: a founder created a new family (activation funnel).
-      widget.analytics?.trackEvent('family_created');
+      widget.analytics?.trackEvent(AnalyticsEvents.familyCreated);
       // The account exists but is unusable until the e-mail is confirmed —
       // this screen is the end of the founder's flow, not a step in it.
       setState(() {
@@ -241,7 +241,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // T-37: where the founder funnel loses people between the two steps —
       // the step's NAME, nothing typed on it.
       widget.analytics
-          ?.trackEvent('signup_step', props: {'step': 'family'});
+          ?.trackEvent(AnalyticsEvents.signupStep, props: {'step': 'family'});
     }
   }
 
@@ -274,7 +274,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     switch (result) {
       case InviteeRegistered():
         // T-37: viral loop closed — an invited caregiver joined a family.
-        widget.analytics?.trackEvent('invitee_joined');
+        widget.analytics?.trackEvent(AnalyticsEvents.inviteeJoined);
         // U-17: already confirmed — sign in and let the router land them.
         try {
           await widget.onSignIn(_email.text.trim(), _password.text);

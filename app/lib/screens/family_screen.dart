@@ -352,13 +352,13 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         _sendingInvite = false;
       });
       if (invitationId == null) {
-        widget.analytics?.trackEvent('invite_sent', props: {'email': 'none'});
+        widget.analytics?.trackEvent(AnalyticsEvents.inviteSent, props: {'email': 'none'});
         showAppSnack(context, l.format(KApp.famPendingAdded, [name]),
             type: AppSnackType.success);
       } else {
         // T-37: viral loop initiated — whether the e-mail went out or the
         // family will have to share the link themselves.
-        widget.analytics?.trackEvent('invite_sent',
+        widget.analytics?.trackEvent(AnalyticsEvents.inviteSent,
             props: {'email': mailed ? 'sent' : 'link_only'});
         showAppSnack(
             context, l[mailed ? K.famInviteEmailSent : K.famInviteEmailFailed],
@@ -469,7 +469,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
           email: email, roleId: member.roleId ?? 0, profileId: member.id);
       final mailed = await widget.dataSource.sendInvitationEmail(id);
       if (!mounted) return;
-      widget.analytics?.trackEvent('invite_sent',
+      widget.analytics?.trackEvent(AnalyticsEvents.inviteSent,
           props: {'email': mailed ? 'sent' : 'link_only'});
       showAppSnack(
           context, l[mailed ? K.famInviteEmailSent : K.famInviteEmailFailed],
@@ -1151,7 +1151,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
   /// an external link — what may be OFFERED is that page's call, and it
   /// depends on the channel.
   void _goToPremium(String gate) {
-    widget.analytics?.trackEvent('premium-gate-click', props: {'gate': gate});
+    widget.analytics?.trackEvent(AnalyticsEvents.premiumGateClick, props: {'gate': gate});
     widget.onOpenPlan?.call();
   }
 

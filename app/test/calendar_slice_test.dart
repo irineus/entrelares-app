@@ -32,6 +32,10 @@ import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 
 class FakeCustodyDataSource implements CustodyDataSource {
+  /// T-78: set by a test that asserts an event fired from a sheet.
+  @override
+  AnalyticsService? analytics;
+
   final List<Member> members;
   List<CareSchedule> days;
   final List<CareSchedule> inserted = [];

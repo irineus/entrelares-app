@@ -66,12 +66,12 @@ class AdminModeOfferer {
   /// The gate CTA: the same funnel family as the other gates (T-37), told
   /// apart by `gate`.
   void openPlan() {
-    unawaited(analytics?.trackEvent('premium-gate-click',
+    unawaited(analytics?.trackEvent(AnalyticsEvents.premiumGateClick,
         props: {'gate': 'admin-retro'}));
     onOpenPlan?.call();
   }
 
   void _track(AdminModeAction action, String result) =>
-      unawaited(analytics?.trackEvent('admin-mode-offer',
+      unawaited(analytics?.trackEvent(AnalyticsEvents.adminModeOffer,
           props: {'action': action.wireName, 'result': result}));
 }

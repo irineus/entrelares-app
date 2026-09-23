@@ -75,10 +75,20 @@ class AnalyticsService {
     return _send(null, _currentPath, null);
   }
 
-  /// A custom funnel event on the current screen. [props] must carry only
-  /// coarse, non-identifying values (a category, a bucket, an action).
-  Future<void> trackEvent(String name, {Map<String, Object>? props}) =>
-      _send(name, _currentPath, props);
+  /// A custom funnel event on the current screen. [name] is an
+  /// [AnalyticsEvents] constant; [props] pass `AnalyticsCatalog.filterProps`
+  /// (T-78), so a key the event did not declare, or a value that is not a
+  /// short token, never leaves the device — free text cannot pass by shape.
+  ///
+  /// A name outside the catalogue is a programming error: it fails loudly in
+  /// debug and tests, and is dropped in release rather than starting a series
+  /// nobody declared. `analytics_call_sites_test` keeps literals out of `lib/`.
+  Future<void> trackEvent(String name, {Map<String, Object>? props}) {
+    assert(AnalyticsCatalog.isKnown(name),
+        'analytics event "$name" is not in AnalyticsCatalog');
+    if (!AnalyticsCatalog.isKnown(name)) return Future<void>.value();
+    return _send(name, _currentPath, AnalyticsCatalog.filterProps(name, props));
+  }
 
   /// Event names already sent by this service instance — i.e. by this app
   /// session, which is the scope the Blazor client counted impressions in

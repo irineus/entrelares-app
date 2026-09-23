@@ -24,9 +24,18 @@ import 'package:entrelares_db_contracts/models/role.dart';
 import 'package:entrelares_db_contracts/models/subscription.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
 
+import 'analytics_service.dart';
+
 /// What the calendar slice needs from the backend — an interface so widget
 /// tests run against a fake while the real implementation talks to Supabase.
 abstract class CustodyDataSource {
+  /// T-78: the product analytics every screen holding the data source can
+  /// reach, so an action is counted where it HAPPENS without threading a new
+  /// parameter through every sheet. Null with analytics off (dev, tests).
+  /// Events for actions that go through this class fire HERE, after the write
+  /// succeeded — the `swap_requested` shape — so no screen can forget one.
+  AnalyticsService? get analytics;
+
   Future<List<Member>> fetchMembers();
 
   /// The signed-in user's OWN profile row, or null when none exists. Read at

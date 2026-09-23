@@ -67,7 +67,7 @@ class _PremiumReturnScreenState extends State<PremiumReturnScreen> {
   Future<void> _poll() async {
     // F-48 funnel: landing here means the payer came back from the hosted
     // checkout; the outcome event follows when the poll resolves.
-    widget.analytics?.trackEvent('premium-checkout-return',
+    widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutReturn,
         props: analyticsFunnelProps(channel: widget.analytics!.channel));
 
     for (var attempt = 0; attempt < widget.maxAttempts; attempt++) {
@@ -81,7 +81,7 @@ class _PremiumReturnScreenState extends State<PremiumReturnScreen> {
       if (_abandoned) return;
       if (family?.plan.toLowerCase() == 'premium') {
         setState(() => _confirmed = true);
-        widget.analytics?.trackEvent('premium-checkout-outcome',
+        widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutOutcome,
             props: analyticsFunnelProps(
                 channel: widget.analytics!.channel, outcome: 'confirmed'));
         return;
@@ -91,7 +91,7 @@ class _PremiumReturnScreenState extends State<PremiumReturnScreen> {
     }
 
     setState(() => _timedOut = true);
-    widget.analytics?.trackEvent('premium-checkout-outcome',
+    widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutOutcome,
         props: analyticsFunnelProps(
             channel: widget.analytics!.channel, outcome: 'timeout'));
   }
