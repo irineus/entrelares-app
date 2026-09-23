@@ -21,7 +21,9 @@ import '../widgets/slot_pill.dart';
 enum DaySheetOutcome { saved, cleared, swapRequested, revertRequested }
 
 /// U-25: the pencil that turns the summary into the editor — keyed so a flow
-/// test reaches it without a localized finder.
+/// test reaches it without a localized finder. Since U-56 it exists only on a
+/// PAST day under the admin mode: every other day the reader can change opens
+/// in the editor.
 const daySheetEditKey = Key('day-sheet-edit');
 
 /// F-67 Part B: "Corrigir o planejamento" on a past day, for an admin with the
@@ -52,6 +54,16 @@ String daySheetCorrectAccountKey(int id) => 'day-sheet-correct-account-$id';
 /// with the editor one pencil away and a ✕ that is always there. An empty day
 /// has nothing to summarize and opens straight in the editor. No rule moved:
 /// the same form, the same save routing, one tap deeper.
+///
+/// U-56 (owner, 23/09/2026: *"a maioria das pessoas acaba clicando sempre
+/// duas vezes"*): that tap deeper was paid by almost every reader, so a day
+/// the reader can change, today or ahead, opens in the EDITOR again
+/// ([daySheetOpening]). The clutter U-25 hid is removed instead: the summary's
+/// pills sit on top of the form as the day's current state, the planned-parent
+/// field leaves when the reader cannot change it (S-09), and "Salvar" lights
+/// only when the draft differs from the stored day ([dayDraftChanged]). The
+/// summary stays for the days nothing can be saved on, and for a past day,
+/// whose primary is the relato (F-67).
 Future<DaySheetOutcome?> showDaySheet({
   required BuildContext context,
   required DateTime date,
@@ -192,8 +204,20 @@ class _DaySheetState extends State<_DaySheet> {
   /// until read; a failed read just skips the "N left" line.
   int? _writtenToday;
 
-  /// U-25: the editor is on screen. Starts false on an assigned day (the
-  /// summary) and true on an empty one, where the only thing to do is assign.
+  /// U-56: how the day tap opened this sheet — decides the first mode and is
+  /// the `mode` of `day-sheet-closed`.
+  late final DaySheetOpening _opening;
+
+  /// U-56: how the sheet ended, reported when it goes away. Stays [none]
+  /// when the reader only looked.
+  DaySheetResult _result = DaySheetResult.none;
+
+  /// U-56: what the last build painted for "Salvar", so typing in the note
+  /// rebuilds only when the answer flips.
+  bool _paintedDraftChanged = false;
+
+  /// U-25: the editor is on screen. Since U-56 it starts true wherever a save
+  /// is possible, except on a past assigned day (the relato's summary).
   late bool _editing;
 
   /// Where "Cancelar" goes: back to the summary the editor was opened from,
@@ -333,8 +357,11 @@ class _DaySheetState extends State<_DaySheet> {
     _swapMessage = TextEditingController();
     _accountBody = TextEditingController();
     _resetDraft();
+    _notes.addListener(_onNotesChanged);
     if (_isPast) _loadAccounts();
-    _editing = !_readOnly && _isEmptyDay;
+    _opening = daySheetOpening(
+        canSave: !_readOnly, isEmptyDay: _isEmptyDay, isPast: _isPast);
+    _editing = _opening.opensEditor;
     _startedInSummary = !_editing;
     final previous = widget.previousDay;
     if (previous != null) {
@@ -373,6 +400,48 @@ class _DaySheetState extends State<_DaySheet> {
     _revertSnapshotText = null;
     _revertCurrentText = null;
   }
+
+  /// U-56: the draft differs from the stored day — the only time "Salvar"
+  /// has something to write.
+  bool get _draftChanged {
+    final day = widget.day;
+    final handoff = _handoff;
+    return dayDraftChanged(
+      storedScheduledParentId: day?.scheduledParentId,
+      storedActualParentId: day?.actualParentId,
+      storedNotes: day?.notes,
+      storedHandoffTime: day?.handoffTime,
+      draftScheduledParentId: _scheduledParentId,
+      draftActualParentId: _actualParentId,
+      draftNotes: _notes.text,
+      draftHandoff: handoff == null
+          ? null
+          : (hour: handoff.hour, minute: handoff.minute),
+    );
+  }
+
+  void _onNotesChanged() {
+    if (mounted && _draftChanged != _paintedDraftChanged) setState(() {});
+  }
+
+  /// U-56: the sheet closes on a write — the outcome goes to the caller for
+  /// its toast and to `day-sheet-closed` for the count.
+  void _finish(DaySheetOutcome outcome) {
+    _result = switch (outcome) {
+      DaySheetOutcome.saved => DaySheetResult.saved,
+      DaySheetOutcome.cleared => DaySheetResult.cleared,
+      DaySheetOutcome.swapRequested => DaySheetResult.swap,
+      DaySheetOutcome.revertRequested => DaySheetResult.revert,
+    };
+    Navigator.of(context).pop(outcome);
+  }
+
+  /// U-56: the planned-parent field is a question only for whoever can answer
+  /// it — an empty day, the admin mode, or an admin who will be offered the
+  /// mode on the tap. For everyone else it was a row of locked chips (S-09)
+  /// repeating the pill on top.
+  bool get _showPlannedField =>
+      !_scheduledLocked || _canOffer(AdminModeAction.changePlannedParent);
 
   /// F-67 Part B: what an admin with the mode off is offered for [action]
   /// here. [AdminModeOfferKind.none] for everyone else — including every
@@ -503,6 +572,7 @@ class _DaySheetState extends State<_DaySheet> {
         _correcting = null;
         _accountBody.clear();
         _writtenToday = (_writtenToday ?? 0) + 1;
+        _result = DaySheetResult.report;
       });
       showAppSnack(context, l[KApp.dayAccountSaved]);
       await _loadAccounts();
@@ -531,6 +601,13 @@ class _DaySheetState extends State<_DaySheet> {
 
   @override
   void dispose() {
+    // U-56: one event per sheet, fired where the answer is known — never from
+    // build (T-76).
+    unawaited(widget.dataSource.analytics?.trackEvent(
+            AnalyticsEvents.daySheetClosed,
+            props: {'mode': _opening.wire, 'outcome': _result.wire}) ??
+        Future<void>.value());
+    _notes.removeListener(_onNotesChanged);
     _notes.dispose();
     _swapMessage.dispose();
     _accountBody.dispose();
@@ -617,9 +694,7 @@ class _DaySheetState extends State<_DaySheet> {
           myProfile: _requireMyProfile(),
           allProfiles: widget.allProfiles,
         );
-        if (mounted) {
-          Navigator.of(context).pop(DaySheetOutcome.revertRequested);
-        }
+        if (mounted) _finish(DaySheetOutcome.revertRequested);
         return;
       }
 
@@ -660,9 +735,7 @@ class _DaySheetState extends State<_DaySheet> {
           myProfile: _requireMyProfile(),
           allProfiles: widget.allProfiles,
         );
-        if (mounted) {
-          Navigator.of(context).pop(DaySheetOutcome.swapRequested);
-        }
+        if (mounted) _finish(DaySheetOutcome.swapRequested);
         return;
       }
 
@@ -684,7 +757,7 @@ class _DaySheetState extends State<_DaySheet> {
         await widget.dataSource.updateDay(row);
       }
       _trackNote(existing?.notes, notesText);
-      if (mounted) Navigator.of(context).pop(DaySheetOutcome.saved);
+      if (mounted) _finish(DaySheetOutcome.saved);
     } catch (e) {
       _fail(e.toString(), l[KApp.errDaySave]);
     }
@@ -737,7 +810,7 @@ class _DaySheetState extends State<_DaySheet> {
     });
     try {
       await widget.dataSource.deleteDay(existing.id);
-      if (mounted) Navigator.of(context).pop(DaySheetOutcome.cleared);
+      if (mounted) _finish(DaySheetOutcome.cleared);
     } catch (e) {
       _fail(e.toString(), l[K.errDeleteFailed]);
     }
@@ -831,6 +904,7 @@ class _DaySheetState extends State<_DaySheet> {
     // relato — the one door every active member has; "Corrigir o
     // planejamento" (Part B) stays the secondary, admin-only one.
     final offerReport = !editing && !reporting && _isPast && _canWriteAccount;
+    final draftChanged = _paintedDraftChanged = _draftChanged;
     return AppSheetFrame(
       title: _capitalize('${formatHandoffDate(widget.date, l)} · '
           '${daysUntilLabel(widget.date, widget.today, l)}'),
@@ -884,7 +958,10 @@ class _DaySheetState extends State<_DaySheet> {
           ? (_writtenToday != null && _capLeft <= 0 ? null : _saveAccount)
           : offerReport
               ? () => _startReport()
-              : _scheduledParentId == null || _deleting || _beyondRetroReach
+              : _scheduledParentId == null ||
+                      !draftChanged ||
+                      _deleting ||
+                      _beyondRetroReach
                   ? null
                   : _save,
       secondaryLabel: reporting
@@ -922,7 +999,15 @@ class _DaySheetState extends State<_DaySheet> {
           _summary(l, day, assignment),
           ..._accountsSection(l),
         ],
-        if (editing) ..._form(l),
+        if (editing) ...[
+          // U-56: the summary's pills lead the form — the day as it IS, above
+          // the controls that change it. An empty day has no state to show.
+          if (!_isEmptyDay && day != null && assignment != null) ...[
+            _statePills(l, day, assignment),
+            const SizedBox(height: Spacing.md),
+          ],
+          ..._form(l),
+        ],
       ],
     );
   }
@@ -1087,9 +1172,31 @@ class _DaySheetState extends State<_DaySheet> {
     }
     final tokens = context.tokens;
     final textTheme = Theme.of(context).textTheme;
+    final notes = day.notes?.trim() ?? '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _statePills(l, day, assignment),
+        if (notes.isNotEmpty) ...[
+          const SizedBox(height: Spacing.md),
+          Text(l[K.editorDayNote],
+              style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
+          const SizedBox(height: 2),
+          Text(notes, style: textTheme.bodyMedium),
+        ],
+      ],
+    );
+  }
+
+  /// U-25's pills — the real carer, *Trocado*, the handoff time — and, on a
+  /// swapped day, whom it was planned for. U-56 puts the same block on top of
+  /// the editor, so the form and the summary say the day's state one way.
+  Widget _statePills(
+      Localization l, CareSchedule day, DayAssignment assignment) {
+    final tokens = context.tokens;
+    final textTheme = Theme.of(context).textTheme;
     final swapped = isSwapped(assignment);
     final effective = assignment.effectiveParentId;
-    final notes = day.notes?.trim() ?? '';
     const pillHeight = 28.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1142,13 +1249,6 @@ class _DaySheetState extends State<_DaySheet> {
               style: textTheme.bodySmall?.copyWith(color: tokens.textMuted),
             ),
           ),
-        if (notes.isNotEmpty) ...[
-          const SizedBox(height: Spacing.md),
-          Text(l[K.editorDayNote],
-              style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
-          const SizedBox(height: 2),
-          Text(notes, style: textTheme.bodyMedium),
-        ],
       ],
     );
   }
@@ -1241,7 +1341,9 @@ class _DaySheetState extends State<_DaySheet> {
       //
       // U-28 QA: each block of this form is a card now. Loose on the sheet they
       // read as one long list of controls with no idea where one question ended
-      // and the next began.
+      // and the next began. U-56: a card nobody here can answer is not shown —
+      // the pill on top already names the carer.
+      if (_showPlannedField) ...[
       AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1275,6 +1377,7 @@ class _DaySheetState extends State<_DaySheet> {
         ),
       ),
       const SizedBox(height: Spacing.sm),
+      ],
 
       // ── Actual parent — general since lote 3: changing it on today/future
       //    opens a swap request; the direct write survives only where the DB

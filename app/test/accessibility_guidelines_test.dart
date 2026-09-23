@@ -481,14 +481,15 @@ void main() {
       );
     });
 
-    _scene('calendar, day sheet summary and editor', (tester, dark) async {
+    // U-56: today opens straight in the editor, the summary's pills on top.
+    // The summary alone is measured by the two past-day scenes below.
+    _scene('calendar and the day sheet editor', (tester, dark) async {
       final ds = _calendarSource();
       await tester.pumpWidget(_calendar(ds, dark: dark));
       await tester.pumpAndSettle();
       await _measure(tester, 'calendar');
       await cal.openDay(tester, cal.today.day);
-      await _measure(tester, 'day sheet summary');
-      await cal.tapSheet(tester, find.byKey(daySheetEditKey));
+      expect(find.byKey(daySheetEditKey), findsNothing);
       await _measure(tester, 'day sheet editor');
     });
 

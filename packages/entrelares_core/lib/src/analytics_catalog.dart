@@ -35,6 +35,7 @@ abstract final class AnalyticsEvents {
   static const swapRequested = 'swap_requested'; // scenario
   static const swapAnswered = 'swap-answered'; // T-78: action × kind
   static const dayNoteSaved = 'day-note-saved'; // T-78
+  static const daySheetClosed = 'day-sheet-closed'; // U-56, 23/09/2026: mode × outcome
   static const dayNoticeSent = 'day-notice-sent'; // T-78 (F-52 enums)
   static const dayNoticeAnswered = 'day-notice-answered'; // T-78
   static const dayAccountSaved = 'day-account-saved'; // T-78 (F-67)
@@ -84,6 +85,7 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.swapRequested: {'scenario'},
     AnalyticsEvents.swapAnswered: {'action', 'kind'},
     AnalyticsEvents.dayNoteSaved: {'state'},
+    AnalyticsEvents.daySheetClosed: {'mode', 'outcome'},
     AnalyticsEvents.dayNoticeSent: {'reason', 'request', 'eta'},
     AnalyticsEvents.dayNoticeAnswered: {'outcome'},
     AnalyticsEvents.dayAccountSaved: {'correction'},

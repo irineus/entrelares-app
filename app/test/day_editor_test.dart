@@ -71,8 +71,8 @@ void main() {
     await settleSnack(tester);
   });
 
-  testWidgets('S-09: the planned parent of an assigned day is locked for '
-      'non-admins', (tester) async {
+  testWidgets('S-09 + U-56: a non-admin cannot change the planned parent of '
+      'an assigned day, so the field is not offered at all', (tester) async {
     final future = futureDay;
     if (future == null) return;
     final ds = FakeCustodyDataSource(
@@ -81,18 +81,31 @@ void main() {
     await tester.pumpAndSettle();
 
     await openDayEditor(tester, future);
-    // U-28 QA: the explanation moved off the label and into an ⓘ tooltip, so
-    // it is a Tooltip's message now and not a line of text under the chips.
+    // U-56: the locked chips (and the ⓘ that explained the lock) repeated the
+    // pill on top; the pill names the planned carer, the field is gone.
+    expect(find.text(pt[K.editorScheduledParent]), findsNothing);
     expect(
         find.byWidgetPredicate(
             (w) => w is Tooltip && w.message == pt[K.editorLockedHint]),
+        findsNothing);
+    expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('day-summary-responsible')),
+            matching: find.text('Ana Souza')),
         findsOneWidget);
-    // Chip disabled — no effect.
-    await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno').first);
-    await tapSheet(tester, find.text(pt[K.commonSave]));
+  });
 
-    expect(ds.updated.single.scheduledParentId, 1);
-    await settleSnack(tester);
+  testWidgets('U-56: an admin with the mode off still sees the planned-parent '
+      'field on an assigned day — tapping it is where the mode is offered',
+      (tester) async {
+    final future = futureDay;
+    if (future == null) return;
+    final adminDs = FakeCustodyDataSource(
+        members: [anaAdmin, bruno], days: [row(7, dayOfMonth(future), 1)]);
+    await tester.pumpWidget(app(adminDs, adminMode: AdminMode()));
+    await tester.pumpAndSettle();
+    await openDayEditor(tester, future);
+    expect(find.text(pt[K.editorScheduledParent]), findsOneWidget);
   });
 
   testWidgets('S-09: admin mode changes it, but only after the explicit '
@@ -246,8 +259,13 @@ void main() {
         findsOneWidget);
     expect(find.text(pt[K.editorActualParent]), findsNothing);
     expect(find.text(pt[K.editorSameAsPlanned]), findsNothing);
-    // Not the departed ghost: the chip carries the pending mark, not "(saiu)".
-    expect(find.widgetWithText(ChoiceChip, 'Eva ${pt[KApp.calMemberPending]}'),
+    // Not the departed ghost: the pill carries the pending mark, not "(saiu)"
+    // (U-56: the planned field left for a non-admin; the pill names her).
+    expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('day-summary-responsible')),
+            matching:
+                find.text('Eva Pendente ${pt[KApp.calMemberPending]}')),
         findsOneWidget);
     expect(find.textContaining(pt[K.calMemberLeft]), findsNothing);
   });
