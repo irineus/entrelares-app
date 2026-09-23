@@ -66,7 +66,38 @@ enum WizardValidationError {
 
   /// F-39: the start itself must be within the family's planning horizon.
   startBeyondHorizon,
+
+  /// U-55: the handoff time was neither picked nor declared absent. Checked
+  /// LAST, and rendered on the field itself rather than in the sheet's
+  /// banner — it is the one failure that belongs to a single control.
+  handoffUnanswered,
 }
+
+/// U-55: the wizard's handoff time is a QUESTION, not an optional field.
+/// Family 19 planned 365 days with none (21/09/2026) because the field could
+/// be scrolled past, and a day without a time anchors urgency (F-22), the
+/// F-24/F-60 deadline and the F-52 estimate at MIDNIGHT. So the answer is a
+/// time or an explicit "não temos horário fixo" — never a default: a guessed
+/// 18:00 would be a wrong deadline written into every transition day.
+enum WizardHandoffAnswer {
+  unanswered,
+  time,
+
+  /// Behaves exactly like the null the field used to allow.
+  noFixedTime,
+}
+
+/// Picking a time wins over a stale "none": the UI clears one when the other
+/// is chosen, and this keeps the rule right even if it did not.
+WizardHandoffAnswer wizardHandoffAnswer({
+  required bool hasTime,
+  required bool declaredNone,
+}) =>
+    hasTime
+        ? WizardHandoffAnswer.time
+        : (declaredNone
+            ? WizardHandoffAnswer.noFixedTime
+            : WizardHandoffAnswer.unanswered);
 
 /// Mirror of the validation prologue of `GenerateSchedule` — first failure
 /// wins, null = valid.
@@ -75,6 +106,7 @@ WizardValidationError? validateWizard({
   required DateTime start,
   required DateTime today,
   DateTime? maxScheduleDate,
+  required WizardHandoffAnswer handoff,
 }) {
   if (blocks.isEmpty) return WizardValidationError.tooFewBlocks;
   if (blocks.any((b) => b.profileId == 0)) {
@@ -86,6 +118,9 @@ WizardValidationError? validateWizard({
   }
   if (isStartBeyondHorizon(start, maxScheduleDate)) {
     return WizardValidationError.startBeyondHorizon;
+  }
+  if (handoff == WizardHandoffAnswer.unanswered) {
+    return WizardValidationError.handoffUnanswered;
   }
   return null;
 }

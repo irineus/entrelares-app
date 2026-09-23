@@ -388,7 +388,9 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   contrato no-PII é espelho puro (`sanitizeAnalyticsPath`): query e fragmento caem sempre,
   GUID e id numérico viram `:id`. Eventos portados: `signup_started`, `family_created`,
   `invitee_joined`, `invite_sent`, `wizard_completed` (desde o F-51 com a prop
-  `replaced: yes|no` — o assistente substituiu o plano ou só acrescentou), `swap_requested`. Os
+  `replaced: yes|no` — o assistente substituiu o plano ou só acrescentou; desde o U-55 com
+  `handoff: yes|none` — o plano nasceu com horário de troca ou com "não temos horário fixo"),
+  `swap_requested`. Os
   `premium-gate-click` chegaram no lote 5, junto das CTAs que eles medem.
 - **Alvo web:** habilitado (tensão 1 — Flutter Web substitui o PWA). `flutter build web`
   entra no `verify.yml` e o run imprime o peso gzip do first-load; a medição de aceite do

@@ -375,6 +375,10 @@ abstract final class K {
   static const String wizMonthsMany = 'wiz.monthsMany';
   static const String wizHandoffTime = 'wiz.handoffTime';
   static const String wizHandoffHint = 'wiz.handoffHint';
+  // U-55: the handoff time is a question — a time or an explicit "none".
+  static const String wizHandoffPick = 'wiz.handoffPick';
+  static const String wizHandoffNone = 'wiz.handoffNone';
+  static const String wizHandoffRequired = 'wiz.handoffRequired';
   static const String wizCyclePreview = 'wiz.cyclePreview';
   static const String wizGenerate = 'wiz.generate';
   static const String wizCycleSummary = 'wiz.cycleSummary';
@@ -1491,6 +1495,9 @@ abstract final class K {
     wizMonthsMany,
     wizHandoffTime,
     wizHandoffHint,
+    wizHandoffPick,
+    wizHandoffNone,
+    wizHandoffRequired,
     wizCyclePreview,
     wizGenerate,
     wizCycleSummary,

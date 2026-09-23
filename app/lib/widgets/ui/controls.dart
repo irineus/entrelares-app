@@ -300,6 +300,10 @@ class AppTimeField extends StatelessWidget {
   /// look for it.
   final Key? fieldKey;
 
+  /// U-55: a validation message that belongs to THIS field (U-38 — a field's
+  /// validation stays on the field), drawn by the decoration like any input.
+  final String? errorText;
+
   const AppTimeField({
     super.key,
     required this.label,
@@ -313,6 +317,7 @@ class AppTimeField extends StatelessWidget {
     this.trailing,
     this.enabled = true,
     this.fieldKey,
+    this.errorText,
   });
 
   Future<void> _pick(BuildContext context) async {
@@ -352,6 +357,9 @@ class AppTimeField extends StatelessWidget {
               decoration: InputDecoration(
                 enabled: enabled,
                 hintText: emptyText,
+                errorText: errorText,
+                // A sentence, not a word: at 360 dp one line ellipsizes it.
+                errorMaxLines: 3,
                 prefixIcon: const Icon(Icons.schedule_outlined),
                 suffixIcon: current == null
                     ? null

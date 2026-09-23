@@ -54,12 +54,17 @@ void main() {
             blocks: const [CycleBlock(10, 7), CycleBlock(20, 7)],
             start: _today,
             today: _today,
+            handoff: WizardHandoffAnswer.time,
           ),
           isNull);
     });
     test('empty cycle', () {
       expect(
-          validateWizard(blocks: const [], start: _today, today: _today),
+          validateWizard(
+              blocks: const [],
+              start: _today,
+              today: _today,
+              handoff: WizardHandoffAnswer.time),
           WizardValidationError.tooFewBlocks);
     });
     test('a block without a parent', () {
@@ -68,6 +73,7 @@ void main() {
             blocks: const [CycleBlock(10, 7), CycleBlock(0, 7)],
             start: _today,
             today: _today,
+            handoff: WizardHandoffAnswer.time,
           ),
           WizardValidationError.blockWithoutParent);
     });
@@ -77,6 +83,7 @@ void main() {
             blocks: const [CycleBlock(10, 0)],
             start: _today,
             today: _today,
+            handoff: WizardHandoffAnswer.time,
           ),
           WizardValidationError.blockWithoutDays);
     });
@@ -86,6 +93,7 @@ void main() {
             blocks: const [CycleBlock(10, 7)],
             start: DateTime(2026, 8, 18),
             today: _today,
+            handoff: WizardHandoffAnswer.time,
           ),
           WizardValidationError.startInPast);
     });
@@ -96,8 +104,47 @@ void main() {
             start: DateTime(2027, 3, 1),
             today: _today,
             maxScheduleDate: DateTime(2027, 2, 19),
+            handoff: WizardHandoffAnswer.time,
           ),
           WizardValidationError.startBeyondHorizon);
+    });
+    test('U-55: an unanswered handoff fails, and only after the others', () {
+      expect(
+          validateWizard(
+            blocks: const [CycleBlock(10, 7)],
+            start: _today,
+            today: _today,
+            handoff: WizardHandoffAnswer.unanswered,
+          ),
+          WizardValidationError.handoffUnanswered);
+      expect(
+          validateWizard(
+            blocks: const [CycleBlock(0, 7)],
+            start: _today,
+            today: _today,
+            handoff: WizardHandoffAnswer.unanswered,
+          ),
+          WizardValidationError.blockWithoutParent);
+    });
+    test('U-55: "não temos horário fixo" is an answer', () {
+      expect(
+          validateWizard(
+            blocks: const [CycleBlock(10, 7)],
+            start: _today,
+            today: _today,
+            handoff: WizardHandoffAnswer.noFixedTime,
+          ),
+          isNull);
+    });
+    test('U-55: the answer — a time wins over a stale "none"', () {
+      expect(wizardHandoffAnswer(hasTime: false, declaredNone: false),
+          WizardHandoffAnswer.unanswered);
+      expect(wizardHandoffAnswer(hasTime: false, declaredNone: true),
+          WizardHandoffAnswer.noFixedTime);
+      expect(wizardHandoffAnswer(hasTime: true, declaredNone: false),
+          WizardHandoffAnswer.time);
+      expect(wizardHandoffAnswer(hasTime: true, declaredNone: true),
+          WizardHandoffAnswer.time);
     });
     test('today itself is a valid start', () {
       expect(
@@ -105,6 +152,7 @@ void main() {
             blocks: const [CycleBlock(10, 7)],
             start: DateTime(2026, 8, 19, 23, 0),
             today: _today,
+            handoff: WizardHandoffAnswer.time,
           ),
           isNull);
     });
