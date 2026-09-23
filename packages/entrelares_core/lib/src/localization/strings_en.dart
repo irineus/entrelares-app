@@ -322,7 +322,13 @@ abstract final class StringsEn {
     K.wizMonthsOne: '{0} month',
     K.wizMonthsMany: '{0} months',
     K.wizHandoffTime: 'Handover time',
-    K.wizHandoffHint: 'The time applies only to transition days.',
+    K.wizHandoffHint:
+        'Applied only on transition days. Request deadlines and lateness '
+            'are counted from it.',
+    K.wizHandoffPick: 'Choose a time',
+    K.wizHandoffNone: 'No fixed time',
+    K.wizHandoffRequired:
+        'Choose the handover time, or mark that there is no fixed time.',
     K.wizCyclePreview: 'Cycle:',
     K.wizGenerate: 'Generate plan',
     K.wizCycleSummary: '{0} days per cycle · repeats ~{1}× · {2} days in total',

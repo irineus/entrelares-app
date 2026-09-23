@@ -109,6 +109,12 @@ class _WizardSheetState extends State<_WizardSheet> {
   int _durationMonths = 3;
   /// U-37: one value, picked by the platform; null is "no handoff time".
   TimeOfDay? _handoff;
+
+  /// U-55: null alone is no longer an answer — the reader either picks a
+  /// time or says there is none, and until then "Gerar" refuses on the field.
+  bool _noFixedTime = false;
+  String? _handoffError;
+  final _handoffFieldKey = GlobalKey();
   bool _generating = false;
   bool _completed = false;
   String? _successMessage;
@@ -143,6 +149,9 @@ class _WizardSheetState extends State<_WizardSheet> {
   ({int hour, int minute})? get _handoffTime =>
       _handoff == null ? null : (hour: _handoff!.hour, minute: _handoff!.minute);
 
+  WizardHandoffAnswer get _handoffAnswer => wizardHandoffAnswer(
+      hasTime: _handoff != null, declaredNone: _noFixedTime);
+
   @override
   void initState() {
     super.initState();
@@ -163,15 +172,19 @@ class _WizardSheetState extends State<_WizardSheet> {
   List<CycleBlock> get _cycleBlocks =>
       [for (final b in _blocks) CycleBlock(b.profileId, b.days)];
 
-  String? _validationText(Localization l) {
-    final error = validateWizard(
-      blocks: _cycleBlocks,
-      start: _startDate,
-      today: widget.today,
-      maxScheduleDate: widget.maxScheduleDate,
-    );
+  WizardValidationError? get _validation => validateWizard(
+        blocks: _cycleBlocks,
+        start: _startDate,
+        today: widget.today,
+        maxScheduleDate: widget.maxScheduleDate,
+        handoff: _handoffAnswer,
+      );
+
+  /// The banner text of a sheet-level failure. The U-55 one is not here:
+  /// it is drawn on the handoff field (see [_generate]).
+  String? _validationText(Localization l, WizardValidationError? error) {
     return switch (error) {
-      null => null,
+      null || WizardValidationError.handoffUnanswered => null,
       WizardValidationError.tooFewBlocks => l[KApp.wizErrTooFewBlocks],
       WizardValidationError.blockWithoutParent =>
         l[K.wizErrPickParentPerBlock],
@@ -186,7 +199,24 @@ class _WizardSheetState extends State<_WizardSheet> {
   Future<void> _generate() async {
     if (_generating) return;
     final l = AppL10n.of(context).l;
-    final validation = _validationText(l);
+    final error = _validation;
+    if (error == WizardValidationError.handoffUnanswered) {
+      // The field sits mid-form and "Gerar" is pinned below it: a message
+      // on a field scrolled out of sight is the U-38 trap, so bring it in.
+      setState(() {
+        _errorMessage = null;
+        _handoffError = l[K.wizHandoffRequired];
+      });
+      final fieldContext = _handoffFieldKey.currentContext;
+      if (fieldContext != null) {
+        await Scrollable.ensureVisible(fieldContext,
+            duration: const Duration(milliseconds: 200),
+            alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+            alignment: 0.2);
+      }
+      return;
+    }
+    final validation = _validationText(l, error);
     if (validation != null) {
       setState(() => _errorMessage = validation);
       return;
@@ -277,6 +307,8 @@ class _WizardSheetState extends State<_WizardSheet> {
       widget.analytics?.trackEvent('wizard_completed', props: {
         'created': created > 0 ? 'yes' : 'none',
         'replaced': replaceRange != null ? 'yes' : 'no',
+        // U-55: whether the plan was born with a handoff time.
+        'handoff': _handoff != null ? 'yes' : 'none',
       });
       setState(() {
         _generating = false;
@@ -573,17 +605,46 @@ class _WizardSheetState extends State<_WizardSheet> {
       //
       // U-37: one field, the platform's picker, instead of the hour + minute
       // dropdown pair.
+      //
+      // U-55: no longer optional. A time, or the explicit chip below — the
+      // two exclude each other, and neither is pre-selected.
       AppTimeField(
+        key: _handoffFieldKey,
         fieldKey: const Key('wizHandoff'),
         label: l[K.wizHandoffTime],
         info: l[K.wizHandoffHint],
-        optionalLabel: l[K.commonOptional],
         value: _handoff,
         enabled: !_generating,
-        emptyText: l[K.editorHandoffEmpty],
+        emptyText:
+            _noFixedTime ? l[K.editorHandoffEmpty] : l[K.wizHandoffPick],
         clearLabel: l[K.editorHandoffClear],
+        errorText: _handoffError,
         formatValue: (t) => l.formatTime(DateTime(2000, 1, 1, t.hour, t.minute)),
-        onChanged: (t) => setState(() => _handoff = t),
+        onChanged: (t) => setState(() {
+          _handoff = t;
+          if (t != null) {
+            _noFixedTime = false;
+            _handoffError = null;
+          }
+        }),
+      ),
+      const SizedBox(height: Spacing.sm),
+      Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: FilterChip(
+          key: const Key('wizHandoffNone'),
+          label: Text(l[K.wizHandoffNone]),
+          selected: _noFixedTime,
+          onSelected: _generating
+              ? null
+              : (v) => setState(() {
+                    _noFixedTime = v;
+                    if (v) {
+                      _handoff = null;
+                      _handoffError = null;
+                    }
+                  }),
+        ),
       ),
           ],
         ),

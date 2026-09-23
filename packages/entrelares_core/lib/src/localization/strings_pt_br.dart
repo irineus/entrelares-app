@@ -324,7 +324,13 @@ abstract final class StringsPtBr {
     K.wizMonthsOne: '{0} mês',
     K.wizMonthsMany: '{0} meses',
     K.wizHandoffTime: 'Horário de troca',
-    K.wizHandoffHint: 'O horário é aplicado apenas nos dias de transição.',
+    K.wizHandoffHint:
+        'Aplicado só nos dias de transição. É dele que contam os prazos das '
+            'solicitações e o atraso de uma troca.',
+    K.wizHandoffPick: 'Escolher horário',
+    K.wizHandoffNone: 'Não temos horário fixo',
+    K.wizHandoffRequired:
+        'Escolha o horário da troca ou marque que não há horário fixo.',
     K.wizCyclePreview: 'Ciclo:',
     K.wizGenerate: 'Gerar plano',
     K.wizCycleSummary: '{0} dias por ciclo · repete ~{1}× · {2} dias no total',

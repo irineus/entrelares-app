@@ -10,6 +10,7 @@ import 'package:entrelares_db_contracts/models/family.dart';
 
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
+import 'package:entrelares_app/widgets/ui/ui.dart';
 
 import 'calendar_slice_test.dart';
 
@@ -28,7 +29,24 @@ Future<void> openWizard(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> generate(WidgetTester tester) async {
+/// U-55: "Gerar" needs an answer about the handoff time. The flows that are
+/// not about it answer "não temos horário fixo" — exactly the old null.
+Future<void> answerNoFixedTime(WidgetTester tester) async {
+  final chip = find.byKey(const Key('wizHandoffNone'));
+  await tester.ensureVisible(chip);
+  await tester.pumpAndSettle();
+  await tester.tap(chip);
+  await tester.pumpAndSettle();
+}
+
+Future<void> generate(WidgetTester tester, {bool answer = true}) async {
+  // A picked time is left alone. (Not by the prompt text: InputDecorator
+  // keeps its hint in the tree, faded out, even while a value shows.)
+  final field = tester.widget<AppTimeField>(find.byType(AppTimeField));
+  final chip = tester.widget<FilterChip>(find.byKey(const Key('wizHandoffNone')));
+  if (answer && field.value == null && !chip.selected) {
+    await answerNoFixedTime(tester);
+  }
   await tapSheet(tester, find.text(pt[K.wizGenerate]));
 }
 
@@ -128,7 +146,75 @@ void main() {
     expect(ds.inserted, isEmpty);
   });
 
+  u55HandoffAnswerTests();
   f51ReplaceTests();
+}
+
+// ── U-55: the handoff time is asked, never skipped ──────────────────────────
+
+void u55HandoffAnswerTests() {
+  testWidgets('U-55: "Gerar" with no answer writes nothing and says why ON '
+      'the field', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    await openWizard(tester);
+    // Nothing pre-selected: no default time, no default "none".
+    expect(find.text(pt[K.wizHandoffPick]), findsOneWidget);
+    expect(
+        tester
+            .widget<FilterChip>(find.byKey(const Key('wizHandoffNone')))
+            .selected,
+        isFalse);
+
+    await generate(tester, answer: false);
+
+    expect(ds.inserted, isEmpty);
+    expect(find.text(pt[K.wizHandoffRequired]), findsOneWidget);
+    // The field, not the sheet's banner, carries it.
+    expect(
+        find.descendant(
+            of: find.byType(AppTimeField),
+            matching: find.text(pt[K.wizHandoffRequired])),
+        findsOneWidget);
+  });
+
+  testWidgets('U-55: "Não temos horário fixo" clears the message and '
+      'generates with no time at all', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    await openWizard(tester);
+    await generate(tester, answer: false);
+    await answerNoFixedTime(tester);
+    expect(find.text(pt[K.wizHandoffRequired]), findsNothing);
+    expect(find.text(pt[K.editorHandoffEmpty]), findsOneWidget);
+
+    await generate(tester);
+    expect(ds.inserted, hasLength(daysInThreeMonths()));
+    expect(ds.inserted.every((r) => r.handoffTime == null), isTrue);
+  });
+
+  testWidgets('U-55: a time and "none" exclude each other', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    await openWizard(tester);
+    await answerNoFixedTime(tester);
+    await pickTime(tester, find.byKey(const Key('wizHandoff')), hour: 18);
+    expect(
+        tester
+            .widget<FilterChip>(find.byKey(const Key('wizHandoffNone')))
+            .selected,
+        isFalse);
+
+    await answerNoFixedTime(tester);
+    await generate(tester);
+    expect(ds.inserted.every((r) => r.handoffTime == null), isTrue);
+  });
 }
 
 // ── F-51: "substituir os dias já planejados" ────────────────────────────────
