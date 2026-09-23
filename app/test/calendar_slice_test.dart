@@ -224,6 +224,49 @@ class FakeCustodyDataSource implements CustodyDataSource {
         deleted: removed, keptFrozen: 0, keptSwap: 0, batchId: 'fake-batch');
   }
 
+  /// U-55: every call to the range handoff write, in order.
+  final handoffRanges = <({DateTime from, DateTime? to, String time})>[];
+
+  /// U-55: the server's rule, played on the fake's rows — transition days
+  /// from [from] on (never before today) that have no time get it.
+  @override
+  Future<HandoffRangeResult> setHandoffTimeRange(
+      DateTime from, DateTime? to, HandoffTime time) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    final wire = '${time.hour.toString().padLeft(2, '0')}:'
+        '${time.minute.toString().padLeft(2, '0')}:00';
+    handoffRanges.add((from: from, to: to, time: wire));
+    final floor = from.isBefore(dateOnly(today)) ? dateOnly(today) : from;
+    final byIso = {for (final d in days) CareSchedule.isoDate(d.scheduleDate): d};
+    var updated = 0, existing = 0;
+    days = [
+      for (final d in days)
+        () {
+          final date = dateOnly(d.scheduleDate);
+          if (date.isBefore(floor) || (to != null && date.isAfter(to))) {
+            return d;
+          }
+          final prev = byIso[CareSchedule.isoDate(
+              DateTime(date.year, date.month, date.day - 1))];
+          final effective = d.actualParentId ?? d.scheduledParentId;
+          final transition = prev == null ||
+              (prev.actualParentId ?? prev.scheduledParentId) != effective;
+          if (!transition) return d;
+          if (d.handoffTime != null) {
+            existing++;
+            return d;
+          }
+          updated++;
+          return d.copyWith(handoffTime: wire);
+        }(),
+    ];
+    return HandoffRangeResult(
+        updated: updated,
+        keptFrozen: 0,
+        keptExisting: existing,
+        batchId: 'fake-batch');
+  }
+
   @override
   Future<ScheduleRangeResult> replaceScheduleRange(
       DateTime from, DateTime to, List<CareSchedule> newDays) async {

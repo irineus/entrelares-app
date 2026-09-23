@@ -893,6 +893,23 @@ abstract final class StringsPtBr {
     K.auditScheduleChange: '<strong>{0}</strong> {1} para este dia.',
     K.auditBatchClear: '<strong>{0}</strong> limpou o plano numa ação só.',
     K.auditBatchReplace: '<strong>{0}</strong> substituiu o plano numa ação só.',
+    K.auditBatchHandoff:
+        '<strong>{0}</strong> definiu o horário das trocas numa ação só.',
+    K.handoffNudgeMessage:
+        'As trocas não têm horário: prazos e atrasos contam da meia-noite.',
+    K.handoffNudgeAction: 'Definir horário',
+    K.handoffNudgeDismiss: 'Dispensar',
+    K.handoffRangeTitle: 'Horário das trocas',
+    K.handoffRangeIntro:
+        'Vale para todos os dias de troca a partir de hoje que ainda não têm '
+            'horário. Os que já têm continuam como estão.',
+    K.handoffRangeApply: 'Aplicar',
+    K.handoffRangeRequired: 'Escolha o horário da troca.',
+    K.handoffRangeUpdatedOne: '{0} troca com horário definido',
+    K.handoffRangeUpdatedMany: '{0} trocas com horário definido',
+    K.handoffRangeKeptExistingOne: '{0} troca já tinha horário (mantido)',
+    K.handoffRangeKeptExistingMany: '{0} trocas já tinham horário (mantido)',
+    K.handoffRangeNothing: 'Nenhuma troca futura estava sem horário.',
     K.auditBatchRange: 'Dias: {0} a {1}',
     K.auditBatchCreatedOne: '{0} dia planejado',
     K.auditBatchCreatedMany: '{0} dias planejados',

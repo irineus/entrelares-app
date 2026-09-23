@@ -46,6 +46,7 @@ import 'services/connectivity_status.dart';
 import 'services/auth_providers.dart';
 import 'services/crash_reporter.dart';
 import 'services/custody_data_source.dart';
+import 'services/handoff_nudge_prefs.dart';
 import 'services/install_hint.dart';
 import 'services/installed_app.dart';
 import 'services/notification_badge.dart';
@@ -426,7 +427,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   tourKeys: _tourKeys,
                   onOpenFamily: () => _router.go('/family'),
                   onOpenNotifications: () => _router.go('/notifications'),
-                  onOpenPlan: () => _router.go('/family/plan')),
+                  onOpenPlan: () => _router.go('/family/plan'),
+                  handoffNudgePrefs: _handoffNudgePrefs),
             ),
           ]),
           // U-35: the branch's navigator reports to the roster's observer, so
@@ -610,6 +612,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// already on the Home Screen. A notifier for the reason [_deletionBanner]
   /// gives.
   final _installHint = ValueNotifier<InstallHintBanner?>(null);
+
+  /// U-55: the "Definir horário" strip's dismissal, per family, per device.
+  late final _handoffNudgePrefs = SharedHandoffNudgePrefs(widget.prefs);
 
   /// What the browser says about itself (U-51's seam), read ONCE: the shell
   /// strip and the Notificações step (U-54) must agree on the same answer.

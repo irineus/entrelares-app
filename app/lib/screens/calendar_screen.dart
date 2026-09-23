@@ -29,9 +29,11 @@ import '../widgets/today_card.dart';
 import 'bulk_sheet.dart';
 import 'notice_sheet.dart';
 import 'day_sheet.dart';
+import 'handoff_range_sheet.dart';
 import 'frozen_day_sheet.dart';
 import 'quick_swap_sheet.dart';
 import 'resolve_sheet.dart';
+import '../services/handoff_nudge_prefs.dart';
 import '../services/onboarding_service.dart';
 import '../widgets/onboarding.dart';
 import 'wizard_sheet.dart';
@@ -115,6 +117,10 @@ class CalendarScreen extends StatefulWidget {
   /// sends the admin to `/family/plan` (U-49). Null leaves it a sentence.
   final VoidCallback? onOpenPlan;
 
+  /// U-55: where the "Definir horário" strip's dismissal is kept on this
+  /// device. Null (tests, hosts without storage) keeps it for the session.
+  final HandoffNudgePrefs? handoffNudgePrefs;
+
   const CalendarScreen(
       {super.key,
       required this.dataSource,
@@ -126,7 +132,8 @@ class CalendarScreen extends StatefulWidget {
       this.analytics,
       this.onOpenFamily,
       this.onOpenNotifications,
-      this.onOpenPlan});
+      this.onOpenPlan,
+      this.handoffNudgePrefs});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -159,6 +166,10 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// flashing the nudge at somebody who already invited the other caregiver.
   bool _openInvitation = false;
   bool _tourShown = false;
+
+  /// U-55: the strip was sent away in THIS session (the prefs keep it for
+  /// good; this covers a host without them and the frame before the write).
+  bool _handoffNudgeDismissed = false;
   // Today + the next-handoff window ([today, today + 91] — the web scans
   // [tomorrow, tomorrow + 90]; one query serves the card's row and the scan).
   List<CareSchedule> _upcoming = const [];
@@ -994,6 +1005,66 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   /// [start] is the U-40 strip's: the first day the empty month can still be
   /// planned for. The ⋮ menu and the checklist pass nothing (today).
+  // ── U-55: a plan born without a handoff time ────────────────────────────
+
+  /// The strip's rule (`showHandoffNudge`, core) over the window the load
+  /// already holds — `[today, today + 91]` plus yesterday — so it costs no
+  /// query of its own.
+  bool get _showHandoffNudge {
+    final me = _ownProfile;
+    final familyId = me?.familyId;
+    if (me == null || familyId == null || _loading) return false;
+    HandoffNudgeDay view(CareSchedule d) => HandoffNudgeDay(
+        date: d.scheduleDate,
+        effectiveParentId: d.actualParentId ?? d.scheduledParentId,
+        hasTime: d.handoffTime != null);
+    final yesterday = _yesterdayRow;
+    return showHandoffNudge(
+      isAdmin: me.isAdmin,
+      dismissed: _handoffNudgeDismissed ||
+          (widget.handoffNudgePrefs?.isDismissed(familyId) ?? false),
+      upcoming: [for (final d in _upcoming) view(d)],
+      yesterday: yesterday == null ? null : view(yesterday),
+    );
+  }
+
+  void _dismissHandoffNudge() {
+    final familyId = _ownProfile?.familyId;
+    setState(() => _handoffNudgeDismissed = true);
+    if (familyId != null) {
+      unawaited(widget.handoffNudgePrefs?.dismiss(familyId));
+    }
+  }
+
+  /// Admin-only by DB rule and by the strip's own rule, and — owner, U-55 —
+  /// WITHOUT the admin mode: a handoff time is not a protected field.
+  Future<void> _openHandoffRange() async {
+    if (_refuseWriteOffline()) return;
+    final summary = await showHandoffRangeSheet(
+      context: context,
+      dataSource: widget.dataSource,
+      today: _today,
+    );
+    if (summary == null || !mounted) return;
+    showAppSnack(context, summary);
+    _load(silent: true);
+  }
+
+  Widget _handoffNudge(Localization l) => Padding(
+        key: const Key('handoff-nudge'),
+        padding: const EdgeInsets.fromLTRB(
+            Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
+        child: AppBanner(
+          tone: context.tokens.info,
+          icon: Icons.schedule_outlined,
+          message: l[K.handoffNudgeMessage],
+          actionLabel: l[K.handoffNudgeAction],
+          onAction: _openHandoffRange,
+          onClose: _dismissHandoffNudge,
+          closeTooltip: l[K.handoffNudgeDismiss],
+        ),
+      );
+
   Future<void> _openWizard({DateTime? start}) async {
     if (_refuseWriteOffline()) return;
     final generated = await showWizardSheet(
@@ -1811,6 +1882,7 @@ class _CalendarScreenState extends State<CalendarScreen>
             KeyedSubtree(
                 key: widget.tourKeys?.keyFor(TourTarget.todayCard),
                 child: _todayCard(context)),
+          if (_showHandoffNudge) _handoffNudge(l),
           _monthBar(context, l),
           if (_members.isEmpty && _loading)
             const _LegendSkeleton()

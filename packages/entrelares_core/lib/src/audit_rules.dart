@@ -465,7 +465,8 @@ DateTime? trialEndedEntry({
 class AuditBatch {
   final String batchId;
 
-  /// `clear_range` / `replace_range`, as the RPC stamped it.
+  /// `clear_range` / `replace_range` / `handoff_range` (U-55), as the RPC
+  /// stamped it.
   final String? kind;
 
   /// The rows, in the order the timeline holds them (newest first).
@@ -478,6 +479,9 @@ class AuditBatch {
   });
 
   bool get isReplace => kind == 'replace_range';
+
+  /// U-55: `set_handoff_time_range` — every row an UPDATE of a handoff time.
+  bool get isHandoff => kind == 'handoff_range';
 
   int get deleted => logs.where((l) => l.action == 'DELETE').length;
   int get created => logs.where((l) => l.action == 'INSERT').length;

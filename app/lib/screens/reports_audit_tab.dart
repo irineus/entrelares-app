@@ -436,16 +436,25 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   Widget _batchItem(AuditBatch batch, Localization l) {
     final actor = _nameOf(batch.performedById, l[K.auditSystemTrigger]);
     final expanded = _expandedBatches.contains(batch.batchId);
+    // U-55: a handoff batch only UPDATEs — the "updated" badge, and the
+    // clock the day sheet uses for a handoff time.
     return _item(
-      badge: batch.isReplace ? AuditBadge.updated : AuditBadge.deleted,
-      icon: batch.isReplace ? Icons.autorenew : Icons.delete_outline,
+      badge: batch.isReplace || batch.isHandoff
+          ? AuditBadge.updated
+          : AuditBadge.deleted,
+      icon: batch.isHandoff
+          ? Icons.schedule_outlined
+          : (batch.isReplace ? Icons.autorenew : Icons.delete_outline),
       children: [
         Text(
             l.format(K.auditBatchRange,
                 [l.formatDate(batch.firstDate), l.formatDate(batch.lastDate)]),
             style: Theme.of(context).textTheme.labelSmall),
         RichLabel.of(
-            l, batch.isReplace ? K.auditBatchReplace : K.auditBatchClear,
+            l,
+            batch.isHandoff
+                ? K.auditBatchHandoff
+                : (batch.isReplace ? K.auditBatchReplace : K.auditBatchClear),
             args: [actor]),
         Text(auditBatchCounts(batch, l),
             style: Theme.of(context).textTheme.bodySmall),
