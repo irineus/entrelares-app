@@ -60,6 +60,10 @@ abstract class CustodyDataSource {
   /// `GetNextHandoffDateAsync` fetch; the scan itself is pure, in core).
   Future<List<CareSchedule>> fetchUpcoming(DateTime from, int days);
 
+  /// F-70: the family's LAST planned day, or null when it never planned. One
+  /// row, served by the UNIQUE (family_id, schedule_date) index.
+  Future<DateTime?> fetchLastPlannedDay();
+
   /// F-32: the signed-in user's family row (RLS yields at most one), or null.
   /// The entitlement mirror fails CLOSED on null by construction.
   Future<Family?> fetchOwnFamily();

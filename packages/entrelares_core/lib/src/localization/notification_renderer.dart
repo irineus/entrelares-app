@@ -270,6 +270,12 @@ abstract final class NotificationRenderer {
       case 'billing' when kind == 'grace_warning' && date != null:
         return l.format(K.notifRenderBillingGrace, [date]);
 
+      // ── The plan runs out (F-70) ──
+      case 'plan_ending' when kind == 'ending' && date != null:
+        return l.format(K.notifRenderPlanEnding, [date]);
+      case 'plan_ending' when kind == 'ended' && date != null:
+        return l.format(K.notifRenderPlanEnded, [date]);
+
       default:
         return storedMessage;
     }
@@ -396,6 +402,15 @@ abstract final class NotificationRenderer {
           : null,
       'billing' =>
         kind == 'grace_warning' ? K.notifRenderTitleBillingGrace : null,
+      // F-70: the heading only when the body can be rebuilt too — never an
+      // English heading over the stored Portuguese sentence.
+      'plan_ending' => p['date'] == null
+          ? null
+          : switch (kind) {
+              'ending' => K.notifRenderTitlePlanEnding,
+              'ended' => K.notifRenderTitlePlanEnded,
+              _ => null,
+            },
       // F-52: three request kinds share one heading — the body is what says
       // whether anything is being asked of the reader. A cancellation gets its
       // own, because "Aviso de imprevisto" over "X cancelou o aviso" would

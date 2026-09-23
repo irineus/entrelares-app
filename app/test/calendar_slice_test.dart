@@ -79,6 +79,19 @@ class FakeCustodyDataSource implements CustodyDataSource {
         .toList();
   }
 
+  /// F-70: set to state the plan's end apart from [days] — a scene that
+  /// seeds one day to measure something else is not a plan ending today.
+  DateTime? lastPlannedDayOverride;
+
+  @override
+  Future<DateTime?> fetchLastPlannedDay() async {
+    if (lastPlannedDayOverride != null) return lastPlannedDayOverride;
+    if (days.isEmpty) return null;
+    return days
+        .map((d) => d.scheduleDate)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+  }
+
   @override
   Future<Family?> fetchOwnFamily() async {
     if (throwOnFamily != null) throw throwOnFamily!;

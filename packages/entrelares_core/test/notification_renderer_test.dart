@@ -409,6 +409,11 @@ void main() {
         'Sua família já usou 80% dos e-mails deste mês (plano gratuito). As notificações aqui no app seguem sem limite — ative o Premium para um limite bem maior.'),
     ('billing', '{"kind":"grace_warning","date":"12/08/2026"}',
         'Não conseguimos confirmar o pagamento da assinatura. Se a cobrança não for regularizada até 12/08/2026, a família voltará ao Plano Gratuito. Nenhum dado é apagado — os recursos Premium apenas ficam indisponíveis.'),
+    // F-70: the ISO date the RPC stores, rendered in the reader's format.
+    ('plan_ending', '{"kind":"ending","date":"2026-11-12"}',
+        'O planejamento da família vai até 12/11/2026. Planeje os próximos meses.'),
+    ('plan_ending', '{"kind":"ended","date":"2026-09-22"}',
+        'O último dia planejado foi 22/09/2026. Planeje os próximos meses no calendário.'),
   ];
 
   group('PT-BR renders EXACTLY what the writer stored', () {
@@ -463,6 +468,8 @@ void main() {
       ('email_cap_last', '{}'),
       ('email_cap_80', '{}'),
       ('billing', '{"kind":"grace_warning","date":"12/08/2026"}'),
+      ('plan_ending', '{"kind":"ending","date":"2026-11-12"}'),
+      ('plan_ending', '{"kind":"ended","date":"2026-09-22"}'),
     ];
     for (final (type, json) in enTable) {
       test('$type $json', () {
@@ -499,6 +506,8 @@ void main() {
       ('family_deletion', '{"kind":"refused","name":"Ana"}',
           '{"kind":"withdrawn","name":"Ana"}'),
       ('email_cap_reached', '{"tier":"premium"}', '{"tier":"free"}'),
+      ('plan_ending', '{"kind":"ending","date":"2026-11-12"}',
+          '{"kind":"ended","date":"2026-11-12"}'),
       ('swap_family_info',
           '{"kind":"swap","date":"04/08","name":"Ana","requester":"B","approver":"C"}',
           '{"kind":"revert","date":"04/08","name":"Ana"}'),
@@ -520,6 +529,8 @@ void main() {
       ('family_deletion', '{"kind":"something_new","name":"Ana"}'),
       ('email_cap_reached', '{"tier":"enterprise"}'),
       ('billing', '{"kind":"something_new","date":"12/08/2026"}'),
+      ('plan_ending', '{"kind":"something_new","date":"2026-11-12"}'),
+      ('plan_ending', '{"kind":"ending"}'),
     ];
     for (final (type, json) in unknown) {
       test('$type with unknown discriminator keeps the stored sentence', () {

@@ -886,6 +886,15 @@ abstract final class K {
   static const String notifRenderEmailCap80 = 'notifRender.emailCap.eighty';
   static const String notifRenderBillingGrace = 'notifRender.billingGrace';
 
+  // ── Plan ending (F-70) ──
+  static const String notifRenderTitlePlanEnding = 'notifRender.title.planEnding';
+  static const String notifRenderTitlePlanEnded = 'notifRender.title.planEnded';
+  static const String notifRenderPlanEnding = 'notifRender.planEnding';
+  static const String notifRenderPlanEnded = 'notifRender.planEnded';
+  static const String notifPlanAction = 'notif.planAction';
+  static const String calPlanEnding = 'cal.planEnd.ending';
+  static const String calPlanEnded = 'cal.planEnd.ended';
+
   // ── Notifications page ──
   static const String notifPageTitle = 'notif.pageTitle';
   static const String notifFilterAria = 'notif.filterAria';
@@ -1972,6 +1981,13 @@ abstract final class K {
     notifRenderEmailCapLast,
     notifRenderEmailCap80,
     notifRenderBillingGrace,
+    notifRenderTitlePlanEnding,
+    notifRenderTitlePlanEnded,
+    notifRenderPlanEnding,
+    notifRenderPlanEnded,
+    notifPlanAction,
+    calPlanEnding,
+    calPlanEnded,
     notifPageTitle,
     notifFilterAria,
     notifTabIncoming,

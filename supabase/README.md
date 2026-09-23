@@ -295,6 +295,24 @@ is mandatory, exactly like the gotcha above.
 - **Command:** as in 4.4 but with
   `url := 'https://<project-ref>.supabase.co/functions/v1/purge-deleted'`.
 
+### 4.6 The `plan-end-reminders` cron (F-70) — nothing to do by hand
+
+Unlike 4.4/4.5, this job is created by its own migration
+(`20260923230000_f70_plan_end_reminders.sql`, `cron.schedule` upserts by name):
+**`plan-end-reminders-daily`**, `0 12 * * *` (09:00 in Brasília — it rings a
+phone, so never inside the 04:00 UTC purge). The command reads the SAME Vault
+secrets the push trigger reads (`functions_base_url`, `secret_key`, runbook
+§ 11) and sends the key on `apikey`, so a project armed for push is armed for
+this. An unarmed project fails the call in cron's own log and nothing else.
+
+The function only sends the e-mail twins; the selection, the ledger
+(`plan_end_reminders`) and the in-app `plan_ending` rows (whose push follows
+from the notifications trigger) live in `plan_end_reminders_due()`. Check a run:
+```sql
+select jobname, schedule from cron.job where jobname = 'plan-end-reminders-daily';
+select * from public.plan_end_reminders order by sent_at desc limit 20;
+```
+
 ---
 
 ## 5. Authentication settings & e-mail templates (F-15 sign-up)

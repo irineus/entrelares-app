@@ -49,6 +49,11 @@ export const PUSH_TYPES: readonly string[] = [
 	// and both channels route on it — asking goes to "Para você", telling goes to
 	// "Todas", where the row always is.
 	"day_notice",
+	// F-70. The family's own plan runs out (D-30, D-7) or ran out. Nobody did
+	// anything, so the rule above holds: the calendar is emptying under them,
+	// and the member who stopped opening the app is exactly the one a row in
+	// the list never reaches. Lands on "Todas", where the row always is.
+	"plan_ending",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -109,6 +114,11 @@ const K = {
 	tagOverdue: "notifRender.tag.overdue",
 	fbOtherCap: "notifRender.fb.otherCap",
 	fbOtherThe: "notifRender.fb.otherThe",
+
+	titlePlanEnding: "notifRender.title.planEnding",
+	titlePlanEnded: "notifRender.title.planEnded",
+	planEnding: "notifRender.planEnding",
+	planEnded: "notifRender.planEnded",
 } as const;
 
 /// The strings themselves — byte-identical to `StringsPtBr`/`StringsEn` for
@@ -164,6 +174,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.tag.overdue": "ATRASADO: ",
 		"notifRender.fb.otherCap": "Outro responsável",
 		"notifRender.fb.otherThe": "O outro responsável",
+		"notifRender.title.planEnding": "O planejamento termina em breve",
+		"notifRender.title.planEnded": "O planejamento terminou",
+		"notifRender.planEnding": "O planejamento da família vai até {0}. Planeje os próximos meses.",
+		"notifRender.planEnded": "O último dia planejado foi {0}. Planeje os próximos meses no calendário.",
 	},
 	"en": {
 		"notifRender.title.autoReminder": "Pending request awaiting your reply",
@@ -213,6 +227,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.tag.overdue": "OVERDUE: ",
 		"notifRender.fb.otherCap": "Another caregiver",
 		"notifRender.fb.otherThe": "The other caregiver",
+		"notifRender.title.planEnding": "Your plan ends soon",
+		"notifRender.title.planEnded": "Your plan has ended",
+		"notifRender.planEnding": "Your family's plan runs until {0}. Plan the next months.",
+		"notifRender.planEnded": "The last planned day was {0}. Plan the next months in the calendar.",
 	},
 };
 
@@ -445,6 +463,20 @@ export function renderPush(
 			]);
 			break;
 		}
+
+		// F-70: `kind` says whether the last planned day is still ahead or past.
+		// An unknown one is a future writer's shape — no push, never a guess.
+		case "plan_ending":
+			if (kind === "ending") {
+				titleKey = K.titlePlanEnding;
+				body = fmt(lang, K.planEnding, [date]);
+			} else if (kind === "ended") {
+				titleKey = K.titlePlanEnded;
+				body = fmt(lang, K.planEnded, [date]);
+			} else {
+				return null;
+			}
+			break;
 
 		default:
 			return null;

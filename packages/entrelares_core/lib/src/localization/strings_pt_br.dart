@@ -787,6 +787,14 @@ abstract final class StringsPtBr {
     K.notifRenderEmailCapLast: 'Este é o último e-mail do mês no plano gratuito. As notificações aqui no app seguem normais — ative o Premium para um limite bem maior.',
     K.notifRenderEmailCap80: 'Sua família já usou 80% dos e-mails deste mês (plano gratuito). As notificações aqui no app seguem sem limite — ative o Premium para um limite bem maior.',
     K.notifRenderBillingGrace: 'Não conseguimos confirmar o pagamento da assinatura. Se a cobrança não for regularizada até {0}, a família voltará ao Plano Gratuito. Nenhum dado é apagado — os recursos Premium apenas ficam indisponíveis.',
+    // F-70: byte-identical to what plan_end_reminders_due() stores (U-13).
+    K.notifRenderTitlePlanEnding: 'O planejamento termina em breve',
+    K.notifRenderTitlePlanEnded: 'O planejamento terminou',
+    K.notifRenderPlanEnding: 'O planejamento da família vai até {0}. Planeje os próximos meses.',
+    K.notifRenderPlanEnded: 'O último dia planejado foi {0}. Planeje os próximos meses no calendário.',
+    K.notifPlanAction: 'Planejar os próximos meses',
+    K.calPlanEnding: 'O planejamento vai até {0}.',
+    K.calPlanEnded: 'O planejamento terminou em {0}.',
     // ── Notifications page ──
     K.notifPageTitle: 'Notificações',
     K.notifFilterAria: 'Filtro de notificações',

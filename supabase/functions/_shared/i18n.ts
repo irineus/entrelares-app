@@ -498,6 +498,8 @@ export interface AccountStrings {
   subjJoined: (who: string) => string;
   subjReturned: (who: string) => string;
   subjGraceEnding: string;
+  subjPlanEnding: (date: string) => string;
+  subjPlanEnded: string;
   subjFdRequesterSelf: string;
   subjFdRequesterOthers: (deadline: string) => string;
   subjFdReminder: (deadline: string) => string;
@@ -517,6 +519,14 @@ export interface AccountStrings {
   graceIntro: (date: string) => string;
   graceBody: string;
   graceHowTo: string;
+
+  // F-70 — the family's own plan is running out (D-7) or already ran out.
+  planEndingHeading: string;
+  planEndingIntro: (date: string) => string;
+  planEndedHeading: string;
+  planEndedIntro: (date: string) => string;
+  planHowTo: string;
+  planButton: string;
 
   othersHeading: string;
   othersBody: (who: string) => string;
@@ -578,6 +588,8 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
     subjJoined: (w) => `${w} entrou na família`,
     subjReturned: (w) => `${w} voltou à família`,
     subjGraceEnding: "Seu Premium está prestes a ser interrompido",
+    subjPlanEnding: (d) => `O planejamento da família vai até ${d}`,
+    subjPlanEnded: "O planejamento da família terminou",
     subjFdRequesterSelf: "Você solicitou a exclusão da família",
     subjFdRequesterOthers: (d) => `Exclusão da família solicitada — responda até ${d}`,
     subjFdReminder: (d) => `A família será excluída em ${d}`,
@@ -597,6 +609,13 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
     graceIntro: (d) => `Não conseguimos confirmar o pagamento da assinatura Premium da sua família. Estamos mantendo o acesso durante um <strong>período de carência</strong>, mas ele termina em <strong>${d}</strong>.`,
     graceBody: "Se a cobrança não for regularizada até lá, a família <strong>voltará ao Plano Gratuito</strong>. <strong>Nenhum dado é apagado</strong> — o calendário, as trocas e todo o histórico continuam intactos; apenas os recursos Premium ficam indisponíveis até uma nova contratação.",
     graceHowTo: "Para resolver, abra o aplicativo em <strong>Família &gt; Assinatura</strong>.",
+
+    planEndingHeading: "O planejamento termina em breve",
+    planEndingIntro: (d) => `O planejamento da sua família no calendário vai até <strong>${d}</strong>. Depois dessa data, nenhum dia tem responsável definido.`,
+    planEndedHeading: "O planejamento terminou",
+    planEndedIntro: (d) => `O último dia planejado no calendário da sua família foi <strong>${d}</strong>. Desde então, nenhum dia tem responsável definido.`,
+    planHowTo: "Para planejar os próximos meses, abra a notificação no aplicativo — o assistente já começa no primeiro dia sem responsável.",
+    planButton: "Planejar os próximos meses",
 
     othersHeading: "Um responsável saiu da família",
     othersBody: (w) => `<strong>${w}</strong> solicitou a saída da família. Os <strong>dias futuros</strong> que estavam sob responsabilidade dessa pessoa foram <strong>liberados</strong> — abra o calendário para <strong>verificar e reatribuir</strong> o que for necessário.`,
@@ -652,6 +671,8 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
     subjJoined: (w) => `${w} joined the family`,
     subjReturned: (w) => `${w} is back in the family`,
     subjGraceEnding: "Your Premium is about to be interrupted",
+    subjPlanEnding: (d) => `Your family's plan runs until ${d}`,
+    subjPlanEnded: "Your family's plan has ended",
     subjFdRequesterSelf: "You requested the deletion of the family",
     subjFdRequesterOthers: (d) => `Family deletion requested — reply by ${d}`,
     subjFdReminder: (d) => `The family will be deleted on ${d}`,
@@ -671,6 +692,13 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
     graceIntro: (d) => `We could not confirm the payment for your family's Premium subscription. We are keeping access during a <strong>grace period</strong>, but it ends on <strong>${d}</strong>.`,
     graceBody: "If the charge is not settled by then, the family <strong>goes back to the Free plan</strong>. <strong>No data is deleted</strong> — the calendar, the swaps and the whole history stay intact; only the Premium features become unavailable until a new subscription.",
     graceHowTo: "To sort it out, open the app under <strong>Family &gt; Subscription</strong>.",
+
+    planEndingHeading: "Your plan ends soon",
+    planEndingIntro: (d) => `Your family's plan in the calendar runs until <strong>${d}</strong>. After that date, no day has a caregiver set.`,
+    planEndedHeading: "Your plan has ended",
+    planEndedIntro: (d) => `The last planned day in your family's calendar was <strong>${d}</strong>. Since then, no day has a caregiver set.`,
+    planHowTo: "To plan the next months, open the notification in the app — the wizard already starts on the first day without a caregiver.",
+    planButton: "Plan the next months",
 
     othersHeading: "A caregiver left the family",
     othersBody: (w) => `<strong>${w}</strong> requested to leave the family. The <strong>future days</strong> that were under that person's responsibility were <strong>released</strong> — open the calendar to <strong>check and reassign</strong> whatever is needed.`,
