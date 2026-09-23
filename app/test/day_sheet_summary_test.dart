@@ -190,6 +190,11 @@ void main() {
             matching: find.byWidgetPredicate((w) =>
                 w is CustomPaint && w.foregroundPainter is DashedBorderPainter)),
         findsOneWidget);
+    expect(
+        find.descendant(of: anySheet, matching: find.text(pt[K.calSwapped])),
+        findsOneWidget,
+        reason: 'the pill says it — the U-28 badge on the "Responsável real" '
+            'label said it a second time once the pills led the form');
     expect(find.text(pt.format(KApp.sheetPlanned, ['Ana Souza'])),
         findsOneWidget);
     expect(

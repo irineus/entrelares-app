@@ -1395,16 +1395,13 @@ class _DaySheetState extends State<_DaySheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-      // U-28 QA: the redundant "Responsável: X" line went away, and with it the
-      // "(trocado)" suffix it carried. The FACT is not redundant, only the
-      // sentence was — so it rides here, on the label of the field that owns it.
+      // U-28 QA put the "Trocado" fact on this label as a badge, because the
+      // form had lost every line that said it. U-56: the pills lead the form
+      // again and the dashed "Trocado" pill says it right above — a badge here
+      // said it twice.
       AppFieldLabel(
         l[K.editorActualParent],
         info: l[K.editorActualParentHint],
-        trailing: isSwapped(_assignment)
-            ? AppBadge(
-                text: l[K.calSwapped], tone: context.tokens.swapped.tone)
-            : null,
       ),
       Wrap(
         spacing: 8,
