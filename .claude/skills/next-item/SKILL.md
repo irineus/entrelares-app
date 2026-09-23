@@ -261,7 +261,43 @@ chamadas.
    futuro: tabelas de capacidade ganham a feature entregue; inventários de suíte refletem arquivos
    de teste novos; o `CLAUDE.md` só muda no que mudou em PRODUÇÃO. **Nada disso toca `backlog/`**,
    que é história congelada.
-6. Terminar a sessão com um **bloco de resumo** para o board. Se sobrou ação do owner, o resumo
+6. **Canal Android — acumular ou promover. PERGUNTAR, nunca decidir sozinho.** Vale para todo item
+   cujo merge bumpou o `versionCode`: assim que o run do `main` mostrar o `play-internal` verde (o
+   código novo está na **Internal testing**), perguntar com **AskUserQuestion** — antes do resumo,
+   e mesmo que a sessão anterior tenha promovido:
+
+   - **Acumular** *(o owner não vai a Production agora)*: não escrever notas nem abrir PR. A
+     Internal segue recebendo cada merge; o próximo item que perguntar e ouvir "promover" escreve
+     notas que cobrem TUDO o que se acumulou. No resumo, uma linha só:
+     `Android: <code> na Internal · Production em <código> · acumulando desde <código>`.
+     Não vira `AÇÃO DO OWNER PENDENTE` no card — acumular é uma decisão, não uma pendência.
+   - **Escrever as notas e promover**: as notas descrevem o que mudou **desde a versão que os
+     usuários têm em Production**, não desde o último item:
+     1. **A base é a Play, não o repositório.** Ler a Production na tela de releases
+        (`https://play.google.com/console/u/0/developers/5188946194088545235/app/4976020657794164634/releases/overview`,
+        pedir o print ao owner) e/ou o último `play-promote` **não-dry-run**
+        (`gh run list --workflow play-promote.yml`, e no log `DRY_RUN: false` + a linha
+        *"promovido à Production"*). Uma liberação feita à mão antes do T-79 não aparece em run
+        nenhum — medido em 23/09/2026: a 131 estava em Production "In review" e o único run era
+        um `dry_run`. Uma liberação ainda **em revisão** é substituída pelo promote, então a base
+        é a última que **passou** da revisão, e as mudanças da que está em revisão entram nas notas.
+     2. **O que mudou:** `git log` entre o commit que levou o `versionCode` da base ao
+        `app/pubspec.yaml` (`git log -S'+<base>' -- app/pubspec.yaml`) e `origin/main`; só o que o
+        usuário do APP vê — fora docs, CI, web-only e servidor-only (`store/README.md`, "Release
+        notes").
+     3. **Escrever** `store/release-notes/<code>/pt-BR.txt` e `en-US.txt` para o `<code>` que a
+        Internal tem agora — **no máximo 500 caracteres cada** (limite da Play;
+        `play_release_test` confere na entrada). Só o código promovido precisa de notas: os
+        intermediários acumulados nunca vão a Production e ficam sem pasta.
+     4. PR só com essas duas pastas (é `.txt`, então **roda** o CI — não é markdown) e merge com o OK
+        do owner, como todo PR.
+     5. Depois do merge, **bloco de handoff** do `play-promote` (`action = promote`,
+        `version_code = <code>`, `fraction` à escolha do owner — `0.2` como padrão — e **Approve**
+        no Environment `play-production`), com a conferência na mesma tela de releases.
+
+   Sem resposta clara, o padrão é **acumular**: promover é decisão do owner (T-79), e notas
+   escritas cedo demais ficam velhas no próximo merge.
+7. Terminar a sessão com um **bloco de resumo** para o board. Se sobrou ação do owner, o resumo
    **abre** com a lista numerada dessas ações (só os títulos — os blocos completos já estão acima),
    antes de qualquer outra coisa: o que vem depois de um resumo longo não é lido.
 
@@ -275,7 +311,7 @@ de QA em `pr-<N>.entrelares-web-qa.pages.dev` — o job `qa-preview` comenta os 
 segunda conta de um teste com dois responsáveis entra por esse web. O `main` fica servido no banco de
 QA em `qa.entrelares.app` (job `qa-web`). O canal Android sobe sozinho para a **Internal testing** no merge que bumpa a versão
 (job `play-internal`, T-79); **Production** só sai quando o owner dispara o `play-promote` e aprova o run
-no Environment `play-production` — e o `promote` exige as notas em `store/release-notes/<versionCode>/`.
+no Environment `play-production` — e o `promote` exige as notas em `store/release-notes/<versionCode>/` — acumular ou promover se pergunta ao owner ao fim de cada item (*Encerrar o item*, passo 6).
 
 **Por isso o Entrelares NÃO copia o merge automático do Gestão** (lá `develop` é do CI e `main` é do
 dono; aqui só existe `main`, e ela é o dono).
