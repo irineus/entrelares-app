@@ -108,6 +108,7 @@ void main() {
       'family_deletion_reminders_due',
       'notify_family_email_cap',
       'billing_grace_warnings_due',
+      'plan_end_reminders_due',
     ]) {
       expect(writers, contains(expected));
     }

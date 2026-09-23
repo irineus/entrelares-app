@@ -442,7 +442,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   onOpenFamily: () => _router.go('/family'),
                   onOpenNotifications: () => _router.go('/notifications'),
                   onOpenPlan: () => _router.go('/family/plan'),
-                  handoffNudgePrefs: _handoffNudgePrefs),
+                  handoffNudgePrefs: _handoffNudgePrefs,
+                  planRequest: _planRequest),
             ),
           ]),
           // U-35: the branch's navigator reports to the roster's observer, so
@@ -559,6 +560,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   push: _push,
                   installFacts: _browserFacts,
                   analytics: _analytics,
+                  onPlanFrom: (start) {
+                    _planRequest.value = start;
+                    _router.go('/');
+                  },
                   landing: switch (state.uri.queryParameters['tab']) {
                     'incoming' => NotificationLanding.incoming,
                     'history' => NotificationLanding.history,
@@ -629,6 +634,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
 
   /// U-55: the "Definir horário" strip's dismissal, per family, per device.
   late final _handoffNudgePrefs = SharedHandoffNudgePrefs(widget.prefs);
+
+  /// F-70: Notificações → calendar, carrying the day the wizard opens on.
+  /// The calendar consumes it (sets it back to null) once it opens.
+  final _planRequest = ValueNotifier<DateTime?>(null);
 
   /// What the browser says about itself (U-51's seam), read ONCE: the shell
   /// strip and the Notificações step (U-54) must agree on the same answer.
@@ -836,6 +845,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _deletionBanner.dispose();
     _appHandoff.dispose();
     _installHint.dispose();
+    _planRequest.dispose();
     super.dispose();
   }
 

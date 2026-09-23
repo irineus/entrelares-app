@@ -45,6 +45,7 @@ export 'src/localization/notification_renderer.dart';
 export 'src/localization/rich_text.dart';
 export 'src/localization/strings_en.dart';
 export 'src/localization/strings_pt_br.dart';
+export 'src/plan_end_rules.dart';
 export 'src/policy_versions.dart';
 export 'src/push_enrollment.dart';
 export 'src/push_nudge_rules.dart';

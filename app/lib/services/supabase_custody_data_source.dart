@@ -100,6 +100,17 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<DateTime?> fetchLastPlannedDay() async {
+    final rows = await _client
+        .from('care_schedules')
+        .select('schedule_date')
+        .order('schedule_date', ascending: false)
+        .limit(1);
+    if (rows.isEmpty) return null;
+    return DateTime.tryParse(rows.first['schedule_date'] as String);
+  }
+
+  @override
   Future<Family?> fetchOwnFamily() async {
     // Same shape as the web's GetMyFamilyAsync: a plain RLS-scoped select,
     // first row or null — never the is_premium() RPC (the mirror exists so

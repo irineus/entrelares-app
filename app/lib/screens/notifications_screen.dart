@@ -67,6 +67,11 @@ class NotificationsScreen extends StatefulWidget {
   /// U-54: the nudge's impressions and taps, and the enable result.
   final AnalyticsService? analytics;
 
+  /// F-70: a plan-end row's "Planejar os próximos meses" — the host takes the
+  /// reader to the calendar with the wizard open on this day. Null hides the
+  /// action (tests, hosts without a calendar).
+  final ValueChanged<DateTime>? onPlanFrom;
+
   const NotificationsScreen(
       {super.key,
       required this.dataSource,
@@ -75,6 +80,7 @@ class NotificationsScreen extends StatefulWidget {
       this.push,
       this.installFacts,
       this.analytics,
+      this.onPlanFrom,
       this.landing,
       this.landingNonce});
 
@@ -87,6 +93,10 @@ class NotificationsScreen extends StatefulWidget {
 
   /// U-54: the iPhone-in-Safari step, above the list.
   static const pushInstallKey = Key('push-install');
+
+  /// F-70: the plan-end row's action, per notification.
+  static Key planActionKey(Object notificationId) =>
+      ValueKey('plan-end-action-$notificationId');
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -113,6 +123,7 @@ IconData notifIcon(String type) => switch (type) {
       'email_cap_80' => Icons.warning_amber_rounded,
       'email_cap_last' || 'email_cap_reached' => Icons.mail_outline,
       'billing' => Icons.credit_card,
+      'plan_ending' => Icons.event_note_outlined,
       _ => Icons.notifications_none,
     };
 
@@ -914,6 +925,29 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         timestamp:
             createdLocal == null ? '' : l.formatDateTime(createdLocal),
+        detail: _planAction(notif, l),
+      ),
+    );
+  }
+
+  /// F-70: the one thing a plan-end row asks for, on the row itself. A row
+  /// whose params the rule cannot read offers nothing and still renders.
+  Widget? _planAction(AppNotification notif, Localization l) {
+    final onPlanFrom = widget.onPlanFrom;
+    if (onPlanFrom == null) return null;
+    final start =
+        PlanEndRules.actionStart(notif.type, notif.paramsJson, DateTime.now());
+    if (start == null) return null;
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: NotificationsScreen.planActionKey(notif.id),
+        icon: const Icon(Icons.edit_calendar_outlined),
+        label: Text(l[K.notifPlanAction]),
+        onPressed: () {
+          _trackListOpen(PlanEndRules.type);
+          onPlanFrom(start);
+        },
       ),
     );
   }
