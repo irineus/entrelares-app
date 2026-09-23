@@ -94,7 +94,7 @@ class _FamilyAdminModeScreenState extends State<FamilyAdminModeScreen> {
   /// depends on the channel.
   void _goToPremium() {
     widget.analytics
-        ?.trackEvent('premium-gate-click', props: {'gate': 'admin-mode'});
+        ?.trackEvent(AnalyticsEvents.premiumGateClick, props: {'gate': 'admin-mode'});
     widget.onOpenPlan?.call();
   }
 

@@ -179,7 +179,7 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
       if (!mounted) return;
       // T-37: same funnel event the register form emits — the channel is in
       // the pageview, never a person.
-      widget.analytics?.trackEvent('family_created');
+      widget.analytics?.trackEvent(AnalyticsEvents.familyCreated);
       await _clearPendingToken();
       await widget.onCompleted();
     } on OnboardingRefused catch (e) {
@@ -203,7 +203,7 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
     switch (result) {
       case InviteeRegistered():
         // T-37: viral loop closed — an invited caregiver joined a family.
-        widget.analytics?.trackEvent('invitee_joined');
+        widget.analytics?.trackEvent(AnalyticsEvents.inviteeJoined);
         await _clearPendingToken();
         await widget.onCompleted();
       case InviteeNeedsMigration(:final previousFamilyName):

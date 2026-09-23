@@ -335,7 +335,20 @@ class _EntrelaresAppState extends State<EntrelaresApp>
               language: _l.current.code,
               route: _helpFrom ?? (signedIn ? '/' : '/login'),
             ),
-            onSend: SupportService(_client).send,
+            onSend: (draft) async {
+              final result = await SupportService(_client).send(draft);
+              // T-78: the category and whether the sender was signed in —
+              // never the message, never the address.
+              if (result.outcome == SupportOutcome.sent) {
+                unawaited(_analytics.trackEvent(
+                    AnalyticsEvents.supportContactSent,
+                    props: {
+                      'category': draft.category.wire,
+                      'signed_in': signedIn ? 'yes' : 'no',
+                    }));
+              }
+              return result;
+            },
             onClose: () {
               if (_router.canPop()) {
                 _router.pop();
@@ -639,6 +652,38 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     if (_phase == _AuthPhase.authed) unawaited(_activity.touch());
   }
 
+  /// T-78: how the session that is about to become AUTHED came in —
+  /// `password`, `google`, `link` (an e-mail link: confirmation, invite,
+  /// recovery) or `restore` (the gate kept a saved session). Consumed by
+  /// [_setPhase] into one `sign-in` event; null once reported.
+  String? _signInMethod;
+
+  /// T-78: the Google door leaves the app (redirect / custom tab) and the
+  /// session comes back through the gate or the auth listener, where nothing
+  /// says which door it was. The marker says so, and dies on first read.
+  static const String _pendingGoogleKey = 'analytics.pendingGoogleSignIn';
+
+  String _consumeSignInMarker(String fallback) {
+    final google = widget.prefs.getBool(_pendingGoogleKey) ?? false;
+    if (google) unawaited(widget.prefs.remove(_pendingGoogleKey));
+    return google ? 'google' : fallback;
+  }
+
+  /// T-78: the admin-mode state last reported, so a notifier ping that did
+  /// not change it is not a toggle.
+  bool _adminModeReported = false;
+
+  void _onAdminModeChanged() {
+    final active = _adminMode.isActive;
+    if (active == _adminModeReported) return;
+    _adminModeReported = active;
+    // Leaving the authenticated phase drops the mode (S-10); that is a
+    // sign-out, not somebody switching it off.
+    if (_phase != _AuthPhase.authed) return;
+    unawaited(_analytics.trackEvent(AnalyticsEvents.adminModeToggle,
+        props: {'state': active ? 'on' : 'off'}));
+  }
+
   /// Where a dismissal of the hint is remembered — per BROWSER, like the
   /// handoff's: it is that Safari that keeps the app as a tab.
   static const String _installHintDismissedKey = 'app.installHint.dismissed';
@@ -705,6 +750,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       // survives inside the shell branch.
       // F-52: `kind` rides in the payload so a courtesy aviso lands on
       // "Todas" and a request lands on "Para você".
+      // T-78: which notice brought the person back, by type only.
+      unawaited(_analytics.trackEvent(AnalyticsEvents.notificationOpen, props: {
+        'source': 'push',
+        'type': AnalyticsCatalog.notificationType(data['type']),
+      }));
       final landing =
           PushRouting.landingFor(data['type'], kind: data['kind']);
       final query = {
@@ -722,6 +772,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     // learns of a change by listening — the same reason the connectivity strip
     // is a listenable.
     widget.appearance.addListener(_onAppearanceChanged);
+    _adminMode.addListener(_onAdminModeChanged);
     _openGate();
     _authSub = _client.auth.onAuthStateChange.listen((state) {
       switch (state.event) {
@@ -745,6 +796,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         case AuthChangeEvent.signedIn:
           if (_phase == _AuthPhase.anon) {
             _expiredReason = SessionExpiredReason.none;
+            _signInMethod ??= _consumeSignInMarker('link');
             // F-57: the OAuth return lands here (deep link / web redirect) —
             // and an OAuth session may have NO profile yet, so the phase is
             // resolved from the profile, never assumed.
@@ -767,6 +819,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     WidgetsBinding.instance.removeObserver(this);
     appConnectivity.removeListener(_onConnectivityChanged);
     widget.appearance.removeListener(_onAppearanceChanged);
+    _adminMode.removeListener(_onAdminModeChanged);
     _authSub?.cancel();
     if (_routerLive) {
       _router.routeInformationProvider.removeListener(_trackPageView);
@@ -842,6 +895,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _resolveInstallHint();
       // T-78: the day this member used the app, on this channel.
       _touchActivity();
+      _trackAuthedEntry();
     } else {
       _badge.stop();
       unawaited(_push.stop());
@@ -953,10 +1007,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       return;
     }
     _installHint.value = InstallHintBanner(
-      onOpen: () => unawaited(_analytics.trackEvent('install-hint-open')),
+      onOpen: () => unawaited(_analytics.trackEvent(AnalyticsEvents.installHintOpen)),
       onDismiss: _dismissInstallHint,
     );
-    unawaited(_analytics.trackEvent('install-hint-view'));
+    unawaited(_analytics.trackEvent(AnalyticsEvents.installHintView));
   }
 
   /// The dismissals this browser remembers. U-51 wrote only a bool; it reads
@@ -978,7 +1032,27 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     unawaited(widget.prefs.setInt(_installHintDismissCountKey, next.count));
     unawaited(widget.prefs.setInt(
         _installHintLastDismissedKey, next.last!.millisecondsSinceEpoch));
-    unawaited(_analytics.trackEvent('install-hint-dismiss'));
+    unawaited(_analytics.trackEvent(AnalyticsEvents.installHintDismiss));
+  }
+
+  /// T-78: `app-open` once per app session, and the `sign-in` that led here
+  /// (once per sign-in). Umami's `channel` stays web/store (T-37's series);
+  /// the web's installed/tab split rides as `display`.
+  void _trackAuthedEntry() {
+    unawaited(_analytics.trackEventOnce(AnalyticsEvents.appOpen, props: {
+      'channel': _analytics.channel,
+      if (kIsWeb)
+        'display': _browserFacts != null &&
+                InstallHintRules.isStandalone(_browserFacts)
+            ? 'installed'
+            : 'tab',
+    }));
+    final method = _signInMethod;
+    _signInMethod = null;
+    if (method != null) {
+      unawaited(_analytics
+          .trackEvent(AnalyticsEvents.signIn, props: {'method': method}));
+    }
   }
 
   /// F-09 — needs the profile id, which the phase transition does not carry.
@@ -1015,6 +1089,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _expiredReason = !alive && hadSession
         ? SessionExpiredReason.restored
         : SessionExpiredReason.none;
+    if (alive) _signInMethod = _consumeSignInMarker('restore');
     if (verdict == RestoredSession.offline) {
       // T-18: the profile read would only spend postgrest's retries (~7 s)
       // under the splash to fail anyway. Open on what the device has; the
@@ -1031,7 +1106,15 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   }
 
   Future<void> _signIn(String email, String password) async {
-    await _client.auth.signInWithPassword(email: email, password: password);
+    // T-78: named BEFORE the await — the auth listener sees the same session
+    // arrive while anonymous and must not call it an e-mail link.
+    _signInMethod = 'password';
+    try {
+      await _client.auth.signInWithPassword(email: email, password: password);
+    } catch (_) {
+      _signInMethod = null;
+      rethrow;
+    }
     _expiredReason = SessionExpiredReason.none;
     await _resolveAuthedPhase();
   }
@@ -1048,6 +1131,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       await widget.prefs
           .setString(OauthOnboardingScreen.pendingInviteTokenKey, token);
     }
+    // T-78: best-effort — a storage refusal only makes this sign-in read as
+    // `link`/`restore`, never blocks it.
+    try {
+      await widget.prefs.setBool(_pendingGoogleKey, true);
+    } catch (_) {}
     await _client.auth.signInWithOAuth(
       OAuthProvider.google,
       redirectTo: kIsWeb ? Uri.base.origin : DeepLinkUrls.oauthCallback,
@@ -1106,6 +1194,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// choice asks for: `MaterialApp.themeMode` is read in [build].
   void _onAppearanceChanged() {
     if (mounted) setState(() {});
+    // T-78: the notifier only pings on a real change (the picker's choose).
+    unawaited(_analytics.trackEvent(AnalyticsEvents.preferenceChanged,
+        props: {'pref': 'theme', 'value': widget.appearance.value.name}));
   }
 
   void _onConnectivityChanged() {
@@ -1232,6 +1323,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// in the new language (the `forceLoad` analog).
   Future<void> _setLanguage(AppLanguage language) async {
     if (language == _l.current) return;
+    unawaited(_analytics.trackEvent(AnalyticsEvents.preferenceChanged,
+        props: {'pref': 'language', 'value': language.code}));
     try {
       await widget.prefs
           .setString(LanguageResolver.storageKey, language.code);

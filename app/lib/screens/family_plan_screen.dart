@@ -206,7 +206,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       );
       if (ui == BillingUi.offer && !_paywallViewTracked) {
         _paywallViewTracked = true;
-        widget.analytics?.trackEvent('premium-paywall-view',
+        widget.analytics?.trackEvent(AnalyticsEvents.premiumPaywallView,
             props: analyticsFunnelProps(channel: _channel));
       }
       setState(() {
@@ -278,7 +278,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     setState(() => _premiumBusy = true);
     try {
       await widget.dataSource.registerPremiumInterest(feature: 'family');
-      widget.analytics?.trackEvent('premium-interest', props: {
+      widget.analytics?.trackEvent(AnalyticsEvents.premiumInterest, props: {
         'source': 'family',
         'trial': _planStatus.onTrial,
       });
@@ -349,7 +349,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       final url = avulso
           ? await widget.dataSource.startAvulso(cycle)
           : await widget.dataSource.startCheckout(cycle);
-      widget.analytics?.trackEvent('premium-checkout-start',
+      widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutStart,
           props: analyticsFunnelProps(
               channel: _channel,
               cycle: cycle,
@@ -483,7 +483,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       // unacknowledged purchase after three days, and acknowledging one the
       // server refused would strand the family without the entitlement.
       await widget.storeBilling?.complete(purchase);
-      widget.analytics?.trackEvent('premium-checkout-outcome',
+      widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutOutcome,
           props: analyticsFunnelProps(
               channel: _channel,
               cycle: cycleForStoreProduct(purchase.productId),
@@ -718,7 +718,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                 l,
                 widget.dataSource.cancelSubscription,
                 successKey: K.famSubscriptionCancelled,
-                event: 'premium-cancel',
+                event: AnalyticsEvents.premiumCancel,
               ),
         child: Text(l[K.premCancelConfirm]),
       ),
@@ -997,7 +997,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     if (store == null) return;
     setState(() => _billingBusy = true);
     try {
-      widget.analytics?.trackEvent('premium-checkout-start',
+      widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutStart,
           props: analyticsFunnelProps(
               channel: _channel, cycle: product.cycle, mode: 'store'));
       await store.buy(product);
@@ -1118,7 +1118,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                 l,
                 widget.dataSource.reactivateSubscription,
                 successKey: K.famSubscriptionReactivated,
-                event: 'premium-reactivate',
+                event: AnalyticsEvents.premiumReactivate,
               ),
         child: Text(l[K.premReactivateButton]),
       ),

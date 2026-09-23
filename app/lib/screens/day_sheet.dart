@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
@@ -647,6 +649,7 @@ class _DaySheetState extends State<_DaySheet> {
         } else {
           await widget.dataSource.updateDay(base);
         }
+        _trackNote(existing?.notes, notesText);
         // Reload to get the id (and fresh tokens) if it was just inserted.
         final refreshed = await widget.dataSource.fetchDay(widget.date);
         await widget.dataSource.createSwapRequest(
@@ -680,10 +683,21 @@ class _DaySheetState extends State<_DaySheet> {
         // Full-row update carrying the T-33/T-35 echo (see CareSchedule).
         await widget.dataSource.updateDay(row);
       }
+      _trackNote(existing?.notes, notesText);
       if (mounted) Navigator.of(context).pop(DaySheetOutcome.saved);
     } catch (e) {
       _fail(e.toString(), l[KApp.errDaySave]);
     }
+  }
+
+  /// T-78: `day-note-saved` when a save CHANGED the Observação — written or
+  /// cleared; a save that only moved the carer or the time is not a note.
+  void _trackNote(String? before, String after) {
+    if ((before ?? '').trim() == after) return;
+    unawaited(widget.dataSource.analytics?.trackEvent(
+            AnalyticsEvents.dayNoteSaved,
+            props: {'state': after.isEmpty ? 'cleared' : 'set'}) ??
+        Future<void>.value());
   }
 
   /// Web parity: `GetCurrentProfileAsync` throws when the profile is missing —

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:typed_data';
 
 import 'package:entrelares_core/entrelares_core.dart';
@@ -240,6 +242,11 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       );
 
       final bytes = await buildReportPdf(report, l);
+      // T-78: the period KIND only — never the dates or the header name.
+      unawaited(widget.dataSource.analytics?.trackEvent(
+              AnalyticsEvents.pdfExport,
+              props: {'period': _kind.name}) ??
+          Future<void>.value());
       if (!mounted) return;
       setState(() {
         _report = report;

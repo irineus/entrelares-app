@@ -551,7 +551,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       if (nudgeApplies && !openInvitation) {
         final analytics = widget.analytics;
         if (analytics != null) {
-          unawaited(analytics.trackEventOnce('invite_nudge_shown',
+          unawaited(analytics.trackEventOnce(AnalyticsEvents.inviteNudgeShown,
               props: analyticsFunnelProps(channel: analytics.channel)));
         }
       }
@@ -1450,7 +1450,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   void _onInviteNudgeTap() {
     final analytics = widget.analytics;
     if (analytics != null) {
-      unawaited(analytics.trackEvent('invite_nudge_click',
+      unawaited(analytics.trackEvent(AnalyticsEvents.inviteNudgeClick,
           props: analyticsFunnelProps(channel: analytics.channel)));
     }
     context.go('/family');

@@ -191,7 +191,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         step == PushNudgeStep.unsupportedBrowser) {
       return;
     }
-    unawaited(analytics.trackEventOnce('push-nudge-view',
+    unawaited(analytics.trackEventOnce(AnalyticsEvents.pushNudgeView,
         props: analyticsFunnelProps(
             channel: analytics.channel, platform: _platform, step: step)));
   }
@@ -199,7 +199,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _trackNudgeClick(PushNudgeStep step) {
     final analytics = widget.analytics;
     if (analytics == null) return;
-    unawaited(analytics.trackEvent('push-nudge-click',
+    unawaited(analytics.trackEvent(AnalyticsEvents.pushNudgeClick,
         props: analyticsFunnelProps(
             channel: analytics.channel, platform: _platform, step: step)));
   }
@@ -294,6 +294,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// the work and reports the outcome; this screen reloads, refreshes the bell
   /// and shows the SAME toast the calendar shows for the same outcome.
   Future<void> _openRequest(SwapRequest req) async {
+    _trackListOpen(req.isRevertPending ? 'revert_request' : 'swap_request');
     final outcome = await showFrozenDaySheet(
       context: context,
       request: req,
@@ -540,7 +541,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final result = await push.enable();
       final analytics = widget.analytics;
       if (analytics != null) {
-        unawaited(analytics.trackEvent('push-enable-result',
+        unawaited(analytics.trackEvent(AnalyticsEvents.pushEnableResult,
             props: analyticsFunnelProps(
                 channel: analytics.channel,
                 platform: _platform,
@@ -745,7 +746,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
+  /// T-78: a row of *Para você* opened — the push twin fires in main.dart.
+  void _trackListOpen(String type) => unawaited(widget.analytics?.trackEvent(
+          AnalyticsEvents.notificationOpen,
+          props: {'source': 'list', 'type': type}) ??
+      Future<void>.value());
+
   Future<void> _answerNotice(DayNotice notice, String sentence) async {
+    _trackListOpen('day_notice');
     final outcome = await showAnswerNoticeSheet(
       context: context,
       dataSource: widget.dataSource,
