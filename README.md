@@ -478,14 +478,22 @@ regras e ~0% do visual — por um sistema de tokens. O que ela estabelece:
   F-44 ficam nela, porque a folha não abre mais para um pedido fechado). Antes eram duas
   cópias da mesma ação — o cartão com campo de texto e dois botões POR pedido, e a folha —
   que já divergiam; as duas formatavam o horário à mão, ignorando `formatTimeString`.
-- **A folha do dia abre como RESUMO (U-25, 16/09/2026).** Um dia atribuído mostra pills
-  (`SlotPill`, o mesmo desenho da legenda do mês) do responsável real, "Trocado" tracejado e
-  "Troca às HH:MM", "Planejado: X" só no dia trocado, e a observação — sem campo nem barra
-  de ações. O ✏️ abre o formulário de sempre na mesma folha (nenhuma regra mudou); Cancelar
-  volta ao resumo descartando o rascunho, e o ✕ do cabeçalho (`AppSheetFrame.onClose`, também
-  na folha de dia congelado) fecha. Dia vazio abre direto no formulário. Origem: o closed
-  alpha achou a folha "muito poluída" e sem "botão voltar"; o corpo liberado é onde o F-55
-  vai desenhar a agenda do dia.
+- **A folha do dia abre pronta para agir, com um toque (U-56, 23/09/2026; substitui o
+  padrão do U-25).** Um dia que o leitor pode mudar, hoje ou adiante, abre direto no
+  formulário (`daySheetOpening`, core); no topo, as pills do U-25 (`SlotPill`, o mesmo
+  desenho da legenda do mês) dizem o estado do dia — responsável real, "Trocado" tracejado,
+  "Troca às HH:MM", e "Planejado: X" só no dia trocado. O campo "Responsável planejado" só
+  aparece para quem pode respondê-lo (dia vazio, modo administrador, ou admin a quem o toque
+  oferece o modo) — para os demais era uma fileira de chips travados (S-09). "Salvar" só
+  acende quando o rascunho difere do dia gravado (`dayDraftChanged`, core): o trigger de
+  auditoria grava um UPDATE mesmo sem diferença. O RESUMO do U-25 ficou para os dias em que
+  nada se salva (passado sem o modo, congelado, offline) e para o dia passado, cujo botão
+  principal é o relato (F-67) — ali o ✏️ leva à correção sob o modo administrador. O ✕ do
+  cabeçalho (`AppSheetFrame.onClose`, também na folha de dia congelado) fecha em todo modo;
+  `day-sheet-closed` (modo × desfecho) mede quantas folhas terminam sem escrita. Origem: o
+  U-25 respondeu ao closed alpha ("muito poluída", sem "botão voltar") escondendo o
+  formulário atrás do ✏️, e o owner viu quase todo leitor tocar o ✏️ — dois toques onde
+  antes era um.
 - **Skeletons no lugar dos spinners** onde a forma do que vem é conhecida: o grid do mês, as
   listas de Notificações e de auditoria, os cartões do resumo, Família, Perfil, papéis
   personalizados e o histórico premium. Ficam spinner de propósito: botão em ação (o giro é

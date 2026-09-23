@@ -19,6 +19,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'calendar_slice_test.dart';
+import 'day_editor_test.dart' show anaAdmin;
 
 const _phone = Size(360, 700);
 
@@ -370,8 +371,10 @@ void main() {
         final day = futureDay;
         if (day == null) return;
         _usePhone(tester);
+        // U-56: an ADMIN, because only she still sees the planned-parent
+        // field — the tallest form, the one that scrolls on a 700 dp phone.
         final ds = FakeCustodyDataSource(
-          members: [ana, bruno],
+          members: [anaAdmin, bruno],
           days: [row(5, dayOfMonth(day), 1)],
         )..throwOnWrite = Exception('boom');
         await tester.pumpWidget(app(ds));

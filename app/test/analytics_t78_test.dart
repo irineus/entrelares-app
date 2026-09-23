@@ -16,6 +16,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:entrelares_app/services/analytics_service.dart';
+import 'package:entrelares_app/widgets/ui/ui.dart';
 
 import 'calendar_slice_test.dart';
 
@@ -134,6 +135,89 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(Duration.zero));
 
       expect(r.names, isNot(contains(AnalyticsEvents.dayNoteSaved)));
+    });
+  });
+
+  group('day-sheet-closed (U-56)', () {
+    // The number that says whether opening in the editor was right: how many
+    // sheets end with nothing written, per opening mode.
+    Map<String, dynamic>? closed(_Recorder r) => r.events
+        .where((e) => e.name == AnalyticsEvents.daySheetClosed)
+        .single
+        .data;
+
+    testWidgets('a day opened and closed with nothing written: edit × none',
+        (tester) async {
+      final day = futureDay;
+      if (day == null) return;
+      final r = _Recorder();
+      final ds = FakeCustodyDataSource(
+        members: [ana, bruno],
+        days: [row(5, dayOfMonth(day), 1)],
+      )..analytics = r.service;
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+
+      await openDay(tester, day);
+      await tapSheet(tester, find.byKey(AppSheetFrame.closeKey));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+
+      expect(closed(r), {'mode': 'edit', 'outcome': 'none'});
+    });
+
+    testWidgets('a save that wrote: edit × saved, once', (tester) async {
+      final day = futureDay;
+      if (day == null) return;
+      final r = _Recorder();
+      final ds = FakeCustodyDataSource(
+        members: [ana, bruno],
+        days: [row(5, dayOfMonth(day), 1)],
+      )..analytics = r.service;
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+
+      await openDay(tester, day);
+      await tester.enterText(find.byType(TextField), 'Trocar mochila');
+      await tapSheet(tester, find.text('Salvar'));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+
+      expect(closed(r), {'mode': 'edit', 'outcome': 'saved'});
+      await settleSnack(tester);
+    });
+
+    testWidgets('an empty day planned: plan × saved', (tester) async {
+      final day = futureDay;
+      if (day == null) return;
+      final r = _Recorder();
+      final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+        ..analytics = r.service;
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+
+      await openDay(tester, day);
+      await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno'));
+      await tapSheet(tester, find.text('Salvar'));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+
+      expect(closed(r), {'mode': 'plan', 'outcome': 'saved'});
+      await settleSnack(tester);
+    });
+
+    testWidgets('a read-only past day: view × none', (tester) async {
+      if (today.day == 1) return;
+      final r = _Recorder();
+      final ds = FakeCustodyDataSource(
+        members: [ana, bruno],
+        days: [row(5, dayOfMonth(today.day - 1), 1)],
+      )..analytics = r.service;
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+
+      await openDay(tester, today.day - 1);
+      await tapSheet(tester, find.byKey(AppSheetFrame.closeKey));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+
+      expect(closed(r), {'mode': 'view', 'outcome': 'none'});
     });
   });
 }

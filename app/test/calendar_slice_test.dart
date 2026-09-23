@@ -1224,11 +1224,13 @@ Future<void> openDay(WidgetTester tester, int day) async {
   await tester.pumpAndSettle();
 }
 
-/// U-25: an assigned day opens as a SUMMARY; the editor is one pencil away.
-/// An empty day opens straight in the editor, so it keeps [openDay].
+/// U-56: a day the reader can change, today or ahead, opens straight in the
+/// editor; only a PAST day under the admin mode opens as the summary with the
+/// U-25 pencil. One helper for both, so a test says "the editor" and not how.
 Future<void> openDayEditor(WidgetTester tester, int day) async {
   await openDay(tester, day);
-  await tapSheet(tester, find.byKey(daySheetEditKey));
+  final pencil = find.byKey(daySheetEditKey);
+  if (pencil.evaluate().isNotEmpty) await tapSheet(tester, pencil);
 }
 
 /// The full editor is taller than the sheet's viewport — scroll the target
@@ -1448,7 +1450,10 @@ void main() {
     expect(find.text('Ana'), findsOneWidget, reason: 'names never translate');
 
     await openDayEditor(tester, day);
-    expect(find.text('Planned caregiver'), findsOneWidget);
+    // U-56: the planned field is gone for a non-admin; the pills lead.
+    expect(find.text(Localization(AppLanguage.en)[K.editorActualParent]),
+        findsOneWidget);
+    expect(find.text('Planned: Ana Souza'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
     // U-28 QA: the redundant "Responsável: X (swapped)" line is gone; the fact
     // it carried now rides as a badge on the field that owns it.

@@ -7,7 +7,6 @@
 // URL, nothing here is "web by construction" — so this is a widget suite,
 // not an integration one.
 import 'package:entrelares_app/screens/calendar_screen.dart';
-import 'package:entrelares_app/screens/day_sheet.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/theme/app_theme.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
@@ -171,7 +170,8 @@ void main() {
       await _pump(tester);
       await cal.openDay(tester, cal.today.day);
       expect(find.byType(BottomSheet), findsOneWidget);
-      expect(find.byKey(daySheetEditKey), findsOneWidget);
+      // U-56: today opens in the editor — Escape must leave it all the same.
+      expect(find.byType(TextField), findsOneWidget);
       await _key(tester, LogicalKeyboardKey.escape);
       expect(
         find.byType(BottomSheet),

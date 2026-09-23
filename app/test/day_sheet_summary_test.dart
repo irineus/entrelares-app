@@ -1,14 +1,20 @@
-// U-25 — the day sheet opens as a SUMMARY of the day (closed alpha,
-// 12/08/2026: "essa lista suspensa está muito poluído… falta um botão
-// voltar"). An assigned day shows who has the child, the swap and the handoff
-// as pills plus the day's note; the editor is one pencil away; a ✕ closes the
-// sheet in every mode; "Cancelar" returns to the summary and drops the draft.
-// An empty day has nothing to summarize and opens straight in the editor.
+// U-25 + U-56 — what a day tap opens.
+//
+// U-25 (closed alpha, 12/08/2026: "essa lista suspensa está muito poluído…
+// falta um botão voltar") made every assigned day open as a SUMMARY with the
+// editor one pencil away. U-56 (owner, 23/09/2026: "a maioria das pessoas
+// acaba clicando sempre duas vezes") turned the default back: a day the reader
+// can change, today or ahead, opens in the EDITOR — with the summary's pills
+// on top, without the planned-parent field the reader cannot change, and with
+// "Salvar" lit only when something changed. The summary stays for the days
+// nothing can be saved on, and for a past day (the relato's, F-67), where the
+// admin mode reaches the editor through the pencil. A ✕ closes in every mode.
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
 import 'package:entrelares_app/screens/day_sheet.dart';
@@ -16,6 +22,7 @@ import 'package:entrelares_app/theme/slot_pattern.dart';
 import 'package:entrelares_app/widgets/ui/ui.dart';
 
 import 'calendar_slice_test.dart';
+import 'day_editor_test.dart' show anaAdmin, activeAdminMode, pastDay;
 
 final pt = Localization(AppLanguage.ptBr);
 
@@ -36,9 +43,17 @@ Finder get editPencil => find.byKey(daySheetEditKey);
 Finder get closeX => find.byKey(AppSheetFrame.closeKey);
 Finder get anySheet => find.byType(AppSheetFrame);
 
+/// The pinned "Salvar" — null [FilledButton.onPressed] is the unlit state.
+bool saveEnabled(WidgetTester tester) => tester
+        .widget<FilledButton>(
+            find.ancestor(of: find.text(pt[K.commonSave]), matching: find.byType(FilledButton)))
+        .onPressed !=
+    null;
+
 void main() {
-  testWidgets('an assigned day opens as a summary: name, note, pencil and ✕ — '
-      'no field and no action row', (tester) async {
+  testWidgets('an assigned day ahead opens in the EDITOR in one tap: the '
+      'pills on top, the fields, the ✕ — no pencil, and no planned-parent '
+      'field for a reader who cannot change it', (tester) async {
     final day = futureDay;
     if (day == null) return;
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [
@@ -49,27 +64,25 @@ void main() {
 
     await openDay(tester, day);
     expect(anySheet, findsOneWidget);
-    expect(find.byType(TextField), findsNothing);
-    expect(find.byType(ChoiceChip), findsNothing);
-    expect(find.text(pt[K.commonSave]), findsNothing);
-    expect(find.text(pt[K.commonCancel]), findsNothing);
     expect(
         find.descendant(
             of: find.byKey(const ValueKey('day-summary-responsible')),
             matching: find.text('Ana Souza')),
         findsOneWidget);
-    expect(find.text(pt[K.editorDayNote]), findsOneWidget);
-    expect(find.text('Levar o casaco azul'), findsOneWidget);
-    expect(find.byKey(const ValueKey('day-summary-swapped')), findsNothing);
-    expect(editPencil, findsOneWidget);
+    expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'Levar o casaco azul');
+    expect(find.text(pt[K.editorActualParent]), findsOneWidget);
+    // S-09: the planned parent of an assigned day is locked for a non-admin —
+    // the pill on top already names her; a row of dead chips said it twice.
+    expect(find.text(pt[K.editorScheduledParent]), findsNothing);
+    expect(editPencil, findsNothing);
     expect(closeX, findsOneWidget);
-    // The ✕ and the pencil say what they do to a screen reader.
     expect(find.byTooltip(pt[K.commonClose]), findsOneWidget);
-    expect(find.byTooltip(pt[K.editorAriaLabel]), findsOneWidget);
   });
 
-  testWidgets('the pencil opens the editor, and Cancelar returns to the '
-      'summary with the draft dropped and nothing written', (tester) async {
+  testWidgets('"Salvar" lights only when the draft differs from the stored '
+      'day, and goes out again when the change is undone', (tester) async {
     final day = futureDay;
     if (day == null) return;
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [
@@ -79,30 +92,30 @@ void main() {
     await tester.pumpAndSettle();
 
     await openDay(tester, day);
-    await tapSheet(tester, editPencil);
-    expect(find.byType(TextField), findsOneWidget);
-    expect(editPencil, findsNothing, reason: 'the pencil is the way IN');
-    expect(closeX, findsOneWidget, reason: 'the ✕ stays in the editor');
+    expect(saveEnabled(tester), isFalse,
+        reason: 'opening a day is not a change — a reflex tap must not write');
 
-    await tester.enterText(find.byType(TextField), 'Rascunho descartado');
-    await tapSheet(tester, find.text(pt[K.commonCancel]));
+    await tester.enterText(find.byType(TextField), 'Levar o casaco verde');
+    await tester.pump();
+    expect(saveEnabled(tester), isTrue);
 
-    expect(anySheet, findsOneWidget, reason: 'Cancelar is not the ✕');
-    expect(find.byType(TextField), findsNothing);
-    expect(find.text('Levar o casaco azul'), findsOneWidget);
-    expect(find.text('Rascunho descartado'), findsNothing);
+    // Whitespace is not a change: the save trims before writing.
+    await tester.enterText(find.byType(TextField), ' Levar o casaco azul ');
+    await tester.pump();
+    expect(saveEnabled(tester), isFalse);
+
+    await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno'));
+    expect(saveEnabled(tester), isTrue, reason: 'the real carer is a change');
+    await tapSheet(
+        tester, find.widgetWithText(ChoiceChip, pt[K.editorSameAsPlanned]));
+    expect(saveEnabled(tester), isFalse);
+
     expect(ds.inserted, isEmpty);
     expect(ds.updated, isEmpty);
-
-    // Opening the editor again starts from the stored day, not the draft.
-    await tapSheet(tester, editPencil);
-    expect(
-        tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        'Levar o casaco azul');
   });
 
-  testWidgets('the ✕ closes the sheet from the summary and from the editor, '
-      'writing nothing', (tester) async {
+  testWidgets('Cancelar and the ✕ both close the editor, writing nothing',
+      (tester) async {
     final day = futureDay;
     if (day == null) return;
     final ds = FakeCustodyDataSource(
@@ -111,20 +124,24 @@ void main() {
     await tester.pumpAndSettle();
 
     await openDay(tester, day);
-    await tapSheet(tester, closeX);
-    expect(anySheet, findsNothing);
+    await tester.enterText(find.byType(TextField), 'Não salvo');
+    await tapSheet(tester, find.text(pt[K.commonCancel]));
+    expect(anySheet, findsNothing,
+        reason: 'opened in the editor, so there is no summary to go back to');
 
     await openDay(tester, day);
-    await tapSheet(tester, editPencil);
-    await tester.enterText(find.byType(TextField), 'Não salvo');
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        isEmpty,
+        reason: 'the draft died with the sheet');
+    await tester.enterText(find.byType(TextField), 'Também não');
     await tapSheet(tester, closeX);
     expect(anySheet, findsNothing);
     expect(ds.inserted, isEmpty);
     expect(ds.updated, isEmpty);
   });
 
-  testWidgets('an empty day opens straight in the editor, and Cancelar closes '
-      'the sheet', (tester) async {
+  testWidgets('an empty day opens in the editor with the planned-parent '
+      'question — the only thing to do there — and no pills', (tester) async {
     final day = futureDay;
     if (day == null) return;
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
@@ -132,10 +149,12 @@ void main() {
     await tester.pumpAndSettle();
 
     await openDay(tester, day);
+    expect(find.text(pt[K.editorScheduledParent]), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, 'Ana'), findsWidgets);
-    expect(editPencil, findsNothing,
-        reason: 'no summary to come from, so no pencil to go back through');
+    expect(find.byKey(const ValueKey('day-summary-responsible')), findsNothing);
+    expect(editPencil, findsNothing);
     expect(closeX, findsOneWidget);
+    expect(saveEnabled(tester), isFalse, reason: 'nobody chosen yet');
 
     await tapSheet(tester, find.text(pt[K.commonCancel]));
     expect(anySheet, findsNothing);
@@ -143,7 +162,7 @@ void main() {
   });
 
   testWidgets('a swapped day: the real carer, the dashed "Trocado" pill, the '
-      'planned carer and the handoff time', (tester) async {
+      'planned carer and the handoff time lead the editor', (tester) async {
     final day = futureDay;
     if (day == null) return;
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [
@@ -153,6 +172,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await openDay(tester, day);
+    expect(find.text(pt[K.editorActualParent]), findsOneWidget);
     expect(
         find.descendant(
             of: find.byKey(const ValueKey('day-summary-responsible')),
@@ -170,6 +190,11 @@ void main() {
             matching: find.byWidgetPredicate((w) =>
                 w is CustomPaint && w.foregroundPainter is DashedBorderPainter)),
         findsOneWidget);
+    expect(
+        find.descendant(of: anySheet, matching: find.text(pt[K.calSwapped])),
+        findsOneWidget,
+        reason: 'the pill says it — the U-28 badge on the "Responsável real" '
+            'label said it a second time once the pills led the form');
     expect(find.text(pt.format(KApp.sheetPlanned, ['Ana Souza'])),
         findsOneWidget);
     expect(
@@ -180,12 +205,16 @@ void main() {
         findsOneWidget);
   });
 
-  testWidgets('a read-only past day is the same summary with no pencil',
-      (tester) async {
-    final past = today.day == 1 ? null : today.day - 1;
+  testWidgets('a read-only past day is the summary, with the note and no '
+      'pencil', (tester) async {
+    final past = pastDay;
     if (past == null) return;
-    final ds = FakeCustodyDataSource(
-        members: [ana, bruno], days: [noteRow(7, dayOfMonth(past), 1)]);
+    final ds = FakeCustodyDataSource(members: [
+      ana,
+      bruno
+    ], days: [
+      noteRow(7, dayOfMonth(past), 1, notes: 'Levar o casaco azul'),
+    ]);
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
 
@@ -193,8 +222,35 @@ void main() {
     expect(find.text(pt[K.editorPastReadonly]), findsOneWidget);
     expect(find.byKey(const ValueKey('day-summary-responsible')),
         findsOneWidget);
+    expect(find.text('Levar o casaco azul'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
     expect(editPencil, findsNothing);
     expect(closeX, findsOneWidget);
+  });
+
+  testWidgets('a past day under the admin mode stays the summary — the relato '
+      'is its primary — and the pencil reaches the correction; Cancelar goes '
+      'back to the summary', (tester) async {
+    final past = pastDay;
+    if (past == null) return;
+    final ds = FakeCustodyDataSource(
+        members: [anaAdmin, bruno], days: [noteRow(7, dayOfMonth(past), 1)])
+      ..family = const Family(id: 1, plan: 'free')
+      ..publicSettings = const {'override_free_days': '400'};
+    await tester.pumpWidget(app(ds, adminMode: activeAdminMode()));
+    await tester.pumpAndSettle();
+
+    await openDay(tester, past);
+    expect(find.byType(TextField), findsNothing);
+    expect(editPencil, findsOneWidget);
+    expect(find.text(pt[KApp.dayAccountAction]), findsOneWidget);
+
+    await tapSheet(tester, editPencil);
+    expect(find.text(pt[K.editorActualParent]), findsOneWidget);
+    await tapSheet(tester, find.text(pt[K.commonCancel]));
+    expect(anySheet, findsOneWidget, reason: 'Cancelar is not the ✕ here');
+    expect(editPencil, findsOneWidget);
+    expect(ds.updated, isEmpty);
   });
 
   testWidgets('the frozen-day sheet — the other sheet a day tap opens — has '
@@ -221,8 +277,8 @@ void main() {
     expect(anySheet, findsNothing);
   });
 
-  testWidgets('344 dp: the longest summary row fits — long names, swap and '
-      'handoff wrap instead of overflowing', (tester) async {
+  testWidgets('344 dp: the longest pill row fits on top of the editor — long '
+      'names, swap and handoff wrap instead of overflowing', (tester) async {
     final day = futureDay;
     if (day == null) return;
     tester.view.physicalSize = const Size(344 * 3, 780 * 3);

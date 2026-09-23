@@ -21,7 +21,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_app/main.dart' as app;
-import 'package:entrelares_app/screens/day_sheet.dart';
 
 import 'e2e_family.dart';
 import 'e2e_proof.dart';
@@ -148,24 +147,21 @@ void main() {
     await tester.pumpAndSettle(const Duration(seconds: 3));
   }
 
-  /// U-25: an assigned day opens as a SUMMARY, so the chips are one pencil
-  /// away. Found by key — a localized tooltip would tie the lane to the
-  /// reader's language. The failure names what the sheet showed instead, for
-  /// the same reason [openDay]'s comment gives: "No element" hides the cause.
-  Future<void> openEditor(WidgetTester tester) async {
-    final pencil = find.byKey(daySheetEditKey);
-    if (pencil.evaluate().isEmpty) {
+  /// U-56: a day ahead opens straight in the EDITOR (U-25's pencil stayed only
+  /// on past days). Proven by the chips being there — and when they are not,
+  /// the failure names what the sheet showed instead, for the same reason
+  /// [openDay]'s comment gives: "No element" on a chip hides the cause.
+  Future<void> expectEditor(WidgetTester tester) async {
+    if (find.byType(ChoiceChip).evaluate().isEmpty) {
       final onScreen = find
           .byType(Text)
           .evaluate()
           .map((e) => (e.widget as Text).data)
           .whereType<String>()
           .toList();
-      fail('the seeded day should open as a summary with a pencil — '
+      fail('the seeded day should open in the editor — '
           'texts on screen: $onScreen');
     }
-    await tester.tap(pencil);
-    await tester.pumpAndSettle();
   }
 
   testWidgets('p0 — a swap request travels between two real users and the '
@@ -177,8 +173,8 @@ void main() {
         reason: 'the founder should land on the authenticated shell');
 
     await openDay(tester, targetDay);
-    // U-25: the seeded day opens as a summary; the editor is behind the pencil.
-    await openEditor(tester);
+    // U-56: the seeded day (ahead) opens in the editor, one tap.
+    await expectEditor(tester);
     final memberChip =
         find.widgetWithText(ChoiceChip, family.member.fullName.split(' ').first);
     await tester.ensureVisible(memberChip.last);
@@ -269,7 +265,7 @@ void main() {
     await bootApp(tester);
     await signIn(tester, family.founder.email);
     await openDay(tester, day);
-    await openEditor(tester);
+    await expectEditor(tester);
     final memberChip =
         find.widgetWithText(ChoiceChip, family.member.fullName.split(' ').first);
     await tester.ensureVisible(memberChip.last);
