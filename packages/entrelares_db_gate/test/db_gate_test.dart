@@ -37,6 +37,7 @@ import 'suites/handoff_transition.dart';
 import 'suites/invitation_lifecycle.dart';
 import 'suites/invitation_purge.dart';
 import 'suites/joined_via_invite.dart';
+import 'suites/member_activity.dart';
 import 'suites/multi_caregiver.dart';
 import 'suites/notification_params.dart';
 import 'suites/oauth_onboarding.dart';
@@ -139,6 +140,8 @@ void main() {
   // F-68: the support door — who the reply goes to, the limit, retention,
   // and a table no client can read.
   supportRequestTests(fx);
+  // T-78: one row per member × day × channel, readable by no client.
+  memberActivityTests(fx);
   e2eDateAllocatorTests(fx);
   premiumEntitlementTests(fx);
   billingCheckoutTests(fx);

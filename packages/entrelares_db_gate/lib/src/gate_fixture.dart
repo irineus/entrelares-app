@@ -439,6 +439,12 @@ class GateFixture {
     return _thirdClient ??= await signIn(testEmail('third'));
   }
 
+  /// T-78: removes an account from GoTrue the way the `purge-deleted` pass
+  /// does, so `profiles_user_id_fkey ON DELETE SET NULL` runs for real and
+  /// every trigger keyed on it fires. Only for a [createFamily] member: the
+  /// shared fixture's accounts must survive the run. Idempotent (404 is fine).
+  Future<void> deleteAuthUser(String userId) => _admin.deleteUser(userId);
+
   /// S-11: a fresh, isolated 2-member family (admin + member) for the
   /// DESTRUCTIVE tests — leaving a member mutates the family, so it must not
   /// touch the shared [familyId] the rest of the gate uses. Purged (and its

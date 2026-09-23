@@ -1132,6 +1132,14 @@ class FakeCustodyDataSource implements CustodyDataSource {
     if (!registeredPushTokens.contains(token)) registeredPushTokens.add(token);
   }
 
+  /// T-78: every channel the shell reported, in order.
+  final List<String> touchedActivity = [];
+
+  @override
+  Future<void> touchActivity(String channel) async {
+    touchedActivity.add(channel);
+  }
+
   @override
   Future<void> deletePushToken(String token) async {
     registeredPushTokens.remove(token);
