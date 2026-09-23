@@ -106,17 +106,32 @@ android {
 // Fail fast: a release build of a flavor with no signing entries would come
 // out unsigned (the flavor carries no signingConfig), which only surfaces at
 // install time — or, for the Play upload, as a rejection after the build.
-for (flavor in listOf("dev", "prod").filterNot { it in signedFlavors }) {
-    val variant = flavor.replaceFirstChar { it.uppercase() } + "Release"
-    tasks.configureEach {
-        if (name.contains(variant)) {
-            doFirst {
-                throw GradleException(
-                    "No `$flavor.*` signing entries in ${keyPropertiesFile.path} — " +
-                        "a $flavor release build requires its T-55 keystore. " +
-                        "See README 'Assinatura (release)'."
-                )
-            }
+//
+// The guard reads the TASK GRAPH for the variant's PACKAGING tasks, never a
+// task name that merely contains `ProdRelease` (T-79, 22/09/2026): Flutter's
+// Gradle plugin points `externalNativeBuild` at an empty CMakeLists to force
+// the NDK download, and AGP folds the identical CMake setup of both flavours
+// into ONE `configureCMakeRelease[<abi>]` task hung on a single variant's
+// `pre<Variant>Build` — so `preProdReleaseBuild` runs inside a DEV release
+// build. The name match refused the PR preview job (dev-only key.properties)
+// at that harmless lifecycle task. `package<Variant>` (APK) and
+// `package<Variant>Bundle` (AAB) are what write the artifact; assemble and
+// bundle are lifecycle tasks over them. Checked before anything executes.
+val unsignedReleaseVariants = listOf("dev", "prod")
+    .filterNot { it in signedFlavors }
+    .associateWith { it.replaceFirstChar { c -> c.uppercase() } + "Release" }
+gradle.taskGraph.whenReady {
+    for ((flavor, variant) in unsignedReleaseVariants) {
+        val packaging = setOf(
+            "${project.path}:package$variant",
+            "${project.path}:package${variant}Bundle",
+        )
+        if (allTasks.any { it.path in packaging }) {
+            throw GradleException(
+                "No `$flavor.*` signing entries in ${keyPropertiesFile.path} — " +
+                    "a $flavor release build requires its T-55 keystore. " +
+                    "See README 'Assinatura (release)'."
+            )
         }
     }
 }
