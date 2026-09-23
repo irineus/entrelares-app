@@ -39,6 +39,12 @@ class AppBanner extends StatelessWidget {
   final VoidCallback? onAction;
   final IconData? actionIcon;
 
+  /// U-55: a ✕ in the top corner for a banner the reader may send away for
+  /// good (an OFFER, never a state — a gate or an error cannot be dismissed).
+  /// Both or neither: the tooltip is the button's accessible name.
+  final VoidCallback? onClose;
+  final String? closeTooltip;
+
   const AppBanner({
     super.key,
     required this.tone,
@@ -49,8 +55,12 @@ class AppBanner extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.actionIcon,
+    this.onClose,
+    this.closeTooltip,
   })  : assert((actionLabel == null) == (onAction == null),
             'actionLabel and onAction come together'),
+        assert((onClose == null) == (closeTooltip == null),
+            'onClose and closeTooltip come together'),
         assert(actionIcon == null || actionLabel != null,
             'an action icon needs an action to sit on');
 
@@ -100,18 +110,32 @@ class AppBanner extends StatelessWidget {
         border: bordered ? Border.all(color: tone.border) : null,
         borderRadius: BorderRadius.circular(Radii.md),
       ),
-      child: icon == null
+      child: icon == null && onClose == null
           ? text
           : Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  // Sits on the first line's x-height, not the block's top.
-                  padding: const EdgeInsets.only(top: 1),
-                  child: Icon(icon, size: 20, color: tone.onContainer),
-                ),
-                const SizedBox(width: Spacing.sm),
+                if (icon != null) ...[
+                  Padding(
+                    // Sits on the first line's x-height, not the block's top.
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(icon, size: 20, color: tone.onContainer),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                ],
                 Expanded(child: text),
+                if (onClose != null)
+                  // The full 48 dp target, pulled into the padding so the
+                  // glyph lines up with the first line instead of pushing it.
+                  Transform.translate(
+                    offset: const Offset(Spacing.sm, -Spacing.sm),
+                    child: IconButton(
+                      onPressed: onClose,
+                      tooltip: closeTooltip,
+                      color: tone.onContainer,
+                      icon: const Icon(Icons.close, size: 20),
+                    ),
+                  ),
               ],
             ),
     );

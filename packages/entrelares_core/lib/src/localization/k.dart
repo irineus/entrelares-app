@@ -660,6 +660,22 @@ abstract final class K {
   // F-51: a range operation folded into one timeline entry.
   static const String auditBatchClear = 'audit.batch.clear';
   static const String auditBatchReplace = 'audit.batch.replace';
+  // U-55: the one-step handoff time for a plan's future transition days.
+  static const String auditBatchHandoff = 'audit.batch.handoff';
+  static const String handoffNudgeMessage = 'handoffNudge.message';
+  static const String handoffNudgeAction = 'handoffNudge.action';
+  static const String handoffNudgeDismiss = 'handoffNudge.dismiss';
+  static const String handoffRangeTitle = 'handoffRange.title';
+  static const String handoffRangeIntro = 'handoffRange.intro';
+  static const String handoffRangeApply = 'handoffRange.apply';
+  static const String handoffRangeRequired = 'handoffRange.required';
+  static const String handoffRangeUpdatedOne = 'handoffRange.updatedOne';
+  static const String handoffRangeUpdatedMany = 'handoffRange.updatedMany';
+  static const String handoffRangeKeptExistingOne =
+      'handoffRange.keptExistingOne';
+  static const String handoffRangeKeptExistingMany =
+      'handoffRange.keptExistingMany';
+  static const String handoffRangeNothing = 'handoffRange.nothing';
   static const String auditBatchRange = 'audit.batch.range';
   static const String auditBatchCreatedOne = 'audit.batch.createdOne';
   static const String auditBatchCreatedMany = 'audit.batch.createdMany';
@@ -1763,6 +1779,19 @@ abstract final class K {
     auditScheduleChange,
     auditBatchClear,
     auditBatchReplace,
+    auditBatchHandoff,
+    handoffNudgeMessage,
+    handoffNudgeAction,
+    handoffNudgeDismiss,
+    handoffRangeTitle,
+    handoffRangeIntro,
+    handoffRangeApply,
+    handoffRangeRequired,
+    handoffRangeUpdatedOne,
+    handoffRangeUpdatedMany,
+    handoffRangeKeptExistingOne,
+    handoffRangeKeptExistingMany,
+    handoffRangeNothing,
     auditBatchRange,
     auditBatchCreatedOne,
     auditBatchCreatedMany,

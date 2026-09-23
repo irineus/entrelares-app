@@ -32,6 +32,7 @@ import 'suites/elevation_code.dart';
 import 'suites/email_quota_gate.dart';
 import 'suites/family_deletion.dart';
 import 'suites/family_isolation.dart';
+import 'suites/handoff_range.dart';
 import 'suites/handoff_transition.dart';
 import 'suites/invitation_lifecycle.dart';
 import 'suites/invitation_purge.dart';
@@ -97,6 +98,8 @@ void main() {
   dayProtectionTests(fx);
   handoffTransitionTests(fx);
   scheduleRangeTests(fx);
+  // U-55: one handoff time for every future transition day without one.
+  handoffRangeTests(fx);
   planningHorizonGateTests(fx);
   optimisticConcurrencyTests(fx);
   autoApprovalTests(fx);
