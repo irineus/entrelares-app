@@ -560,6 +560,32 @@ void main() {
       await _measure(tester, 'wizard');
     });
 
+    // U-55: the admin's strip on a plan born without a handoff time, and the
+    // sheet it opens — the ✕ is a 48 dp target with a name.
+    _scene('handoff strip and sheet', (tester, dark) async {
+      const admin = Member(
+          id: 1,
+          fullName: 'Ana Souza',
+          colorSlot: 1,
+          userId: 'u1',
+          isAdmin: true,
+          familyId: 7);
+      final t = cal.today;
+      final ds = cal.FakeCustodyDataSource(members: [
+        admin,
+        cal.bruno
+      ], days: [
+        for (var i = 0; i < 14; i++)
+          cal.row(300 + i, DateTime(t.year, t.month, t.day + i), i < 7 ? 1 : 2),
+      ]);
+      await tester.pumpWidget(_calendar(ds, dark: dark));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('handoff-nudge')), findsOneWidget);
+      await _measure(tester, 'handoff strip');
+      await cal.tapSheet(tester, find.text(pt[K.handoffNudgeAction]));
+      await _measure(tester, 'handoff range sheet');
+    });
+
     _scene('selection bar and bulk sheet', (tester, dark) async {
       await tester.pumpWidget(_calendar(_calendarSource(), dark: dark));
       await tester.pumpAndSettle();

@@ -254,6 +254,19 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<HandoffRangeResult> setHandoffTimeRange(
+      DateTime from, DateTime? to, HandoffTime time) async {
+    final result =
+        await _client.rpc<dynamic>('set_handoff_time_range', params: {
+      'p_from': CareSchedule.isoDate(from),
+      'p_to': to == null ? null : CareSchedule.isoDate(to),
+      'p_time': '${time.hour.toString().padLeft(2, '0')}:'
+          '${time.minute.toString().padLeft(2, '0')}:00',
+    });
+    return HandoffRangeResult.fromJson(Map<String, dynamic>.from(result as Map));
+  }
+
+  @override
   Future<ScheduleRangeResult> replaceScheduleRange(
       DateTime from, DateTime to, List<CareSchedule> days) async {
     final result =

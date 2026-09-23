@@ -887,6 +887,23 @@ abstract final class StringsEn {
     K.auditScheduleChange: '<strong>{0}</strong> {1} for this day.',
     K.auditBatchClear: '<strong>{0}</strong> cleared the plan in one action.',
     K.auditBatchReplace: '<strong>{0}</strong> replaced the plan in one action.',
+    K.auditBatchHandoff:
+        '<strong>{0}</strong> set the handover time in one action.',
+    K.handoffNudgeMessage:
+        'Handovers have no time: deadlines and lateness count from midnight.',
+    K.handoffNudgeAction: 'Set the time',
+    K.handoffNudgeDismiss: 'Dismiss',
+    K.handoffRangeTitle: 'Handover time',
+    K.handoffRangeIntro:
+        'Applies to every handover day from today on that has no time yet. '
+            'The ones that already have one stay as they are.',
+    K.handoffRangeApply: 'Apply',
+    K.handoffRangeRequired: 'Choose the handover time.',
+    K.handoffRangeUpdatedOne: '{0} handover given the time',
+    K.handoffRangeUpdatedMany: '{0} handovers given the time',
+    K.handoffRangeKeptExistingOne: '{0} handover already had a time (kept)',
+    K.handoffRangeKeptExistingMany: '{0} handovers already had a time (kept)',
+    K.handoffRangeNothing: 'No future handover was missing a time.',
     K.auditBatchRange: 'Days: {0} to {1}',
     K.auditBatchCreatedOne: '{0} day planned',
     K.auditBatchCreatedMany: '{0} days planned',

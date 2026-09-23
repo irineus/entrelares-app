@@ -1,6 +1,8 @@
 import 'package:entrelares_core/entrelares_core.dart'
     show
         AppLanguage,
+        HandoffRangeResult,
+        HandoffTime,
         PreEditNotes,
         ScheduleRangeResult,
         SignInIdentity,
@@ -146,6 +148,14 @@ abstract class CustodyDataSource {
   /// untouched: the whole call rolls back.
   Future<ScheduleRangeResult> replaceScheduleRange(
       DateTime from, DateTime to, List<CareSchedule> days);
+
+  /// U-55 — one handoff time for every TRANSITION day in [from, to] (null =
+  /// no upper bound) that has none, in ONE statement as the caller
+  /// (`set_handoff_time_range`, SECURITY INVOKER). The server floors [from]
+  /// to today, keeps frozen days and never overwrites a time already set;
+  /// the counts it answers are the closing line. Admin-only by DB rule.
+  Future<HandoffRangeResult> setHandoffTimeRange(
+      DateTime from, DateTime? to, HandoffTime time);
 
   /// Starts listening for care_schedules changes; [onChange] fires on any
   /// insert/update/delete visible to this session. [onStatus] reports socket

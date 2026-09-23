@@ -282,6 +282,35 @@ void main() {
           findsNothing);
     });
 
+    testWidgets('U-55: a handoff batch folds into one "definiu o horário" '
+        'entry with its count', (tester) async {
+      ActivityLog stamped(int id, int day) => ActivityLog(
+            id: id,
+            affectedDate: DateTime(2026, 8, day),
+            createdAt: DateTime.utc(2026, 8, 18, 10),
+            action: 'UPDATE',
+            performedById: 1,
+            oldData: const {'scheduled_parent_id': 1, 'handoff_time': null},
+            newData: const {
+              'scheduled_parent_id': 1,
+              'handoff_time': '18:30:00'
+            },
+            context: const AuditContext(
+                actorIsAdmin: true,
+                batchId: 'b-2',
+                batchKind: 'handoff_range'),
+          );
+      await pumpAudit(
+        tester,
+        source(logs: [stamped(3, 28), stamped(2, 21), stamped(1, 14)]),
+      );
+
+      expect(find.textContaining('definiu o horário das trocas'),
+          findsOneWidget);
+      expect(find.textContaining('limpou o plano'), findsNothing);
+      expect(find.text('3 dias atualizados'), findsOneWidget);
+    });
+
     testWidgets('a row without context (older than F-61) says nothing',
         (tester) async {
       await pumpAudit(
