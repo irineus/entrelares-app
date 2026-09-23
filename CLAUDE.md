@@ -119,7 +119,7 @@ chores that are not backlog items.
 ## Build & test
 ```
 cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
-# Nesse lane moram os nove ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21 + F-60 + F-68): rótulos
+# Nesse lane moram os dez ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21 + F-60 + F-68 + T-78): rótulos
 # de papel em inglês, formato de data dos e-mails, a chave `lang` do redirect de reset,
 # a cobertura de `params` de todo writer de notificação, o catálogo de push
 # (F-09: o texto do push é montado no servidor, então `_shared/push.ts` duplica de
@@ -140,13 +140,22 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # `interval '48 hours'` ao lado dela é a regra, que o item não tocou), e os números da porta
 # de suporte (F-68: tamanho da mensagem, os limites por hora/dia e as cinco categorias moram
 # em `send-support-request/index.ts`; o espelho lê esse arquivo e o CHECK da migração —
-# errar aqui recusa depois do Enviar justamente quem já estava travado). Cinco leem
+# errar aqui recusa depois do Enviar justamente quem já estava travado), e os canais e a
+# retenção da atividade por membro (T-78: `member_activity_days` aceita android/web/
+# web-installed no CHECK e na guarda de `touch_activity`, e o purge guarda 400 dias — o prazo
+# da §11 da política; o app chama fire-and-forget, então um canal recusado sumiria dos dados
+# sem sintoma). Cinco leem
 # supabase/functions/_shared/i18n.ts e supabase/migrations — as duplicações que
 # existem de propósito porque Deno não chama Dart; o sexto lê um service worker, o
 # sétimo uma Edge Function, o oitavo um catálogo de e-mail ao lado de uma migração e o
-# nono uma Edge Function ao lado de uma migração,
+# nono uma Edge Function ao lado de uma migração e o décimo uma migração só,
 # pela mesma razão em outras linguagens. Um espelho que
 # ninguém confere apodrece calado, e é o lane mais barato do run.
+# Também no lane core, desde o T-78 (23/09/2026), analytics_catalog_test: todo evento que o
+# app manda ao Umami está em AnalyticsEvents (core), com as chaves de prop que declara; o
+# transporte descarta chave não declarada e valor que não é token curto, e o teste prende a
+# LISTA de nomes — renomear um evento encerra uma série (o degrau do U-35). No lane do app,
+# analytics_t78_test recusa nome de evento escrito como literal num call site.
 # Fora de mirrors/, no mesmo lane, a guarda do U-26 (email_layout_guard_test): todo e-mail
 # sai de supabase/functions/_shared/email_layout.ts, e a suíte lê esse arquivo e os quatro
 # send-* (o send-support-request desde o F-68): estilo só na tabela literal `S`, `color` E `background-color` em toda entrada,
@@ -237,7 +246,7 @@ cd app && fvm flutter build web --release --no-web-resources-cdn --dart-define=A
 # `entrelares-app@<versão do pubspec>` — a mesma string que o cliente manda, senão
 # mapas e eventos nunca se encontram — e APAGA todo .map antes de publicar, porque
 # um mapa servido da nossa origem entrega o fonte Dart inteiro a quem pedir.
-# Gate de banco (291 testes de RLS/RPC/trigger contra o projeto dev), Dart puro
+# Gate de banco (357 testes de RLS/RPC/trigger contra o projeto dev, 23/09/2026), Dart puro
 # desde o PR 16 do T-56. Exige a service_role do DEV — nunca a de produção. Sem
 # ela a suíte aborta com instruções em vez de rodar pela metade.
 cd packages/entrelares_db_gate && fvm dart analyze --fatal-infos

@@ -39,7 +39,7 @@ app/tool/                     # subset_inter.py — regenera a fonte embarcada (
 packages/entrelares_core/     # Dart puro: espelhos-cliente das regras do servidor, testáveis com `dart test`
 packages/entrelares_core/test/mirrors/   # T-56/F-09/T-62: os seis espelhos (i18n.ts, migrations, service worker)
 packages/entrelares_db_contracts/        # T-56 PR 6: as formas de linha do PostgREST, lidas pelo app E pelo gate
-packages/entrelares_db_gate/  # T-56 PRs 6-16 + F-57 + F-09 + F-56 + F-62: o gate de banco (256 testes), Dart puro
+packages/entrelares_db_gate/  # T-56 PRs 6-16 + F-57 + F-09 + F-56 + F-62: o gate de banco (357 testes em 23/09/2026), Dart puro
 supabase/                     # T-56 PR 3: migrations, Edge Functions e o runbook de deploy
 backlog/                      # T-56 PR 4a: a memória escrita do produto (registros + archive/)
 store/                        # T-56 PR 4c: listagens da Play, masters de marca e seus geradores
@@ -62,7 +62,7 @@ cd app && fvm flutter run -d web-server --web-port 8080
 # E2E (lote 3): app real em emulador contra o projeto dev — exige a service_role key
 cd app && fvm flutter test integration_test/swap_workflow_test.dart \
   --flavor dev --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev>
-# Gate de banco: 256 testes de RLS/RPC/trigger contra o projeto dev, com família
+# Gate de banco: 357 testes de RLS/RPC/trigger contra o projeto dev, com família
 # descartável. Exige a service_role do DEV (nunca a de produção); sem ela a suíte
 # aborta com instruções em vez de rodar pela metade.
 cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm dart test
@@ -113,7 +113,7 @@ um vermelho com a janela do `db-gate` no mesmo projeto dev (hipótese H1 do T-71
 
 ## Gate de banco (`packages/entrelares_db_gate/`)
 
-**256 testes** sobre RLS, RPCs `SECURITY DEFINER`, triggers e o ledger de cobrança,
+**357 testes** (23/09/2026) sobre RLS, RPCs `SECURITY DEFINER`, triggers e o ledger de cobrança,
 rodando contra o projeto **dev** real com família descartável. É a camada que prova o
 invariante do produto — *o cliente ESPELHA, o banco IMPÕE* — e veio do `entrelares-app-legacy`,
 que está sendo arquivado (ver [`docs/arquivamento-app.md`](docs/arquivamento-app.md)).
