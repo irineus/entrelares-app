@@ -450,6 +450,11 @@ verify_jwt = false
 [functions.purge-deleted]
 verify_jwt = false
 
+# F-70: the daily plan-end cron (pg_cron from the migration, secret key on
+# `apikey`) — same shape as auto-approve-expired.
+[functions.plan-end-reminders]
+verify_jwt = false
+
 [functions.send-swap-email]
 verify_jwt = false
 

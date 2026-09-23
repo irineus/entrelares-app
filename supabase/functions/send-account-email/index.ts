@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretKey } from "../_shared/keys.ts";
 import { hasValidUserSession, isSecretKeyCaller } from "../_shared/auth.ts";
 import { isTestRecipient } from "../_shared/mail.ts";
-import { code as codeBlock, emailDocument, heading, list, paragraph } from "../_shared/email_layout.ts";
+import { button, code as codeBlock, emailDocument, heading, list, paragraph } from "../_shared/email_layout.ts";
 import { account, common, formatDateIn, type Lang, resolveLang } from "../_shared/i18n.ts";
 
 // S-11 — account-lifecycle e-mails (Resend). Separate from send-swap-email
@@ -43,6 +43,11 @@ import { account, common, formatDateIn, type Lang, resolveLang } from "../_share
 //     subscription panel are admin-only, so an alarm to someone who cannot act on
 //     it is noise. The deadline arrives in the payload (`graceEndsAt`) because
 //     the caller already computed it from billing.grace_days.
+//   · plan_ending — F-70, cron only (`plan-end-reminders`): subject = one
+//     active member, told that the family's plan runs until `planEnd` (D-7) or
+//     ran out on it (`planEnded`). The cron already fans out one call per
+//     member, so this e-mails ONLY the subject. Refused to a user session, like
+//     elevation_code: nobody has a reason to ask for it but the job.
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
@@ -66,6 +71,7 @@ type EmailType =
   | "family_deletion_withdrawn" | "family_deletion_reminder"
   | "family_deletion_completed"
   | "premium_grace_ending"
+  | "plan_ending"
   | "elevation_code";
 
 interface Payload {
@@ -77,6 +83,10 @@ interface Payload {
   familyName?: string;
   // premium_grace_ending only — ISO date the grace period runs out.
   graceEndsAt?: string;
+  // plan_ending only — the last planned day (ISO `yyyy-MM-dd`) and whether it
+  // is already past.
+  planEnd?: string;
+  planEnded?: boolean;
   // elevation_code only — the subject and the code itself. `elevate` mints the
   // code, stores only its digest, and hands the plaintext here; this is the one
   // place it exists outside that function's memory.
@@ -125,13 +135,13 @@ serve(async (req: Request) => {
     }
 
     const { emailType, profileId, environmentPrefix = "", recipients, familyName, graceEndsAt,
-            userId, code, expiresInMinutes }: Payload = await req.json();
+            planEnd, planEnded, userId, code, expiresInMinutes }: Payload = await req.json();
 
     const validTypes: EmailType[] = [
       "member_left", "member_joined", "member_returned",
       "family_deletion_requested", "family_deletion_refused",
       "family_deletion_withdrawn", "family_deletion_reminder",
-      "family_deletion_completed", "premium_grace_ending", "elevation_code",
+      "family_deletion_completed", "premium_grace_ending", "plan_ending", "elevation_code",
     ];
     if (!validTypes.includes(emailType)) {
       return jsonResponse({ error: "Payload inválido." }, 400);
@@ -176,6 +186,12 @@ serve(async (req: Request) => {
       // S-13: never log the address, and never the code.
       console.log(`[send-account-email] elevation_code → ${lang}${sent ? "" : " (suppressed)"}`);
       return jsonResponse({ sent: sent ? 1 : 0, suppressed: sent ? 0 : 1, failed: 0 });
+    }
+
+    // F-70 — the cron is the only caller with a reason to send this.
+    if (emailType === "plan_ending" && !isSecretKeyCaller(req, serviceKey)) {
+      console.warn("[send-account-email] plan_ending refused — not a secret-key caller");
+      return jsonResponse({ error: "Não autorizado." }, 401);
     }
 
     // The purge already removed the profiles — recipients come in the payload.
@@ -246,7 +262,23 @@ serve(async (req: Request) => {
     // cannot read.
     const langOf = (p: Profile): Lang => resolveLang(p.language_effective);
 
-    if (emailType === "premium_grace_ending") {
+    if (emailType === "plan_ending") {
+      // The day is the whole message; a missing one would state nothing true.
+      if (!planEnd || !/^\d{4}-\d{2}-\d{2}$/.test(planEnd)) {
+        return jsonResponse({ error: "Payload inválido: planEnd ausente." }, 400);
+      }
+      // A member who left between the job and this call is not written to.
+      if (s.left_at) return jsonResponse({ sent: 0, suppressed: 0, failed: 0 });
+      const lang = langOf(s);
+      const t = account(lang);
+      const day = formatDateIn(lang, planEnd);
+      const appUrl = (Deno.env.get("APP_URL") ?? "https://web.entrelares.app").replace(/\/$/, "");
+      messages.push({
+        to: s.email,
+        subject: `${environmentPrefix}${planEnded ? t.subjPlanEnded : t.subjPlanEnding(day)}`,
+        html: planEndingHtml(lang, s.full_name, day, planEnded === true, `${appUrl}/notifications?tab=history`),
+      });
+    } else if (emailType === "premium_grace_ending") {
       // The deadline is the whole point of this e-mail, and the "in 30 days"
       // fallback belongs to the account-deletion grace — printing it here would
       // state a period that is not this one. Refuse instead of misinform.
@@ -414,6 +446,19 @@ function graceEndingHtml(lang: Lang, name: string, graceDate: string): string {
       ${paragraph(t.graceIntro(graceDate))}
       ${paragraph(t.graceBody)}
       ${paragraph(t.graceHowTo)}`);
+}
+
+// F-70 -- the plan is running out, or ran out. Says the day, what that means
+// (no caregiver set after it) and where the next step is. The button opens the
+// notification list, where the row carries the one-tap way into the wizard; a
+// signed-out reader passes the login first and lands on the calendar.
+function planEndingHtml(lang: Lang, name: string, day: string, ended: boolean, href: string): string {
+  const t = account(lang);
+  return shell(lang, ended ? t.planEndedHeading : t.planEndingHeading, `
+      ${paragraph(common(lang).greeting(escapeHtml(name)))}
+      ${paragraph(ended ? t.planEndedIntro(day) : t.planEndingIntro(day))}
+      ${paragraph(t.planHowTo)}
+      ${button(href, t.planButton)}`);
 }
 
 function othersHtml(lang: Lang, recipientName: string, leaverName: string): string {

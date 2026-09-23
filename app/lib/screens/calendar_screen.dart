@@ -121,6 +121,13 @@ class CalendarScreen extends StatefulWidget {
   /// device. Null (tests, hosts without storage) keeps it for the session.
   final HandoffNudgePrefs? handoffNudgePrefs;
 
+  /// F-70: the plan-end notification's "Planejar os próximos meses" lands
+  /// here with the day the wizard should open on. A notifier and not a route
+  /// argument: this screen's State outlives the navigation inside the shell
+  /// branch (go_router caches the page), so only a listenable reaches it (T-65).
+  /// The screen consumes the value — it sets it back to null when it opens.
+  final ValueNotifier<DateTime?>? planRequest;
+
   const CalendarScreen(
       {super.key,
       required this.dataSource,
@@ -133,7 +140,8 @@ class CalendarScreen extends StatefulWidget {
       this.onOpenFamily,
       this.onOpenNotifications,
       this.onOpenPlan,
-      this.handoffNudgePrefs});
+      this.handoffNudgePrefs,
+      this.planRequest});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -280,6 +288,33 @@ class _CalendarScreenState extends State<CalendarScreen>
     _loadHorizonInputs();
     _watch();
     _schedulePoll();
+    widget.planRequest?.addListener(_onPlanRequest);
+    // The branch may be built by the very navigation that carries the request.
+    if (widget.planRequest?.value != null) _onPlanRequest();
+  }
+
+  /// F-70: the day a plan-end notification asked the wizard to open on, held
+  /// until the month has loaded — the wizard needs the members to offer.
+  DateTime? _pendingPlanStart;
+
+  void _onPlanRequest() {
+    final start = widget.planRequest?.value;
+    if (start == null) return;
+    widget.planRequest!.value = null;
+    _pendingPlanStart = start;
+    _openPendingPlan();
+  }
+
+  void _openPendingPlan() {
+    final start = _pendingPlanStart;
+    if (start == null || _loading || !mounted) return;
+    _pendingPlanStart = null;
+    // A notifier write schedules no frame by itself, so ask for one — or the
+    // callback waits for the next unrelated repaint.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openWizard(start: start);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _schedulePoll() {
@@ -437,6 +472,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     widget.adminMode.removeListener(_onAdminModeChanged);
     widget.onboarding?.removeListener(_onOnboardingPing);
     widget.connectivity?.removeListener(_onConnectivityChanged);
+    widget.planRequest?.removeListener(_onPlanRequest);
     _unwatch?.call();
     _unwatchWorkflow?.call();
     _pollTimer?.cancel();
@@ -522,6 +558,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         _loading = false;
         _loadError = null;
       });
+      _openPendingPlan();
       final readAt = DateTime.now();
       widget.connectivity?.loadedData(readAt);
       // T-18: only the CURRENT month is worth a device copy — the door-of-the-

@@ -43,6 +43,7 @@ import 'suites/notification_params.dart';
 import 'suites/oauth_onboarding.dart';
 import 'suites/optimistic_concurrency.dart';
 import 'suites/pending_member.dart';
+import 'suites/plan_end_reminders.dart';
 import 'suites/planning_horizon_gate.dart';
 import 'suites/platform_operator.dart';
 import 'suites/premium_entitlement.dart';
@@ -147,6 +148,7 @@ void main() {
   billingCheckoutTests(fx);
   billingGraceTests(fx);
   billingGraceWarningTests(fx);
+  planEndReminderTests(fx);
   billingHistoryTests(fx);
   billingReactivateTests(fx);
   billingAvulsoTests(fx);

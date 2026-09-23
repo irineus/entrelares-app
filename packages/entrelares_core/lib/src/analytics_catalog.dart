@@ -141,9 +141,11 @@ abstract final class AnalyticsCatalog {
   }
 
   /// The notification types `notification-open` may name; anything else is
-  /// reported as `other`. The ten F-09 push types, the F-52 aviso, and the
-  /// three things a row in *Para você* opens.
+  /// reported as `other`. The ten F-09 push types, the F-52 aviso, the F-70
+  /// plan end (from 23/09/2026 — its opens are that item's success measure),
+  /// and the three things a row in *Para você* opens.
   static const notificationTypes = {
+    'plan_ending',
     'auto_reminder',
     'auto_approved',
     'swap_requested',

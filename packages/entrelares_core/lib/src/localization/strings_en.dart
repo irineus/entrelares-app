@@ -783,6 +783,11 @@ abstract final class StringsEn {
     K.notifRenderEmailCapLast: 'This is the last e-mail of the month on the free plan. Notifications here in the app carry on as usual — activate Premium for a much higher limit.',
     K.notifRenderEmailCap80: 'Your family has used 80% of this month\'s e-mails (free plan). Notifications here in the app have no limit — activate Premium for a much higher limit.',
     K.notifRenderBillingGrace: 'We could not confirm the subscription payment. If the charge is not settled by {0}, the family goes back to the Free plan. No data is deleted — the Premium features simply become unavailable.',
+    K.notifRenderTitlePlanEnding: 'Your plan ends soon',
+    K.notifRenderTitlePlanEnded: 'Your plan has ended',
+    K.notifRenderPlanEnding: "Your family's plan runs until {0}. Plan the next months.",
+    K.notifRenderPlanEnded: 'The last planned day was {0}. Plan the next months in the calendar.',
+    K.notifPlanAction: 'Plan the next months',
     // ── Notifications page ──
     K.notifPageTitle: 'Notifications',
     K.notifFilterAria: 'Notification filter',
