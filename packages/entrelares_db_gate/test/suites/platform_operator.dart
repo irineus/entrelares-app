@@ -600,9 +600,11 @@ void platformOperatorTests(GateFixture fx) {
       final days = fx.nextFutureDates(2);
       final swapDays = fx.nextFutureDates(2);
 
-      await fx.service
-          .from('families')
-          .update({'name': '$marker-family'}).eq('id', fam.familyId);
+      // The E2E prefix stays: `purge_e2e_family` refuses a family whose name
+      // lost its signature, and the teardown would leave this one behind.
+      await fx.service.from('families').update({
+        'name': '${TestEnv.e2eFamilyPrefix}${fx.runId}-$marker-family'
+      }).eq('id', fam.familyId);
       await fx.service.from('profiles').update(
           {'full_name': '$marker-admin'}).eq('id', fam.adminProfile.id);
 
