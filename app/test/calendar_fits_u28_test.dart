@@ -55,6 +55,9 @@ Future<void> _pump(WidgetTester tester, Size size,
         : const [],
   );
   if (withMarks) ds.frozenRequests = [frz.swapReq(10, cal.dayOfMonth(1))];
+  // F-70: the one seeded day is a mark to measure, not a plan ending today —
+  // without this the plan-end strip takes the height the cell is measured in.
+  if (withMarks) ds.lastPlannedDayOverride = cal.today.add(const Duration(days: 365));
   // The product's own theme, so the cell's text names Inter — the family the
   // U-39 group loads — rather than the host's fallback font. `cal.app` runs
   // on the bare MaterialApp for the slice tests, which measure no text.

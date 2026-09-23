@@ -892,6 +892,8 @@ abstract final class K {
   static const String notifRenderPlanEnding = 'notifRender.planEnding';
   static const String notifRenderPlanEnded = 'notifRender.planEnded';
   static const String notifPlanAction = 'notif.planAction';
+  static const String calPlanEnding = 'cal.planEnd.ending';
+  static const String calPlanEnded = 'cal.planEnd.ended';
 
   // ── Notifications page ──
   static const String notifPageTitle = 'notif.pageTitle';
@@ -1984,6 +1986,8 @@ abstract final class K {
     notifRenderPlanEnding,
     notifRenderPlanEnded,
     notifPlanAction,
+    calPlanEnding,
+    calPlanEnded,
     notifPageTitle,
     notifFilterAria,
     notifTabIncoming,

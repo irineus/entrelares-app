@@ -38,10 +38,36 @@ abstract final class PlanEndRules {
   /// Null when [isoLastDay] is not a real ISO date.
   static DateTime? wizardStart(String? isoLastDay, DateTime today) {
     final last = _parseIso(isoLastDay);
-    if (last == null) return null;
-    final next = DateTime(last.year, last.month, last.day + 1);
+    return last == null ? null : startAfter(last, today);
+  }
+
+  /// The first plannable day after the plan's [lastDay]: the next day, or
+  /// [today] when that one is already past.
+  static DateTime startAfter(DateTime lastDay, DateTime today) {
+    final next = DateTime(lastDay.year, lastDay.month, lastDay.day + 1);
     final floor = DateTime(today.year, today.month, today.day);
     return next.isBefore(floor) ? floor : next;
+  }
+
+  /// The window in which the calendar says the plan is ending — the same 30
+  /// days the job's first reminder uses, so the strip and the notification
+  /// never disagree about whether there is anything to say.
+  static const stripWindowDays = 30;
+
+  /// The calendar's plan-end strip: `ending` while [lastDay] is at most
+  /// [stripWindowDays] ahead (today included), `ended` once it is past, null
+  /// when it is further away or when the family never planned (that is the
+  /// empty-month strip's case, U-40, not this one). Unlike the notification,
+  /// the strip is a STATE, not an event: it shows every day until the family
+  /// plans further, whichever door — e-mail, push, a plain visit — they came
+  /// through.
+  static String? stripKind(DateTime? lastDay, DateTime today) {
+    if (lastDay == null) return null;
+    final last = DateTime.utc(lastDay.year, lastDay.month, lastDay.day);
+    final floor = DateTime.utc(today.year, today.month, today.day);
+    if (last.isBefore(floor)) return 'ended';
+    // Calendar days in UTC: a DST shift must not move the edge.
+    return last.difference(floor).inDays <= stripWindowDays ? 'ending' : null;
   }
 
   static DateTime? _parseIso(String? value) {

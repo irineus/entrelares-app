@@ -128,6 +128,9 @@ class CalendarScreen extends StatefulWidget {
   /// The screen consumes the value — it sets it back to null when it opens.
   final ValueNotifier<DateTime?>? planRequest;
 
+  /// F-70: the plan-end strip, for tests.
+  static const planEndStripKey = Key('plan-end-strip');
+
   const CalendarScreen(
       {super.key,
       required this.dataSource,
@@ -292,6 +295,9 @@ class _CalendarScreenState extends State<CalendarScreen>
     // The branch may be built by the very navigation that carries the request.
     if (widget.planRequest?.value != null) _onPlanRequest();
   }
+
+  /// F-70: the family's last planned day, read with every load (best-effort).
+  DateTime? _lastPlannedDay;
 
   /// F-70: the day a plan-end notification asked the wizard to open on, held
   /// until the month has loaded — the wizard needs the members to offer.
@@ -530,6 +536,12 @@ class _CalendarScreenState extends State<CalendarScreen>
       // once a month, which is exactly the kind of defect nobody reports.
       // Both reads are best-effort: a calendar must not fail to draw because
       // an aviso could not be counted.
+      // F-70: the plan-end strip's one fact. Best-effort like the avisos: a
+      // calendar must not fail to draw because the strip could not decide.
+      var lastPlannedDay = _lastPlannedDay;
+      try {
+        lastPlannedDay = await widget.dataSource.fetchLastPlannedDay();
+      } catch (_) {/* keep whatever we had */}
       var todayNotices = _todayNotices;
       var yesterdayRow = _yesterdayRow;
       try {
@@ -553,6 +565,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         _upcoming = upcoming;
         _todayNotices = todayNotices;
         _yesterdayRow = yesterdayRow;
+        _lastPlannedDay = lastPlannedDay;
         _loadedMonth = month;
         _openInvitation = openInvitation;
         _loading = false;
@@ -1085,6 +1098,34 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (summary == null || !mounted) return;
     showAppSnack(context, summary);
     _load(silent: true);
+  }
+
+  // ── F-70: the plan is running out ─────────────────────────────────────────
+
+  /// `ending` / `ended` / null (`PlanEndRules.stripKind`). Every member sees
+  /// it — any member may plan an empty day — and it has no close: it is the
+  /// calendar's STATE, and it goes away the moment the family plans further.
+  /// It is also where a reader lands after the login an e-mail link passes
+  /// through (T-64 keeps no destination), so the action has to live here too.
+  String? get _planEndKind =>
+      _loading ? null : PlanEndRules.stripKind(_lastPlannedDay, _today);
+
+  Widget _planEndStrip(Localization l, String kind) {
+    final last = _lastPlannedDay!;
+    return Padding(
+      key: CalendarScreen.planEndStripKey,
+      padding: const EdgeInsets.fromLTRB(
+          Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
+      child: AppBanner(
+        tone: context.tokens.info,
+        icon: Icons.event_note_outlined,
+        message: l.format(kind == 'ended' ? K.calPlanEnded : K.calPlanEnding,
+            [l.formatDate(last)]),
+        actionLabel: l[K.notifPlanAction],
+        onAction: () =>
+            _openWizard(start: PlanEndRules.startAfter(last, _today)),
+      ),
+    );
   }
 
   Widget _handoffNudge(Localization l) => Padding(
@@ -1920,6 +1961,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                 key: widget.tourKeys?.keyFor(TourTarget.todayCard),
                 child: _todayCard(context)),
           if (_showHandoffNudge) _handoffNudge(l),
+          if (_planEndKind case final kind?) _planEndStrip(l, kind),
           _monthBar(context, l),
           if (_members.isEmpty && _loading)
             const _LegendSkeleton()

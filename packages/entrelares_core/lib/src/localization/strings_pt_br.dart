@@ -793,6 +793,8 @@ abstract final class StringsPtBr {
     K.notifRenderPlanEnding: 'O planejamento da família vai até {0}. Planeje os próximos meses.',
     K.notifRenderPlanEnded: 'O último dia planejado foi {0}. Planeje os próximos meses no calendário.',
     K.notifPlanAction: 'Planejar os próximos meses',
+    K.calPlanEnding: 'O planejamento vai até {0}.',
+    K.calPlanEnded: 'O planejamento terminou em {0}.',
     // ── Notifications page ──
     K.notifPageTitle: 'Notificações',
     K.notifFilterAria: 'Filtro de notificações',

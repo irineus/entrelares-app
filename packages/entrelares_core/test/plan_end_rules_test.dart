@@ -64,4 +64,34 @@ void main() {
       expect(PlanEndRules.actionStart('plan_ending', null, today), isNull);
     });
   });
+
+  group('PlanEndRules.stripKind', () {
+    test('never planned: nothing (the empty-month strip owns that case)', () {
+      expect(PlanEndRules.stripKind(null, today), isNull);
+    });
+
+    test('31 days ahead: nothing; 30: ending; today: ending', () {
+      expect(PlanEndRules.stripKind(DateTime(2026, 10, 24), today), isNull);
+      expect(PlanEndRules.stripKind(DateTime(2026, 10, 23), today), 'ending');
+      expect(PlanEndRules.stripKind(today, today), 'ending');
+    });
+
+    test('yesterday or before: ended', () {
+      expect(PlanEndRules.stripKind(DateTime(2026, 9, 22), today), 'ended');
+      expect(PlanEndRules.stripKind(DateTime(2026, 9, 2), today), 'ended');
+    });
+
+    test('a time of day on either side is ignored', () {
+      expect(
+          PlanEndRules.stripKind(
+              DateTime(2026, 9, 23, 0, 1), DateTime(2026, 9, 23, 23, 59)),
+          'ending');
+    });
+  });
+
+  test('startAfter: the next day, never before today', () {
+    expect(PlanEndRules.startAfter(DateTime(2026, 10, 1), today),
+        DateTime(2026, 10, 2));
+    expect(PlanEndRules.startAfter(DateTime(2026, 9, 2), today), today);
+  });
 }

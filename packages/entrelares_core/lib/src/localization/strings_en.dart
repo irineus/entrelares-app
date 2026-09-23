@@ -788,6 +788,8 @@ abstract final class StringsEn {
     K.notifRenderPlanEnding: "Your family's plan runs until {0}. Plan the next months.",
     K.notifRenderPlanEnded: 'The last planned day was {0}. Plan the next months in the calendar.',
     K.notifPlanAction: 'Plan the next months',
+    K.calPlanEnding: 'The plan runs until {0}.',
+    K.calPlanEnded: 'The plan ended on {0}.',
     // ── Notifications page ──
     K.notifPageTitle: 'Notifications',
     K.notifFilterAria: 'Notification filter',

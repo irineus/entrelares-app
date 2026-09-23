@@ -137,4 +137,64 @@ void main() {
     expect(request.value, isNull,
         reason: 'a second visit to the calendar must not reopen the wizard');
   });
+
+  group('the calendar strip (a state, whatever door the reader came through)',
+      () {
+    Future<void> pumpCalendar(WidgetTester tester, List<DateTime> planned) async {
+      final ds = FakeCustodyDataSource(
+          members: [ana, bruno],
+          days: [
+            for (final (i, d) in planned.indexed) row(900 + i, d, ana.id)
+          ]);
+      await tester.pumpWidget(AppL10n(
+        l: _pt,
+        setLanguage: (_) async {},
+        child: MaterialApp(
+          home: CalendarScreen(dataSource: ds, adminMode: AdminMode()),
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Finder strip() => find.byKey(CalendarScreen.planEndStripKey);
+
+    testWidgets('a plan that ended says so and plans from today',
+        (tester) async {
+      final last = DateTime(day.year, day.month, day.day - 5);
+      await pumpCalendar(tester, [DateTime(day.year, day.month, day.day - 6), last]);
+
+      expect(
+          find.text(_pt.format(K.calPlanEnded, [_pt.formatDate(last)])),
+          findsOneWidget);
+      await tester.tap(find.descendant(
+          of: strip(), matching: find.text(_pt[K.notifPlanAction])));
+      await tester.pumpAndSettle();
+      expect(find.text(_pt[K.wizTitle]), findsOneWidget);
+      expect(_wizardStart(day), findsOneWidget);
+    });
+
+    testWidgets('a plan ending within 30 days plans from the day after',
+        (tester) async {
+      final last = DateTime(day.year, day.month, day.day + 12);
+      await pumpCalendar(tester, [last]);
+
+      expect(
+          find.text(_pt.format(K.calPlanEnding, [_pt.formatDate(last)])),
+          findsOneWidget);
+      await tester.tap(find.descendant(
+          of: strip(), matching: find.text(_pt[K.notifPlanAction])));
+      await tester.pumpAndSettle();
+      expect(_wizardStart(DateTime(last.year, last.month, last.day + 1)),
+          findsOneWidget);
+    });
+
+    testWidgets('a plan further than 30 days, or none at all, shows nothing',
+        (tester) async {
+      await pumpCalendar(tester, [DateTime(day.year, day.month, day.day + 31)]);
+      expect(strip(), findsNothing);
+
+      await pumpCalendar(tester, const []);
+      expect(strip(), findsNothing);
+    });
+  });
 }
