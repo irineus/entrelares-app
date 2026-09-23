@@ -248,5 +248,19 @@ void main() {
       expect(gradle, contains('val signedFlavors'));
       expect(gradle, isNot(contains('hasKeyProperties')));
     });
+
+    test('the unsigned-flavour guard reads the packaging tasks, not names',
+        () {
+      // A DEV release build runs `preProdReleaseBuild`: AGP hangs the shared
+      // `configureCMakeRelease[<abi>]` (Flutter's forced-NDK CMake) on one
+      // flavour's pre-build. Matching any task NAME with `ProdRelease` in it
+      // refused the PR preview job at that lifecycle task (T-79, PR #244).
+      final gradle =
+          File('android/app/build.gradle.kts').readAsStringSync();
+      expect(gradle, contains('gradle.taskGraph.whenReady'));
+      expect(gradle, contains(r'package$variant'));
+      expect(gradle, contains(r'package${variant}Bundle'));
+      expect(gradle, isNot(contains('name.contains(variant)')));
+    });
   });
 }
