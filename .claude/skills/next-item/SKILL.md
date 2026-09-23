@@ -39,7 +39,7 @@ todo o resto do produto (só UI, notificações e e-mails são PT-BR).
 | `ID` | texto | na query é **`"userDefined:ID"`**, nunca `ID`. Chave estável (`F-`/`U-`/`T-`/`S-`/`L-` + número), **nunca reusada** — é a junção com todo o histórico dos repos |
 | `Fase` | select | os 8 grupos do roadmap (`1 · …` a `8 · …`). **Eixo vivo**, e ele SOBREVIVE ao encerramento |
 | `Ordem` | número | aceita decimal — inserção no meio da fila não renumera os demais |
-| `Status` | select | `pending` · `in-progress` · `completed` · `skipped` |
+| `Status` | select | `pending` · `in-progress` · `awaiting-release` · `completed` · `skipped`. **`awaiting-release`** (23/09/2026) = trabalho FEITO e mergeado, esperando a promoção na Play: é o status de todo card cujo merge bumpou o `versionCode`. Quem está nele é exatamente a lista das notas da próxima release (*Encerrar o item*, passo 1) |
 | `Prioridade` | select | `critical` · `high` · `medium` · `low` |
 | `Notas` | texto | contexto prático: `Origem:`, `Destrava:`, `DECISÃO`, `CONCLUÍDO <data>:` |
 | `Tamanho` | select | `P`/`M`/`G`/`GG` = 1/3/5/8 pontos |
@@ -92,9 +92,13 @@ Uma chamada só — a query é tarifada. Buscar tudo o que a sessão precisa de 
 SELECT "userDefined:ID", "Item", "Status", "Fase", "Ordem", "Prioridade",
        "Tamanho", "Tipo", "Notas", url
 FROM "collection://109b1b02-5b6b-48ef-b3b6-990374a3d10f"
-WHERE "Status" IN ('pending', 'in-progress')
+WHERE "Status" IN ('pending', 'in-progress', 'awaiting-release')
 ORDER BY CAST(substr("Fase", 1, 2) AS INTEGER), "Ordem"
 ```
+
+Os `awaiting-release` vêm na MESMA chamada porque uma segunda query custa o mesmo que esta inteira
+— mas eles **não são candidatos a trabalhar**: são a fila da próxima release da Play (ver *Escolher
+o item* e *Encerrar o item*, passo 1).
 
 Armadilhas que já custaram tempo: a coluna é **`"userDefined:ID"`**, nunca `ID`; **um alias não
 serve no `WHERE`**; e `substr("Fase", 1, 2)` funciona porque os grupos são `1 ·` a `8 ·` — se um dia
@@ -114,7 +118,12 @@ resultado: se `CAST(...)` der 0 em toda linha, os nomes dos grupos mudaram.
    de ir para o próximo `pending`. **Não escolher sozinho:** item em andamento costuma estar parado
    por dependência de terceiro (owner, Play Console, jurídico), e só o usuário sabe se destravou.
 3. Sem nenhum `in-progress`, o próximo é o primeiro não concluído na ordenação, respeitando as
-   dependências anotadas nas Notas.
+   dependências anotadas nas Notas. **`awaiting-release` não entra nessa conta** — o trabalho dele
+   acabou; o que falta é a promoção na Play, que é decisão do owner.
+
+Quando houver card em `awaiting-release`, dizer numa linha só, antes de propor o item: quantos são e
+desde qual `versionCode` acumulam. É a deixa para o owner pedir a promoção se quiser, sem virar
+pergunta.
 
 Apresentar o item escolhido **com o corpo do card e as Notas completas** antes de começar — é ali
 que está o registro inteiro e a decisão bloqueante.
@@ -230,20 +239,42 @@ antes quantas aprovações virão:** até **3** sem decisão (2 se não houver r
 **6** com. Medido em 11/09/2026: eram 4 e 7, porque `Notas` e `Status`/`Conclusão` iam em duas
 chamadas.
 
-1. **Resultado extenso** (especificação, medição, relatório, ADR): criar como **subpágina do card**
+1. **Canal Android — acumular ou promover. PERGUNTAR, nunca decidir sozinho, e perguntar ANTES das
+   escritas**, porque a resposta é que escolhe o `Status` do passo 4. Vale para todo item cujo merge
+   bumpou o `versionCode`: assim que o run do `main` mostrar o `play-internal` verde (o código novo
+   está na **Internal testing**), perguntar com **AskUserQuestion** — mesmo que a sessão anterior
+   tenha promovido:
+
+   - **Acumular** *(o owner não vai a Production agora)*: o card fecha em
+     **`Status` = `awaiting-release`**. Não escrever notas nem abrir PR. A Internal segue recebendo
+     cada merge, e a fila de cards nesse status É a lista das notas da próxima release. No resumo,
+     uma linha só: `Android: <code> na Internal · Production em <código> · N cards awaiting-release`.
+     Não vira `AÇÃO DO OWNER PENDENTE` no card — acumular é uma decisão, não uma pendência.
+   - **Promover**: o card fecha igualmente em **`awaiting-release`** (ele é parte da release que vai
+     sair), e a promoção acontece depois das escritas, pela seção *Promover: notas, PR e a virada
+     dos cards* — é lá que todos os `awaiting-release` viram `completed`, de uma vez.
+
+   Sem resposta clara, o padrão é **acumular**: promover é decisão do owner (T-79), e notas escritas
+   cedo demais ficam velhas no próximo merge.
+
+   **Item que NÃO bumpou versão** (docs internos, CI, só servidor) pula esta pergunta e fecha direto
+   em `completed`: não há release para esperar.
+2. **Resultado extenso** (especificação, medição, relatório, ADR): criar como **subpágina do card**
    (`parent: {page_id: <card-id>}`), nunca solta na raiz do workspace. *1 escrita.*
-2. **Corpo do card**: é o registro do item — atualizar o que a entrega mudou no enunciado dele
+3. **Corpo do card**: é o registro do item — atualizar o que a entrega mudou no enunciado dele
    (`update_content`). *1 escrita.*
-3. **Propriedades do card, TODAS numa única `update_properties`.** *1 escrita:*
+4. **Propriedades do card, TODAS numa única `update_properties`.** *1 escrita:*
    - **`Notas`**: o campo é **sobrescrito** — ler o valor atual primeiro (`fetch`, não pergunta) e
      reenviar o texto completo, preservando a linha `Origem:`. Prefixar o que foi feito com
      `CONCLUÍDO <data>:`, com o link do PR;
-   - **`Status` = `completed`** e **`Conclusão` = a data de hoje**. As duas coisas, sempre;
+   - **`Status`**: `awaiting-release` se o merge bumpou o `versionCode` (passo 1), `completed` se
+     não bumpou. **`Conclusão` = a data de hoje nos dois casos** — a data é a da ENTREGA, não a da
+     promoção; um item que espera três dias na fila não mente sobre quando ficou pronto;
    - **`Tamanho`** e **`Tipo`**, se o card ainda não tiver;
    - **`Fase` NÃO se limpa** — ela diz em que grupo o item foi entregue.
 
    Partir isso em duas chamadas é uma aprovação a mais por item e nenhum benefício.
-4. **Decisões vigentes**, se o item gerou decisão (arquitetura, regra, schema, parâmetro, risco). A
+5. **Decisões vigentes**, se o item gerou decisão (arquitetura, regra, schema, parâmetro, risco). A
    decisão se escreve em **três lugares diferentes** — são três páginas, logo *3 escritas*, e não
    há como fundir sem mudar a estrutura do T-63:
    - **o enunciado** vai para a seção da página-mãe, com `update_content` (**nunca**
@@ -256,50 +287,60 @@ chamadas.
    Decisão revogada é a única que volta para a página-mãe: vai para a §6 "Superseded decisions",
    com o motivo. **Não apagar a antiga** — saber o que foi tentado e por que caiu evita refazer a
    discussão.
-5. **Varredura de documentação, na MESMA entrega.** `grep -rn '<ID>'` nos `README.md` e `CLAUDE.md`
+6. **Varredura de documentação, na MESMA entrega.** `grep -rn '<ID>'` nos `README.md` e `CLAUDE.md`
    dos repos que o item tocou, e corrigir todo acerto que ainda descreva o item como pendente ou
    futuro: tabelas de capacidade ganham a feature entregue; inventários de suíte refletem arquivos
    de teste novos; o `CLAUDE.md` só muda no que mudou em PRODUÇÃO. **Nada disso toca `backlog/`**,
    que é história congelada.
-6. **Canal Android — acumular ou promover. PERGUNTAR, nunca decidir sozinho.** Vale para todo item
-   cujo merge bumpou o `versionCode`: assim que o run do `main` mostrar o `play-internal` verde (o
-   código novo está na **Internal testing**), perguntar com **AskUserQuestion** — antes do resumo,
-   e mesmo que a sessão anterior tenha promovido:
-
-   - **Acumular** *(o owner não vai a Production agora)*: não escrever notas nem abrir PR. A
-     Internal segue recebendo cada merge; o próximo item que perguntar e ouvir "promover" escreve
-     notas que cobrem TUDO o que se acumulou. No resumo, uma linha só:
-     `Android: <code> na Internal · Production em <código> · acumulando desde <código>`.
-     Não vira `AÇÃO DO OWNER PENDENTE` no card — acumular é uma decisão, não uma pendência.
-   - **Escrever as notas e promover**: as notas descrevem o que mudou **desde a versão que os
-     usuários têm em Production**, não desde o último item:
-     1. **A base é a Play, não o repositório.** Ler a Production na tela de releases
-        (`https://play.google.com/console/u/0/developers/5188946194088545235/app/4976020657794164634/releases/overview`,
-        pedir o print ao owner) e/ou o último `play-promote` **não-dry-run**
-        (`gh run list --workflow play-promote.yml`, e no log `DRY_RUN: false` + a linha
-        *"promovido à Production"*). Uma liberação feita à mão antes do T-79 não aparece em run
-        nenhum — medido em 23/09/2026: a 131 estava em Production "In review" e o único run era
-        um `dry_run`. Uma liberação ainda **em revisão** é substituída pelo promote, então a base
-        é a última que **passou** da revisão, e as mudanças da que está em revisão entram nas notas.
-     2. **O que mudou:** `git log` entre o commit que levou o `versionCode` da base ao
-        `app/pubspec.yaml` (`git log -S'+<base>' -- app/pubspec.yaml`) e `origin/main`; só o que o
-        usuário do APP vê — fora docs, CI, web-only e servidor-only (`store/README.md`, "Release
-        notes").
-     3. **Escrever** `store/release-notes/<code>/pt-BR.txt` e `en-US.txt` para o `<code>` que a
-        Internal tem agora — **no máximo 500 caracteres cada** (limite da Play;
-        `play_release_test` confere na entrada). Só o código promovido precisa de notas: os
-        intermediários acumulados nunca vão a Production e ficam sem pasta.
-     4. PR só com essas duas pastas (é `.txt`, então **roda** o CI — não é markdown) e merge com o OK
-        do owner, como todo PR.
-     5. Depois do merge, **bloco de handoff** do `play-promote` (`action = promote`,
-        `version_code = <code>`, `fraction` à escolha do owner — `0.2` como padrão — e **Approve**
-        no Environment `play-production`), com a conferência na mesma tela de releases.
-
-   Sem resposta clara, o padrão é **acumular**: promover é decisão do owner (T-79), e notas
-   escritas cedo demais ficam velhas no próximo merge.
 7. Terminar a sessão com um **bloco de resumo** para o board. Se sobrou ação do owner, o resumo
    **abre** com a lista numerada dessas ações (só os títulos — os blocos completos já estão acima),
    antes de qualquer outra coisa: o que vem depois de um resumo longo não é lido.
+
+### Promover: notas, PR e a virada dos cards
+
+Só quando o owner responde "promover" (passo 1), ou pede a promoção em qualquer momento. As notas
+descrevem o que mudou **desde a versão que os usuários têm em Production**, não desde o último item —
+e a lista de itens **são os cards em `awaiting-release`**, que é a razão desse status existir
+(23/09/2026).
+
+1. **Os cards.** Uma query, ordenada por `Conclusão`:
+
+   ```sql
+   SELECT "userDefined:ID", "Item", "Tipo", "Notas", "date:Conclusão:start", url
+   FROM "collection://109b1b02-5b6b-48ef-b3b6-990374a3d10f"
+   WHERE "Status" = 'awaiting-release'
+   ORDER BY "date:Conclusão:start"
+   ```
+
+   Card de mudança que o usuário do app Android **não vê** (só web, só servidor, só CI) fica na
+   lista, não gera linha de nota e **fecha junto** na promoção — o código dele vai no mesmo bundle.
+2. **A base é a Play, não o repositório.** Ler a Production na tela de releases
+   (`https://play.google.com/console/u/0/developers/5188946194088545235/app/4976020657794164634/releases/overview`,
+   pedir o print ao owner) e/ou o último `play-promote` **não-dry-run**
+   (`gh run list --workflow play-promote.yml`, e no log `DRY_RUN: false` + a linha *"promovido à
+   Production"*). Uma liberação feita à mão antes do T-79 não aparece em run nenhum — medido em
+   23/09/2026: a 131 estava em Production "In review" e o único run era um `dry_run`. Uma liberação
+   ainda **em revisão** é substituída pelo promote, então a base é a última que **passou** da
+   revisão, e as mudanças da que está em revisão entram nas notas.
+3. **Conferir a fila contra o `git log`** entre o commit que levou o `versionCode` da base ao
+   `app/pubspec.yaml` (`git log -S'+<base>' -- app/pubspec.yaml`) e `origin/main`. Merge sem card
+   (hotfix, conserto de gate) não aparece na query e ainda assim mudou o app: entra nas notas do
+   mesmo jeito. A query diz o que foi entregue; o `git log` prova que nada ficou de fora.
+4. **Escrever** `store/release-notes/<code>/pt-BR.txt` e `en-US.txt` para o `<code>` que a Internal
+   tem agora — **no máximo 500 caracteres cada** (limite da Play; `play_release_test` confere na
+   entrada). Só o código promovido precisa de notas: os intermediários acumulados nunca vão a
+   Production e ficam sem pasta.
+5. PR só com essas duas pastas (é `.txt`, então **roda** o CI — não é markdown) e merge com o OK do
+   owner, como todo PR.
+6. Depois do merge, **bloco de handoff** do `play-promote` (`action = promote`,
+   `version_code = <code>`, `fraction` à escolha do owner — `0.2` como padrão — e **Approve** no
+   Environment `play-production`), com a conferência na mesma tela de releases.
+7. **Quando o owner confirmar que a promoção saiu**, virar TODOS os cards da fila: por card, uma
+   `update_properties` com **`Status` = `completed`** e a linha
+   `PROMOVIDO <data>: versão <x.y.z> (<code>), rollout <fração>` prefixada nas `Notas` (ler antes com
+   `fetch`, que não pergunta; `Conclusão` **não muda** — ela é a data da entrega). São **N escritas
+   para N cards**, então dizer o número antes de começar e fazê-las em bloco contíguo, como todo
+   encerramento. Um card promovido sem virar o status reaparece nas notas da release seguinte.
 
 ## Ciclo do Git
 
@@ -311,7 +352,8 @@ de QA em `pr-<N>.entrelares-web-qa.pages.dev` — o job `qa-preview` comenta os 
 segunda conta de um teste com dois responsáveis entra por esse web. O `main` fica servido no banco de
 QA em `qa.entrelares.app` (job `qa-web`). O canal Android sobe sozinho para a **Internal testing** no merge que bumpa a versão
 (job `play-internal`, T-79); **Production** só sai quando o owner dispara o `play-promote` e aprova o run
-no Environment `play-production` — e o `promote` exige as notas em `store/release-notes/<versionCode>/` — acumular ou promover se pergunta ao owner ao fim de cada item (*Encerrar o item*, passo 6).
+no Environment `play-production` — e o `promote` exige as notas em `store/release-notes/<versionCode>/` — acumular ou promover se pergunta ao owner ao fechar cada item que bumpou a versão (*Encerrar o item*,
+passo 1), e o card fica em `awaiting-release` até a promoção sair.
 
 **Por isso o Entrelares NÃO copia o merge automático do Gestão** (lá `develop` é do CI e `main` é do
 dono; aqui só existe `main`, e ela é o dono).
