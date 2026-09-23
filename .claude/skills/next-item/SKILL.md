@@ -39,7 +39,7 @@ todo o resto do produto (só UI, notificações e e-mails são PT-BR).
 | `ID` | texto | na query é **`"userDefined:ID"`**, nunca `ID`. Chave estável (`F-`/`U-`/`T-`/`S-`/`L-` + número), **nunca reusada** — é a junção com todo o histórico dos repos |
 | `Fase` | select | os 8 grupos do roadmap (`1 · …` a `8 · …`). **Eixo vivo**, e ele SOBREVIVE ao encerramento |
 | `Ordem` | número | aceita decimal — inserção no meio da fila não renumera os demais |
-| `Status` | select | `pending` · `in-progress` · `awaiting-release` · `completed` · `skipped`. **`awaiting-release`** (23/09/2026) = trabalho FEITO e mergeado, esperando a promoção na Play: é o status de todo card cujo merge bumpou o `versionCode`. Quem está nele é exatamente a lista das notas da próxima release (*Encerrar o item*, passo 1) |
+| `Status` | select | `pending` · `in-progress` · `awaiting-release` · `completed` · `skipped`. **`in-progress` é só o que está em DESENVOLVIMENTO** — alguém mexe nele agora ou na próxima sessão. **`awaiting-release`** (23/09/2026) = trabalho FEITO, esperando a LOJA: o card cujo merge bumpou o `versionCode` e espera a promoção, e o card cuja única pendência é um clique na Play Console (ficha, Data safety, aprovação do Google). Quem está nele é a lista das notas da próxima release (*Encerrar o item*, passo 1). Pendência de owner que NÃO é da loja e ainda pede código (um secret que o próximo PR precisa) mantém o card em `in-progress`: o trabalho não acabou |
 | `Prioridade` | select | `critical` · `high` · `medium` · `low` |
 | `Notas` | texto | contexto prático: `Origem:`, `Destrava:`, `DECISÃO`, `CONCLUÍDO <data>:` |
 | `Tamanho` | select | `P`/`M`/`G`/`GG` = 1/3/5/8 pontos |
@@ -113,13 +113,15 @@ resultado: se `CAST(...)` der 0 em toda linha, os nomes dos grupos mudaram.
 `pending`:
 
 1. Listar TODOS os `in-progress` na ordenação acima, com as **Notas completas** (elas dizem o que
-   falta e de quem depende).
+   falta e de quem depende), **mais os `awaiting-release` cujas Notas tenham a linha `AÇÃO DO OWNER
+   PENDENTE`** — esses não são trabalho a retomar, mas a pendência tem de aparecer toda sessão, ou
+   um clique na Play Console fica esquecido por dias porque o card saiu da lista.
 2. Perguntar com **AskUserQuestion** em qual seguir — uma opção por item em andamento, mais a opção
    de ir para o próximo `pending`. **Não escolher sozinho:** item em andamento costuma estar parado
    por dependência de terceiro (owner, Play Console, jurídico), e só o usuário sabe se destravou.
 3. Sem nenhum `in-progress`, o próximo é o primeiro não concluído na ordenação, respeitando as
    dependências anotadas nas Notas. **`awaiting-release` não entra nessa conta** — o trabalho dele
-   acabou; o que falta é a promoção na Play, que é decisão do owner.
+   acabou; o que falta é a loja.
 
 Quando houver card em `awaiting-release`, dizer numa linha só, antes de propor o item: quantos são e
 desde qual `versionCode` acumulam. É a deixa para o owner pedir a promoção se quiser, sem virar
@@ -205,9 +207,10 @@ Além do bloco no chat, **registrar nas `Notas` do card** a linha
 AÇÃO DO OWNER PENDENTE: <o que falta, em uma linha> — <console>
 ```
 
-Um item que fica `in-progress` esperando clique de terceiro é exatamente o que a seção *Escolher o
-item* manda listar no começo da sessão seguinte — e sem essa linha nas Notas, a sessão seguinte não
-tem como saber o que era.
+Um item parado esperando clique de terceiro é exatamente o que a seção *Escolher o item* manda
+listar no começo da sessão seguinte — e sem essa linha nas Notas, a sessão seguinte não tem como
+saber o que era. Vale nos dois status em que ele pode estar: `in-progress`, quando ainda falta
+código depois do clique, e `awaiting-release`, quando o clique é na loja e o trabalho acabou.
 
 Essa linha vai na **mesma `update_properties`** de qualquer outra propriedade que esteja mudando
 naquele momento (um `PARCIAL`, um `Status`), nunca numa chamada só para ela — cada escrita no Notion
@@ -259,6 +262,12 @@ chamadas.
 
    **Item que NÃO bumpou versão** (docs internos, CI, só servidor) pula esta pergunta e fecha direto
    em `completed`: não há release para esperar.
+
+   **Item com `AÇÃO DO OWNER PENDENTE` na LOJA** (ficha, Data safety, aprovação do Google) também vai
+   para `awaiting-release`, com ou sem bump — ele não está em desenvolvimento, e é a loja que o
+   destrava. A linha da pendência fica nas Notas, e a abertura da sessão seguinte a lista (ver
+   *Escolher o item*). Pendência que ainda pede CÓDIGO depois (um secret que o próximo PR precisa)
+   mantém o card em `in-progress`.
 2. **Resultado extenso** (especificação, medição, relatório, ADR): criar como **subpágina do card**
    (`parent: {page_id: <card-id>}`), nunca solta na raiz do workspace. *1 escrita.*
 3. **Corpo do card**: é o registro do item — atualizar o que a entrega mudou no enunciado dele
@@ -335,7 +344,9 @@ e a lista de itens **são os cards em `awaiting-release`**, que é a razão dess
 6. Depois do merge, **bloco de handoff** do `play-promote` (`action = promote`,
    `version_code = <code>`, `fraction` à escolha do owner — `0.2` como padrão — e **Approve** no
    Environment `play-production`), com a conferência na mesma tela de releases.
-7. **Quando o owner confirmar que a promoção saiu**, virar TODOS os cards da fila: por card, uma
+7. **Quando o owner confirmar que a promoção saiu**, virar os cards da fila — **menos os que ainda
+   tiverem `AÇÃO DO OWNER PENDENTE`**, que seguem em `awaiting-release` até a própria pendência
+   cair, recebendo só a linha `PROMOVIDO`. Por card, uma
    `update_properties` com **`Status` = `completed`** e a linha
    `PROMOVIDO <data>: versão <x.y.z> (<code>), rollout <fração>` prefixada nas `Notas` (ler antes com
    `fetch`, que não pergunta; `Conclusão` **não muda** — ela é a data da entrega). São **N escritas
