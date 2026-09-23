@@ -1049,6 +1049,11 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<void> touchActivity(String channel) async {
+    await _client.rpc('touch_activity', params: {'p_channel': channel});
+  }
+
+  @override
   Future<void> deletePushToken(String token) async {
     await _client.from('push_subscriptions').delete().eq('token', token);
   }

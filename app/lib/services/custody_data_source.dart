@@ -302,6 +302,12 @@ abstract class CustodyDataSource {
   /// bulk PATCH on my unread rows.
   Future<void> markAllNotificationsRead(int myProfileId);
 
+  /// T-78: records that the caller used the app today on [channel]
+  /// (`ActivityChannel.wire`). The server picks the profile (the caller's own)
+  /// and the day (America/Sao_Paulo); a repeat on the same day writes nothing.
+  /// Nothing reads it back from a client — the table is service-role only.
+  Future<void> touchActivity(String channel);
+
   /// F-09: registers this device's FCM token for [myProfileId], or refreshes
   /// the `last_seen_at` of a token already registered.
   ///

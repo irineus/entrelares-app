@@ -38,6 +38,7 @@ import 'screens/reports_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/update_password_screen.dart';
 import 'services/account_identity.dart';
+import 'services/activity_tracker.dart';
 import 'services/admin_mode.dart';
 import 'services/analytics_service.dart';
 import 'services/appearance.dart';
@@ -622,6 +623,22 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   late final BrowserInstallFacts? _browserFacts =
       kIsWeb ? readBrowserInstallFacts() : null;
 
+  /// T-78: "this member used the app today, on this channel", once per day.
+  /// Touched on entering the authenticated phase, on every resume and on every
+  /// pointer-down while authenticated — the tracker turns all but the day's
+  /// first success into a string comparison. The installed/tab split is the
+  /// same browser fact the U-51 hint reads.
+  late final ActivityTracker _activity = ActivityTracker(
+      _dataSource.touchActivity,
+      channel: ActivityRules.channel(
+          isWeb: kIsWeb,
+          standalone: _browserFacts != null &&
+              InstallHintRules.isStandalone(_browserFacts)));
+
+  void _touchActivity() {
+    if (_phase == _AuthPhase.authed) unawaited(_activity.touch());
+  }
+
   /// Where a dismissal of the hint is remembered — per BROWSER, like the
   /// handoff's: it is that Safari that keeps the app as a tab.
   static const String _installHintDismissedKey = 'app.installHint.dismissed';
@@ -771,7 +788,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _checkInactivity();
+    if (state == AppLifecycleState.resumed) {
+      _checkInactivity();
+      _touchActivity();
+    }
   }
 
   void _trackPageView() {
@@ -799,6 +819,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       appConnectivity.forgetData();
       unawaited(_offlineCache.clear());
       _profileGatesDeferred = false;
+      _activity.reset();
     }
     if (phase == _AuthPhase.authed) {
       _lastInteraction = DateTime.now();
@@ -819,6 +840,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       // a tab. Same place, same reason: the strip lives in the authenticated
       // shell, and a stranger evaluating the app is not asked to install it.
       _resolveInstallHint();
+      // T-78: the day this member used the app, on this channel.
+      _touchActivity();
     } else {
       _badge.stop();
       unawaited(_push.stop());
@@ -1238,7 +1261,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       child: Listener(
         // S-04: any touch anywhere is activity.
         behavior: HitTestBehavior.translucent,
-        onPointerDown: (_) => _lastInteraction = DateTime.now(),
+        // T-78: and a touch is a day of use (throttled to one call a day).
+        onPointerDown: (_) {
+          _lastInteraction = DateTime.now();
+          _touchActivity();
+        },
         child: MaterialApp.router(
           // U-48: per route ("Família · Entrelares"), so tabs and history
           // are readable — T-64 fixed the URL and left the title.

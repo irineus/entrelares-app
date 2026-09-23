@@ -122,6 +122,18 @@ serve(async (req: Request) => {
       supportPurged = (supData as number) ?? 0;
     }
 
+    // ── 1c''. Retention (T-78): member activity days older than 400 days ────
+    // The period privacidade.html §11 promises, plus any tombstone's rows (the
+    // trigger on profiles.user_id already drops them when an account goes; this
+    // is the convergent sweep). Independent, like the three above.
+    let activityPurged = 0;
+    const { data: actData, error: actError } = await supabase.rpc("purge_old_member_activity");
+    if (actError) {
+      console.error(`[purge-deleted] activity retention rpc failed — ${actError.message}`);
+    } else {
+      activityPurged = (actData as number) ?? 0;
+    }
+
     // ── 1d. Premium grace warnings (S-15/B-3, sent once) ────────────────────
     // The Terms promise an e-mail before the downgrade. The RPC already wrote the
     // in-app notice and stamped the marker inside its own transaction, so the
@@ -208,7 +220,7 @@ serve(async (req: Request) => {
       }
     }
 
-    console.log(`[purge-deleted] done — accounts=${rows.length} families=${familiesPurged} reminders=${reminders} oldNotifications=${notificationsPurged} staleInvitations=${invitationsPurged} oldSupportRequests=${supportPurged} graceWarnings=${graceWarnings} failed=${failed}`);
+    console.log(`[purge-deleted] done — accounts=${rows.length} families=${familiesPurged} reminders=${reminders} oldNotifications=${notificationsPurged} staleInvitations=${invitationsPurged} oldSupportRequests=${supportPurged} oldActivityDays=${activityPurged} graceWarnings=${graceWarnings} failed=${failed}`);
     return json({
       purged: rows.length - failed,
       families: familiesPurged,
@@ -216,6 +228,7 @@ serve(async (req: Request) => {
       oldNotifications: notificationsPurged,
       staleInvitations: invitationsPurged,
       oldSupportRequests: supportPurged,
+      oldActivityDays: activityPurged,
       graceWarnings,
       failed,
     });
