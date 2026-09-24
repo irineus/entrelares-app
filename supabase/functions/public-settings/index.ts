@@ -73,7 +73,12 @@ serve(async (req) => {
 		ETag: etag,
 	};
 
-	if (req.headers.get("If-None-Match") === etag) {
+	// If-None-Match uses the WEAK comparison (RFC 9110 §13.1.2), and the platform
+	// gateway hands our ETag out as `W/"…"` — measured on dev, 24/09/2026 — so a
+	// client echoes the weak form. Compare opaque tags, any entry of the list.
+	const opaque = (tag: string) => tag.trim().replace(/^W\//, "");
+	const presented = (req.headers.get("If-None-Match") ?? "").split(",").map(opaque);
+	if (presented.includes(opaque(etag)) || presented.includes("*")) {
 		return new Response(null, { status: 304, headers });
 	}
 	return new Response(body, { status: 200, headers });
