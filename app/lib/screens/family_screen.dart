@@ -871,7 +871,11 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             AppBanner(
               tone: context.tokens.info,
               icon: Icons.lock_outline,
-              message: l[K.famFreeCapNotice],
+              // U-57: the count is the live `free_caregivers`, never typed in.
+              message: l.format(K.famFreeCapNotice, [
+                _settings.freeCaregivers,
+                l.ordinal(_settings.freeCaregivers + 1),
+              ]),
               actionLabel:
                   widget.onOpenPlan == null ? null : l[K.famSeePremium],
               actionIcon:

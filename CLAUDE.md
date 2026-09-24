@@ -178,6 +178,11 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # bytes de backspace no lugar do \b — por meses ela não casava com nada.
 # String nova com uma dessas palavras derruba o lane core; as exceções são presas pelo nome
 # da chave. O glossário do produto mora na subpágina Design system and UX.
+# Desde o U-57 (23/09/2026), settings_copy_guard_test: toda frase que AFIRMA o valor de uma
+# chave do app_settings (free_caregivers, calendar_months_free/premium) usa placeholder e não
+# carrega o seed escrito (nem "dois"/"two"), e nenhum catálogo conta meses ou responsáveis com
+# dígito digitado — senão uma edição no console faz o servidor recusar num número enquanto a
+# tela promete o antigo. Frase nova que afirma um desses números entra no registro do teste.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
 cd app && fvm flutter analyze && fvm flutter test
 # The four source gates live in that suite: no_literal_snack_test (catalog strings),

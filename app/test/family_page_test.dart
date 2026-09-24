@@ -197,6 +197,11 @@ const _billingOn = {
   'billing.grace_days': '7',
 };
 
+/// U-57: the free-cap sentence as the screen formats it — the count is the
+/// live `free_caregivers`, the ordinal the next seat.
+String capNotice(Localization l, [int free = 2]) =>
+    l.format(K.famFreeCapNotice, [free, l.ordinal(free + 1)]);
+
 void main() {
   final l = Localization(AppLanguage.ptBr);
 
@@ -299,8 +304,23 @@ void main() {
       // 2 active members = the free cap.
       await pumpFamily(tester, source());
 
-      expect(find.text(l[K.famFreeCapNotice]), findsOne);
+      expect(find.text(capNotice(l)), findsOne);
       expect(find.text(l[K.famSendInvite]), findsNothing);
+    });
+
+    testWidgets('U-57: the notice states the LIVE free_caregivers, not the seed',
+        (tester) async {
+      // An operator raised the free tier to 3: three seats (two members and a
+      // placeholder) are the cap, and the sentence says so — 3, and a 4th.
+      await pumpFamily(
+          tester,
+          source(
+              members: const [admin, plain, pending],
+              settings: const {'free_caregivers': '3'}));
+
+      expect(find.text(capNotice(l, 3)), findsOne);
+      expect(capNotice(l, 3), contains('3 responsáveis'));
+      expect(capNotice(l, 3), contains('4º cuidador'));
     });
 
     testWidgets('a premium family below the hard cap gets the form',
@@ -310,7 +330,7 @@ void main() {
       // F-56: with the address blank the button promises a calendar entry,
       // not an e-mail — the form is there either way.
       expect(find.text(l[KApp.famAddWithoutInvite]), findsOne);
-      expect(find.text(l[K.famFreeCapNotice]), findsNothing);
+      expect(find.text(capNotice(l)), findsNothing);
     });
 
     testWidgets('a PENDING invitation holds a seat', (tester) async {
@@ -319,7 +339,7 @@ void main() {
           tester,
           source(members: const [admin], invitations: [pendingInvite()]));
 
-      expect(find.text(l[K.famFreeCapNotice]), findsOne);
+      expect(find.text(capNotice(l)), findsOne);
     });
 
     testWidgets('a DEPARTED member holds none', (tester) async {
@@ -616,7 +636,7 @@ void main() {
       expect(find.text(l[KApp.famPendingBadge]), findsOne);
       expect(find.text(l[KApp.famPendingHint]), findsOne);
       expect(find.text(l[K.famLeftBadge]), findsNothing);
-      expect(find.text(l[K.famFreeCapNotice]), findsOne);
+      expect(find.text(capNotice(l)), findsOne);
 
       // U-47: the two moves are behind the card's ⋮, not buttons in the tile.
       expect(find.text(l[KApp.famPendingInvite]), findsNothing);
