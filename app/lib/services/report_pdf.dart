@@ -96,6 +96,10 @@ Future<Uint8List> buildReportPdf(
         ..._historySection(report, l),
         pw.SizedBox(height: 14),
         ..._dayAccountsSection(report, l),
+        if (report.agenda != null) ...[
+          pw.SizedBox(height: 14),
+          ..._agendaSection(report.agenda!, l),
+        ],
         pw.SizedBox(height: 16),
         pw.Divider(color: PdfColors.grey400),
         _paragraph(
@@ -358,6 +362,40 @@ List<pw.Widget> _dayAccountsSection(CustodyReport report, Localization l) => [
             ),
           ),
     ];
+
+/// F-55: section 5 — the agenda of the period, day by day. It replaces the
+/// Observação do dia; it never says who had the child (sections 1–3 do).
+List<pw.Widget> _agendaSection(List<ReportAgendaItem> items, Localization l) {
+  DateTime? lastDay;
+  final rows = <pw.Widget>[];
+  for (final i in items) {
+    final day = DateTime(i.date.year, i.date.month, i.date.day);
+    if (lastDay != day) {
+      lastDay = day;
+      rows.add(pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 6, bottom: 2),
+        child: pw.Text(l.formatDate(day),
+            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+      ));
+    }
+    final head = [
+      ?i.timeRange,
+      i.kindLabel,
+      ?i.childName,
+    ].join(' · ');
+    rows.add(pw.Padding(
+      padding: const pw.EdgeInsets.only(left: 10, bottom: 2),
+      child: pw.Text(i.body == null ? head : '$head — ${i.body}',
+          style: const pw.TextStyle(fontSize: 8.5)),
+    ));
+  }
+  return [
+    _sectionTitle(l[KApp.agendaPdfSection]),
+    _paragraph(l[KApp.agendaPdfLead], size: 8.5),
+    pw.SizedBox(height: 4),
+    if (items.isEmpty) _paragraph(l[KApp.agendaPdfEmpty]) else ...rows,
+  ];
+}
 
 /// Mirror of the web's document markup: a two-sided change reads `de → para`,
 /// a one-sided one prints whichever value exists.

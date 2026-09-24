@@ -22,6 +22,8 @@ import 'suites/billing_webhook.dart';
 import 'suites/caregiver_gate.dart';
 import 'suites/claim_invitation.dart';
 import 'suites/consent_and_retention.dart';
+import 'suites/_helpers.dart';
+import 'suites/agenda.dart';
 import 'suites/children.dart';
 import 'suites/custom_role.dart';
 import 'suites/day_account.dart';
@@ -91,8 +93,20 @@ import 'suites/test_recipient_suppression.dart';
 void main() {
   final fx = GateFixture();
 
-  setUpAll(fx.initialize);
-  tearDownAll(fx.dispose);
+  // F-55: the agenda flag is OFF for the run (see `readFlag`), and whatever
+  // the dev project had — ON, by T-84 — comes back at the end.
+  const agendaFlag = 'feature.child_agenda';
+  String? agendaFlagBefore;
+  setUpAll(() async {
+    await fx.initialize();
+    agendaFlagBefore = await readFlag(fx, agendaFlag);
+    await writeFlag(fx, agendaFlag, 'false');
+  });
+  tearDownAll(() async {
+    final before = agendaFlagBefore;
+    if (before != null) await writeFlag(fx, agendaFlag, before);
+    await fx.dispose();
+  });
 
   familyIsolationTests(fx);
   rlsHardeningTests(fx);
@@ -137,6 +151,9 @@ void main() {
   customRoleTests(fx);
   // F-55: the child entity — dark by flag, admin-only, family-scoped.
   childrenTests(fx);
+  // F-55 PR 2: the agenda — kinds, the free note, Premium, the past, the
+  // frozen observation and the conversion.
+  agendaTests(fx);
   appSettingsTests(fx);
   publicSettingsTests(fx);
   serverParametersTests(fx);

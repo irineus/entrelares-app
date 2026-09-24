@@ -464,6 +464,47 @@ abstract final class KApp {
   static const String childRemoved = 'app.child.removed';
   static const String childErrLoad = 'app.child.errLoad';
 
+  // ── F-55 the day agenda (PR 2). Every key lives under `app.agenda.` — the
+  //    ADDRESS vocabulary_test pins the words "agenda" and "nota" to. ──
+  static const String agendaSection = 'app.agenda.section';
+  static const String agendaKindSchool = 'app.agenda.kind.school';
+  static const String agendaKindHealth = 'app.agenda.kind.health';
+  static const String agendaKindMedicine = 'app.agenda.kind.medicine';
+  static const String agendaKindActivity = 'app.agenda.kind.activity';
+  static const String agendaKindFree = 'app.agenda.kind.free';
+  static const String agendaKindNote = 'app.agenda.kind.note';
+  static const String agendaKindOther = 'app.agenda.kind.other';
+  static const String agendaAdd = 'app.agenda.add';
+  static const String agendaEmpty = 'app.agenda.empty';
+  static const String agendaNewTitle = 'app.agenda.newTitle';
+  static const String agendaEditTitle = 'app.agenda.editTitle';
+  static const String agendaKindLabel = 'app.agenda.kindLabel';
+  static const String agendaChildLabel = 'app.agenda.childLabel';
+  static const String agendaStartLabel = 'app.agenda.startLabel';
+  static const String agendaEndLabel = 'app.agenda.endLabel';
+  static const String agendaNoTime = 'app.agenda.noTime';
+  static const String agendaClearTime = 'app.agenda.clearTime';
+  static const String agendaBodyLabel = 'app.agenda.bodyLabel';
+  static const String agendaNoteBodyLabel = 'app.agenda.noteBodyLabel';
+  static const String agendaDelete = 'app.agenda.delete';
+  static const String agendaDeleteConfirm = 'app.agenda.deleteConfirm';
+  static const String agendaSaved = 'app.agenda.saved';
+  static const String agendaDeleted = 'app.agenda.deleted';
+  static const String agendaErrLoad = 'app.agenda.errLoad';
+  static const String agendaFreeNotesOne = 'app.agenda.freeNotesOne';
+  static const String agendaFreeNotesMany = 'app.agenda.freeNotesMany';
+  static const String agendaReadOnlyPast = 'app.agenda.readOnlyPast';
+  static const String agendaReadOnlyPremium = 'app.agenda.readOnlyPremium';
+  static const String agendaNoChildAdmin = 'app.agenda.noChildAdmin';
+  static const String agendaNoChildMember = 'app.agenda.noChildMember';
+  static const String agendaBy = 'app.agenda.by';
+  static const String agendaFromObservation = 'app.agenda.fromObservation';
+  static const String agendaAuditAdded = 'app.agenda.auditAdded';
+  static const String agendaAuditDeleted = 'app.agenda.auditDeleted';
+  static const String agendaPdfSection = 'app.agenda.pdfSection';
+  static const String agendaPdfLead = 'app.agenda.pdfLead';
+  static const String agendaPdfEmpty = 'app.agenda.pdfEmpty';
+
   static const List<String> allKeys = [
     sessionRestoredExpired,
     sessionExpired,
@@ -748,6 +789,44 @@ abstract final class KApp {
     childRenamed,
     childRemoved,
     childErrLoad,
+    agendaSection,
+    agendaKindSchool,
+    agendaKindHealth,
+    agendaKindMedicine,
+    agendaKindActivity,
+    agendaKindFree,
+    agendaKindNote,
+    agendaKindOther,
+    agendaAdd,
+    agendaEmpty,
+    agendaNewTitle,
+    agendaEditTitle,
+    agendaKindLabel,
+    agendaChildLabel,
+    agendaStartLabel,
+    agendaEndLabel,
+    agendaNoTime,
+    agendaClearTime,
+    agendaBodyLabel,
+    agendaNoteBodyLabel,
+    agendaDelete,
+    agendaDeleteConfirm,
+    agendaSaved,
+    agendaDeleted,
+    agendaErrLoad,
+    agendaFreeNotesOne,
+    agendaFreeNotesMany,
+    agendaReadOnlyPast,
+    agendaReadOnlyPremium,
+    agendaNoChildAdmin,
+    agendaNoChildMember,
+    agendaBy,
+    agendaFromObservation,
+    agendaAuditAdded,
+    agendaAuditDeleted,
+    agendaPdfSection,
+    agendaPdfLead,
+    agendaPdfEmpty,
   ];
 }
 
@@ -1179,11 +1258,50 @@ abstract final class StringsAppPtBr {
     KApp.childAdd: 'Cadastrar a criança',
     KApp.childRename: 'Mudar o nome',
     KApp.childRemove: 'Remover',
-    KApp.childRemoveConfirm: 'Remover {0} da família?',
+    KApp.childRemoveConfirm: 'Remover {0} da família? A agenda de {0} sai junto.',
     KApp.childAdded: 'Criança cadastrada.',
     KApp.childRenamed: 'Nome atualizado.',
     KApp.childRemoved: 'Criança removida.',
     KApp.childErrLoad: 'Não foi possível carregar a criança.',
+    // ── F-55 the day agenda ──
+    KApp.agendaSection: 'Agenda',
+    KApp.agendaKindSchool: 'Escola',
+    KApp.agendaKindHealth: 'Saúde',
+    KApp.agendaKindMedicine: 'Remédio',
+    KApp.agendaKindActivity: 'Atividade',
+    KApp.agendaKindFree: 'Livre',
+    KApp.agendaKindNote: 'Nota',
+    KApp.agendaKindOther: 'Outro',
+    KApp.agendaAdd: 'Adicionar à agenda',
+    KApp.agendaEmpty: 'Nada na agenda deste dia.',
+    KApp.agendaNewTitle: 'Novo na agenda',
+    KApp.agendaEditTitle: 'Editar na agenda',
+    KApp.agendaKindLabel: 'Tipo',
+    KApp.agendaChildLabel: 'Criança',
+    KApp.agendaStartLabel: 'Início',
+    KApp.agendaEndLabel: 'Fim',
+    KApp.agendaNoTime: 'Sem horário',
+    KApp.agendaClearTime: 'Tirar o horário',
+    KApp.agendaBodyLabel: 'Texto (opcional)',
+    KApp.agendaNoteBodyLabel: 'Texto da nota',
+    KApp.agendaDelete: 'Apagar da agenda',
+    KApp.agendaDeleteConfirm: 'Apagar este item da agenda? O Histórico guarda quem apagou.',
+    KApp.agendaSaved: 'Agenda atualizada.',
+    KApp.agendaDeleted: 'Item apagado da agenda.',
+    KApp.agendaErrLoad: 'Não foi possível carregar a agenda deste dia.',
+    KApp.agendaFreeNotesOne: 'No plano gratuito, a agenda tem {0} nota por dia. Escola, saúde, remédio e atividades são Premium.',
+    KApp.agendaFreeNotesMany: 'No plano gratuito, a agenda tem {0} notas por dia. Escola, saúde, remédio e atividades são Premium.',
+    KApp.agendaReadOnlyPast: 'Um dia que já passou é só leitura na agenda.',
+    KApp.agendaReadOnlyPremium: 'Este item é da agenda Premium e fica só para leitura no plano gratuito.',
+    KApp.agendaNoChildAdmin: 'Cadastre a criança em Família para usar a agenda completa.',
+    KApp.agendaNoChildMember: 'Para a agenda completa, o administrador cadastra a criança em Família.',
+    KApp.agendaBy: 'por {0}',
+    KApp.agendaFromObservation: 'da antiga observação do dia',
+    KApp.agendaAuditAdded: '{0} adicionou à agenda',
+    KApp.agendaAuditDeleted: '{0} apagou da agenda',
+    KApp.agendaPdfSection: '5. Agenda da criança',
+    KApp.agendaPdfLead: 'O que a família registrou na agenda para os dias do período. A agenda não muda o planejamento: não troca quem fica com a criança em nenhum dia.',
+    KApp.agendaPdfEmpty: 'Nenhum item na agenda no período.',
   };
 }
 
@@ -1610,10 +1728,49 @@ abstract final class StringsAppEn {
     KApp.childAdd: 'Add the child',
     KApp.childRename: 'Change the name',
     KApp.childRemove: 'Remove',
-    KApp.childRemoveConfirm: 'Remove {0} from the family?',
+    KApp.childRemoveConfirm: 'Remove {0} from the family? {0}\'s agenda goes with it.',
     KApp.childAdded: 'Child added.',
     KApp.childRenamed: 'Name updated.',
     KApp.childRemoved: 'Child removed.',
     KApp.childErrLoad: 'The child could not be loaded.',
+    // ── F-55 the day agenda ──
+    KApp.agendaSection: 'Agenda',
+    KApp.agendaKindSchool: 'School',
+    KApp.agendaKindHealth: 'Health',
+    KApp.agendaKindMedicine: 'Medicine',
+    KApp.agendaKindActivity: 'Activity',
+    KApp.agendaKindFree: 'Free time',
+    KApp.agendaKindNote: 'Note',
+    KApp.agendaKindOther: 'Other',
+    KApp.agendaAdd: 'Add to the agenda',
+    KApp.agendaEmpty: 'Nothing on this day\'s agenda.',
+    KApp.agendaNewTitle: 'New on the agenda',
+    KApp.agendaEditTitle: 'Edit on the agenda',
+    KApp.agendaKindLabel: 'Type',
+    KApp.agendaChildLabel: 'Child',
+    KApp.agendaStartLabel: 'Start',
+    KApp.agendaEndLabel: 'End',
+    KApp.agendaNoTime: 'No time',
+    KApp.agendaClearTime: 'Remove the time',
+    KApp.agendaBodyLabel: 'Text (optional)',
+    KApp.agendaNoteBodyLabel: 'Note text',
+    KApp.agendaDelete: 'Delete from the agenda',
+    KApp.agendaDeleteConfirm: 'Delete this item from the agenda? The History keeps who deleted it.',
+    KApp.agendaSaved: 'Agenda updated.',
+    KApp.agendaDeleted: 'Item deleted from the agenda.',
+    KApp.agendaErrLoad: 'This day\'s agenda could not be loaded.',
+    KApp.agendaFreeNotesOne: 'On the free plan, the agenda has {0} note per day. School, health, medicine and activities are Premium.',
+    KApp.agendaFreeNotesMany: 'On the free plan, the agenda has {0} notes per day. School, health, medicine and activities are Premium.',
+    KApp.agendaReadOnlyPast: 'A past day is read-only on the agenda.',
+    KApp.agendaReadOnlyPremium: 'This item belongs to the Premium agenda and is read-only on the free plan.',
+    KApp.agendaNoChildAdmin: 'Add the child under Family to use the full agenda.',
+    KApp.agendaNoChildMember: 'For the full agenda, the administrator adds the child under Family.',
+    KApp.agendaBy: 'by {0}',
+    KApp.agendaFromObservation: 'from the old day\'s observation',
+    KApp.agendaAuditAdded: '{0} added to the agenda',
+    KApp.agendaAuditDeleted: '{0} deleted from the agenda',
+    KApp.agendaPdfSection: '5. The child\'s agenda',
+    KApp.agendaPdfLead: 'What the family recorded on the agenda for the days of the period. The agenda does not change the plan: it never changes who has the child on any day.',
+    KApp.agendaPdfEmpty: 'No agenda items in the period.',
   };
 }

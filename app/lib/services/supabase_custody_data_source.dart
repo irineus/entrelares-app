@@ -9,6 +9,7 @@ import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
+import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -1577,6 +1578,92 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   @override
   Future<void> removeChild(int childId) async {
     await _client.rpc<dynamic>('remove_child', params: {'p_child_id': childId});
+  }
+
+  // ── F-55 PR 2: the day agenda ───────────────────────────────────────────
+
+  static String _isoDay(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  @override
+  Future<List<ChildEvent>> fetchChildEvents(DateTime from, DateTime to,
+      {bool includeDeleted = false}) async {
+    var query = _client
+        .from('child_events')
+        .select()
+        .gte('event_date', _isoDay(from))
+        .lte('event_date', _isoDay(to));
+    if (!includeDeleted) query = query.isFilter('deleted_at', null);
+    // postgrest-dart orders DESCENDING unless told otherwise.
+    final rows = await query
+        .order('event_date', ascending: true)
+        .order('id', ascending: true);
+    return rows.map(ChildEvent.fromJson).toList();
+  }
+
+  Map<String, dynamic> _eventParams({
+    required DateTime date,
+    required String kind,
+    int? childId,
+    String? start,
+    String? end,
+    String? body,
+  }) =>
+      {
+        'p_date': _isoDay(date),
+        'p_kind': kind,
+        'p_child_id': childId,
+        'p_start': start,
+        'p_end': end,
+        'p_body': (body ?? '').trim().isEmpty ? null : body!.trim(),
+      };
+
+  @override
+  Future<int> addChildEvent({
+    required DateTime date,
+    required String kind,
+    int? childId,
+    String? start,
+    String? end,
+    String? body,
+  }) async =>
+      await _client.rpc<dynamic>('add_child_event',
+          params: _eventParams(
+              date: date,
+              kind: kind,
+              childId: childId,
+              start: start,
+              end: end,
+              body: body)) as int;
+
+  @override
+  Future<void> updateChildEvent({
+    required int id,
+    required DateTime date,
+    required String kind,
+    int? childId,
+    String? start,
+    String? end,
+    String? body,
+  }) async {
+    await _client.rpc<dynamic>('update_child_event', params: {
+      'p_event_id': id,
+      ..._eventParams(
+          date: date,
+          kind: kind,
+          childId: childId,
+          start: start,
+          end: end,
+          body: body),
+    });
+  }
+
+  @override
+  Future<void> deleteChildEvent(int id) async {
+    await _client
+        .rpc<dynamic>('delete_child_event', params: {'p_event_id': id});
   }
 
   // ── Lote 4: profile, account and the LGPD export ─────────────────────────

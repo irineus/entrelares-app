@@ -14,6 +14,7 @@ import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
+import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -564,6 +565,39 @@ abstract class CustodyDataSource {
   Future<void> renameChild({required int childId, required String firstName});
 
   Future<void> removeChild(int childId);
+
+  // ── F-55 PR 2: the day agenda ────────────────────────────────────────────
+
+  /// The family's agenda events in [from]..[to] (date-only, inclusive).
+  /// [includeDeleted] brings the soft-deleted rows too — the Histórico says
+  /// that they were removed; the day sheet shows only the live ones.
+  Future<List<ChildEvent>> fetchChildEvents(DateTime from, DateTime to,
+      {bool includeDeleted = false});
+
+  /// Server-enforced: flag on, an active member, today on, the Premium gate,
+  /// the free note cap, the day cap and the text limit — the RPC's PT-BR
+  /// sentence reaches the user verbatim.
+  Future<int> addChildEvent({
+    required DateTime date,
+    required String kind,
+    int? childId,
+    String? start,
+    String? end,
+    String? body,
+  });
+
+  Future<void> updateChildEvent({
+    required int id,
+    required DateTime date,
+    required String kind,
+    int? childId,
+    String? start,
+    String? end,
+    String? body,
+  });
+
+  /// A soft delete: the row stays with who and when.
+  Future<void> deleteChildEvent(int id);
 
   // ── Lote 4: profile, account and the LGPD export ──────────────────────────
 

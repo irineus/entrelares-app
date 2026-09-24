@@ -51,6 +51,7 @@ void childrenTests(GateFixture fx) {
       fam = await fx.createFamily('f55kids');
     });
 
+    // Back to what the run found (OFF — the entrypoint's choice for the run).
     tearDownAll(() async => setFlag(flagBefore));
 
     test('with the flag OFF the server refuses the write', () async {

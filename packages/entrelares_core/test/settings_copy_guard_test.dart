@@ -32,6 +32,12 @@ void main() {
       keys: [K.horizonPremium, K.horizonFree],
       words: const [],
     ),
+    // F-55: the free family's notes per day (the sheet's free-plan line).
+    'agenda.free_notes_per_day': (
+      seed: seeds.agendaFreeNotesPerDay,
+      keys: [KApp.agendaFreeNotesOne, KApp.agendaFreeNotesMany],
+      words: ['uma', 'one'],
+    ),
     // T-82: server-only key, stated through the notification's `params.percent`
     // (seed 80 — the app has no PublicSettings getter for it on purpose).
     'email_quota.warn_percent': (

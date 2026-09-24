@@ -74,6 +74,9 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   /// registered name(s) and the free field disappears (owner, 24/09/2026).
   /// Null keeps today's free field — flag off, or no child yet.
   String? _registeredChildNames;
+
+  /// F-55: the agenda is on for this build — the PDF prints section 5.
+  bool _agendaOn = false;
   bool _includeFutureSwaps = false;
 
   CustodyReport? _report;
@@ -123,6 +126,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
     try {
       final settings =
           PublicSettings(await widget.dataSource.fetchPublicSettings());
+      _agendaOn = settings.childAgendaEnabled;
       if (!settings.childAgendaEnabled) return null;
       final children = await widget.dataSource.fetchChildren();
       if (!mounted) return null;
@@ -188,6 +192,33 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         dayAccounts = await widget.dataSource.fetchDayAccounts(start, end);
       } catch (_) {/* section 4 prints its empty line */}
 
+      // F-55: section 5 — the live events of the period. A failure prints the
+      // section's empty line, like the other enrichments.
+      List<ReportAgendaItem>? agenda;
+      if (_agendaOn) {
+        agenda = const [];
+        try {
+          final events = await widget.dataSource.fetchChildEvents(start, end);
+          final children = await widget.dataSource.fetchChildren();
+          agenda = [
+            for (final e in events)
+              ReportAgendaItem(
+                date: e.eventDate,
+                timeRange: AgendaRules.timeRange(e.startTime, e.endTime),
+                start: e.startTime,
+                kindLabel: l[(AgendaKind.parse(e.kind) ?? AgendaKind.other)
+                    .labelKey],
+                childName: [
+                  for (final c in children)
+                    if (c.id == e.childId) c.firstName
+                ].firstOrNull,
+                body: e.body,
+                createdAt: e.createdAt,
+              ),
+          ];
+        } catch (_) {/* section 5 prints its empty line */}
+      }
+
       String roleLabelOf(int profileId) {
         for (final m in members) {
           if (m.id != profileId) continue;
@@ -245,6 +276,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               createdAtLocal: e.createdAt.toLocal(),
             ),
         ],
+        agenda: agenda,
         dayAccounts: [
           for (final a in dayAccounts)
             ReportDayAccount(

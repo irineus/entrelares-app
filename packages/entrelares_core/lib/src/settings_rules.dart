@@ -96,6 +96,13 @@ class PublicSettings {
   bool get childAgendaEnabled =>
       parseBoolSetting(values, 'feature.child_agenda', false);
 
+  // F-55 PR 2 — the agenda's operator keys (the RPCs read the same ones).
+  bool get agendaPremiumOnly =>
+      parseBoolSetting(values, 'agenda.premium_only', true);
+  int get agendaFreeNotesPerDay => _int('agenda.free_notes_per_day', 1);
+  int get agendaMaxEventsPerDay => _int('agenda.max_events_per_day', 20);
+  int get agendaTextMaxChars => _int('agenda.text_max_chars', 500);
+
   // T-39 billing (F-48 promotional prices: 549, not 490 — Asaas refuses
   // Pix/boleto charges under R$ 5,00). Enabled=false shows the waitlist.
   bool get billingEnabled => parseBoolSetting(values, 'billing.enabled', false);

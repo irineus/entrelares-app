@@ -156,6 +156,38 @@ void main() {
     }
   });
 
+  // F-55: "Agenda" and "Nota" are the day agenda, and nothing else — the
+  // agenda REPLACES the Observação do dia, and a second "nota" anywhere would
+  // read as the old field. Same shape as the aviso and the relato: an ADDRESS
+  // (`app.agenda.`, plus the child page that introduces it) and the half that
+  // rots in silence (the surface still says it).
+  const agendaPrefixes = ['app.agenda.', 'app.child.'];
+
+  test('"agenda" and "nota" name the F-55 agenda, and nothing else', () {
+    final pt = catalogs['pt-BR']!;
+    final word = RegExp(r'\b(agendas?|notas?)\b', caseSensitive: false);
+    for (final key in [...K.allKeys, ...KApp.allKeys]) {
+      if (agendaPrefixes.any(key.startsWith)) continue;
+      expect(word.hasMatch(pt[key]), isFalse,
+          reason: '$key says "${pt[key]}"');
+    }
+  });
+
+  test('the F-55 surface calls itself the agenda, and the note a nota', () {
+    final pt = catalogs['pt-BR']!;
+    for (final key in [
+      KApp.agendaSection,
+      KApp.agendaAdd,
+      KApp.agendaPdfSection,
+    ]) {
+      expect(RegExp(r'\bagenda\b', caseSensitive: false).hasMatch(pt[key]),
+          isTrue,
+          reason: '$key says "${pt[key]}"');
+    }
+    expect(pt[KApp.agendaKindNote], 'Nota');
+    expect(catalogs['en']![KApp.agendaKindNote], 'Note');
+  });
+
   // `scheduled_parent` is "planejado" / "planned" — the word the day sheet, the
   // onboarding, the wizard and the PDF already used. Three stragglers said
   // "agendado"; what is left of that word is a DATE something is set for
