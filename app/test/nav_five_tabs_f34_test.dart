@@ -41,7 +41,9 @@ const _wide = Size(800, 900);
 const _paths = ['/', '/family', '/notifications', '/expenses', '/reports'];
 
 Widget _shellApp(Localization l,
-    {required int selected, required ValueNotifier<bool> expensesTab}) {
+    {required int selected,
+    required ValueNotifier<bool> expensesTab,
+    ValueNotifier<bool>? chatTab}) {
   final router = GoRouter(
     initialLocation: _paths[selected],
     routes: [
@@ -53,6 +55,7 @@ Widget _shellApp(Localization l,
             onSignOut: () async {},
             onOpenProfile: () {},
             expensesTab: expensesTab,
+            chatTab: chatTab,
             badge: NotificationBadge(
                 FakeCustodyDataSource(members: const [], days: []))),
         branches: [
@@ -148,6 +151,25 @@ void main() {
         expectOneLineIn(tester, l[key], _wide.width / 5);
       }
     });
+  }
+
+  // F-35: the final bar — Calendário · Família · Comunicação · Despesas ·
+  // Relatórios. "Comunicação" is the widest label the bar has had.
+  for (final language in AppLanguage.values) {
+    final l = Localization(language);
+    for (final scale in [1.0, 1.3]) {
+      testWidgets('$language @$scale, the final bar: Comunicação selected '
+          'fits its slot on one line', (tester) async {
+        await useSize(tester, _phone, scale);
+        await tester.pumpWidget(_shellApp(l,
+            selected: 2,
+            expensesTab: ValueNotifier(true),
+            chatTab: ValueNotifier(true)));
+        await tester.pumpAndSettle();
+        expectOneLineIn(tester, l[KApp.chatNav], _phone.width / 5);
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   testWidgets('off: four tabs, and Relatórios still opens its own branch',

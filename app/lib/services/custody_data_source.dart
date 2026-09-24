@@ -18,6 +18,7 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/child_routine.dart';
+import 'package:entrelares_db_contracts/models/chat_message.dart';
 import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
@@ -645,6 +646,32 @@ abstract class CustodyDataSource {
   /// `verify_report_attestation` — PUBLIC (anon): the closed state and, while
   /// valid, the period, the attested summary and the fingerprint.
   Future<Map<String, dynamic>> verifyReportAttestation(String id);
+
+  // ── F-35: the family's Conversa ──────────────────────────────────────────
+
+  /// Every text of the family's conversation, oldest first. A viewer reads
+  /// them too (RLS).
+  Future<List<ChatMessage>> fetchChatMessages();
+
+  /// "Lida por" — every read mark of the family's texts.
+  Future<List<ChatRead>> fetchChatReads();
+
+  /// Server-enforced: flag on, a full seat, Premium, the length key and the
+  /// hourly brake — the RPC's PT-BR sentence reaches the user verbatim.
+  Future<int> sendChatMessage(
+      {required String body, int? quoteId, DateTime? quotedDay});
+
+  /// Marks every text up to [upToId] (not mine) as read now.
+  Future<int> markChatRead(int upToId);
+
+  /// Whether I silenced the chat's push.
+  Future<bool> fetchChatPushMuted();
+
+  Future<void> setChatPushMuted(bool muted);
+
+  /// How many texts of others arrived after the newest one [profileId] read
+  /// (capped at 100 — the badge prints "99+" past that).
+  Future<int> fetchChatUnreadCount(int profileId);
 
   // ── F-34: shared expenses ────────────────────────────────────────────────
 

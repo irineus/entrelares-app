@@ -128,6 +128,10 @@ class CalendarScreen extends StatefulWidget {
   /// The screen consumes the value — it sets it back to null when it opens.
   final ValueNotifier<DateTime?>? planRequest;
 
+  /// F-35: a day a Conversa text cited — the calendar goes to its month and
+  /// opens that day's sheet once the month has loaded.
+  final ValueNotifier<DateTime?>? dayRequest;
+
   /// F-70: the plan-end strip, for tests.
   static const planEndStripKey = Key('plan-end-strip');
 
@@ -144,7 +148,8 @@ class CalendarScreen extends StatefulWidget {
       this.onOpenNotifications,
       this.onOpenPlan,
       this.handoffNudgePrefs,
-      this.planRequest});
+      this.planRequest,
+      this.dayRequest});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -294,6 +299,43 @@ class _CalendarScreenState extends State<CalendarScreen>
     widget.planRequest?.addListener(_onPlanRequest);
     // The branch may be built by the very navigation that carries the request.
     if (widget.planRequest?.value != null) _onPlanRequest();
+    widget.dayRequest?.addListener(_onDayRequest);
+    if (widget.dayRequest?.value != null) _onDayRequest();
+  }
+
+  /// F-35: the day a cited Conversa text asked for, held until its month is
+  /// the one on screen and loaded.
+  DateTime? _pendingDay;
+
+  void _onDayRequest() {
+    final day = widget.dayRequest?.value;
+    if (day == null) return;
+    widget.dayRequest!.value = null;
+    _pendingDay = DateTime(day.year, day.month, day.day);
+    final month = DateTime(day.year, day.month);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if ((month.year != _visibleMonth.year ||
+              month.month != _visibleMonth.month) &&
+          _pageController.hasClients) {
+        _pageController.jumpToPage(_pageForMonth(month));
+      }
+      _openPendingDay();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _openPendingDay() {
+    final day = _pendingDay;
+    if (day == null || _loading || !mounted) return;
+    if (day.year != _visibleMonth.year || day.month != _visibleMonth.month) {
+      return;
+    }
+    _pendingDay = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openDay(day);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   /// F-70: the family's last planned day, read with every load (best-effort).
@@ -492,6 +534,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     widget.onboarding?.removeListener(_onOnboardingPing);
     widget.connectivity?.removeListener(_onConnectivityChanged);
     widget.planRequest?.removeListener(_onPlanRequest);
+    widget.dayRequest?.removeListener(_onDayRequest);
     _unwatch?.call();
     _unwatchWorkflow?.call();
     _pollTimer?.cancel();
@@ -585,6 +628,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         _loadError = null;
       });
       _openPendingPlan();
+      _openPendingDay();
       final readAt = DateTime.now();
       widget.connectivity?.loadedData(readAt);
       // T-18: only the CURRENT month is worth a device copy — the door-of-the-

@@ -18,6 +18,7 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/child_routine.dart';
+import 'package:entrelares_db_contracts/models/chat_message.dart';
 import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
@@ -1111,6 +1112,91 @@ class FakeCustodyDataSource implements CustodyDataSource {
   @override
   Future<Map<String, dynamic>> verifyReportAttestation(String id) async =>
       verifyAnswer;
+
+  // ── F-35: the family's Conversa ──
+  List<ChatMessage> chatMessages = [];
+  List<ChatRead> chatReads = [];
+  bool chatPushMuted = false;
+  Object? throwOnChatSend;
+
+  /// Every chat write, in order, as a readable line.
+  final List<String> chatWrites = [];
+  int _nextChatId = 500;
+
+  /// The profile the fake chat RPCs act as.
+  int chatActorId = 1;
+
+  @override
+  Future<List<ChatMessage>> fetchChatMessages() async => chatMessages;
+
+  @override
+  Future<List<ChatRead>> fetchChatReads() async => chatReads;
+
+  @override
+  Future<int> sendChatMessage(
+      {required String body, int? quoteId, DateTime? quotedDay}) async {
+    if (throwOnChatSend != null) throw throwOnChatSend!;
+    final id = _nextChatId++;
+    final day = quotedDay == null
+        ? '-'
+        : '${quotedDay.year}-${quotedDay.month.toString().padLeft(2, '0')}-'
+            '${quotedDay.day.toString().padLeft(2, '0')}';
+    chatWrites.add('send:$body:${quoteId ?? '-'}:$day');
+    chatMessages = [
+      ...chatMessages,
+      ChatMessage(
+          id: id,
+          authorProfileId: chatActorId,
+          body: body.trim(),
+          quoteId: quoteId,
+          quotedDay: quotedDay,
+          createdAt: DateTime.utc(2026, 9, 24, 12)),
+    ];
+    return id;
+  }
+
+  @override
+  Future<int> markChatRead(int upToId) async {
+    chatWrites.add('read:$upToId');
+    var n = 0;
+    for (final m in chatMessages) {
+      if (m.id > upToId || m.authorProfileId == chatActorId) continue;
+      if (chatReads.any(
+          (r) => r.messageId == m.id && r.profileId == chatActorId)) {
+        continue;
+      }
+      chatReads = [
+        ...chatReads,
+        ChatRead(
+            messageId: m.id,
+            profileId: chatActorId,
+            readAt: DateTime.utc(2026, 9, 24, 12, 30)),
+      ];
+      n++;
+    }
+    return n;
+  }
+
+  @override
+  Future<bool> fetchChatPushMuted() async => chatPushMuted;
+
+  @override
+  Future<int> fetchChatUnreadCount(int profileId) async => ChatRules.unreadFor(
+      profileId,
+      [
+        for (final m in chatMessages)
+          (id: m.id, author: m.authorProfileId, body: m.body)
+      ],
+      [
+        for (final r in chatReads)
+          (messageId: r.messageId, profileId: r.profileId, readAt: r.readAt)
+      ]);
+
+  @override
+  Future<void> setChatPushMuted(bool muted) async {
+    chatWrites.add('mute:$muted');
+    chatPushMuted = muted;
+  }
 
   // ── F-34: shared expenses ──
   List<Expense> expenses = [];

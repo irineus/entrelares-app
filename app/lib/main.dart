@@ -36,6 +36,7 @@ import 'screens/premium_return_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/verify_report_screen.dart';
+import 'screens/communication_screen.dart';
 import 'screens/expenses_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/reset_password_screen.dart';
@@ -65,6 +66,7 @@ import 'services/support_service.dart';
 import 'services/supabase_custody_data_source.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_l10n.dart';
+import 'widgets/chat_view.dart';
 import 'widgets/app_width_cap.dart';
 import 'widgets/app_splash.dart';
 import 'widgets/onboarding.dart';
@@ -444,7 +446,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
             installHint: _installHint,
             connectivity: appConnectivity,
             tourKeys: _tourKeys,
-            expensesTab: _expensesTab),
+            expensesTab: _expensesTab,
+            chatTab: _chatTab),
         branches: [
           StatefulShellBranch(routes: [
             GoRoute(
@@ -461,7 +464,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   onOpenNotifications: () => _router.go('/notifications'),
                   onOpenPlan: () => _router.go('/family/plan'),
                   handoffNudgePrefs: _handoffNudgePrefs,
-                  planRequest: _planRequest),
+                  planRequest: _planRequest,
+                  dayRequest: _dayRequest),
             ),
           ]),
           // U-35: the branch's navigator reports to the roster's observer, so
@@ -579,25 +583,54 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/notifications',
-              builder: (_, state) => NotificationsScreen(
-                  dataSource: _dataSource,
-                  badge: _badge,
-                  connectivity: appConnectivity,
-                  push: _push,
-                  installFacts: _browserFacts,
-                  analytics: _analytics,
-                  onPlanFrom: (start) {
-                    _planRequest.value = start;
-                    _router.go('/');
-                  },
-                  onOpenExpenses: () => _router.go('/expenses'),
-                  landing: switch (state.uri.queryParameters['tab']) {
-                    'incoming' => NotificationLanding.incoming,
-                    'history' => NotificationLanding.history,
-                    'chat' => NotificationLanding.chat,
-                    _ => null,
-                  },
-                  landingNonce: state.uri.queryParameters['n']),
+              // F-35: with the Conversa on this branch is Comunicação — the
+              // Conversa and these Notificações as its two tabs. Listened to,
+              // because the flag is read after the shell mounted.
+              builder: (_, state) {
+                final landing = switch (state.uri.queryParameters['tab']) {
+                  'incoming' => NotificationLanding.incoming,
+                  'history' => NotificationLanding.history,
+                  'chat' => NotificationLanding.chat,
+                  _ => null,
+                };
+                final nonce = state.uri.queryParameters['n'];
+                NotificationsScreen notifications({required bool embedded}) =>
+                    NotificationsScreen(
+                        dataSource: _dataSource,
+                        badge: _badge,
+                        connectivity: appConnectivity,
+                        push: _push,
+                        installFacts: _browserFacts,
+                        analytics: _analytics,
+                        onPlanFrom: (start) {
+                          _planRequest.value = start;
+                          _router.go('/');
+                        },
+                        onOpenExpenses: () => _router.go('/expenses'),
+                        embedded: embedded,
+                        landing: landing,
+                        landingNonce: nonce);
+                return ValueListenableBuilder<bool>(
+                  valueListenable: _chatTab,
+                  builder: (_, chatOn, _) => chatOn
+                      ? CommunicationScreen(
+                          badge: _badge,
+                          openOnChat: landing == NotificationLanding.chat,
+                          landingNonce: '${landing?.name}:$nonce',
+                          chat: ChatView(
+                            dataSource: _dataSource,
+                            onOpenPlan: () => _router.go('/family/plan'),
+                            onOpenDay: (day) {
+                              _dayRequest.value = day;
+                              _router.go('/');
+                            },
+                            onRead: _badge.refresh,
+                          ),
+                          notifications: notifications(embedded: true),
+                        )
+                      : notifications(embedded: false),
+                );
+              },
             ),
           ]),
           // F-34: always a branch (index 3, HomeShell.expensesBranch); the
@@ -656,6 +689,13 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// F-34: whether the bar offers Despesas (flag on, not a viewer). Read at
   /// sign-in; the shell listens, for the reason [_deletionBanner] gives.
   final _expensesTab = ValueNotifier<bool>(false);
+
+  /// F-35: whether the Conversa is on for this member (viewers read it too) —
+  /// the third tab is Comunicação then. Read at sign-in; listened to.
+  final _chatTab = ValueNotifier<bool>(false);
+
+  /// F-35: a day a Conversa text cited — the calendar opens that day's sheet.
+  final _dayRequest = ValueNotifier<DateTime?>(null);
 
   /// T-65: the web→app offer, or null — which is the answer on every native
   /// build and on every browser that did not confirm the app is on this device.
@@ -890,6 +930,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _refresh.dispose();
     _deletionBanner.dispose();
     _expensesTab.dispose();
+    _chatTab.dispose();
+    _dayRequest.dispose();
     _appHandoff.dispose();
     _installHint.dispose();
     _planRequest.dispose();
@@ -932,6 +974,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _activity.reset();
       _idleTimeout = InactivityPolicy.timeout;
       _expensesTab.value = false;
+      _chatTab.value = false;
+      _badge.chatOn = false;
     }
     if (phase == _AuthPhase.authed) {
       _lastInteraction = DateTime.now();
@@ -939,6 +983,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           InactivityPolicy.pollInterval, (_) => _checkInactivity());
       unawaited(_loadIdleTimeout());
       unawaited(_loadExpensesTab());
+      unawaited(_loadChatTab());
       // The bell badge lives with the authenticated phase (count + its
       // workflow Realtime trigger).
       _badge.start();
@@ -1151,6 +1196,22 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         _expensesTab.value = me != null && !me.isViewer;
       }
     } catch (_) {/* the tab stays hidden */}
+  }
+
+  /// F-35: the same shape — best-effort, and the server refuses every chat
+  /// write with the flag off anyway.
+  Future<void> _loadChatTab() async {
+    try {
+      final settings =
+          PublicSettings(await _dataSource.fetchPublicSettings());
+      if (!settings.chatEnabled) return;
+      final me = await _dataSource.fetchOwnProfile();
+      if (_phase == _AuthPhase.authed && me != null) {
+        _chatTab.value = true;
+        _badge.chatOn = true;
+        unawaited(_badge.refresh());
+      }
+    } catch (_) {/* Notificações stays as it was */}
   }
 
   void _checkInactivity() {

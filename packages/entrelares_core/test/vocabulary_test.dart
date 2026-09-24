@@ -284,6 +284,18 @@ void main() {
     }
   });
 
+  test('F-35: the tab that holds the Conversa is Comunicação', () {
+    final pt = catalogs['pt-BR']!;
+    expect(pt[KApp.chatNav], 'Comunicação');
+    expect(pt[KApp.chatTabChat], 'Conversa');
+    // Nothing else in the product calls itself "comunicação".
+    final word = RegExp(r'comunica(ção|ções)', caseSensitive: false);
+    for (final key in [...K.allKeys, ...KApp.allKeys]) {
+      if (key == KApp.chatNav) continue;
+      expect(word.hasMatch(pt[key]), isFalse, reason: '$key says "${pt[key]}"');
+    }
+  });
+
   test('the F-35 notification calls it the Conversa, never a mensagem', () {
     final pt = catalogs['pt-BR']!;
     expect(pt[K.notifRenderTitleChatMessage], 'Conversa da família');

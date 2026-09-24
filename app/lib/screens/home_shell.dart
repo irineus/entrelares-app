@@ -130,6 +130,10 @@ class HomeShell extends StatelessWidget {
   /// The branch always exists; this only decides whether the bar offers it.
   final ValueListenable<bool>? expensesTab;
 
+  /// F-35: whether the Conversa is on — the third tab is then "Comunicação"
+  /// and the bell counts unread texts too ([NotificationBadge.total]).
+  final ValueListenable<bool>? chatTab;
+
   /// The shell's branch order (main.dart): Calendário, Família, Notificações,
   /// Despesas, Relatórios.
   static const int expensesBranch = 3;
@@ -148,7 +152,8 @@ class HomeShell extends StatelessWidget {
       this.installHint,
       this.connectivity,
       this.tourKeys,
-      this.expensesTab});
+      this.expensesTab,
+      this.chatTab});
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +262,7 @@ class HomeShell extends StatelessWidget {
         },
       ),
       bottomNavigationBar: ListenableBuilder(
-        listenable: Listenable.merge([badge, expensesTab]),
+        listenable: Listenable.merge([badge, expensesTab, chatTab]),
         builder: (context, _) {
           // A host without the Despesas branch (four branches: the tests'
           // shells) keeps the four tabs it always had.
@@ -265,6 +270,9 @@ class HomeShell extends StatelessWidget {
           final hasExpensesBranch = total > 4;
           final withExpenses =
               hasExpensesBranch && (expensesTab?.value ?? false);
+          final commLabel = (chatTab?.value ?? false)
+              ? l[KApp.chatNav]
+              : l[K.navNotificationsShort];
           // The branches the bar offers, in order; a hidden branch keeps its
           // index so a route never moves.
           final branches = [
@@ -274,7 +282,7 @@ class HomeShell extends StatelessWidget {
           final labels = [
             l[K.navCalendar],
             l[K.navFamily],
-            l[K.navNotificationsShort],
+            commLabel,
             if (withExpenses) l[KApp.expenseNav],
             l[K.navReports],
           ];
@@ -323,7 +331,7 @@ class HomeShell extends StatelessWidget {
                                 : K.navNotificationsManyPending,
                             [badge.count])
                         : null,
-                    label: l[K.navNotificationsShort]),
+                    label: commLabel),
                 if (withExpenses)
                   NavigationDestination(
                       key: const ValueKey('nav-expenses'),
@@ -533,8 +541,9 @@ class HomeShell extends StatelessWidget {
             : null,
         excludeSemantics: true,
         child: Badge(
-          isLabelVisible: badge.count > 0,
-          label: Text(bellBadgeText(badge.count)),
+          // F-35: requests waiting on me plus unread Conversa texts.
+          isLabelVisible: badge.total > 0,
+          label: Text(bellBadgeText(badge.total)),
           child: icon,
         ),
       );
@@ -577,8 +586,10 @@ class _NavLabelFit extends StatelessWidget {
   /// Air kept on each side of the widest label, so two neighbours never touch.
   static const double _sideGap = 2;
 
-  /// F-34: the five-tab floor — [AppShrinkToFit]'s.
-  static const double fiveTabFloor = 0.85;
+  /// F-34: the five-tab floor — [AppShrinkToFit]'s 0.85 at first; F-35
+  /// (provisional, pending the owner): 0.8, the smallest factor at which
+  /// "Comunicação" (85.6 dp at 1.0×) fits a 360 dp phone's slot.
+  static const double fiveTabFloor = 0.8;
 
   /// The SDK already stops the bar's labels here (`navigation_bar.dart`).
   static const double _sdkCeiling = 1.3;
