@@ -227,6 +227,69 @@ abstract final class AgendaRules {
   }
 }
 
+/// F-55 PR 4 — who an agenda item's notice and reminder go to. The wire
+/// keys are `child_events.notify_to`'s CHECK.
+enum AgendaAudience {
+  none('none'),
+  self('self'),
+  responsible('responsible'),
+  family('family');
+
+  const AgendaAudience(this.wire);
+  final String wire;
+
+  static AgendaAudience parse(String? wire) =>
+      values.where((a) => a.wire == wire).firstOrNull ?? none;
+}
+
+/// F-55 PR 4 — the creator's choice: who, which channels (push and/or in-app,
+/// never e-mail) and the reminder offset. The offsets are FIXED (T-84: a
+/// closed catalogue, not a key).
+class AgendaNotify {
+  const AgendaNotify({
+    this.to = AgendaAudience.none,
+    this.push = true,
+    this.inApp = true,
+    this.remindMinutes,
+  });
+
+  static const none = AgendaNotify();
+  static const List<int> remindOffsets = [0, 15, 30, 60];
+
+  final AgendaAudience to;
+  final bool push;
+  final bool inApp;
+  final int? remindMinutes;
+
+  /// The client's half of `agenda_notify_validate`, in its words. Null when
+  /// the choice may be sent. [start] is the item's start time, if any.
+  String? validate({required String? start}) {
+    if (to != AgendaAudience.none && !push && !inApp) {
+      return 'Escolha pelo menos um canal da notificação: no celular ou no app.';
+    }
+    final remind = remindMinutes;
+    if (remind != null) {
+      if (!remindOffsets.contains(remind)) {
+        return 'O lembrete é na hora ou 15, 30 ou 60 minutos antes.';
+      }
+      if (start == null) return 'O lembrete precisa do horário de início.';
+      if (to == AgendaAudience.none) return 'Escolha quem recebe o lembrete.';
+    }
+    return null;
+  }
+
+  /// What is actually sent: no audience means no channel choice and no
+  /// reminder; no start time means no reminder.
+  AgendaNotify normalized({required String? start}) => to == AgendaAudience.none
+      ? none
+      : AgendaNotify(
+          to: to,
+          push: push,
+          inApp: inApp,
+          remindMinutes: start == null ? null : remindMinutes,
+        );
+}
+
 /// One line of the agenda's Histórico ([AgendaRules.trail]).
 class AgendaTrailLine<T> {
   const AgendaTrailLine({

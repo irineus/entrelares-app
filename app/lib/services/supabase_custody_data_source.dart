@@ -1049,7 +1049,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         .eq('recipient_profile_id', myProfileId)
         .order('created_at', ascending: false)
         .limit(100);
-    return rows.map(AppNotification.fromJson).toList();
+    // F-55 PR 4: a "phone only" agenda row exists for the push to render
+    // from; the list does not show it.
+    return rows
+        .map(AppNotification.fromJson)
+        .where((n) => n.shownInApp)
+        .toList();
   }
 
   @override
@@ -1611,6 +1616,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     String? start,
     String? end,
     String? body,
+    AgendaNotify notify = AgendaNotify.none,
   }) =>
       {
         'p_date': _isoDay(date),
@@ -1619,6 +1625,10 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         'p_start': start,
         'p_end': end,
         'p_body': (body ?? '').trim().isEmpty ? null : body!.trim(),
+        'p_notify_to': notify.to.wire,
+        'p_notify_push': notify.push,
+        'p_notify_in_app': notify.inApp,
+        'p_remind': notify.remindMinutes,
       };
 
   @override
@@ -1629,6 +1639,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     String? start,
     String? end,
     String? body,
+    AgendaNotify notify = AgendaNotify.none,
   }) async =>
       await _client.rpc<dynamic>('add_child_event',
           params: _eventParams(
@@ -1637,7 +1648,8 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
               childId: childId,
               start: start,
               end: end,
-              body: body)) as int;
+              body: body,
+              notify: notify)) as int;
 
   @override
   Future<void> updateChildEvent({
@@ -1648,6 +1660,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     String? start,
     String? end,
     String? body,
+    AgendaNotify notify = AgendaNotify.none,
   }) async {
     await _client.rpc<dynamic>('update_child_event', params: {
       'p_event_id': id,
@@ -1657,7 +1670,8 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
           childId: childId,
           start: start,
           end: end,
-          body: body),
+          body: body,
+          notify: notify),
     });
   }
 
@@ -1687,6 +1701,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     String? start,
     String? end,
     String? body,
+    AgendaNotify notify = AgendaNotify.none,
   }) async {
     final event = _eventParams(
         date: from,
@@ -1694,7 +1709,8 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         childId: childId,
         start: start,
         end: end,
-        body: body);
+        body: body,
+        notify: notify);
     final r = Map<String, dynamic>.from(
         await _client.rpc<dynamic>('save_child_routine', params: {
       'p_routine_id': routineId,
@@ -1705,6 +1721,10 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       'p_start': start,
       'p_end': end,
       'p_body': event['p_body'],
+      'p_notify_to': event['p_notify_to'],
+      'p_notify_push': event['p_notify_push'],
+      'p_notify_in_app': event['p_notify_in_app'],
+      'p_remind': event['p_remind'],
     }) as Map);
     return (
       routineId: r['routine_id'] as String,

@@ -33,6 +33,14 @@ class ChildEvent {
   final int? deletedBy;
   final DateTime? deletedAt;
 
+  /// F-55 PR 4 — who the creator chose to tell (`none`, `self`,
+  /// `responsible`, `family`), on which channels, and the reminder offset in
+  /// minutes (0/15/30/60, only with a start time).
+  final String notifyTo;
+  final bool notifyPush;
+  final bool notifyInApp;
+  final int? remindMinutes;
+
   const ChildEvent({
     required this.id,
     required this.familyId,
@@ -48,6 +56,10 @@ class ChildEvent {
     this.createdBy,
     this.deletedBy,
     this.deletedAt,
+    this.notifyTo = 'none',
+    this.notifyPush = true,
+    this.notifyInApp = true,
+    this.remindMinutes,
   });
 
   bool get isDeleted => deletedAt != null;
@@ -75,5 +87,9 @@ class ChildEvent {
         deletedAt: json['deleted_at'] == null
             ? null
             : DateTime.parse(json['deleted_at'] as String).toUtc(),
+        notifyTo: (json['notify_to'] as String?) ?? 'none',
+        notifyPush: (json['notify_push'] as bool?) ?? true,
+        notifyInApp: (json['notify_in_app'] as bool?) ?? true,
+        remindMinutes: json['remind_minutes'] as int?,
       );
 }

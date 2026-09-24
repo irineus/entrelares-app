@@ -364,6 +364,12 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
   late String? _end = widget.event?.endTime;
   late final TextEditingController _body =
       TextEditingController(text: widget.event?.body ?? '');
+
+  /// F-55 PR 4: who is told, on which channels, and the reminder.
+  late AgendaAudience _notifyTo = AgendaAudience.parse(widget.event?.notifyTo);
+  late bool _notifyPush = widget.event?.notifyPush ?? true;
+  late bool _notifyInApp = widget.event?.notifyInApp ?? true;
+  late int? _remind = widget.event?.remindMinutes;
   String? _error;
   bool _busy = false;
   bool _confirmingDelete = false;
@@ -383,8 +389,19 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
         _end = r.endTime;
         _body.text = r.body ?? '';
         _weekdays = r.weekdays.toSet();
+        _notifyTo = AgendaAudience.parse(r.notifyTo);
+        _notifyPush = r.notifyPush;
+        _notifyInApp = r.notifyInApp;
+        _remind = r.remindMinutes;
         _error = null;
       });
+
+  AgendaNotify get _notify => AgendaNotify(
+        to: _notifyTo,
+        push: _notifyPush,
+        inApp: _notifyInApp,
+        remindMinutes: _remind,
+      ).normalized(start: _start);
 
   @override
   void dispose() {
@@ -448,10 +465,12 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
       body: _body.text,
       maxChars: widget.settings.agendaTextMaxChars,
     );
-    if (error != null) {
-      setState(() => _error = error);
+    final notifyError = _notify.validate(start: _start);
+    if (error != null || notifyError != null) {
+      setState(() => _error = error ?? notifyError);
       return;
     }
+    final notify = _notify;
     final event = widget.event;
     if (_repeat || _editingRoutine) {
       if (_weekdays.isEmpty) {
@@ -468,6 +487,7 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
           start: _start,
           end: _end,
           body: _body.text,
+          notify: notify,
         );
         return l.format(
             KApp.agendaRoutineApplied, [r.created, l.formatDate(r.until)]);
@@ -483,6 +503,7 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
           start: _start,
           end: _end,
           body: _body.text,
+          notify: notify,
         );
       } else {
         await widget.dataSource.updateChildEvent(
@@ -493,6 +514,7 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
           start: _start,
           end: _end,
           body: _body.text,
+          notify: notify,
         );
       }
       return l[KApp.agendaSaved];
@@ -757,6 +779,97 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
           maxLength: widget.settings.agendaTextMaxChars,
           maxLines: 4,
         ),
+        const SizedBox(height: Spacing.sm),
+        ..._notifyFields(l),
+    ];
+  }
+
+  /// F-55 PR 4: the creator's choice — who, which channels (never e-mail),
+  /// and the reminder when the item has a start time.
+  List<Widget> _notifyFields(Localization l) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    final muted = textTheme.labelMedium?.copyWith(color: tokens.textMuted);
+    void pick(VoidCallback change) => setState(() {
+          change();
+          _error = null;
+        });
+    return [
+      Text(l[KApp.agendaNotifyLabel], style: muted),
+      const SizedBox(height: Spacing.xs),
+      Wrap(
+        spacing: Spacing.xs,
+        runSpacing: Spacing.xs,
+        children: [
+          for (final (a, key) in const [
+            (AgendaAudience.none, KApp.agendaNotifyNone),
+            (AgendaAudience.self, KApp.agendaNotifySelf),
+            (AgendaAudience.responsible, KApp.agendaNotifyResponsible),
+            (AgendaAudience.family, KApp.agendaNotifyFamily),
+          ])
+            ChoiceChip(
+              key: ValueKey('agenda-notify-${a.wire}'),
+              label: Text(l[key]),
+              selected: _notifyTo == a,
+              onSelected: _busy ? null : (_) => pick(() => _notifyTo = a),
+            ),
+        ],
+      ),
+      if (_notifyTo != AgendaAudience.none) ...[
+        const SizedBox(height: Spacing.xs),
+        Wrap(
+          spacing: Spacing.xs,
+          runSpacing: Spacing.xs,
+          children: [
+            FilterChip(
+              key: const ValueKey('agenda-notify-push'),
+              label: Text(l[KApp.agendaNotifyPush]),
+              selected: _notifyPush,
+              onSelected:
+                  _busy ? null : (on) => pick(() => _notifyPush = on),
+            ),
+            FilterChip(
+              key: const ValueKey('agenda-notify-app'),
+              label: Text(l[KApp.agendaNotifyInApp]),
+              selected: _notifyInApp,
+              onSelected:
+                  _busy ? null : (on) => pick(() => _notifyInApp = on),
+            ),
+          ],
+        ),
+        const SizedBox(height: Spacing.sm),
+        Text(l[KApp.agendaRemindLabel], style: muted),
+        const SizedBox(height: Spacing.xs),
+        if (_start == null)
+          Text(l[KApp.agendaRemindNeedsStart],
+              key: const ValueKey('agenda-remind-needs-start'),
+              style: textTheme.bodySmall?.copyWith(color: tokens.textMuted))
+        else
+          Wrap(
+            spacing: Spacing.xs,
+            runSpacing: Spacing.xs,
+            children: [
+              ChoiceChip(
+                key: const ValueKey('agenda-remind-none'),
+                label: Text(l[KApp.agendaRemindNone]),
+                selected: _remind == null,
+                onSelected: _busy ? null : (_) => pick(() => _remind = null),
+              ),
+              for (final m in AgendaNotify.remindOffsets)
+                ChoiceChip(
+                  key: ValueKey('agenda-remind-$m'),
+                  label: Text(m == 0
+                      ? l[KApp.agendaRemindAtStart]
+                      : l.format(KApp.agendaRemindBefore, [m])),
+                  selected: _remind == m,
+                  onSelected: _busy ? null : (_) => pick(() => _remind = m),
+                ),
+            ],
+          ),
+        const SizedBox(height: Spacing.xs),
+        Text(l[KApp.agendaNotifyLead],
+            style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+      ],
     ];
   }
 }

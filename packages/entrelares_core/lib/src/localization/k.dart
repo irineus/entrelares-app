@@ -895,6 +895,24 @@ abstract final class K {
   static const String calPlanEnding = 'cal.planEnd.ending';
   static const String calPlanEnded = 'cal.planEnd.ended';
 
+  // ── The agenda speaks (F-55 PR 4) ──
+  // The kind labels repeat `KApp.agendaKind*` on purpose: the push catalog
+  // in `_shared/push.ts` mirrors THIS catalog, and `agenda_rules_test` pins
+  // the two copies equal.
+  static const String notifRenderTitleAgendaNotice = 'notifRender.title.agendaNotice';
+  static const String notifRenderTitleAgendaReminder = 'notifRender.title.agendaReminder';
+  static const String notifRenderAgendaNotice = 'notifRender.agendaNotice';
+  static const String notifRenderAgendaRoutineNotice = 'notifRender.agendaRoutineNotice';
+  static const String notifRenderAgendaReminder = 'notifRender.agendaReminder';
+  static const String notifRenderAgendaTextSuffix = 'notifRender.agendaTextSuffix';
+  static const String notifRenderAgendaKindSchool = 'notifRender.agendaKind.school';
+  static const String notifRenderAgendaKindHealth = 'notifRender.agendaKind.health';
+  static const String notifRenderAgendaKindMedicine = 'notifRender.agendaKind.medicine';
+  static const String notifRenderAgendaKindActivity = 'notifRender.agendaKind.activity';
+  static const String notifRenderAgendaKindFree = 'notifRender.agendaKind.free';
+  static const String notifRenderAgendaKindNote = 'notifRender.agendaKind.note';
+  static const String notifRenderAgendaKindOther = 'notifRender.agendaKind.other';
+
   // ── Notifications page ──
   static const String notifPageTitle = 'notif.pageTitle';
   static const String notifFilterAria = 'notif.filterAria';
@@ -1988,6 +2006,19 @@ abstract final class K {
     notifPlanAction,
     calPlanEnding,
     calPlanEnded,
+    notifRenderTitleAgendaNotice,
+    notifRenderTitleAgendaReminder,
+    notifRenderAgendaNotice,
+    notifRenderAgendaRoutineNotice,
+    notifRenderAgendaReminder,
+    notifRenderAgendaTextSuffix,
+    notifRenderAgendaKindSchool,
+    notifRenderAgendaKindHealth,
+    notifRenderAgendaKindMedicine,
+    notifRenderAgendaKindActivity,
+    notifRenderAgendaKindFree,
+    notifRenderAgendaKindNote,
+    notifRenderAgendaKindOther,
     notifPageTitle,
     notifFilterAria,
     notifTabIncoming,

@@ -203,4 +203,22 @@ void main() {
       expect(lines.any((l) => l.events.any((e) => e.id == 5)), isFalse);
     });
   });
+
+  test('the push catalog names the kinds exactly as the sheet does (PR 4)',
+      () {
+    for (final lang in AppLanguage.values) {
+      final l = Localization(lang);
+      for (final (kind, key) in [
+        (AgendaKind.school, K.notifRenderAgendaKindSchool),
+        (AgendaKind.health, K.notifRenderAgendaKindHealth),
+        (AgendaKind.medicine, K.notifRenderAgendaKindMedicine),
+        (AgendaKind.activity, K.notifRenderAgendaKindActivity),
+        (AgendaKind.free, K.notifRenderAgendaKindFree),
+        (AgendaKind.note, K.notifRenderAgendaKindNote),
+        (AgendaKind.other, K.notifRenderAgendaKindOther),
+      ]) {
+        expect(l[key], l[kind.labelKey], reason: '$lang ${kind.wire}');
+      }
+    }
+  });
 }

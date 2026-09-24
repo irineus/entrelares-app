@@ -31,6 +31,10 @@ class AppNotification {
   /// row predates U-13 (legacy rows fall back to the stored sentence).
   String? get paramsJson => params == null ? null : jsonEncode(params);
 
+  /// F-55 PR 4: false for a row whose author chose "phone only" — it exists
+  /// so the push can render from it, is born read, and stays off the list.
+  bool get shownInApp => params?['in_app'] != 'false';
+
   factory AppNotification.fromJson(Map<String, dynamic> json) =>
       AppNotification(
         id: json['id'] as int,

@@ -417,6 +417,18 @@ void main() {
         'O planejamento da família vai até 12/11/2026. Planeje os próximos meses.'),
     ('plan_ending', '{"kind":"ended","date":"2026-09-22"}',
         'O último dia planejado foi 22/09/2026. Planeje os próximos meses no calendário.'),
+    // F-55 PR 4: what agenda_notify() stores, word for word.
+    ('agenda_notice',
+        '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia","name":"Ana","msg":"5 ml"}',
+        'Ana adicionou à agenda de 25/09/2026: 14:00 · Remédio · Bia. 5 ml'),
+    ('agenda_notice', '{"date":"2026-09-25","kind":"note","name":"Ana","msg":"casaco"}',
+        'Ana adicionou à agenda de 25/09/2026: Nota. casaco'),
+    ('agenda_notice',
+        '{"date":"2026-10-04","kind":"activity","time":"17:00","child":"Bia","name":"Ana","routine":"1"}',
+        'Ana criou uma rotina na agenda a partir de 04/10/2026: 17:00 · Atividade · Bia.'),
+    ('agenda_reminder',
+        '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia"}',
+        '14:00 · Remédio · Bia (25/09/2026).'),
   ];
 
   group('PT-BR renders EXACTLY what the writer stored', () {
@@ -473,6 +485,11 @@ void main() {
       ('billing', '{"kind":"grace_warning","date":"12/08/2026"}'),
       ('plan_ending', '{"kind":"ending","date":"2026-11-12"}'),
       ('plan_ending', '{"kind":"ended","date":"2026-09-22"}'),
+      ('agenda_notice',
+          '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia","name":"Ana"}'),
+      ('agenda_notice',
+          '{"date":"2026-10-04","kind":"activity","name":"Ana","routine":"1"}'),
+      ('agenda_reminder', '{"date":"2026-09-25","kind":"school","time":"07:30"}'),
     ];
     for (final (type, json) in enTable) {
       test('$type $json', () {

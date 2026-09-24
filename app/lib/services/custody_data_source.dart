@@ -1,5 +1,6 @@
 import 'package:entrelares_core/entrelares_core.dart'
     show
+        AgendaNotify,
         AppLanguage,
         HandoffRangeResult,
         HandoffTime,
@@ -585,6 +586,7 @@ abstract class CustodyDataSource {
     String? start,
     String? end,
     String? body,
+    AgendaNotify notify = AgendaNotify.none,
   });
 
   Future<void> updateChildEvent({
@@ -595,6 +597,7 @@ abstract class CustodyDataSource {
     String? start,
     String? end,
     String? body,
+    AgendaNotify notify = AgendaNotify.none,
   });
 
   /// A soft delete: the row stays with who and when.
@@ -618,6 +621,7 @@ abstract class CustodyDataSource {
     String? start,
     String? end,
     String? body,
+    AgendaNotify notify = AgendaNotify.none,
   });
 
   /// Removes the routine's events from [from] on and stops it. Returns how

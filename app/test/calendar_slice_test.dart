@@ -954,10 +954,11 @@ class FakeCustodyDataSource implements CustodyDataSource {
     String? start,
     String? end,
     String? body,
+    AgendaNotify notify = AgendaNotify.none,
   }) async {
     if (throwOnEventWrite != null) throw throwOnEventWrite!;
     eventWrites.add('add:$kind:${childId ?? '-'}:${start ?? '-'}:'
-        '${end ?? '-'}:${body ?? ''}');
+        '${end ?? '-'}:${body ?? ''}${_notifyTag(notify)}');
     final id = childEvents.fold<int>(0, (m, e) => e.id > m ? e.id : m) + 1;
     childEvents = [
       ...childEvents,
@@ -972,6 +973,10 @@ class FakeCustodyDataSource implements CustodyDataSource {
         body: (body ?? '').trim().isEmpty ? null : body!.trim(),
         createdBy: members.firstOrNull?.id,
         createdAt: DateTime.now().toUtc(),
+        notifyTo: notify.to.wire,
+        notifyPush: notify.push,
+        notifyInApp: notify.inApp,
+        remindMinutes: notify.remindMinutes,
       ),
     ];
     return id;
@@ -986,9 +991,11 @@ class FakeCustodyDataSource implements CustodyDataSource {
     String? start,
     String? end,
     String? body,
+    AgendaNotify notify = AgendaNotify.none,
   }) async {
     if (throwOnEventWrite != null) throw throwOnEventWrite!;
-    eventWrites.add('update:$id:$kind:${start ?? '-'}:${body ?? ''}');
+    eventWrites.add(
+        'update:$id:$kind:${start ?? '-'}:${body ?? ''}${_notifyTag(notify)}');
     childEvents = [
       for (final e in childEvents)
         e.id == id
@@ -1033,6 +1040,12 @@ class FakeCustodyDataSource implements CustodyDataSource {
     ];
   }
 
+  /// F-55 PR 4: the creator's choice, when there is one, in a write's tag.
+  static String _notifyTag(AgendaNotify n) => n.to == AgendaAudience.none
+      ? ''
+      : ':notify=${n.to.wire}/${n.push ? 'push' : '-'}/'
+          '${n.inApp ? 'app' : '-'}/${n.remindMinutes ?? '-'}';
+
   // ── F-55 PR 3: the routine ──
   List<ChildRoutine> childRoutines = [];
 
@@ -1053,11 +1066,13 @@ class FakeCustodyDataSource implements CustodyDataSource {
     String? start,
     String? end,
     String? body,
+    AgendaNotify notify = AgendaNotify.none,
   }) async {
     if (throwOnEventWrite != null) throw throwOnEventWrite!;
     final id = routineId ?? 'r${childRoutines.length + 1}';
     eventWrites.add('routine:${routineId ?? 'new'}:$kind:'
-        '${weekdays.join(',')}:${childId ?? '-'}:${start ?? '-'}:${body ?? ''}');
+        '${weekdays.join(',')}:${childId ?? '-'}:${start ?? '-'}:${body ?? ''}'
+        '${_notifyTag(notify)}');
     final days = AgendaRules.routineDays(from, planEnd, weekdays);
     if (routineId != null) {
       childEvents = [
