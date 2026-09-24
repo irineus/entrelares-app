@@ -383,7 +383,7 @@ void main() {
 
         final banner = tester.widget<AppBanner>(
           find.ancestor(
-            of: find.text(_l[K.famFreeCapNotice]),
+            of: find.text(_l.format(K.famFreeCapNotice, [2, _l.ordinal(3)])),
             matching: find.byType(AppBanner),
           ),
         );
@@ -401,7 +401,7 @@ void main() {
 
       final banner = tester.widget<AppBanner>(
         find.ancestor(
-          of: find.text(_l[K.famFreeCapNotice]),
+          of: find.text(_l.format(K.famFreeCapNotice, [2, _l.ordinal(3)])),
           matching: find.byType(AppBanner),
         ),
       );

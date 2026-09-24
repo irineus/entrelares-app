@@ -49,6 +49,18 @@ class Localization {
   String format(String key, List<Object?> args) =>
       _substitute(_lookup(key), args);
 
+  /// U-57 — an ordinal in the session's language ("3º" / "3rd"), for a
+  /// sentence whose count comes from `app_settings` and so cannot be typed
+  /// into the catalog.
+  String ordinal(int n) {
+    if (!isEnglish) return '$nº';
+    final mod100 = n % 100;
+    final suffix = mod100 >= 11 && mod100 <= 13
+        ? 'th'
+        : switch (n % 10) { 1 => 'st', 2 => 'nd', 3 => 'rd', _ => 'th' };
+    return '$n$suffix';
+  }
+
   /// Picks between two already-localized values — for the handful of texts
   /// that are NOT catalog entries (the legal declarations).
   String pick(String ptBr, String en) => isEnglish ? en : ptBr;

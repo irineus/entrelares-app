@@ -897,4 +897,28 @@ void main() {
       expect(find.textContaining('R\$ 54,90'), findsOne);
     });
   });
+
+  group('U-57 — the feature list states the live numbers', () {
+    testWidgets('the seed reads as before', (tester) async {
+      await _pump(tester, _source());
+
+      expect(_text(l.format(K.premFeatureCaregivers, [2])), findsOne);
+      expect(_text(l.format(K.premFeatureHorizon, [6])), findsOne);
+      expect(l.format(K.premFeatureHorizon, [6]), 'Planejar além de 6 meses à frente');
+    });
+
+    testWidgets('an operator edit reaches the sentence with no rebuild',
+        (tester) async {
+      await _pump(
+          tester,
+          _source(settings: const {
+            ..._billingOn,
+            'free_caregivers': '3',
+            'calendar_months_free': '9',
+          }));
+
+      expect(_text('Mais de 3 responsáveis na família'), findsOne);
+      expect(_text('Planejar além de 9 meses à frente'), findsOne);
+    });
+  });
 }

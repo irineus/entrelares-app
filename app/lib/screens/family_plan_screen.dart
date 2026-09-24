@@ -561,14 +561,18 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                 // did not line up with each other. `AppBulletList` gives the
                 // hanging indent; the icons are the app's own, not emoji, so
                 // the list reads as a feature table rather than as chat.
+                // U-57: the two numbers are the live `free_caregivers` and
+                // `calendar_months_free` — what the server enforces.
                 AppBulletList(
-                  items: const [
-                    K.premFeatureCaregivers,
-                    K.premFeatureHorizon,
-                    K.premFeaturePdf,
-                    K.premFeatureAdminMode,
-                    K.premFeatureRoles,
-                  ].map((k) => l[k]).toList(),
+                  items: [
+                    l.format(K.premFeatureCaregivers,
+                        [_settings.freeCaregivers]),
+                    l.format(
+                        K.premFeatureHorizon, [_settings.calendarMonthsFree]),
+                    l[K.premFeaturePdf],
+                    l[K.premFeatureAdminMode],
+                    l[K.premFeatureRoles],
+                  ],
                   leadingIcons: const [
                     Icon(Icons.group_outlined, size: TypeScale.subtitle),
                     Icon(Icons.event_available_outlined,
