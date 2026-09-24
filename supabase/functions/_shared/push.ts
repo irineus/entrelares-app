@@ -62,6 +62,13 @@ export const PUSH_TYPES: readonly string[] = [
 	// land on "Todas".
 	"agenda_notice",
 	"agenda_reminder",
+	// F-34. An expense the reader takes part in was added, changed or deleted;
+	// a settle-up waits for the reader to confirm it; the reader's settle-up
+	// was answered. All land on "Todas" (the Despesas tab holds the pending
+	// confirmation). Never e-mail.
+	"expense_changed",
+	"settlement_requested",
+	"settlement_answered",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -125,6 +132,25 @@ const K = {
 
 	titlePlanEnding: "notifRender.title.planEnding",
 	titlePlanEnded: "notifRender.title.planEnded",
+	titleExpenseAdded: "notifRender.title.expenseAdded",
+	titleExpenseUpdated: "notifRender.title.expenseUpdated",
+	titleExpenseDeleted: "notifRender.title.expenseDeleted",
+	expenseAdded: "notifRender.expenseAdded",
+	expenseUpdated: "notifRender.expenseUpdated",
+	expenseDeleted: "notifRender.expenseDeleted",
+	titleSettlementRequested: "notifRender.title.settlementRequested",
+	settlementRequested: "notifRender.settlementRequested",
+	titleSettlementConfirmed: "notifRender.title.settlementConfirmed",
+	titleSettlementRejected: "notifRender.title.settlementRejected",
+	settlementConfirmed: "notifRender.settlementConfirmed",
+	settlementRejected: "notifRender.settlementRejected",
+	expenseCategorySchool: "notifRender.expenseCategory.school",
+	expenseCategoryHealth: "notifRender.expenseCategory.health",
+	expenseCategoryClothes: "notifRender.expenseCategory.clothes",
+	expenseCategoryActivities: "notifRender.expenseCategory.activities",
+	expenseCategoryFood: "notifRender.expenseCategory.food",
+	expenseCategoryTransport: "notifRender.expenseCategory.transport",
+	expenseCategoryOther: "notifRender.expenseCategory.other",
 	titleAgendaNotice: "notifRender.title.agendaNotice",
 	titleAgendaReminder: "notifRender.title.agendaReminder",
 	agendaNotice: "notifRender.agendaNotice",
@@ -199,6 +225,25 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.planEnded": "O planejamento terminou",
 		"notifRender.planEnding": "O planejamento da família vai até {0}. Planeje os próximos meses.",
 		"notifRender.planEnded": "O último dia planejado foi {0}. Planeje os próximos meses no calendário.",
+		"notifRender.title.expenseAdded": "Despesa lançada",
+		"notifRender.title.expenseUpdated": "Despesa alterada",
+		"notifRender.title.expenseDeleted": "Despesa apagada",
+		"notifRender.expenseAdded": "{0} lançou uma despesa de {1} em {2}: {3}. {4}",
+		"notifRender.expenseUpdated": "{0} alterou uma despesa de {1} em {2}: {3}. {4}",
+		"notifRender.expenseDeleted": "{0} apagou uma despesa de {1} em {2}: {3}. {4}",
+		"notifRender.title.settlementRequested": "Confirme um acerto",
+		"notifRender.settlementRequested": "{0} registrou em {1} que pagou {2} a você. Confirme em Despesas se recebeu.",
+		"notifRender.title.settlementConfirmed": "Acerto confirmado",
+		"notifRender.title.settlementRejected": "Acerto não confirmado",
+		"notifRender.settlementConfirmed": "{0} confirmou que recebeu {1} ({2}).",
+		"notifRender.settlementRejected": "{0} não confirmou que recebeu {1} ({2}).",
+		"notifRender.expenseCategory.school": "Escola",
+		"notifRender.expenseCategory.health": "Saúde",
+		"notifRender.expenseCategory.clothes": "Roupas",
+		"notifRender.expenseCategory.activities": "Atividades",
+		"notifRender.expenseCategory.food": "Alimentação",
+		"notifRender.expenseCategory.transport": "Transporte",
+		"notifRender.expenseCategory.other": "Outros",
 		"notifRender.title.agendaNotice": "Novo na agenda",
 		"notifRender.title.agendaReminder": "Lembrete da agenda",
 		"notifRender.agendaNotice": "{0} adicionou à agenda de {1}: {2}.{3}",
@@ -265,6 +310,25 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.planEnded": "Your plan has ended",
 		"notifRender.planEnding": "Your family's plan runs until {0}. Plan the next months.",
 		"notifRender.planEnded": "The last planned day was {0}. Plan the next months in the calendar.",
+		"notifRender.title.expenseAdded": "Expense added",
+		"notifRender.title.expenseUpdated": "Expense changed",
+		"notifRender.title.expenseDeleted": "Expense deleted",
+		"notifRender.expenseAdded": "{0} added an expense of {1} on {2}: {3}. {4}",
+		"notifRender.expenseUpdated": "{0} changed an expense of {1} on {2}: {3}. {4}",
+		"notifRender.expenseDeleted": "{0} deleted an expense of {1} on {2}: {3}. {4}",
+		"notifRender.title.settlementRequested": "Confirm a settle-up",
+		"notifRender.settlementRequested": "{0} recorded on {1} that they paid you {2}. Confirm in Expenses whether you received it.",
+		"notifRender.title.settlementConfirmed": "Settle-up confirmed",
+		"notifRender.title.settlementRejected": "Settle-up not confirmed",
+		"notifRender.settlementConfirmed": "{0} confirmed receiving {1} ({2}).",
+		"notifRender.settlementRejected": "{0} did not confirm receiving {1} ({2}).",
+		"notifRender.expenseCategory.school": "School",
+		"notifRender.expenseCategory.health": "Health",
+		"notifRender.expenseCategory.clothes": "Clothes",
+		"notifRender.expenseCategory.activities": "Activities",
+		"notifRender.expenseCategory.food": "Food",
+		"notifRender.expenseCategory.transport": "Transport",
+		"notifRender.expenseCategory.other": "Other",
 		"notifRender.title.agendaNotice": "New on the agenda",
 		"notifRender.title.agendaReminder": "Agenda reminder",
 		"notifRender.agendaNotice": "{0} added to the agenda for {1}: {2}.{3}",
@@ -303,6 +367,17 @@ function splitDeadline(value: string | undefined): { date: string; time: string 
 		at.getUTCHours() !== h || at.getUTCMinutes() !== mi
 	) return null;
 	return { date: `${match[1]}-${match[2]}-${match[3]}`, time: `${match[4]}:${match[5]}` };
+}
+
+/// F-34: "R$ 1.234,56" / "R$1,234.56" from integer cents (a string in params).
+function brl(lang: Lang, raw: string | undefined): string | null {
+	if (raw === undefined || !/^-?\d+$/.test(raw)) return null;
+	const v = Math.abs(Number(raw));
+	const whole = Math.floor(v / 100).toString();
+	const frac = String(v % 100).padStart(2, "0");
+	return lang === "en"
+		? `R$${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${frac}`
+		: `R$ ${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".")},${frac}`;
 }
 
 function fmt(lang: Lang, key: string, args: string[] = []): string {
@@ -558,6 +633,47 @@ export function renderPush(
 				titleKey = K.titleAgendaReminder;
 				body = fmt(lang, K.agendaReminder, [what, date, text]);
 			}
+			break;
+		}
+
+		// F-34. Money travels in cents and is printed in the reader's format —
+		// the twin of ExpenseRules.brl (Dart) and brl_text (SQL).
+		case "expense_changed": {
+			const verb = ({
+				added: [K.titleExpenseAdded, K.expenseAdded],
+				updated: [K.titleExpenseUpdated, K.expenseUpdated],
+				deleted: [K.titleExpenseDeleted, K.expenseDeleted],
+			} as Record<string, string[]>)[kind ?? ""];
+			const cat = ({
+				school: K.expenseCategorySchool,
+				health: K.expenseCategoryHealth,
+				clothes: K.expenseCategoryClothes,
+				activities: K.expenseCategoryActivities,
+				food: K.expenseCategoryFood,
+				transport: K.expenseCategoryTransport,
+				other: K.expenseCategoryOther,
+			} as Record<string, string>)[params["category"] ?? ""];
+			const money = brl(lang, params["amount"]);
+			if (verb === undefined || cat === undefined || money === null) return null;
+			titleKey = verb[0];
+			body = fmt(lang, verb[1], [name ?? otherCap(), money, date, fmt(lang, cat), msg ?? ""]);
+			break;
+		}
+
+		case "settlement_requested": {
+			const money = brl(lang, params["amount"]);
+			if (money === null) return null;
+			titleKey = K.titleSettlementRequested;
+			body = fmt(lang, K.settlementRequested, [name ?? otherCap(), date, money]);
+			break;
+		}
+
+		case "settlement_answered": {
+			const money = brl(lang, params["amount"]);
+			if (money === null || (kind !== "confirmed" && kind !== "rejected")) return null;
+			titleKey = kind === "confirmed" ? K.titleSettlementConfirmed : K.titleSettlementRejected;
+			body = fmt(lang, kind === "confirmed" ? K.settlementConfirmed : K.settlementRejected,
+				[name ?? otherCap(), money, date]);
 			break;
 		}
 

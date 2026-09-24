@@ -898,6 +898,27 @@ abstract final class K {
   static const String calPlanEnding = 'cal.planEnd.ending';
   static const String calPlanEnded = 'cal.planEnd.ended';
 
+  // ── Shared expenses (F-34) ──
+  static const String notifRenderTitleExpenseAdded = 'notifRender.title.expenseAdded';
+  static const String notifRenderTitleExpenseUpdated = 'notifRender.title.expenseUpdated';
+  static const String notifRenderTitleExpenseDeleted = 'notifRender.title.expenseDeleted';
+  static const String notifRenderExpenseAdded = 'notifRender.expenseAdded';
+  static const String notifRenderExpenseUpdated = 'notifRender.expenseUpdated';
+  static const String notifRenderExpenseDeleted = 'notifRender.expenseDeleted';
+  static const String notifRenderTitleSettlementRequested = 'notifRender.title.settlementRequested';
+  static const String notifRenderSettlementRequested = 'notifRender.settlementRequested';
+  static const String notifRenderTitleSettlementConfirmed = 'notifRender.title.settlementConfirmed';
+  static const String notifRenderTitleSettlementRejected = 'notifRender.title.settlementRejected';
+  static const String notifRenderSettlementConfirmed = 'notifRender.settlementConfirmed';
+  static const String notifRenderSettlementRejected = 'notifRender.settlementRejected';
+  static const String notifRenderExpenseCategorySchool = 'notifRender.expenseCategory.school';
+  static const String notifRenderExpenseCategoryHealth = 'notifRender.expenseCategory.health';
+  static const String notifRenderExpenseCategoryClothes = 'notifRender.expenseCategory.clothes';
+  static const String notifRenderExpenseCategoryActivities = 'notifRender.expenseCategory.activities';
+  static const String notifRenderExpenseCategoryFood = 'notifRender.expenseCategory.food';
+  static const String notifRenderExpenseCategoryTransport = 'notifRender.expenseCategory.transport';
+  static const String notifRenderExpenseCategoryOther = 'notifRender.expenseCategory.other';
+
   // ── The agenda speaks (F-55 PR 4) ──
   // The kind labels repeat `KApp.agendaKind*` on purpose: the push catalog
   // in `_shared/push.ts` mirrors THIS catalog, and `agenda_rules_test` pins
@@ -2012,6 +2033,25 @@ abstract final class K {
     notifPlanAction,
     calPlanEnding,
     calPlanEnded,
+    notifRenderTitleExpenseAdded,
+    notifRenderTitleExpenseUpdated,
+    notifRenderTitleExpenseDeleted,
+    notifRenderExpenseAdded,
+    notifRenderExpenseUpdated,
+    notifRenderExpenseDeleted,
+    notifRenderTitleSettlementRequested,
+    notifRenderSettlementRequested,
+    notifRenderTitleSettlementConfirmed,
+    notifRenderTitleSettlementRejected,
+    notifRenderSettlementConfirmed,
+    notifRenderSettlementRejected,
+    notifRenderExpenseCategorySchool,
+    notifRenderExpenseCategoryHealth,
+    notifRenderExpenseCategoryClothes,
+    notifRenderExpenseCategoryActivities,
+    notifRenderExpenseCategoryFood,
+    notifRenderExpenseCategoryTransport,
+    notifRenderExpenseCategoryOther,
     notifRenderTitleAgendaNotice,
     notifRenderTitleAgendaReminder,
     notifRenderAgendaNotice,

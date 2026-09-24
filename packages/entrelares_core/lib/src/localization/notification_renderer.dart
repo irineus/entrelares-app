@@ -28,6 +28,7 @@ library;
 
 import 'dart:convert';
 
+import '../expense_rules.dart';
 import '../notice_rules.dart';
 import 'date_formats.dart';
 import 'k.dart';
@@ -278,6 +279,34 @@ abstract final class NotificationRenderer {
       case 'plan_ending' when kind == 'ended' && date != null:
         return l.format(K.notifRenderPlanEnded, [date]);
 
+      // ── Shared expenses (F-34) ──
+      // The amount travels in cents and is printed in the reader's money
+      // format; the category is a closed key; the description stays as typed.
+      case 'expense_changed'
+          when date != null &&
+              _money(p, l) != null &&
+              _expenseCategory(p['category']) != null &&
+              _expenseKind(kind) != null:
+        return l.format(_expenseKind(kind)!, [
+          name ?? l[K.notifRenderFbOtherCap],
+          _money(p, l)!,
+          date,
+          l[_expenseCategory(p['category'])!],
+          p['msg'] ?? '',
+        ]);
+      case 'settlement_requested' when date != null && _money(p, l) != null:
+        return l.format(K.notifRenderSettlementRequested,
+            [name ?? l[K.notifRenderFbOtherCap], date, _money(p, l)!]);
+      case 'settlement_answered'
+          when date != null &&
+              _money(p, l) != null &&
+              (kind == 'confirmed' || kind == 'rejected'):
+        return l.format(
+            kind == 'confirmed'
+                ? K.notifRenderSettlementConfirmed
+                : K.notifRenderSettlementRejected,
+            [name ?? l[K.notifRenderFbOtherCap], _money(p, l)!, date]);
+
       // ── The agenda speaks (F-55 PR 4) ──
       // "What" is the item as the day sheet heads it — time, kind, child —
       // and the item's own text follows as written. An unknown `kind` is a
@@ -328,6 +357,30 @@ abstract final class NotificationRenderer {
         ? ''
         : l.format(K.notifRenderAgendaTextSuffix, [text]);
   }
+
+  /// F-34: `params.amount` (cents) in the reader's money format, or null.
+  static String? _money(Map<String, String> p, Localization l) {
+    final cents = int.tryParse(p['amount'] ?? '');
+    return cents == null ? null : ExpenseRules.brl(cents, english: l.isEnglish);
+  }
+
+  static String? _expenseKind(String? kind) => switch (kind) {
+        'added' => K.notifRenderExpenseAdded,
+        'updated' => K.notifRenderExpenseUpdated,
+        'deleted' => K.notifRenderExpenseDeleted,
+        _ => null,
+      };
+
+  static String? _expenseCategory(String? wire) => switch (wire) {
+        'school' => K.notifRenderExpenseCategorySchool,
+        'health' => K.notifRenderExpenseCategoryHealth,
+        'clothes' => K.notifRenderExpenseCategoryClothes,
+        'activities' => K.notifRenderExpenseCategoryActivities,
+        'food' => K.notifRenderExpenseCategoryFood,
+        'transport' => K.notifRenderExpenseCategoryTransport,
+        'other' => K.notifRenderExpenseCategoryOther,
+        _ => null,
+      };
 
   /// F-60: `params.deadline` as the instant it claims to be, or null.
   ///
@@ -465,6 +518,25 @@ abstract final class NotificationRenderer {
           : null,
       'agenda_reminder' => p['date'] != null && _agendaKind(kind) != null
           ? K.notifRenderTitleAgendaReminder
+          : null,
+      // F-34: the heading only where the body is rebuilt too.
+      'expense_changed' => p['date'] != null && p['amount'] != null
+          ? switch (kind) {
+              'added' => K.notifRenderTitleExpenseAdded,
+              'updated' => K.notifRenderTitleExpenseUpdated,
+              'deleted' => K.notifRenderTitleExpenseDeleted,
+              _ => null,
+            }
+          : null,
+      'settlement_requested' => p['date'] != null && p['amount'] != null
+          ? K.notifRenderTitleSettlementRequested
+          : null,
+      'settlement_answered' => p['date'] != null && p['amount'] != null
+          ? switch (kind) {
+              'confirmed' => K.notifRenderTitleSettlementConfirmed,
+              'rejected' => K.notifRenderTitleSettlementRejected,
+              _ => null,
+            }
           : null,
       // F-52: three request kinds share one heading — the body is what says
       // whether anything is being asked of the reader. A cancellation gets its

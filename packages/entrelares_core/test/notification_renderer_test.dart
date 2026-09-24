@@ -429,6 +429,18 @@ void main() {
     ('agenda_reminder',
         '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia"}',
         '14:00 · Remédio · Bia (25/09/2026).'),
+    // F-34: what expense_notify() / settlement_notify() store, word for word.
+    ('expense_changed',
+        '{"kind":"added","date":"2026-09-24","amount":"123456","category":"school","name":"Ana","msg":"mensalidade"}',
+        'Ana lançou uma despesa de R\$ 1.234,56 em 24/09/2026: Escola. mensalidade'),
+    ('expense_changed',
+        '{"kind":"deleted","date":"2026-09-24","amount":"5","category":"food","name":"Ana","msg":"lanche"}',
+        'Ana apagou uma despesa de R\$ 0,05 em 24/09/2026: Alimentação. lanche'),
+    ('settlement_requested', '{"date":"2026-09-24","amount":"5000","name":"Bruno"}',
+        'Bruno registrou em 24/09/2026 que pagou R\$ 50,00 a você. Confirme em Despesas se recebeu.'),
+    ('settlement_answered',
+        '{"kind":"rejected","date":"2026-09-24","amount":"5000","name":"Ana"}',
+        'Ana não confirmou que recebeu R\$ 50,00 (24/09/2026).'),
   ];
 
   group('PT-BR renders EXACTLY what the writer stored', () {
@@ -490,6 +502,10 @@ void main() {
       ('agenda_notice',
           '{"date":"2026-10-04","kind":"activity","name":"Ana","routine":"1"}'),
       ('agenda_reminder', '{"date":"2026-09-25","kind":"school","time":"07:30"}'),
+      ('expense_changed',
+          '{"kind":"updated","date":"2026-09-24","amount":"123456","category":"health","name":"Ana","msg":"x"}'),
+      ('settlement_answered',
+          '{"kind":"confirmed","date":"2026-09-24","amount":"5000","name":"Ana"}'),
     ];
     for (final (type, json) in enTable) {
       test('$type $json', () {

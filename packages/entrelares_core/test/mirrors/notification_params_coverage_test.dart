@@ -110,6 +110,8 @@ void main() {
       'billing_grace_warnings_due',
       'plan_end_reminders_due',
       'agenda_notify',
+      'expense_notify',
+      'settlement_notify',
     ]) {
       expect(writers, contains(expected));
     }
