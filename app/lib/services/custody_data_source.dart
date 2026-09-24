@@ -7,6 +7,7 @@ import 'package:entrelares_core/entrelares_core.dart'
         PreEditNotes,
         ScheduleRangeResult,
         SignInIdentity,
+        SplitPart,
         SwapOrigin,
         auditPageSize;
 
@@ -17,6 +18,7 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/child_routine.dart';
+import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
@@ -643,6 +645,56 @@ abstract class CustodyDataSource {
   /// `verify_report_attestation` — PUBLIC (anon): the closed state and, while
   /// valid, the period, the attested summary and the fingerprint.
   Future<Map<String, dynamic>> verifyReportAttestation(String id);
+
+  // ── F-34: shared expenses ────────────────────────────────────────────────
+
+  /// The family's expenses with their shares, newest first. A viewer reads
+  /// none (RLS). [includeDeleted] brings the soft-deleted rows too.
+  Future<List<Expense>> fetchExpenses(
+      {DateTime? from, DateTime? to, bool includeDeleted = false});
+
+  /// The append-only trail of the given expenses, oldest first.
+  Future<List<ExpenseHistoryEntry>> fetchExpenseHistory(List<int> expenseIds);
+
+  Future<List<ExpenseSettlement>> fetchSettlements();
+
+  /// Server-enforced: flag on, a full seat, the Premium gate, the category,
+  /// the ceiling and the split — the RPC's PT-BR sentence reaches the user.
+  Future<int> addExpense({
+    int? childId,
+    required String description,
+    required String category,
+    required int amountCents,
+    required int paidBy,
+    required DateTime spentOn,
+    required String method,
+    required List<SplitPart> parts,
+  });
+
+  Future<void> updateExpense({
+    required int id,
+    int? childId,
+    required String description,
+    required String category,
+    required int amountCents,
+    required int paidBy,
+    required DateTime spentOn,
+    required String method,
+    required List<SplitPart> parts,
+  });
+
+  /// A soft delete: the row and its trail stay.
+  Future<void> deleteExpense(int id);
+
+  /// "I paid [amountCents] to [toProfileId]" — waits for the receiver.
+  Future<int> requestSettlement(
+      {int? childId, required int toProfileId, required int amountCents});
+
+  /// The receiver's answer.
+  Future<void> answerSettlement(int id, {required bool received});
+
+  /// The one who recorded it takes it back while it waits.
+  Future<void> cancelSettlement(int id);
 
   // ── F-55 PR 3: the routine ───────────────────────────────────────────────
 

@@ -72,6 +72,18 @@ class NotificationsScreen extends StatefulWidget {
   /// action (tests, hosts without a calendar).
   final ValueChanged<DateTime>? onPlanFrom;
 
+  /// F-34: an expense or settle-up row's "Abrir Despesas". Null hides it.
+  final VoidCallback? onOpenExpenses;
+
+  /// The notification types whose row opens Despesas.
+  static const Set<String> expenseTypes = {
+    'expense_changed',
+    'settlement_requested',
+    'settlement_answered',
+  };
+
+  static Key expenseActionKey(int id) => Key('notif-expense-$id');
+
   const NotificationsScreen(
       {super.key,
       required this.dataSource,
@@ -81,6 +93,7 @@ class NotificationsScreen extends StatefulWidget {
       this.installFacts,
       this.analytics,
       this.onPlanFrom,
+      this.onOpenExpenses,
       this.landing,
       this.landingNonce});
 
@@ -928,7 +941,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         timestamp:
             createdLocal == null ? '' : l.formatDateTime(createdLocal),
-        detail: _planAction(notif, l),
+        detail: _planAction(notif, l) ?? _expenseAction(notif, l),
+      ),
+    );
+  }
+
+  /// F-34: an expense or settle-up row opens Despesas, where the balance and
+  /// the "Recebi / Não recebi" answer live.
+  Widget? _expenseAction(AppNotification notif, Localization l) {
+    final open = widget.onOpenExpenses;
+    if (open == null ||
+        _ownProfile?.isViewer == true ||
+        !NotificationsScreen.expenseTypes.contains(notif.type)) {
+      return null;
+    }
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: NotificationsScreen.expenseActionKey(notif.id),
+        icon: const Icon(Icons.receipt_long_outlined),
+        label: Text(l[KApp.expenseOpen]),
+        onPressed: open,
       ),
     );
   }

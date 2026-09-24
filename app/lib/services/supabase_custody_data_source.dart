@@ -11,6 +11,7 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/child_routine.dart';
+import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
@@ -1748,6 +1749,138 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       Map<String, dynamic>.from(await _client.rpc<dynamic>(
           'verify_report_attestation',
           params: {'p_id': id}) as Map);
+
+  @override
+  Future<List<Expense>> fetchExpenses(
+      {DateTime? from, DateTime? to, bool includeDeleted = false}) async {
+    var q = _client.from('expenses').select('*, expense_shares(*)');
+    if (from != null) q = q.gte('spent_on', _isoDay(from));
+    if (to != null) q = q.lte('spent_on', _isoDay(to));
+    if (!includeDeleted) q = q.isFilter('deleted_at', null);
+    final rows = await q
+        .order('spent_on', ascending: false)
+        .order('id', ascending: false);
+    return rows.map(Expense.fromJson).toList();
+  }
+
+  @override
+  Future<List<ExpenseHistoryEntry>> fetchExpenseHistory(
+      List<int> expenseIds) async {
+    if (expenseIds.isEmpty) return const [];
+    final rows = await _client
+        .from('expense_history')
+        .select()
+        .inFilter('expense_id', expenseIds)
+        .order('at', ascending: true);
+    return rows.map(ExpenseHistoryEntry.fromJson).toList();
+  }
+
+  @override
+  Future<List<ExpenseSettlement>> fetchSettlements() async {
+    final rows = await _client
+        .from('expense_settlements')
+        .select()
+        .order('created_at', ascending: false);
+    return rows.map(ExpenseSettlement.fromJson).toList();
+  }
+
+  static Map<String, dynamic> _expenseParams({
+    int? childId,
+    required String description,
+    required String category,
+    required int amountCents,
+    required int paidBy,
+    required DateTime spentOn,
+    required String method,
+    required List<SplitPart> parts,
+  }) =>
+      {
+        'p_child_id': childId,
+        'p_desc': description,
+        'p_category': category,
+        'p_amount': amountCents,
+        'p_paid_by': paidBy,
+        'p_spent_on': _isoDay(spentOn),
+        'p_method': method,
+        'p_parts': [
+          for (final p in parts) {'profile_id': p.profileId, 'value': p.value}
+        ],
+      };
+
+  @override
+  Future<int> addExpense({
+    int? childId,
+    required String description,
+    required String category,
+    required int amountCents,
+    required int paidBy,
+    required DateTime spentOn,
+    required String method,
+    required List<SplitPart> parts,
+  }) async =>
+      await _client.rpc<dynamic>('add_expense',
+          params: _expenseParams(
+              childId: childId,
+              description: description,
+              category: category,
+              amountCents: amountCents,
+              paidBy: paidBy,
+              spentOn: spentOn,
+              method: method,
+              parts: parts)) as int;
+
+  @override
+  Future<void> updateExpense({
+    required int id,
+    int? childId,
+    required String description,
+    required String category,
+    required int amountCents,
+    required int paidBy,
+    required DateTime spentOn,
+    required String method,
+    required List<SplitPart> parts,
+  }) async {
+    await _client.rpc<dynamic>('update_expense', params: {
+      'p_id': id,
+      ..._expenseParams(
+          childId: childId,
+          description: description,
+          category: category,
+          amountCents: amountCents,
+          paidBy: paidBy,
+          spentOn: spentOn,
+          method: method,
+          parts: parts),
+    });
+  }
+
+  @override
+  Future<void> deleteExpense(int id) async {
+    await _client.rpc<dynamic>('delete_expense', params: {'p_id': id});
+  }
+
+  @override
+  Future<int> requestSettlement(
+          {int? childId,
+          required int toProfileId,
+          required int amountCents}) async =>
+      await _client.rpc<dynamic>('request_settlement', params: {
+        'p_child_id': childId,
+        'p_to': toProfileId,
+        'p_amount': amountCents,
+      }) as int;
+
+  @override
+  Future<void> answerSettlement(int id, {required bool received}) async {
+    await _client.rpc<dynamic>('answer_settlement',
+        params: {'p_id': id, 'p_received': received});
+  }
+
+  @override
+  Future<void> cancelSettlement(int id) async {
+    await _client.rpc<dynamic>('cancel_settlement', params: {'p_id': id});
+  }
 
   @override
   Future<List<ChildRoutine>> fetchChildRoutines() async {

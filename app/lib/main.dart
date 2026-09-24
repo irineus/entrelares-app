@@ -36,6 +36,7 @@ import 'screens/premium_return_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/verify_report_screen.dart';
+import 'screens/expenses_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/update_password_screen.dart';
@@ -442,7 +443,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
             appHandoff: _appHandoff,
             installHint: _installHint,
             connectivity: appConnectivity,
-            tourKeys: _tourKeys),
+            tourKeys: _tourKeys,
+            expensesTab: _expensesTab),
         branches: [
           StatefulShellBranch(routes: [
             GoRoute(
@@ -588,12 +590,23 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                     _planRequest.value = start;
                     _router.go('/');
                   },
+                  onOpenExpenses: () => _router.go('/expenses'),
                   landing: switch (state.uri.queryParameters['tab']) {
                     'incoming' => NotificationLanding.incoming,
                     'history' => NotificationLanding.history,
                     _ => null,
                   },
                   landingNonce: state.uri.queryParameters['n']),
+            ),
+          ]),
+          // F-34: always a branch (index 3, HomeShell.expensesBranch); the
+          // bar offers it only while the module is on for this member.
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/expenses',
+              builder: (_, _) => ExpensesScreen(
+                  dataSource: _dataSource,
+                  onOpenPlan: () => _router.go('/family/plan')),
             ),
           ]),
           StatefulShellBranch(routes: [
@@ -638,6 +651,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// state, correct, and painted only when the reader switched tabs. The shell
   /// listens to the notifier instead, and a late answer paints on its own.
   final _deletionBanner = ValueNotifier<FamilyDeletionBanner?>(null);
+
+  /// F-34: whether the bar offers Despesas (flag on, not a viewer). Read at
+  /// sign-in; the shell listens, for the reason [_deletionBanner] gives.
+  final _expensesTab = ValueNotifier<bool>(false);
 
   /// T-65: the web→app offer, or null — which is the answer on every native
   /// build and on every browser that did not confirm the app is on this device.
@@ -867,6 +884,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _push.dispose();
     _refresh.dispose();
     _deletionBanner.dispose();
+    _expensesTab.dispose();
     _appHandoff.dispose();
     _installHint.dispose();
     _planRequest.dispose();
@@ -908,12 +926,14 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _profileGatesDeferred = false;
       _activity.reset();
       _idleTimeout = InactivityPolicy.timeout;
+      _expensesTab.value = false;
     }
     if (phase == _AuthPhase.authed) {
       _lastInteraction = DateTime.now();
       _inactivityTimer ??= Timer.periodic(
           InactivityPolicy.pollInterval, (_) => _checkInactivity());
       unawaited(_loadIdleTimeout());
+      unawaited(_loadExpensesTab());
       // The bell badge lives with the authenticated phase (count + its
       // workflow Realtime trigger).
       _badge.start();
@@ -1112,6 +1132,20 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         _idleTimeout = InactivityPolicy.timeoutFor(settings);
       }
     } catch (_) {/* the seed stands */}
+  }
+
+  /// F-34: best-effort — a failed read keeps the tab hidden, and the server
+  /// refuses every expense write with the flag off anyway.
+  Future<void> _loadExpensesTab() async {
+    try {
+      final settings =
+          PublicSettings(await _dataSource.fetchPublicSettings());
+      if (!settings.expensesEnabled) return;
+      final me = await _dataSource.fetchOwnProfile();
+      if (_phase == _AuthPhase.authed) {
+        _expensesTab.value = me != null && !me.isViewer;
+      }
+    } catch (_) {/* the tab stays hidden */}
   }
 
   void _checkInactivity() {

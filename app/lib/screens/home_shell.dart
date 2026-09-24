@@ -124,6 +124,16 @@ class HomeShell extends StatelessWidget {
   /// rather than in any screen — so the key registry is shared.
   final TourKeys? tourKeys;
 
+  /// F-34: whether the Despesas tab shows — the module's flag is on and the
+  /// signed-in member is not a viewer. Decided after the shell mounted (a
+  /// network read), so listened to for the reason [deletionBanner] gives.
+  /// The branch always exists; this only decides whether the bar offers it.
+  final ValueListenable<bool>? expensesTab;
+
+  /// The shell's branch order (main.dart): Calendário, Família, Notificações,
+  /// Despesas, Relatórios.
+  static const int expensesBranch = 3;
+
   const HomeShell(
       {super.key,
       required this.shell,
@@ -137,7 +147,8 @@ class HomeShell extends StatelessWidget {
       this.appHandoff,
       this.installHint,
       this.connectivity,
-      this.tourKeys});
+      this.tourKeys,
+      this.expensesTab});
 
   @override
   Widget build(BuildContext context) {
@@ -246,52 +257,87 @@ class HomeShell extends StatelessWidget {
         },
       ),
       bottomNavigationBar: ListenableBuilder(
-        listenable: badge,
-        builder: (context, _) => _NavLabelFit(
-          labels: [
+        listenable: Listenable.merge([badge, expensesTab]),
+        builder: (context, _) {
+          // A host without the Despesas branch (four branches: the tests'
+          // shells) keeps the four tabs it always had.
+          final total = shell.route.branches.length;
+          final hasExpensesBranch = total > 4;
+          final withExpenses =
+              hasExpensesBranch && (expensesTab?.value ?? false);
+          // The branches the bar offers, in order; a hidden branch keeps its
+          // index so a route never moves.
+          final branches = [
+            for (var i = 0; i < total; i++)
+              if (i != expensesBranch || !hasExpensesBranch || withExpenses) i
+          ];
+          final labels = [
             l[K.navCalendar],
             l[K.navFamily],
             l[K.navNotificationsShort],
+            if (withExpenses) l[KApp.expenseNav],
             l[K.navReports],
-          ],
-          child: NavigationBar(
-            selectedIndex: shell.currentIndex,
-            onDestinationSelected: (index) {
-              shell.goBranch(index,
-                  // Re-tapping the active tab resets it to its root, the
-                  // platform convention.
-                  initialLocation: index == shell.currentIndex);
-              // Web parity: the badge refreshes on every navigation.
-              badge.refresh();
-            },
-            destinations: [
-              NavigationDestination(
-                  icon: const Icon(Icons.calendar_month_outlined),
-                  selectedIcon: const Icon(Icons.calendar_month),
-                  label: l[K.navCalendar]),
-              NavigationDestination(
-                  icon: const Icon(Icons.group_outlined),
-                  selectedIcon: const Icon(Icons.group),
-                  label: l[K.navFamily]),
-              NavigationDestination(
-                  key: tourKeys?.keyFor(TourTarget.notificationsTab),
-                  icon: _bellIcon(const Icon(Icons.notifications_outlined), l),
-                  selectedIcon: _bellIcon(const Icon(Icons.notifications), l),
-                  tooltip: badge.count > 0
-                      ? l.format(
-                          badge.count == 1
-                              ? K.navNotificationsOnePending
-                              : K.navNotificationsManyPending,
-                          [badge.count])
-                      : null,
-                  label: l[K.navNotificationsShort]),
-              NavigationDestination(
-                  icon: const Icon(Icons.bar_chart_outlined),
-                  selectedIcon: const Icon(Icons.bar_chart),
-                  label: l[K.navReports]),
-            ],
-          ),
-        ),
+          ];
+          final selected = branches.indexOf(shell.currentIndex);
+          final five = labels.length > 4;
+          return _NavLabelFit(
+            labels: labels,
+            floor: five ? _NavLabelFit.fiveTabFloor : 1.0,
+            sideGap: five ? 1 : _NavLabelFit._sideGap,
+            child: NavigationBar(
+              selectedIndex: selected < 0 ? 0 : selected,
+              // F-34: five tabs show every label only while they all fit at
+              // the SDK's own ceiling (1.3×) with the real font; otherwise
+              // only the selected one speaks, the others keep their icon.
+              labelBehavior: five && !navLabelsFitAtCeiling(context, labels)
+                  ? NavigationDestinationLabelBehavior.onlyShowSelected
+                  : null,
+              onDestinationSelected: (index) {
+                final branch = branches[index];
+                shell.goBranch(branch,
+                    // Re-tapping the active tab resets it to its root, the
+                    // platform convention.
+                    initialLocation: branch == shell.currentIndex);
+                // Web parity: the badge refreshes on every navigation.
+                badge.refresh();
+              },
+              destinations: [
+                NavigationDestination(
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    selectedIcon: const Icon(Icons.calendar_month),
+                    label: l[K.navCalendar]),
+                NavigationDestination(
+                    icon: const Icon(Icons.group_outlined),
+                    selectedIcon: const Icon(Icons.group),
+                    label: l[K.navFamily]),
+                NavigationDestination(
+                    key: tourKeys?.keyFor(TourTarget.notificationsTab),
+                    icon:
+                        _bellIcon(const Icon(Icons.notifications_outlined), l),
+                    selectedIcon:
+                        _bellIcon(const Icon(Icons.notifications), l),
+                    tooltip: badge.count > 0
+                        ? l.format(
+                            badge.count == 1
+                                ? K.navNotificationsOnePending
+                                : K.navNotificationsManyPending,
+                            [badge.count])
+                        : null,
+                    label: l[K.navNotificationsShort]),
+                if (withExpenses)
+                  NavigationDestination(
+                      key: const ValueKey('nav-expenses'),
+                      icon: const Icon(Icons.receipt_long_outlined),
+                      selectedIcon: const Icon(Icons.receipt_long),
+                      label: l[KApp.expenseNav]),
+                NavigationDestination(
+                    icon: const Icon(Icons.bar_chart_outlined),
+                    selectedIcon: const Icon(Icons.bar_chart),
+                    label: l[K.navReports]),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -505,14 +551,34 @@ class HomeShell extends StatelessWidget {
 /// asked for. At the default scale this is a no-op (U-48: the adjustment is
 /// paid for by the reader who asked for it), and one ceiling for the four
 /// labels keeps them the same size as each other.
+///
+/// F-34 — five tabs. On a 360 dp phone a slot is 72 dp and "Notificações" is
+/// 79.7 dp at 1.0× with the real font, so the bar shows the selected label
+/// alone ([navLabelsFitAtCeiling]) — and that one label may go below 1.0×,
+/// down to the 0.85× floor [AppShrinkToFit] already uses, measured against
+/// the slot less 1 dp a side (exactly 72 dp wraps on rounding).
 class _NavLabelFit extends StatelessWidget {
   final List<String> labels;
   final Widget child;
 
-  const _NavLabelFit({required this.labels, required this.child});
+  /// The smallest factor the labels may take: 1.0 with four tabs (U-48: the
+  /// adjustment is paid by the reader who asked for it); 0.85 with five.
+  final double floor;
+
+  /// Air kept on each side of the widest label.
+  final double sideGap;
+
+  const _NavLabelFit(
+      {required this.labels,
+      required this.child,
+      this.floor = 1.0,
+      this.sideGap = _sideGap});
 
   /// Air kept on each side of the widest label, so two neighbours never touch.
   static const double _sideGap = 2;
+
+  /// F-34: the five-tab floor — [AppShrinkToFit]'s.
+  static const double fiveTabFloor = 0.85;
 
   /// The SDK already stops the bar's labels here (`navigation_bar.dart`).
   static const double _sdkCeiling = 1.3;
@@ -526,8 +592,8 @@ class _NavLabelFit extends StatelessWidget {
     if (style == null || size == null || labels.isEmpty) return child;
     final reader =
         (MediaQuery.textScalerOf(context).scale(size) / size)
-            .clamp(1.0, _sdkCeiling);
-    if (reader <= 1.0) return child;
+            .clamp(floor, _sdkCeiling);
+    if (reader <= floor) return child;
 
     var widest = 0.0;
     for (final label in labels) {
@@ -541,10 +607,35 @@ class _NavLabelFit extends StatelessWidget {
     }
     if (widest <= 0) return child;
     final slot =
-        MediaQuery.sizeOf(context).width / labels.length - 2 * _sideGap;
-    final ceiling = (slot / widest).clamp(1.0, reader);
+        MediaQuery.sizeOf(context).width / labels.length - 2 * sideGap;
+    final ceiling = (slot / widest).clamp(floor, reader);
     if (ceiling >= reader) return child;
     return MediaQuery.withClampedTextScaling(
         maxScaleFactor: ceiling, child: child);
   }
+}
+
+/// F-34 — whether every label of the bar fits its slot at the SDK's ceiling
+/// (1.3×), measured with the theme's real font. Five tabs show all labels
+/// only when this holds; otherwise the bar shows the selected label alone.
+bool navLabelsFitAtCeiling(BuildContext context, List<String> labels) {
+  final style = NavigationBarTheme.of(context)
+      .labelTextStyle
+      ?.resolve(const {WidgetState.selected});
+  final size = style?.fontSize;
+  if (style == null || size == null || labels.isEmpty) return true;
+  final slot = MediaQuery.sizeOf(context).width / labels.length -
+      2 * _NavLabelFit._sideGap;
+  for (final label in labels) {
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: const TextScaler.linear(_NavLabelFit._sdkCeiling),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    if (width > slot) return false;
+  }
+  return true;
 }

@@ -18,6 +18,7 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/child_routine.dart';
+import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
@@ -1110,6 +1111,174 @@ class FakeCustodyDataSource implements CustodyDataSource {
   @override
   Future<Map<String, dynamic>> verifyReportAttestation(String id) async =>
       verifyAnswer;
+
+  // ── F-34: shared expenses ──
+  List<Expense> expenses = [];
+  List<ExpenseHistoryEntry> expenseHistory = [];
+  List<ExpenseSettlement> settlements = [];
+  Object? throwOnExpenseWrite;
+
+  /// Every write, in order, as a readable line — what the tests assert on.
+  final List<String> expenseWrites = [];
+  int _nextExpenseId = 100;
+
+  /// The profile the fake RPCs act as (created_by, settlement's from).
+  int expenseActorId = 1;
+
+  @override
+  Future<List<Expense>> fetchExpenses(
+          {DateTime? from, DateTime? to, bool includeDeleted = false}) async =>
+      [
+        for (final e in expenses)
+          if ((includeDeleted || !e.isDeleted) &&
+              (from == null || !e.spentOn.isBefore(from)) &&
+              (to == null || !e.spentOn.isAfter(to)))
+            e
+      ];
+
+  @override
+  Future<List<ExpenseHistoryEntry>> fetchExpenseHistory(
+          List<int> expenseIds) async =>
+      [
+        for (final h in expenseHistory)
+          if (expenseIds.contains(h.expenseId)) h
+      ];
+
+  @override
+  Future<List<ExpenseSettlement>> fetchSettlements() async => settlements;
+
+  Expense _expenseRow(int id, int? childId, String description, String category,
+          int amountCents, int paidBy, DateTime spentOn, String method,
+          List<SplitPart> parts) =>
+      Expense(
+        id: id,
+        childId: childId,
+        description: description,
+        category: category,
+        amountCents: amountCents,
+        paidBy: paidBy,
+        spentOn: spentOn,
+        splitMethod: method,
+        createdBy: expenseActorId,
+        createdAt: DateTime.utc(2026, 9, 24),
+        shares: [
+          for (final s in ExpenseSplit.split(
+              amountCents, SplitMethod.parse(method)!, parts))
+            ExpenseShare(
+                profileId: s.profileId,
+                weight: s.weight,
+                shareCents: s.shareCents)
+        ],
+      );
+
+  String _partsText(List<SplitPart> parts) =>
+      [for (final p in parts) '${p.profileId}=${p.value}'].join(',');
+
+  @override
+  Future<int> addExpense({
+    int? childId,
+    required String description,
+    required String category,
+    required int amountCents,
+    required int paidBy,
+    required DateTime spentOn,
+    required String method,
+    required List<SplitPart> parts,
+  }) async {
+    if (throwOnExpenseWrite != null) throw throwOnExpenseWrite!;
+    final id = _nextExpenseId++;
+    expenseWrites.add('add:$description:$category:$amountCents:$paidBy:'
+        '$method:${_partsText(parts)}');
+    expenses = [
+      _expenseRow(id, childId, description, category, amountCents, paidBy,
+          spentOn, method, parts),
+      ...expenses
+    ];
+    return id;
+  }
+
+  @override
+  Future<void> updateExpense({
+    required int id,
+    int? childId,
+    required String description,
+    required String category,
+    required int amountCents,
+    required int paidBy,
+    required DateTime spentOn,
+    required String method,
+    required List<SplitPart> parts,
+  }) async {
+    if (throwOnExpenseWrite != null) throw throwOnExpenseWrite!;
+    expenseWrites.add('update:$id:$description:$amountCents:$method:'
+        '${_partsText(parts)}');
+    expenses = [
+      for (final e in expenses)
+        e.id == id
+            ? _expenseRow(id, childId, description, category, amountCents,
+                paidBy, spentOn, method, parts)
+            : e
+    ];
+  }
+
+  @override
+  Future<void> deleteExpense(int id) async {
+    if (throwOnExpenseWrite != null) throw throwOnExpenseWrite!;
+    expenseWrites.add('delete:$id');
+    expenses = [for (final e in expenses) if (e.id != id) e];
+  }
+
+  @override
+  Future<int> requestSettlement(
+      {int? childId,
+      required int toProfileId,
+      required int amountCents}) async {
+    if (throwOnExpenseWrite != null) throw throwOnExpenseWrite!;
+    final id = _nextExpenseId++;
+    expenseWrites.add('settle:$toProfileId:$amountCents');
+    settlements = [
+      ExpenseSettlement(
+          id: id,
+          childId: childId,
+          fromProfile: expenseActorId,
+          toProfile: toProfileId,
+          amountCents: amountCents,
+          status: 'pending',
+          createdAt: DateTime.utc(2026, 9, 24)),
+      ...settlements
+    ];
+    return id;
+  }
+
+  ExpenseSettlement _withStatus(ExpenseSettlement s, String status) =>
+      ExpenseSettlement(
+          id: s.id,
+          childId: s.childId,
+          fromProfile: s.fromProfile,
+          toProfile: s.toProfile,
+          amountCents: s.amountCents,
+          status: status,
+          createdAt: s.createdAt,
+          answeredAt: DateTime.utc(2026, 9, 24));
+
+  @override
+  Future<void> answerSettlement(int id, {required bool received}) async {
+    if (throwOnExpenseWrite != null) throw throwOnExpenseWrite!;
+    expenseWrites.add('answer:$id:$received');
+    settlements = [
+      for (final s in settlements)
+        s.id == id ? _withStatus(s, received ? 'confirmed' : 'rejected') : s
+    ];
+  }
+
+  @override
+  Future<void> cancelSettlement(int id) async {
+    if (throwOnExpenseWrite != null) throw throwOnExpenseWrite!;
+    expenseWrites.add('cancel:$id');
+    settlements = [
+      for (final s in settlements) s.id == id ? _withStatus(s, 'cancelled') : s
+    ];
+  }
 
   // ── F-55 PR 3: the routine ──
   List<ChildRoutine> childRoutines = [];
