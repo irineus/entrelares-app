@@ -81,6 +81,10 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   /// F-55: the agenda is on for this build — the PDF prints section 5.
   bool _agendaOn = false;
 
+  /// F-34: the expenses are on for this build — the PDF prints their section
+  /// (never for a viewer, who reads no expense).
+  bool _expensesOn = false;
+
   /// F-64: `feature.report_attestation` — the PDF goes out with its QR.
   bool _attestOn = false;
   List<ReportAttestation> _attestations = const [];
@@ -134,6 +138,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       final settings =
           PublicSettings(await widget.dataSource.fetchPublicSettings());
       _agendaOn = settings.childAgendaEnabled;
+      _expensesOn = settings.expensesEnabled;
       _attestOn = settings.reportAttestationEnabled;
       if (_attestOn) unawaited(_loadAttestations());
       if (!settings.childAgendaEnabled) return null;
@@ -144,6 +149,91 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
     } catch (_) {
       return null;
     }
+  }
+
+  /// F-34: the period's live expenses, each caregiver's totals, the payments
+  /// the receiver confirmed in the period, and the edits and deletions made
+  /// in it (the append-only trail).
+  Future<ReportExpenses> _reportExpenses(Localization l, DateTime start,
+      DateTime end, List<Member> members) async {
+    String name(int? id) {
+      for (final m in members) {
+        if (m.id == id && m.fullName.trim().isNotEmpty) return m.fullName;
+      }
+      return l[KApp.expenseFormerMember];
+    }
+
+    String money(int c) => ExpenseRules.brl(c, english: l.isEnglish);
+    final all = await widget.dataSource
+        .fetchExpenses(from: start, to: end, includeDeleted: true);
+    final live = [
+      for (final e in all)
+        if (!e.isDeleted) e
+    ]..sort((a, b) => a.spentOn.compareTo(b.spentOn));
+    final paid = <int, int>{};
+    final share = <int, int>{};
+    for (final e in live) {
+      paid[e.paidBy] = (paid[e.paidBy] ?? 0) + e.amountCents;
+      for (final s in e.shares) {
+        share[s.profileId] = (share[s.profileId] ?? 0) + s.shareCents;
+      }
+    }
+    final people = {...paid.keys, ...share.keys}.toList()..sort();
+    final endExclusive = DateTime(end.year, end.month, end.day + 1);
+    bool inPeriod(DateTime local) =>
+        !local.isBefore(start) && local.isBefore(endExclusive);
+    final settlements = await widget.dataSource.fetchSettlements();
+    final history = await widget.dataSource
+        .fetchExpenseHistory([for (final e in all) e.id]);
+    return ReportExpenses(
+      lines: [
+        for (final e in live)
+          ReportExpenseLine(
+            date: e.spentOn,
+            description: e.description,
+            categoryLabel: l[
+                (ExpenseCategory.parse(e.category) ?? ExpenseCategory.other)
+                    .labelKey],
+            amountCents: e.amountCents,
+            paidByName: name(e.paidBy),
+          ),
+      ],
+      totals: [
+        for (final id in people)
+          ReportExpenseTotal(
+              name: name(id),
+              paidCents: paid[id] ?? 0,
+              shareCents: share[id] ?? 0),
+      ],
+      payments: [
+        for (final s in settlements)
+          if (s.isConfirmed &&
+              s.answeredAt != null &&
+              inPeriod(s.answeredAt!.toLocal()))
+            ReportExpensePayment(
+              date: s.answeredAt!.toLocal(),
+              fromName: name(s.fromProfile),
+              toName: name(s.toProfile),
+              amountCents: s.amountCents,
+            ),
+      ],
+      changes: [
+        for (final h in history)
+          if (h.action != 'created' && h.oldData != null)
+            ReportExpenseChange(
+              atLocal: h.at.toLocal(),
+              actorName: name(h.actorId),
+              text: l.format(
+                  h.action == 'updated'
+                      ? KApp.expensePdfUpdated
+                      : KApp.expensePdfDeleted,
+                  [
+                    '${h.oldData!['description'] ?? ''}',
+                    money(int.tryParse('${h.oldData!['amount_cents']}') ?? 0),
+                  ]),
+            ),
+      ],
+    );
   }
 
   (DateTime, DateTime)? _resolvePeriod(Localization l) {
@@ -228,6 +318,16 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         } catch (_) {/* section 5 prints its empty line */}
       }
 
+      // F-34: the expenses section — the same contract: a failure prints
+      // the section's empty line.
+      ReportExpenses? expenses;
+      if (_expensesOn && !(_me?.isViewer ?? false)) {
+        expenses = const ReportExpenses();
+        try {
+          expenses = await _reportExpenses(l, start, end, members);
+        } catch (_) {/* the section prints its empty line */}
+      }
+
       String roleLabelOf(int profileId) {
         for (final m in members) {
           if (m.id != profileId) continue;
@@ -286,6 +386,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
             ),
         ],
         agenda: agenda,
+        expenses: expenses,
         dayAccounts: [
           for (final a in dayAccounts)
             ReportDayAccount(

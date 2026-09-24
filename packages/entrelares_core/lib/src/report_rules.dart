@@ -493,6 +493,77 @@ List<ReportAgendaItem> reportAgendaInOrder(Iterable<ReportAgendaItem> items) {
   ];
 }
 
+/// F-34: the expenses section — built by the caller from the period's live
+/// expenses, its confirmed payments and the trail of changes. Money in cents.
+class ReportExpenseLine {
+  final DateTime date;
+  final String description;
+  final String categoryLabel;
+  final int amountCents;
+  final String paidByName;
+
+  const ReportExpenseLine({
+    required this.date,
+    required this.description,
+    required this.categoryLabel,
+    required this.amountCents,
+    required this.paidByName,
+  });
+}
+
+class ReportExpenseTotal {
+  final String name;
+  final int paidCents;
+  final int shareCents;
+
+  const ReportExpenseTotal(
+      {required this.name, required this.paidCents, required this.shareCents});
+}
+
+class ReportExpensePayment {
+  final DateTime date;
+  final String fromName;
+  final String toName;
+  final int amountCents;
+
+  const ReportExpensePayment({
+    required this.date,
+    required this.fromName,
+    required this.toName,
+    required this.amountCents,
+  });
+}
+
+/// One entry of the append-only trail: an edit or a delete (the creation is
+/// the line itself).
+class ReportExpenseChange {
+  final DateTime atLocal;
+  final String actorName;
+
+  /// Already in the reader's words ("alterou", "apagou" + the description).
+  final String text;
+
+  const ReportExpenseChange(
+      {required this.atLocal, required this.actorName, required this.text});
+}
+
+class ReportExpenses {
+  final List<ReportExpenseLine> lines;
+  final List<ReportExpenseTotal> totals;
+  final List<ReportExpensePayment> payments;
+  final List<ReportExpenseChange> changes;
+
+  const ReportExpenses({
+    this.lines = const [],
+    this.totals = const [],
+    this.payments = const [],
+    this.changes = const [],
+  });
+
+  bool get isEmpty =>
+      lines.isEmpty && payments.isEmpty && changes.isEmpty;
+}
+
 class CustodyReport {
   final String familyName;
 
@@ -530,6 +601,10 @@ class CustodyReport {
   /// empty when it is on and the period has nothing.
   final List<ReportAgendaItem>? agenda;
 
+  /// F-34: the expenses section. NULL leaves it out (the module is off, or
+  /// the reader is a viewer, who never sees expenses).
+  final ReportExpenses? expenses;
+
   const CustodyReport({
     required this.familyName,
     required this.childName,
@@ -545,6 +620,7 @@ class CustodyReport {
     this.caregiverTimelines = const [],
     this.dayAccounts = const [],
     this.agenda,
+    this.expenses,
   });
 
   int get totalDays =>
@@ -584,6 +660,8 @@ CustodyReport buildCustodyReport({
   List<ReportDayAccount> dayAccounts = const [],
   // F-55: section 5. Null leaves the section out (the agenda is off).
   List<ReportAgendaItem>? agenda,
+  // F-34: the expenses section, already assembled. Null leaves it out.
+  ReportExpenses? expenses,
 }) {
   final stats = caregiverStats(
     members: members,
@@ -631,6 +709,7 @@ CustodyReport buildCustodyReport({
           ),
     dayAccounts: reportDayAccountsInOrder(dayAccounts),
     agenda: agenda == null ? null : reportAgendaInOrder(agenda),
+    expenses: expenses,
   );
 }
 

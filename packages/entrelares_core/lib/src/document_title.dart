@@ -65,6 +65,8 @@ abstract final class DocumentTitle {
         return segments.length == 1 ? K.notifPageTitle : K.notFoundTitle;
       case 'reports':
         return segments.length == 1 ? K.navReports : K.notFoundTitle;
+      case 'expenses':
+        return segments.length == 1 ? KApp.expenseNav : K.notFoundTitle;
       case 'family':
         if (segments.length == 1) return K.famHeading;
         switch (segments[1]) {
@@ -128,6 +130,7 @@ abstract final class DocumentTitle {
     '/family/profile',
     '/family/profile/42',
     '/notifications',
+    '/expenses',
     '/reports',
   ];
 }

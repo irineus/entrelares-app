@@ -109,6 +109,16 @@ class PublicSettings {
   int get agendaMaxEventsPerDay => _int('agenda.max_events_per_day', 20);
   int get agendaTextMaxChars => _int('agenda.text_max_chars', 500);
 
+  // F-34 — shared expenses (the RPCs read the same keys).
+  bool get expensesEnabled =>
+      parseBoolSetting(values, 'feature.expenses', false);
+  bool get expensesPremiumOnly =>
+      parseBoolSetting(values, 'expenses.premium_only', true);
+  int get expenseDescriptionMaxChars =>
+      _int('expenses.description_max_chars', 200);
+  int get expenseMaxAmountCents =>
+      _int('expenses.max_amount_cents', 10000000);
+
   // T-39 billing (F-48 promotional prices: 549, not 490 — Asaas refuses
   // Pix/boleto charges under R$ 5,00). Enabled=false shows the waitlist.
   bool get billingEnabled => parseBoolSetting(values, 'billing.enabled', false);

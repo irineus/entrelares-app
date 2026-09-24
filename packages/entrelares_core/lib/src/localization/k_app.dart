@@ -586,6 +586,87 @@ abstract final class KApp {
   static const String agendaRoutineStopped = 'app.agenda.routineStopped';
   static const String agendaAuditRoutineAdded = 'app.agenda.auditRoutineAdded';
   static const String agendaAuditRoutineDeleted = 'app.agenda.auditRoutineDeleted';
+  // ── F-34: shared expenses ──
+  static const String expenseNav = 'app.expense.nav';
+  static const String expenseLead = 'app.expense.lead';
+  static const String expenseErrLoad = 'app.expense.errLoad';
+  static const String expenseOff = 'app.expense.off';
+  static const String expenseViewer = 'app.expense.viewer';
+  static const String expensePremium = 'app.expense.premium';
+  static const String expenseAdd = 'app.expense.add';
+  static const String expenseEdit = 'app.expense.edit';
+  static const String expenseEmpty = 'app.expense.empty';
+  static const String expenseEmptyBody = 'app.expense.emptyBody';
+  static const String expenseGroupFamily = 'app.expense.groupFamily';
+  static const String expenseGroupLabel = 'app.expense.groupLabel';
+  static const String expenseBalance = 'app.expense.balance';
+  static const String expenseBalanceEven = 'app.expense.balanceEven';
+  static const String expensePays = 'app.expense.pays';
+  static const String expenseNetGets = 'app.expense.netGets';
+  static const String expenseNetOwes = 'app.expense.netOwes';
+  static const String expenseSettle = 'app.expense.settle';
+  static const String expenseSettleTitle = 'app.expense.settleTitle';
+  static const String expenseSettleLead = 'app.expense.settleLead';
+  static const String expenseSettleTo = 'app.expense.settleTo';
+  static const String expenseSettleNobody = 'app.expense.settleNobody';
+  static const String expenseAmount = 'app.expense.amount';
+  static const String expenseSettleSent = 'app.expense.settleSent';
+  static const String expensePending = 'app.expense.pending';
+  static const String expensePendingToMe = 'app.expense.pendingToMe';
+  static const String expensePendingFromMe = 'app.expense.pendingFromMe';
+  static const String expensePendingOthers = 'app.expense.pendingOthers';
+  static const String expenseConfirm = 'app.expense.confirm';
+  static const String expenseReject = 'app.expense.reject';
+  static const String expenseTakeBack = 'app.expense.takeBack';
+  static const String expenseConfirmed = 'app.expense.confirmed';
+  static const String expenseRejected = 'app.expense.rejected';
+  static const String expenseTakenBack = 'app.expense.takenBack';
+  static const String expenseListSection = 'app.expense.listSection';
+  static const String expenseRow = 'app.expense.row';
+  static const String expenseDesc = 'app.expense.desc';
+  static const String expenseCategory = 'app.expense.category';
+  static const String expenseDate = 'app.expense.date';
+  static const String expensePaidBy = 'app.expense.paidBy';
+  static const String expenseSplit = 'app.expense.split';
+  static const String expenseSplitEqual = 'app.expense.splitEqual';
+  static const String expenseSplitExact = 'app.expense.splitExact';
+  static const String expenseSplitPercent = 'app.expense.splitPercent';
+  static const String expenseSplitShares = 'app.expense.splitShares';
+  static const String expenseParticipants = 'app.expense.participants';
+  static const String expenseValueExact = 'app.expense.valueExact';
+  static const String expenseValuePercent = 'app.expense.valuePercent';
+  static const String expenseValueShares = 'app.expense.valueShares';
+  static const String expenseShareOf = 'app.expense.shareOf';
+  static const String expenseErrNoParts = 'app.expense.errNoParts';
+  static const String expenseErrExact = 'app.expense.errExact';
+  static const String expenseErrPercent = 'app.expense.errPercent';
+  static const String expenseErrZero = 'app.expense.errZero';
+  static const String expenseErrAmount = 'app.expense.errAmount';
+  static const String expenseErrMax = 'app.expense.errMax';
+  static const String expenseErrDesc = 'app.expense.errDesc';
+  static const String expenseErrDescLong = 'app.expense.errDescLong';
+  static const String expenseSaved = 'app.expense.saved';
+  static const String expenseDelete = 'app.expense.delete';
+  static const String expenseDeleteConfirm = 'app.expense.deleteConfirm';
+  static const String expenseDeleted = 'app.expense.deleted';
+  static const String expenseDetailSplit = 'app.expense.detailSplit';
+  static const String expenseChanges = 'app.expense.changes';
+  static const String expenseChangeCreated = 'app.expense.changeCreated';
+  static const String expenseChangeUpdated = 'app.expense.changeUpdated';
+  static const String expenseChangeDeleted = 'app.expense.changeDeleted';
+  static const String expenseChangeBefore = 'app.expense.changeBefore';
+  static const String expenseOpen = 'app.expense.open';
+  static const String expenseFormerMember = 'app.expense.formerMember';
+  static const String expensePdfSection = 'app.expense.pdfSection';
+  static const String expensePdfLead = 'app.expense.pdfLead';
+  static const String expensePdfEmpty = 'app.expense.pdfEmpty';
+  static const String expensePdfTotals = 'app.expense.pdfTotals';
+  static const String expensePdfSettlements = 'app.expense.pdfSettlements';
+  static const String expensePdfSettlement = 'app.expense.pdfSettlement';
+  static const String expensePdfChanges = 'app.expense.pdfChanges';
+  static const String expensePdfChange = 'app.expense.pdfChange';
+  static const String expensePdfUpdated = 'app.expense.pdfUpdated';
+  static const String expensePdfDeleted = 'app.expense.pdfDeleted';
 
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -988,6 +1069,86 @@ abstract final class KApp {
     agendaRoutineStopped,
     agendaAuditRoutineAdded,
     agendaAuditRoutineDeleted,
+    expenseNav,
+    expenseLead,
+    expenseErrLoad,
+    expenseOff,
+    expenseViewer,
+    expensePremium,
+    expenseAdd,
+    expenseEdit,
+    expenseEmpty,
+    expenseEmptyBody,
+    expenseGroupFamily,
+    expenseGroupLabel,
+    expenseBalance,
+    expenseBalanceEven,
+    expensePays,
+    expenseNetGets,
+    expenseNetOwes,
+    expenseSettle,
+    expenseSettleTitle,
+    expenseSettleLead,
+    expenseSettleTo,
+    expenseSettleNobody,
+    expenseAmount,
+    expenseSettleSent,
+    expensePending,
+    expensePendingToMe,
+    expensePendingFromMe,
+    expensePendingOthers,
+    expenseConfirm,
+    expenseReject,
+    expenseTakeBack,
+    expenseConfirmed,
+    expenseRejected,
+    expenseTakenBack,
+    expenseListSection,
+    expenseRow,
+    expenseDesc,
+    expenseCategory,
+    expenseDate,
+    expensePaidBy,
+    expenseSplit,
+    expenseSplitEqual,
+    expenseSplitExact,
+    expenseSplitPercent,
+    expenseSplitShares,
+    expenseParticipants,
+    expenseValueExact,
+    expenseValuePercent,
+    expenseValueShares,
+    expenseShareOf,
+    expenseErrNoParts,
+    expenseErrExact,
+    expenseErrPercent,
+    expenseErrZero,
+    expenseErrAmount,
+    expenseErrMax,
+    expenseErrDesc,
+    expenseErrDescLong,
+    expenseSaved,
+    expenseDelete,
+    expenseDeleteConfirm,
+    expenseDeleted,
+    expenseDetailSplit,
+    expenseChanges,
+    expenseChangeCreated,
+    expenseChangeUpdated,
+    expenseChangeDeleted,
+    expenseChangeBefore,
+    expenseOpen,
+    expenseFormerMember,
+    expensePdfSection,
+    expensePdfLead,
+    expensePdfEmpty,
+    expensePdfTotals,
+    expensePdfSettlements,
+    expensePdfSettlement,
+    expensePdfChanges,
+    expensePdfChange,
+    expensePdfUpdated,
+    expensePdfDeleted,
   ];
 }
 
@@ -1542,6 +1703,86 @@ abstract final class StringsAppPtBr {
     KApp.agendaRoutineStopped: 'Rotina parada: {0} item(ns) saíram da agenda.',
     KApp.agendaAuditRoutineAdded: '{0} aplicou uma rotina à agenda',
     KApp.agendaAuditRoutineDeleted: '{0} tirou uma rotina da agenda',
+    KApp.expenseNav: 'Despesas',
+    KApp.expenseLead: 'O que foi gasto com a criança, quem pagou e como dividir. O saldo diz quem paga quanto a quem, com o menor número de pagamentos.',
+    KApp.expenseErrLoad: 'Não foi possível carregar as despesas.',
+    KApp.expenseOff: 'As despesas ainda não estão disponíveis.',
+    KApp.expenseViewer: 'As despesas da família não aparecem para quem só acompanha o plano.',
+    KApp.expensePremium: 'Lançar despesas e acertar contas é um recurso Premium. Sem o Premium, as despesas lançadas ficam só para leitura.',
+    KApp.expenseAdd: 'Lançar despesa',
+    KApp.expenseEdit: 'Editar despesa',
+    KApp.expenseEmpty: 'Nenhuma despesa lançada ainda.',
+    KApp.expenseEmptyBody: 'Lance o que foi gasto com a criança — escola, saúde, roupas — e escolha como dividir.',
+    KApp.expenseGroupFamily: 'Família',
+    KApp.expenseGroupLabel: 'Grupo de despesas',
+    KApp.expenseBalance: 'Saldo',
+    KApp.expenseBalanceEven: 'Tudo acertado: ninguém deve nada.',
+    KApp.expensePays: '{0} paga {1} a {2}',
+    KApp.expenseNetGets: '{0}: tem a receber {1}',
+    KApp.expenseNetOwes: '{0}: deve {1}',
+    KApp.expenseSettle: 'Registrar pagamento',
+    KApp.expenseSettleTitle: 'Acertar contas',
+    KApp.expenseSettleLead: 'Registre um pagamento que você fez. Ele só entra no saldo quando quem recebeu confirmar.',
+    KApp.expenseSettleTo: 'Pago a',
+    KApp.expenseSettleNobody: 'Ninguém mais na família tem conta para confirmar um pagamento.',
+    KApp.expenseAmount: 'Valor (R\$)',
+    KApp.expenseSettleSent: 'Pagamento registrado. Falta a confirmação de quem recebeu.',
+    KApp.expensePending: 'Pagamentos esperando confirmação',
+    KApp.expensePendingToMe: '{0} diz que pagou {1} a você.',
+    KApp.expensePendingFromMe: 'Você registrou {0} pagos a {1}. Falta a confirmação.',
+    KApp.expensePendingOthers: '{0} registrou {1} pagos a {2}.',
+    KApp.expenseConfirm: 'Recebi',
+    KApp.expenseReject: 'Não recebi',
+    KApp.expenseTakeBack: 'Desfazer registro',
+    KApp.expenseConfirmed: 'Pagamento confirmado.',
+    KApp.expenseRejected: 'Pagamento marcado como não recebido.',
+    KApp.expenseTakenBack: 'Registro desfeito.',
+    KApp.expenseListSection: 'Despesas lançadas',
+    KApp.expenseRow: '{0} · {1} · pago por {2}',
+    KApp.expenseDesc: 'Descrição',
+    KApp.expenseCategory: 'Categoria',
+    KApp.expenseDate: 'Data',
+    KApp.expensePaidBy: 'Quem pagou',
+    KApp.expenseSplit: 'Como dividir',
+    KApp.expenseSplitEqual: 'Igual',
+    KApp.expenseSplitExact: 'Valor',
+    KApp.expenseSplitPercent: '%',
+    KApp.expenseSplitShares: 'Cotas',
+    KApp.expenseParticipants: 'Quem divide',
+    KApp.expenseValueExact: 'Valor de {0}',
+    KApp.expenseValuePercent: '% de {0}',
+    KApp.expenseValueShares: 'Cotas de {0}',
+    KApp.expenseShareOf: 'Parte: {0}',
+    KApp.expenseErrNoParts: 'Escolha quem participa da despesa.',
+    KApp.expenseErrExact: 'Os valores da divisão somam {0}, e a despesa é de {1}.',
+    KApp.expenseErrPercent: 'Os percentuais da divisão precisam somar 100%.',
+    KApp.expenseErrZero: 'A divisão precisa de pelo menos uma parte maior que zero.',
+    KApp.expenseErrAmount: 'Informe o valor.',
+    KApp.expenseErrMax: 'O valor passa do limite de {0}.',
+    KApp.expenseErrDesc: 'Descreva a despesa.',
+    KApp.expenseErrDescLong: 'A descrição da despesa é limitada a {0} caracteres.',
+    KApp.expenseSaved: 'Despesa salva.',
+    KApp.expenseDelete: 'Apagar despesa',
+    KApp.expenseDeleteConfirm: 'Apagar "{0}"? Ela sai do saldo, e as alterações guardam quem apagou e quando.',
+    KApp.expenseDeleted: 'Despesa apagada.',
+    KApp.expenseDetailSplit: 'Divisão',
+    KApp.expenseChanges: 'Alterações',
+    KApp.expenseChangeCreated: '{0} lançou em {1}',
+    KApp.expenseChangeUpdated: '{0} alterou em {1}',
+    KApp.expenseChangeDeleted: '{0} apagou em {1}',
+    KApp.expenseChangeBefore: 'Antes: {0} · {1}',
+    KApp.expenseOpen: 'Abrir Despesas',
+    KApp.expenseFormerMember: 'Ex-membro',
+    KApp.expensePdfSection: '{0}. Despesas',
+    KApp.expensePdfLead: 'O que a família lançou como despesa da criança no período, quem pagou e a parte de cada um. Um pagamento entre responsáveis só aparece depois que quem recebeu confirmou.',
+    KApp.expensePdfEmpty: 'Nenhuma despesa no período.',
+    KApp.expensePdfTotals: '{0}: pagou {1} · parte {2}',
+    KApp.expensePdfSettlements: 'Pagamentos confirmados',
+    KApp.expensePdfSettlement: '{0} — {1} pagou {2} a {3}',
+    KApp.expensePdfChanges: 'Alterações e exclusões',
+    KApp.expensePdfChange: '{0} — {1}: {2}',
+    KApp.expensePdfUpdated: 'alterou "{0}" (antes: {1})',
+    KApp.expensePdfDeleted: 'apagou "{0}" ({1})',
   };
 }
 
@@ -2091,5 +2332,85 @@ abstract final class StringsAppEn {
     KApp.agendaRoutineStopped: 'Routine stopped: {0} item(s) left the agenda.',
     KApp.agendaAuditRoutineAdded: '{0} applied a routine to the agenda',
     KApp.agendaAuditRoutineDeleted: '{0} removed a routine from the agenda',
+    KApp.expenseNav: 'Expenses',
+    KApp.expenseLead: 'What was spent on the child, who paid and how it is split. The balance says who pays how much to whom, with the fewest payments.',
+    KApp.expenseErrLoad: 'Could not load the expenses.',
+    KApp.expenseOff: 'Expenses are not available yet.',
+    KApp.expenseViewer: 'Viewers do not see the family\'s expenses.',
+    KApp.expensePremium: 'Adding expenses and settling up is a Premium feature. Without Premium, the expenses already added are read-only.',
+    KApp.expenseAdd: 'Add expense',
+    KApp.expenseEdit: 'Edit expense',
+    KApp.expenseEmpty: 'No expenses yet.',
+    KApp.expenseEmptyBody: 'Add what was spent on the child — school, health, clothes — and choose how to split it.',
+    KApp.expenseGroupFamily: 'Family',
+    KApp.expenseGroupLabel: 'Expense group',
+    KApp.expenseBalance: 'Balance',
+    KApp.expenseBalanceEven: 'All settled: nobody owes anything.',
+    KApp.expensePays: '{0} pays {1} to {2}',
+    KApp.expenseNetGets: '{0}: is owed {1}',
+    KApp.expenseNetOwes: '{0}: owes {1}',
+    KApp.expenseSettle: 'Record a payment',
+    KApp.expenseSettleTitle: 'Settle up',
+    KApp.expenseSettleLead: 'Record a payment you made. It counts in the balance only once the person who received it confirms.',
+    KApp.expenseSettleTo: 'Paid to',
+    KApp.expenseSettleNobody: 'Nobody else in the family has an account to confirm a payment.',
+    KApp.expenseAmount: 'Amount (R\$)',
+    KApp.expenseSettleSent: 'Payment recorded. It waits for the receiver to confirm.',
+    KApp.expensePending: 'Payments awaiting confirmation',
+    KApp.expensePendingToMe: '{0} says they paid you {1}.',
+    KApp.expensePendingFromMe: 'You recorded {0} paid to {1}. Waiting for confirmation.',
+    KApp.expensePendingOthers: '{0} recorded {1} paid to {2}.',
+    KApp.expenseConfirm: 'I received it',
+    KApp.expenseReject: 'I did not receive it',
+    KApp.expenseTakeBack: 'Take it back',
+    KApp.expenseConfirmed: 'Payment confirmed.',
+    KApp.expenseRejected: 'Payment marked as not received.',
+    KApp.expenseTakenBack: 'Record taken back.',
+    KApp.expenseListSection: 'Expenses added',
+    KApp.expenseRow: '{0} · {1} · paid by {2}',
+    KApp.expenseDesc: 'Description',
+    KApp.expenseCategory: 'Category',
+    KApp.expenseDate: 'Date',
+    KApp.expensePaidBy: 'Paid by',
+    KApp.expenseSplit: 'How to split',
+    KApp.expenseSplitEqual: 'Equal',
+    KApp.expenseSplitExact: 'Amount',
+    KApp.expenseSplitPercent: '%',
+    KApp.expenseSplitShares: 'Shares',
+    KApp.expenseParticipants: 'Split between',
+    KApp.expenseValueExact: '{0}\'s amount',
+    KApp.expenseValuePercent: '{0}\'s %',
+    KApp.expenseValueShares: '{0}\'s shares',
+    KApp.expenseShareOf: 'Share: {0}',
+    KApp.expenseErrNoParts: 'Choose who shares the expense.',
+    KApp.expenseErrExact: 'The split adds up to {0}, and the expense is {1}.',
+    KApp.expenseErrPercent: 'The percentages must add up to 100%.',
+    KApp.expenseErrZero: 'The split needs at least one part greater than zero.',
+    KApp.expenseErrAmount: 'Enter the amount.',
+    KApp.expenseErrMax: 'The amount is over the {0} limit.',
+    KApp.expenseErrDesc: 'Describe the expense.',
+    KApp.expenseErrDescLong: 'An expense description is limited to {0} characters.',
+    KApp.expenseSaved: 'Expense saved.',
+    KApp.expenseDelete: 'Delete expense',
+    KApp.expenseDeleteConfirm: 'Delete "{0}"? It leaves the balance, and the changes keep who deleted it and when.',
+    KApp.expenseDeleted: 'Expense deleted.',
+    KApp.expenseDetailSplit: 'Split',
+    KApp.expenseChanges: 'Changes',
+    KApp.expenseChangeCreated: '{0} added it on {1}',
+    KApp.expenseChangeUpdated: '{0} changed it on {1}',
+    KApp.expenseChangeDeleted: '{0} deleted it on {1}',
+    KApp.expenseChangeBefore: 'Before: {0} · {1}',
+    KApp.expenseOpen: 'Open Expenses',
+    KApp.expenseFormerMember: 'Former member',
+    KApp.expensePdfSection: '{0}. Expenses',
+    KApp.expensePdfLead: 'What the family added as the child\'s expenses in the period, who paid and each one\'s share. A payment between caregivers shows only after the receiver confirmed it.',
+    KApp.expensePdfEmpty: 'No expenses in the period.',
+    KApp.expensePdfTotals: '{0}: paid {1} · share {2}',
+    KApp.expensePdfSettlements: 'Confirmed payments',
+    KApp.expensePdfSettlement: '{0} — {1} paid {2} to {3}',
+    KApp.expensePdfChanges: 'Changes and deletions',
+    KApp.expensePdfChange: '{0} — {1}: {2}',
+    KApp.expensePdfUpdated: 'changed "{0}" (before: {1})',
+    KApp.expensePdfDeleted: 'deleted "{0}" ({1})',
   };
 }

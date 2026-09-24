@@ -116,6 +116,11 @@ Future<Uint8List> buildReportPdf(
           pw.SizedBox(height: 14),
           ..._agendaSection(report.agenda!, l),
         ],
+        if (report.expenses != null) ...[
+          pw.SizedBox(height: 14),
+          ..._expensesSection(
+              report.expenses!, report.agenda == null ? 5 : 6, l),
+        ],
         pw.SizedBox(height: 16),
         pw.Divider(color: PdfColors.grey400),
         _paragraph(
@@ -457,6 +462,84 @@ List<pw.Widget> _agendaSection(List<ReportAgendaItem> items, Localization l) {
     _paragraph(l[KApp.agendaPdfLead], size: 8.5),
     pw.SizedBox(height: 4),
     if (items.isEmpty) _paragraph(l[KApp.agendaPdfEmpty]) else ...rows,
+  ];
+}
+
+/// F-34: the expenses of the period — the lines, each caregiver's paid and
+/// share totals, the payments the receiver confirmed, and the trail of edits
+/// and deletions (append-only). Numbered after the agenda when it is printed.
+List<pw.Widget> _expensesSection(
+    ReportExpenses e, int number, Localization l) {
+  String money(int c) => ExpenseRules.brl(c, english: l.isEnglish);
+  final small = const pw.TextStyle(fontSize: 8.5);
+  return [
+    _sectionTitle(l.format(KApp.expensePdfSection, [number])),
+    _paragraph(l[KApp.expensePdfLead], size: 8.5),
+    pw.SizedBox(height: 4),
+    if (e.isEmpty)
+      _paragraph(l[KApp.expensePdfEmpty])
+    else ...[
+      if (e.lines.isNotEmpty)
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+          columnWidths: const {
+            0: pw.FlexColumnWidth(1.2),
+            1: pw.FlexColumnWidth(3),
+            2: pw.FlexColumnWidth(1.4),
+            3: pw.FlexColumnWidth(1.4),
+            4: pw.FlexColumnWidth(1.6),
+          },
+          children: [
+            pw.TableRow(children: [
+              _cell(l[KApp.expenseDate], bold: true),
+              _cell(l[KApp.expenseDesc], bold: true),
+              _cell(l[KApp.expenseCategory], bold: true),
+              _cell(l[KApp.expenseAmount], bold: true),
+              _cell(l[KApp.expensePaidBy], bold: true),
+            ]),
+            for (final line in e.lines)
+              pw.TableRow(children: [
+                _cell(l.formatDate(line.date)),
+                _cell(line.description),
+                _cell(line.categoryLabel),
+                _cell(money(line.amountCents)),
+                _cell(line.paidByName),
+              ]),
+          ],
+        ),
+      if (e.totals.isNotEmpty) ...[
+        pw.SizedBox(height: 6),
+        for (final t in e.totals)
+          pw.Text(
+              l.format(KApp.expensePdfTotals,
+                  [t.name, money(t.paidCents), money(t.shareCents)]),
+              style: small),
+      ],
+      if (e.payments.isNotEmpty) ...[
+        pw.SizedBox(height: 6),
+        pw.Text(l[KApp.expensePdfSettlements],
+            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+        for (final p in e.payments)
+          pw.Text(
+              l.format(KApp.expensePdfSettlement, [
+                l.formatDate(p.date),
+                p.fromName,
+                money(p.amountCents),
+                p.toName,
+              ]),
+              style: small),
+      ],
+      if (e.changes.isNotEmpty) ...[
+        pw.SizedBox(height: 6),
+        pw.Text(l[KApp.expensePdfChanges],
+            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+        for (final c in e.changes)
+          pw.Text(
+              l.format(KApp.expensePdfChange,
+                  [l.formatDateTime(c.atLocal), c.actorName, c.text]),
+              style: small),
+      ],
+    ],
   ];
 }
 
