@@ -16,6 +16,8 @@ const _usageReportKeys = {
   // top level
   'report_version', 'generated_at', 'today', 'family', 'members', 'plan',
   'weeks', 'swaps', 'notices', 'day_accounts',
+  // T-82: the windows the report used (`usage_report.*`)
+  'windows', 'active_days',
   // family
   'id', 'created_at', 'is_premium', 'trial_ends_at', 'comp_premium_at',
   'seats_used', 'seats_cap', 'subscription', 'invitations',
@@ -654,6 +656,29 @@ void platformOperatorTests(GateFixture fx) {
         ? null
         : (response is String ? jsonDecode(response) : response)
             as Map<String, dynamic>;
+
+    test('T-82: the report windows are the operator keys, and it says which',
+        () async {
+      const keys = ['usage_report.weeks', 'usage_report.active_days'];
+      final before = await settingValues(keys);
+      await makeOperator(fx.founderProfile);
+      try {
+        await fx.service
+            .from('app_settings')
+            .update({'value': '4'}).eq('key', 'usage_report.weeks');
+        await fx.service
+            .from('app_settings')
+            .update({'value': '7'}).eq('key', 'usage_report.active_days');
+        final report = decodeReport(await fx.founder.rpc<dynamic>(
+            'admin_family_usage_report',
+            params: {'p_family_id': fx.familyBId}))!;
+        expect(report['windows'], {'weeks': 4, 'active_days': 7});
+        expect(report['weeks'] as List, hasLength(4));
+      } finally {
+        await restoreSettings(before);
+        await removeOperator(fx.founderProfile);
+      }
+    });
 
     test('the usage report is audited on every call, an unknown family too',
         () async {

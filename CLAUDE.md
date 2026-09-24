@@ -251,7 +251,7 @@ cd app && fvm flutter build web --release --no-web-resources-cdn --dart-define=A
 # `entrelares-app@<versão do pubspec>` — a mesma string que o cliente manda, senão
 # mapas e eventos nunca se encontram — e APAGA todo .map antes de publicar, porque
 # um mapa servido da nossa origem entrega o fonte Dart inteiro a quem pedir.
-# Gate de banco (384 testes de RLS/RPC/trigger contra o projeto dev, 24/09/2026), Dart puro
+# Gate de banco (389 testes de RLS/RPC/trigger contra o projeto dev, 24/09/2026), Dart puro
 # desde o PR 16 do T-56. Exige a service_role do DEV — nunca a de produção. Sem
 # ela a suíte aborta com instruções em vez de rodar pela metade.
 cd packages/entrelares_db_gate && fvm dart analyze --fatal-infos

@@ -1,0 +1,93 @@
+import 'package:entrelares_db_gate/entrelares_db_gate.dart';
+import 'package:test/test.dart';
+
+import '_helpers.dart';
+
+/// T-82 — values that were hardcoded become operator parameters, each read by
+/// the server at the moment it decides. Both defaults stay the single writer
+/// (a column default reads the key), so what these tests pin is that the NEXT
+/// row follows the key and nothing already written moves.
+///
+/// Every test puts the shared dev key back in `finally`: the other suites run
+/// against the same project and assume the seeds.
+void serverParametersTests(GateFixture fx) {
+  Future<String> getSetting(String key) async => (await fx.service
+          .from('app_settings')
+          .select('value')
+          .eq('key', key))
+      .single['value'] as String;
+
+  Future<void> setSetting(String key, String value) => fx.service
+      .from('app_settings')
+      .update({'value': value}).eq('key', key);
+
+  Future<void> withSetting(
+      String key, String value, Future<void> Function() body) async {
+    final before = await getSetting(key);
+    await setSetting(key, value);
+    try {
+      await body();
+    } finally {
+      await setSetting(key, before);
+    }
+  }
+
+  group('T-82 · server parameters', () {
+    test("a new family's trial reads trial.days", () async {
+      await withSetting('trial.days', '10', () async {
+        final row = (await fx.service
+                .from('families')
+                .insert({'name': 'e2e-t82-trial'}).select('id, trial_ends_at'))
+            .single;
+        try {
+          final ends = DateTime.parse(row['trial_ends_at'] as String);
+          final days =
+              ends.difference(DateTime.now().toUtc()).inMinutes / (24 * 60);
+          expect(days, closeTo(10, 0.1));
+        } finally {
+          await fx.service.from('families').delete().eq('id', row['id'] as int);
+        }
+      });
+    });
+
+    test("a new invitation's expiry reads invitation.valid_days", () async {
+      final fam = await fx.createFamily('t82inv');
+      // Two members already fill the free seats; the invitation is about the
+      // expiry, not the F-37 gate.
+      await fx.service.rpc<dynamic>('set_family_plan',
+          params: {'p_family_id': fam.familyId, 'p_plan': 'premium'});
+      await withSetting('invitation.valid_days', '3', () async {
+        await GateFixture.createInvitation(
+          fam.admin,
+          'e2e-t82-inv-${DateTime.now().microsecondsSinceEpoch}@resend.dev',
+          fx.roleId('grandmother'),
+        );
+        final row = (await fx.service
+                .from('family_invitations')
+                .select('created_at, expires_at')
+                .eq('family_id', fam.familyId)
+                .order('id', ascending: false)
+                .limit(1))
+            .single;
+        final valid = DateTime.parse(row['expires_at'] as String)
+            .difference(DateTime.parse(row['created_at'] as String));
+        expect(valid.inMinutes / (24 * 60), closeTo(3, 0.01));
+      });
+    });
+
+    test('each key refuses what the product cannot hold', () async {
+      await expectRejected(() => setSetting('trial.days', '91'),
+          contains: 'de 0 a 90 dias');
+      await expectRejected(() => setSetting('invitation.valid_days', '31'),
+          contains: 'de 1 a 30 dias');
+      await expectRejected(() => setSetting('email_quota.warn_percent', '96'),
+          contains: 'de 50% a 95%');
+      await expectRejected(() => setSetting('billing.asaas_due_days', '0'),
+          contains: 'de 1 a 30 dias');
+      await expectRejected(() => setSetting('usage_report.weeks', '53'),
+          contains: 'de 4 a 52');
+      await expectRejected(() => setSetting('usage_report.active_days', '6'),
+          contains: 'de 7 a 90 dias');
+    });
+  });
+}

@@ -181,7 +181,8 @@ export interface SwapStrings {
   subjReminder: (date: string, isRevert: boolean, deadlineDate: string, deadlineTime: string) => string;
   subjAutoApproved: (date: string, isRevert: boolean) => string;
   subjInvitation: (inviter: string) => string;
-  subjCap80: string;
+  /** T-82: the heads-up threshold is `email_quota.warn_percent`. */
+  subjCap80: (percent: number) => string;
   subjCapLast: string;
 
   requestedTitle: string;
@@ -246,7 +247,8 @@ export interface SwapStrings {
   invitationHeading: string;
   invitationBody: (inviter: string, family: string) => string;
   invitationRole: (role: string) => string;
-  invitationExpiry: (date: string) => string;
+  /** T-82: the days THIS invitation is valid for (`invitation.valid_days` when it was created). */
+  invitationExpiry: (days: number, date: string) => string;
   invitationButton: string;
   invitationLinkFallback: string;
   invitationPrivacy: string;
@@ -257,7 +259,7 @@ export interface SwapStrings {
 
   cap80Title: string;
   cap80Heading: string;
-  cap80Body: string;
+  cap80Body: (percent: number) => string;
   cap80Note: string;
   cap80Upsell: string;
   capLastTitle: string;
@@ -292,7 +294,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     subjReminder: (d, r, dd, dt) => `[Auto-aprovação em ${dd} às ${dt}] ${r ? "Reversão" : "Troca"} do dia ${d}`,
     subjAutoApproved: (d, r) => `${r ? "Reversão" : "Troca"} do dia ${d} aprovada automaticamente`,
     subjInvitation: (i) => `${i} convidou você para o Entrelares`,
-    subjCap80: "Vocês já usaram 80% dos e-mails do mês",
+    subjCap80: (p) => `Vocês já usaram ${p}% dos e-mails do mês`,
     subjCapLast: "Este é o último e-mail do mês (plano gratuito)",
 
     requestedTitle: "Nova solicitação de troca",
@@ -357,7 +359,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     invitationHeading: "Você foi convidado(a)!",
     invitationBody: (i, f) => `<strong>${i}</strong> convidou você para gerenciar juntos o calendário de guarda compartilhada da <strong>${f}</strong>.`,
     invitationRole: (r) => `Você entrará como <strong>${r}</strong>.`,
-    invitationExpiry: (d) => `Toque no botão abaixo para criar a sua conta. Este convite é válido por <strong>7 dias</strong>, até <strong>${d}</strong>.`,
+    invitationExpiry: (n, d) => `Toque no botão abaixo para criar a sua conta. Este convite é válido por <strong>${n} ${n === 1 ? "dia" : "dias"}</strong>, até <strong>${d}</strong>.`,
     invitationButton: "Criar minha conta",
     invitationLinkFallback: "Se o botão não funcionar, copie e cole este link no navegador:",
     invitationPrivacy: "Seu nome e e-mail foram inseridos sob o legítimo interesse de quem convidou você. Caso este convite não seja aceito, seu registro será permanentemente expurgado de nossos sistemas em até <strong>30 dias</strong>. Saiba mais na",
@@ -366,7 +368,7 @@ const SWAP: Record<Lang, SwapStrings> = {
 
     cap80Title: "Vocês estão chegando no limite de e-mails do mês",
     cap80Heading: "Chegando no limite de e-mails",
-    cap80Body: "A sua família já usou <strong>80% dos e-mails deste mês</strong> no plano gratuito.",
+    cap80Body: (p) => `A sua família já usou <strong>${p}% dos e-mails deste mês</strong> no plano gratuito.`,
     cap80Note: "Não se preocupe: as <strong>notificações dentro do app</strong> (pedidos e aprovações de troca) continuam <strong>sem limite</strong> — apenas a cópia por e-mail pode pausar ao fim do mês.",
     cap80Upsell: "Quer um limite bem maior de e-mails? Conheça o <strong>Premium</strong>.",
     capLastTitle: "Este é o último e-mail do mês",
@@ -399,7 +401,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     subjReminder: (d, r, dd, dt) => `[Auto-approval on ${dd} at ${dt}] ${r ? "Revert" : "Swap"} for ${d}`,
     subjAutoApproved: (d, r) => `${r ? "Revert" : "Swap"} for ${d} approved automatically`,
     subjInvitation: (i) => `${i} invited you to Entrelares`,
-    subjCap80: "You have used 80% of this month's e-mails",
+    subjCap80: (p) => `You have used ${p}% of this month's e-mails`,
     subjCapLast: "This is the last e-mail of the month (free plan)",
 
     requestedTitle: "New swap request",
@@ -464,7 +466,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     invitationHeading: "You have been invited!",
     invitationBody: (i, f) => `<strong>${i}</strong> invited you to manage the shared custody calendar of <strong>${f}</strong> together.`,
     invitationRole: (r) => `You will join as <strong>${r}</strong>.`,
-    invitationExpiry: (d) => `Tap the button below to create your account. This invitation is valid for <strong>7 days</strong>, until <strong>${d}</strong>.`,
+    invitationExpiry: (n, d) => `Tap the button below to create your account. This invitation is valid for <strong>${n} ${n === 1 ? "day" : "days"}</strong>, until <strong>${d}</strong>.`,
     invitationButton: "Create my account",
     invitationLinkFallback: "If the button does not work, copy and paste this link into your browser:",
     invitationPrivacy: "Your name and e-mail were entered under the legitimate interest of whoever invited you. If this invitation is not accepted, your record is permanently purged from our systems within <strong>30 days</strong>. Read more in the",
@@ -473,7 +475,7 @@ const SWAP: Record<Lang, SwapStrings> = {
 
     cap80Title: "You are approaching this month's e-mail limit",
     cap80Heading: "Approaching the e-mail limit",
-    cap80Body: "Your family has already used <strong>80% of this month's e-mails</strong> on the free plan.",
+    cap80Body: (p) => `Your family has already used <strong>${p}% of this month's e-mails</strong> on the free plan.`,
     cap80Note: "Nothing to worry about: the <strong>notifications inside the app</strong> (swap requests and approvals) carry on <strong>with no limit</strong> — only the e-mail copy may pause at the end of the month.",
     cap80Upsell: "Want a much higher e-mail limit? Take a look at <strong>Premium</strong>.",
     capLastTitle: "This is the last e-mail of the month",

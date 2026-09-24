@@ -322,6 +322,12 @@ serve(async (req: Request) => {
     // F-48: promotional launch price (Aug 2026) — defaults mirror the seeds
     // (549, not 490: Asaas refuses Pix/boleto charges under R$ 5,00).
     const priceDefault = cycle === "monthly" ? 549 : 5490;
+    const { data: dueDaysSetting } = await service.rpc("setting_int", {
+      p_key: "billing.asaas_due_days",
+      p_default: 5,
+    });
+    const dueDays = Number.isInteger(dueDaysSetting) ? (dueDaysSetting as number) : 5;
+
     const { data: priceCents } = await service.rpc("setting_int", {
       p_key: priceKey,
       p_default: priceDefault,
@@ -348,7 +354,9 @@ serve(async (req: Request) => {
       // Business days for each generated charge to fall due — REQUIRED by the
       // payment-link API (the sandbox 400s without it). Pix/card settle
       // instantly; this only bounds how long an unpaid invoice stays open.
-      dueDateLimitDays: 5,
+      // T-82: `billing.asaas_due_days` (default 5, range 1–30 business days —
+      // the Asaas docs set no limit, the range is the owner's).
+      dueDateLimitDays: dueDays,
       value: (priceCents as number) / 100,
       externalReference: `family:${me.family_id}`,
       notificationEnabled: true,

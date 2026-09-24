@@ -263,8 +263,10 @@ abstract final class NotificationRenderer {
         };
       case 'email_cap_last':
         return l[K.notifRenderEmailCapLast];
+      // T-82: the threshold is `email_quota.warn_percent`; a row written before
+      // it carries no `percent` and was written at 80.
       case 'email_cap_80':
-        return l[K.notifRenderEmailCap80];
+        return l.format(K.notifRenderEmailCap80, [p['percent'] ?? '80']);
 
       // ── Billing grace period (S-15) ──
       case 'billing' when kind == 'grace_warning' && date != null:
@@ -432,6 +434,11 @@ abstract final class NotificationRenderer {
     };
 
     if (key == null) return legacyTitle(storedTitle);
+
+    // T-82: the one heading that carries a number.
+    if (type == 'email_cap_80') {
+      return l.format(key, [p['percent'] ?? '80']);
+    }
 
     return switch (p['tag']) {
       'urgent' => l[K.notifRenderTagUrgent] + l[key],
