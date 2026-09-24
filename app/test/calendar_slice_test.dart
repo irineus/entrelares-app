@@ -15,6 +15,7 @@ import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -872,6 +873,54 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Future<void> deleteCustomRole(int roleId) async {
     if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
     deletedRoles.add(roleId);
+  }
+
+  // ── F-55: the child entity ──
+  List<Child> children = [];
+  Object? throwOnChildWrite;
+  final List<String> childWrites = [];
+
+  @override
+  Future<List<Child>> fetchChildren() async => List.of(children);
+
+  @override
+  Future<int> addChild(String firstName) async {
+    if (throwOnChildWrite != null) throw throwOnChildWrite!;
+    childWrites.add('add:$firstName');
+    final id = children.fold<int>(0, (m, c) => c.id > m ? c.id : m) + 1;
+    children = [
+      ...children,
+      Child(
+          id: id,
+          familyId: family?.id ?? 1,
+          firstName: ChildRules.normalize(firstName),
+          sortOrder: children.length),
+    ];
+    return id;
+  }
+
+  @override
+  Future<void> renameChild(
+      {required int childId, required String firstName}) async {
+    if (throwOnChildWrite != null) throw throwOnChildWrite!;
+    childWrites.add('rename:$childId:$firstName');
+    children = [
+      for (final c in children)
+        c.id == childId
+            ? Child(
+                id: c.id,
+                familyId: c.familyId,
+                firstName: ChildRules.normalize(firstName),
+                sortOrder: c.sortOrder)
+            : c,
+    ];
+  }
+
+  @override
+  Future<void> removeChild(int childId) async {
+    if (throwOnChildWrite != null) throw throwOnChildWrite!;
+    childWrites.add('remove:$childId');
+    children = [for (final c in children) if (c.id != childId) c];
   }
 
   // ── Lote 4: profile, account and the LGPD export ──

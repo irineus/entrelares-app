@@ -89,6 +89,13 @@ class PublicSettings {
   int get dayNoticeDailyCap =>
       _int('day_notice.daily_cap', noticeMaxPerSenderPerDay);
 
+  // T-84 phase-6 flags — dark by construction: seeded false in production,
+  // turned on in dev; the SERVER refuses every write of a module whose flag
+  // is off, the client only hides it.
+  /// F-55 — the child entity and the day agenda.
+  bool get childAgendaEnabled =>
+      parseBoolSetting(values, 'feature.child_agenda', false);
+
   // T-39 billing (F-48 promotional prices: 549, not 490 — Asaas refuses
   // Pix/boleto charges under R$ 5,00). Enabled=false shows the waitlist.
   bool get billingEnabled => parseBoolSetting(values, 'billing.enabled', false);

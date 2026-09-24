@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../deep_link_urls.dart';
+import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_invitation.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
@@ -82,6 +83,11 @@ class FamilyScreen extends StatefulWidget {
   final VoidCallback? onOpenAdminMode;
   final VoidCallback? onOpenDeletion;
 
+  /// F-55: the child's page. Its row shows only while `feature.child_agenda`
+  /// is on — the server refuses every write with it off, so a row there would
+  /// lead to a page that can only say no.
+  final VoidCallback? onOpenChildren;
+
   /// F-63: hands the invitation message to the system share sheet. A seam so
   /// a widget test can read what would be sent; null uses share_plus.
   final Future<void> Function(String message)? onShareInvite;
@@ -98,6 +104,7 @@ class FamilyScreen extends StatefulWidget {
     this.onOpenPlan,
     this.onOpenAdminMode,
     this.onOpenDeletion,
+    this.onOpenChildren,
     this.onShareInvite,
   });
 
@@ -115,6 +122,8 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
   List<Role> _roles = const [];
   List<FamilyInvitation> _invitations = const [];
   PublicSettings _settings = PublicSettings.unloaded;
+  // F-55: read only while the flag is on (null = not asked).
+  List<Child>? _children;
 
   // Rename
   bool _editingName = false;
@@ -246,6 +255,16 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
           ? await widget.dataSource.fetchOpenInvitations()
           : <FamilyInvitation>[];
       final deletion = await widget.dataSource.fetchPendingFamilyDeletion();
+      // F-55: best-effort — the row degrades to its empty subtitle rather
+      // than taking the roster down with it.
+      List<Child>? children;
+      if (settings.childAgendaEnabled && widget.onOpenChildren != null) {
+        try {
+          children = await widget.dataSource.fetchChildren();
+        } catch (_) {
+          children = const [];
+        }
+      }
 
       // T-39: the subscription row only matters while billing is on — with the
       // master switch off there is no paid period to summarise, and asking for
@@ -256,6 +275,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
 
       if (!mounted) return;
       setState(() {
+        _children = children;
         _subscription = subscription;
         _deletion = deletion;
         _family = family;
@@ -615,6 +635,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             // this reader may open a request, and a request already open is
             // the inline panel below, never a row.
             const SizedBox(height: 24),
+            if (_children != null) _childrenRow(l, _children!),
             if (widget.onOpenPlan != null) _planRow(l),
             if (_isAdmin && widget.onOpenAdminMode != null) _adminModeRow(l),
             if (_deletion == null &&
@@ -1181,6 +1202,18 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
           subtitle: subtitle == null ? null : Text(subtitle),
           trailing: const Icon(Icons.chevron_right),
         ),
+      );
+
+  /// F-55 *Criança*, subtitled with the name(s) — or that there is none yet.
+  Widget _childrenRow(Localization l, List<Child> children) => _navRow(
+        key: const ValueKey('family-children-row'),
+        icon: Icons.child_care_outlined,
+        title: l[KApp.famChildRow],
+        subtitle: ChildRules.joinNames(
+                [for (final c in children) c.firstName],
+                and: l[KApp.childAnd]) ??
+            l[KApp.famChildRowEmpty],
+        onTap: widget.onOpenChildren!,
       );
 
   /// *Plano e pagamento*, subtitled with the plan's state — from the SAME

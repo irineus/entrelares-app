@@ -13,6 +13,7 @@ import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -549,6 +550,20 @@ abstract class CustodyDataSource {
   /// Delete is deliberately NOT Premium-gated (a family that lapses must still
   /// be able to clean up), but the DB refuses a role still in use.
   Future<void> deleteCustomRole(int roleId);
+
+  // ── F-55: the child entity ───────────────────────────────────────────────
+
+  /// The family's children, in display order. Every member reads them.
+  Future<List<Child>> fetchChildren();
+
+  /// Admin only, flag on — the server refuses otherwise, and its PT-BR
+  /// sentence reaches the user verbatim (`ChildRules` mirrors the two cheap
+  /// checks with the same words).
+  Future<int> addChild(String firstName);
+
+  Future<void> renameChild({required int childId, required String firstName});
+
+  Future<void> removeChild(int childId);
 
   // ── Lote 4: profile, account and the LGPD export ──────────────────────────
 

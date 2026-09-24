@@ -73,6 +73,8 @@ abstract final class DocumentTitle {
             return segments.length == 2 ? KApp.famAdminRow : K.notFoundTitle;
           case 'delete':
             return segments.length == 2 ? K.famDelReqTitle : K.notFoundTitle;
+          case 'children':
+            return segments.length == 2 ? KApp.childTitle : K.notFoundTitle;
           case 'profile':
             // `/family/profile` and `/family/profile/<id>` — the other
             // member's name is data the title does not print.
@@ -118,6 +120,7 @@ abstract final class DocumentTitle {
     '/family/plan',
     '/family/admin-mode',
     '/family/delete',
+    '/family/children',
     '/family/profile',
     '/family/profile/42',
     '/notifications',

@@ -20,6 +20,7 @@ import 'screens/help_screen.dart';
 import 'screens/calendar_screen.dart';
 import 'screens/custom_roles_screen.dart';
 import 'screens/family_admin_mode_screen.dart';
+import 'screens/family_children_screen.dart';
 import 'screens/family_delete_screen.dart';
 import 'screens/family_plan_screen.dart';
 import 'screens/family_screen.dart';
@@ -471,6 +472,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                 onOpenPlan: () => _router.go('/family/plan'),
                 onOpenAdminMode: () => _router.go('/family/admin-mode'),
                 onOpenDeletion: () => _router.go('/family/delete'),
+                // F-55: the child's page — the row exists only with the flag on.
+                onOpenChildren: () => _router.go('/family/children'),
               ),
               routes: [
                 // Nested so the bottom bar stays put — the web navigates away
@@ -502,6 +505,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                     analytics: _analytics,
                     onOpenPlan: () => _router.go('/family/plan'),
                   ),
+                ),
+                GoRoute(
+                  path: 'children',
+                  builder: (_, _) =>
+                      FamilyChildrenScreen(dataSource: _dataSource),
                 ),
                 GoRoute(
                   path: 'delete',

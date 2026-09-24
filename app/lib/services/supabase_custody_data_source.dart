@@ -8,6 +8,7 @@ import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -1544,6 +1545,37 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   @override
   Future<void> deleteCustomRole(int roleId) async {
     await _client.rpc('delete_custom_role', params: {'p_role_id': roleId});
+  }
+
+  // ── F-55: the child entity ──────────────────────────────────────────────
+
+  @override
+  Future<List<Child>> fetchChildren() async {
+    final rows = await _client
+        .from('children')
+        .select()
+        .order('sort_order')
+        .order('id');
+    return rows.map(Child.fromJson).toList();
+  }
+
+  @override
+  Future<int> addChild(String firstName) async =>
+      await _client.rpc<dynamic>('add_child',
+          params: {'p_first_name': ChildRules.normalize(firstName)}) as int;
+
+  @override
+  Future<void> renameChild(
+      {required int childId, required String firstName}) async {
+    await _client.rpc<dynamic>('rename_child', params: {
+      'p_child_id': childId,
+      'p_first_name': ChildRules.normalize(firstName),
+    });
+  }
+
+  @override
+  Future<void> removeChild(int childId) async {
+    await _client.rpc<dynamic>('remove_child', params: {'p_child_id': childId});
   }
 
   // ── Lote 4: profile, account and the LGPD export ─────────────────────────

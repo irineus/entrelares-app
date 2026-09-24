@@ -22,6 +22,7 @@ import 'suites/billing_webhook.dart';
 import 'suites/caregiver_gate.dart';
 import 'suites/claim_invitation.dart';
 import 'suites/consent_and_retention.dart';
+import 'suites/children.dart';
 import 'suites/custom_role.dart';
 import 'suites/day_account.dart';
 import 'suites/day_notice.dart';
@@ -134,6 +135,8 @@ void main() {
   elevationCodeTests(fx);
   sessionHasPasswordTests(fx);
   customRoleTests(fx);
+  // F-55: the child entity — dark by flag, admin-only, family-scoped.
+  childrenTests(fx);
   appSettingsTests(fx);
   publicSettingsTests(fx);
   serverParametersTests(fx);
