@@ -56,7 +56,8 @@ Set<String> _keysOf(Object? node) => switch (node) {
 ///   · writes additionally require an ACTIVE S-10 elevation
 ///     (`ELEVATION_REQUIRED`);
 ///   · `admin_update_setting` validates against `value_type` and refuses
-///     `policy.*`;
+///     `policy.*`; since T-80 it also refuses a value out of the row's range
+///     and a pair of keys that contradict each other, with a sentence;
 ///   · the comp flows through `is_premium()` ITSELF — never a parallel check —
 ///     and survives a billing-style plan downgrade;
 ///   · every operator action leaves its `operator_audit_logs` trail, and a comp
@@ -102,6 +103,27 @@ void platformOperatorTests(GateFixture fx) {
               .select()
               .eq('operator_user_id', operatorUserId))
           .cast<Map<String, dynamic>>();
+
+  Future<Map<String, String>> settingValues(List<String> keys) async => {
+        for (final row in await fx.service
+            .from('app_settings')
+            .select('key, value')
+            .inFilter('key', keys))
+          row['key'] as String: row['value'] as String
+      };
+
+  // Only writes back what a failed refusal moved, so a red run does not also
+  // poison the shared dev config the other suites read.
+  Future<void> restoreSettings(Map<String, String> before) async {
+    final now = await settingValues(before.keys.toList());
+    for (final entry in before.entries) {
+      if (now[entry.key] != entry.value) {
+        await fx.service
+            .from('app_settings')
+            .update({'value': entry.value}).eq('key', entry.key);
+      }
+    }
+  }
 
   Future<List<AccountLog>> familyLogs(int familyId) async => [
         for (final row
@@ -208,6 +230,72 @@ void platformOperatorTests(GateFixture fx) {
           contains: 'inexistente',
         );
       } finally {
+        await fx.clearElevation(fx.founderProfile);
+        await removeOperator(fx.founderProfile);
+      }
+    });
+
+    test('admin_update_setting refuses a value the product cannot hold',
+        () async {
+      // T-80: each refusal names the range in the key's own unit — the sentence
+      // the console shows. Every one of these was ACCEPTED before the item, each
+      // with a real consequence (Asaas refusing every Pix under R$ 5,00, a 5th
+      // member with no colour, a grace period of zero days).
+      await makeOperator(fx.founderProfile);
+      await fx.elevate(fx.founderProfile);
+      final keys = [
+        'billing.price_monthly_cents',
+        'max_caregivers',
+        'billing.grace_days',
+        'billing.grace_warning_days',
+        'billing.price_annual_cents',
+      ];
+      final before = await settingValues(keys);
+      try {
+        await expectRejected(
+          () => fx.founder.rpc<dynamic>('admin_update_setting', params: {
+            'p_key': 'billing.price_monthly_cents',
+            'p_value': '300'
+          }),
+          contains: r'de R$ 5,00 a R$ 999,00',
+        );
+        await expectRejected(
+          () => fx.founder.rpc<dynamic>('admin_update_setting',
+              params: {'p_key': 'max_caregivers', 'p_value': '5'}),
+          contains: 'de 2 a 4',
+        );
+        await expectRejected(
+          () => fx.founder.rpc<dynamic>('admin_update_setting',
+              params: {'p_key': 'billing.grace_days', 'p_value': '0'}),
+          contains: 'de 1 a 30 dias',
+        );
+
+        // In range on its own, refused as a PAIR — and the sentence names the
+        // other key, so the operator knows which one to move first.
+        await expectRejected(
+          () => fx.founder.rpc<dynamic>('admin_update_setting', params: {
+            'p_key': 'billing.grace_warning_days',
+            'p_value': '7'
+          }),
+          contains: 'billing.grace_days',
+        );
+        await expectRejected(
+          () => fx.founder.rpc<dynamic>('admin_update_setting', params: {
+            'p_key': 'billing.price_annual_cents',
+            'p_value': '9999'
+          }),
+          contains: 'billing.price_monthly_cents',
+        );
+
+        expect(await settingValues(keys), before);
+        // A refused write leaves no audit row behind: the trail records what
+        // CHANGED, and nothing did.
+        final audit = (await auditRows(fx.founderProfile.userId!)).where((l) =>
+            l['action'] == 'setting_updated' &&
+            keys.contains(l['setting_key']));
+        expect(audit, isEmpty);
+      } finally {
+        await restoreSettings(before);
         await fx.clearElevation(fx.founderProfile);
         await removeOperator(fx.founderProfile);
       }
