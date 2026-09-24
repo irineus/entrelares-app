@@ -1476,6 +1476,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       myProfileId: _ownProfile!.id,
       dayParentId: dayParentId,
       sentToday: sentToday,
+      dailyCap: _settings.dayNoticeDailyCap,
     );
     if (id == null || !mounted) return;
     _load(silent: true);

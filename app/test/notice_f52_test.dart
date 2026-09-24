@@ -411,6 +411,27 @@ void main() {
     expect(send.onPressed, isNull);
     expect(ds.sentNotices, isEmpty);
   });
+
+  // T-82: the cap is `day_notice.daily_cap` — raised to 3 by the operator, the
+  // third aviso is still offered and the sheet states 3, never the seed.
+  testWidgets('the cap is the live key, not the seed', (tester) async {
+    final ds = FakeCustodyDataSource(
+        members: [ana, bruno], days: [row(1, dayOfMonth(today.day), 1)])
+      ..publicSettings = const {'day_notice.daily_cap': '3'}
+      ..dayNotices = [
+        _notice(id: 1, sender: 1, outcome: 'cancelled'),
+        _notice(id: 2, sender: 1, outcome: 'cancelled'),
+      ];
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await _openNoticeSheet(tester);
+
+    expect(find.text(_pt.format(KApp.noticeCapReached, [3])), findsNothing);
+    expect(find.text(_pt.format(KApp.noticeCapHint, [3])), findsOneWidget);
+    final send = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, _pt[KApp.noticeSend]));
+    expect(send.onPressed, isNotNull);
+  });
 }
 
 // ── "Para você" (PR 3) ──────────────────────────────────────────────────────

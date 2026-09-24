@@ -198,6 +198,41 @@ void dayNoticeTests(GateFixture fx) {
     });
   });
 
+  // T-82: the cap is `day_notice.daily_cap` (default 2, range 1–3). Raised to 3,
+  // the third aviso goes through and the fourth is refused WITH the configured
+  // number. The shared dev key is put back in `finally`, so a red run does not
+  // leave the next suite on a different cap.
+  group('T-82 · the cap is the operator key', () {
+    late ThrowawayFamily fam;
+
+    setUpAll(() async {
+      fam = await fx.createFamily('t82cap');
+      await planToday(fam.familyId, fam.adminProfile.id);
+    });
+
+    Future<void> setCap(String value) => fx.service
+        .from('app_settings')
+        .update({'value': value}).eq('key', 'day_notice.daily_cap');
+
+    test('raised to 3, a third goes through and the fourth says 3', () async {
+      await setCap('3');
+      try {
+        await send(fam.admin);
+        await send(fam.admin);
+        await send(fam.admin);
+        await expectRejected(() => send(fam.admin),
+            contains: 'já enviou 3 avisos hoje');
+      } finally {
+        await setCap('2');
+      }
+    });
+
+    test('the key refuses a cap outside 1 to 3', () async {
+      await expectRejected(() => setCap('4'), contains: 'de 1 a 3');
+      await expectRejected(() => setCap('0'), contains: 'de 1 a 3');
+    });
+  });
+
   group('F-52 · the sentence and the payload', () {
     late ThrowawayFamily fam;
     late int noticeId;

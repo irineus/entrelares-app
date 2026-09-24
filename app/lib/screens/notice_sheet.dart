@@ -32,6 +32,7 @@ Future<int?> showNoticeSheet({
   required int myProfileId,
   required int? dayParentId,
   required int sentToday,
+  required int dailyCap,
 }) {
   return showAppSheet<int>(
     context: context,
@@ -40,6 +41,7 @@ Future<int?> showNoticeSheet({
       myProfileId: myProfileId,
       dayParentId: dayParentId,
       sentToday: sentToday,
+      dailyCap: dailyCap,
     ),
   );
 }
@@ -56,11 +58,15 @@ class _NoticeSheet extends StatefulWidget {
   /// before it blocks.
   final int sentToday;
 
+  /// T-82: the live `day_notice.daily_cap` — the number the server enforces.
+  final int dailyCap;
+
   const _NoticeSheet({
     required this.dataSource,
     required this.myProfileId,
     required this.dayParentId,
     required this.sentToday,
+    required this.dailyCap,
   });
 
   @override
@@ -162,7 +168,7 @@ class _NoticeSheetState extends State<_NoticeSheet> {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
     final textTheme = Theme.of(context).textTheme;
-    final capReached = widget.sentToday >= noticeMaxPerSenderPerDay;
+    final capReached = widget.sentToday >= widget.dailyCap;
 
     return AppSheetFrame(
       title: l[KApp.noticeTitle],
@@ -180,7 +186,7 @@ class _NoticeSheetState extends State<_NoticeSheet> {
               tone: context.tokens.warning,
               icon: Icons.info_outline,
               message: l.format(
-                  KApp.noticeCapReached, [noticeMaxPerSenderPerDay]),
+                  KApp.noticeCapReached, [widget.dailyCap]),
             )
           : null,
       children: [
@@ -252,7 +258,7 @@ class _NoticeSheetState extends State<_NoticeSheet> {
 
         if (!capReached)
           Text(
-            l.format(KApp.noticeCapHint, [noticeMaxPerSenderPerDay]),
+            l.format(KApp.noticeCapHint, [widget.dailyCap]),
             style: textTheme.bodySmall?.copyWith(color: context.tokens.textMuted),
           ),
       ],
