@@ -267,6 +267,29 @@ void main() {
     }
   });
 
+  // F-35: "conversa" names the family chat, and nothing else. The address:
+  // the chat notification and the app's `app.chat.` keys. ("Mensagem" stays
+  // the swap's message — the chat never says it.)
+  test('"conversa" names the F-35 chat, and nothing else', () {
+    const prefixes = [
+      'notifRender.chat',
+      'notifRender.title.chat',
+      'app.chat.',
+    ];
+    final pt = catalogs['pt-BR']!;
+    final word = RegExp(r'conversas?', caseSensitive: false);
+    for (final key in [...K.allKeys, ...KApp.allKeys]) {
+      if (prefixes.any(key.startsWith)) continue;
+      expect(word.hasMatch(pt[key]), isFalse, reason: '$key says "${pt[key]}"');
+    }
+  });
+
+  test('the F-35 notification calls it the Conversa, never a mensagem', () {
+    final pt = catalogs['pt-BR']!;
+    expect(pt[K.notifRenderTitleChatMessage], 'Conversa da família');
+    expect(pt[K.notifRenderTitleChatMessage], isNot(contains('ensagem')));
+  });
+
   test('the F-34 notifications call it a despesa', () {
     final pt = catalogs['pt-BR']!;
     expect(pt[K.notifRenderTitleExpenseAdded], 'Despesa lançada');

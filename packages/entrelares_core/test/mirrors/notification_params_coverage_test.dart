@@ -112,6 +112,7 @@ void main() {
       'agenda_notify',
       'expense_notify',
       'settlement_notify',
+      'send_chat_message',
     ]) {
       expect(writers, contains(expected));
     }

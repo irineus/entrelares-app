@@ -240,6 +240,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _tab = switch (landing) {
       NotificationLanding.incoming => _Tab.incoming,
       NotificationLanding.history => _Tab.history,
+      NotificationLanding.chat => _Tab.history,
     };
   }
 

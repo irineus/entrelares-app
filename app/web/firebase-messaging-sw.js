@@ -117,6 +117,8 @@ const ACTIONABLE_TYPES = ['swap_requested', 'revert_requested', 'auto_reminder']
 // F-52: one type, four wordings. Only the two that ASK for something leave
 // the reader with anything to do; the rest are news and belong in "Todas".
 const ACTIONABLE_KINDS = ['pickup', 'keep'];
+// F-35: a chat notice opens the Conversa itself, where the text is.
+const CHAT_TYPES = ['chat_message'];
 
 /// Where a tapped notification lands — the same URL `main.dart` builds for the
 /// Android tap, which is what makes the two channels agree: the Notificações
@@ -124,7 +126,9 @@ const ACTIONABLE_KINDS = ['pickup', 'keep'];
 function landingUrl(data) {
   const actionable = ACTIONABLE_TYPES.includes(data.type) ||
     (data.type === 'day_notice' && ACTIONABLE_KINDS.includes(data.kind));
-  const tab = actionable ? 'incoming' : 'history';
+  const tab = CHAT_TYPES.includes(data.type)
+    ? 'chat'
+    : actionable ? 'incoming' : 'history';
   const id = data.notificationId || '';
   const query = id ? `?tab=${tab}&n=${encodeURIComponent(id)}` : `?tab=${tab}`;
   return new URL(`/notifications${query}`, self.location.origin).href;

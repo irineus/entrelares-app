@@ -818,6 +818,8 @@ abstract final class StringsPtBr {
     K.notifRenderExpenseCategoryFood: 'Alimentação',
     K.notifRenderExpenseCategoryTransport: 'Transporte',
     K.notifRenderExpenseCategoryOther: 'Outros',
+    K.notifRenderTitleChatMessage: 'Conversa da família',
+    K.notifRenderChatMessage: '{0}: {1}',
     // F-55 PR 4: byte-identical to what agenda_notify() stores (U-13).
     K.notifRenderTitleAgendaNotice: 'Novo na agenda',
     K.notifRenderTitleAgendaReminder: 'Lembrete da agenda',

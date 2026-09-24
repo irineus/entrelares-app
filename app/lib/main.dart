@@ -594,6 +594,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   landing: switch (state.uri.queryParameters['tab']) {
                     'incoming' => NotificationLanding.incoming,
                     'history' => NotificationLanding.history,
+                    'chat' => NotificationLanding.chat,
                     _ => null,
                   },
                   landingNonce: state.uri.queryParameters['n']),
@@ -808,7 +809,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       final landing =
           PushRouting.landingFor(data['type'], kind: data['kind']);
       final query = {
-        'tab': landing == NotificationLanding.incoming ? 'incoming' : 'history',
+        'tab': switch (landing) {
+          NotificationLanding.incoming => 'incoming',
+          NotificationLanding.history => 'history',
+          NotificationLanding.chat => 'chat',
+        },
         if ((data['notificationId'] ?? '').isNotEmpty)
           'n': data['notificationId']!,
       };
