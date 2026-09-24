@@ -278,9 +278,55 @@ abstract final class NotificationRenderer {
       case 'plan_ending' when kind == 'ended' && date != null:
         return l.format(K.notifRenderPlanEnded, [date]);
 
+      // ── The agenda speaks (F-55 PR 4) ──
+      // "What" is the item as the day sheet heads it — time, kind, child —
+      // and the item's own text follows as written. An unknown `kind` is a
+      // future writer's: the stored sentence, never a guess.
+      case 'agenda_notice' when date != null && _agendaKind(kind) != null:
+        return l.format(
+            p['routine'] == '1'
+                ? K.notifRenderAgendaRoutineNotice
+                : K.notifRenderAgendaNotice,
+            [
+              name ?? l[K.notifRenderFbOtherCap],
+              date,
+              _agendaWhat(p, l),
+              _agendaText(p, l),
+            ]);
+      case 'agenda_reminder' when date != null && _agendaKind(kind) != null:
+        return l.format(K.notifRenderAgendaReminder,
+            [_agendaWhat(p, l), date, _agendaText(p, l)]);
+
       default:
         return storedMessage;
     }
+  }
+
+  /// F-55: the catalog key of an agenda kind, or null for one this client
+  /// does not know.
+  static String? _agendaKind(String? kind) => switch (kind) {
+        'school' => K.notifRenderAgendaKindSchool,
+        'health' => K.notifRenderAgendaKindHealth,
+        'medicine' => K.notifRenderAgendaKindMedicine,
+        'activity' => K.notifRenderAgendaKindActivity,
+        'free' => K.notifRenderAgendaKindFree,
+        'note' => K.notifRenderAgendaKindNote,
+        'other' => K.notifRenderAgendaKindOther,
+        _ => null,
+      };
+
+  /// "14:00 · Remédio · Lia" — the pieces the payload carries, in order.
+  static String _agendaWhat(Map<String, String> p, Localization l) => [
+        if (p['time'] case final t?) l.formatTimeString(t),
+        l[_agendaKind(p['kind'])!],
+        ?p['child'],
+      ].join(' · ');
+
+  static String _agendaText(Map<String, String> p, Localization l) {
+    final text = p['msg'];
+    return text == null || text.trim().isEmpty
+        ? ''
+        : l.format(K.notifRenderAgendaTextSuffix, [text]);
   }
 
   /// F-60: `params.deadline` as the instant it claims to be, or null.
@@ -413,6 +459,13 @@ abstract final class NotificationRenderer {
               'ended' => K.notifRenderTitlePlanEnded,
               _ => null,
             },
+      // F-55: the heading only where the body is rebuilt too.
+      'agenda_notice' => p['date'] != null && _agendaKind(kind) != null
+          ? K.notifRenderTitleAgendaNotice
+          : null,
+      'agenda_reminder' => p['date'] != null && _agendaKind(kind) != null
+          ? K.notifRenderTitleAgendaReminder
+          : null,
       // F-52: three request kinds share one heading — the body is what says
       // whether anything is being asked of the reader. A cancellation gets its
       // own, because "Aviso de imprevisto" over "X cancelou o aviso" would

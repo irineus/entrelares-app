@@ -47,6 +47,8 @@ const _usageReportKeys = {
   'events_deleted', 'notes_active', 'converted', 'by_kind', 'kind',
   // F-55 PR 3: the routine — counts only
   'routines', 'events_from_routine',
+  // F-55 PR 4: the reminders — counts only
+  'with_reminder', 'reminders_sent',
 };
 
 Set<String> _keysOf(Object? node) => switch (node) {
@@ -943,6 +945,8 @@ void platformOperatorTests(GateFixture fx) {
         expect(agenda['events_active'], 1);
         expect(agenda['routines'], 0);
         expect(agenda['events_from_routine'], 0);
+        expect(agenda['with_reminder'], 0);
+        expect(agenda['reminders_sent'], 0);
         expect(agenda['by_kind'], [
           {'kind': 'school', 'count': 1}
         ]);

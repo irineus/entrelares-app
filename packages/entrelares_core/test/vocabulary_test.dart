@@ -161,7 +161,13 @@ void main() {
   // read as the old field. Same shape as the aviso and the relato: an ADDRESS
   // (`app.agenda.`, plus the child page that introduces it) and the half that
   // rots in silence (the surface still says it).
-  const agendaPrefixes = ['app.agenda.', 'app.child.'];
+  const agendaPrefixes = [
+    'app.agenda.',
+    'app.child.',
+    // F-55 PR 4: the notice and the reminder name the agenda too.
+    'notifRender.agenda',
+    'notifRender.title.agenda',
+  ];
 
   test('"agenda" and "nota" name the F-55 agenda, and nothing else', () {
     final pt = catalogs['pt-BR']!;

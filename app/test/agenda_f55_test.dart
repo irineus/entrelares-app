@@ -9,6 +9,7 @@ import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
@@ -446,6 +447,110 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('agenda-routine-edit')), findsNothing);
       expect(find.byKey(const ValueKey('agenda-repeat')), findsNothing);
+    });
+  });
+
+  group('notify (PR 4)', () {
+    testWidgets('the creator picks who, the channels and the reminder',
+        (tester) async {
+      final ds = source(events: [
+        event(1, 'medicine', start: '14:00', childId: 5),
+      ]);
+      await pumpSection(tester, ds);
+      await tester.tap(find.byKey(const ValueKey('day-agenda-edit-1')));
+      await tester.pumpAndSettle();
+      // Nobody is told by default: no channel, no reminder offered.
+      expect(find.byKey(const ValueKey('agenda-notify-push')), findsNothing);
+      await tapVisible(tester, 'agenda-notify-family');
+      await tester.pumpAndSettle();
+      await tapVisible(tester, 'agenda-remind-15');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.commonSave]));
+      await tester.pumpAndSettle();
+      expect(ds.eventWrites, ['update:1:medicine:14:00::notify=family/push/app/15']);
+    });
+
+    testWidgets('no start time: the reminder says what it needs',
+        (tester) async {
+      final ds = source();
+      await pumpSection(tester, ds);
+      await tester.tap(find.byKey(const ValueKey('day-agenda-add')));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, 'agenda-notify-self');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('agenda-remind-needs-start')), findsOne);
+      expect(find.byKey(const ValueKey('agenda-remind-15')), findsNothing);
+      await tester.enterText(find.byKey(const ValueKey('agenda-body')), 'x');
+      await tester.tap(find.text(l[K.commonSave]));
+      await tester.pumpAndSettle();
+      expect(ds.eventWrites, ['add:note:-:-:-:x:notify=self/push/app/-']);
+    });
+
+    testWidgets('both channels off never reaches the server', (tester) async {
+      final ds = source();
+      await pumpSection(tester, ds);
+      await tester.tap(find.byKey(const ValueKey('day-agenda-add')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('agenda-body')), 'x');
+      await tapVisible(tester, 'agenda-notify-family');
+      await tester.pumpAndSettle();
+      await tapVisible(tester, 'agenda-notify-push');
+      await tester.pumpAndSettle();
+      await tapVisible(tester, 'agenda-notify-app');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.commonSave]));
+      await tester.pumpAndSettle();
+      expect(ds.eventWrites, isEmpty);
+      expect(
+          find.text(
+              'Escolha pelo menos um canal da notificação: no celular ou no app.'),
+          findsOne);
+    });
+
+    testWidgets('an item opens with the choice it was saved with',
+        (tester) async {
+      final ds = source(events: [
+        ChildEvent(
+          id: 1,
+          familyId: 7,
+          eventDate: tomorrow,
+          kind: 'school',
+          childId: 5,
+          startTime: '07:30',
+          createdBy: 2,
+          createdAt: DateTime.utc(2026, 9, 20, 12),
+          notifyTo: 'responsible',
+          notifyPush: false,
+          remindMinutes: 30,
+        ),
+      ]);
+      await pumpSection(tester, ds);
+      await tester.tap(find.byKey(const ValueKey('day-agenda-edit-1')));
+      await tester.pumpAndSettle();
+      bool selected(String key) =>
+          tester.widget<ChoiceChip>(find.byKey(ValueKey(key))).selected;
+      expect(selected('agenda-notify-responsible'), isTrue);
+      expect(selected('agenda-remind-30'), isTrue);
+      expect(
+          tester
+              .widget<FilterChip>(
+                  find.byKey(const ValueKey('agenda-notify-push')))
+              .selected,
+          isFalse);
+    });
+
+    test('a "phone only" row stays off the notification list', () {
+      AppNotification row(Map<String, dynamic>? params) => AppNotification(
+            id: 1,
+            recipientProfileId: 2,
+            type: 'agenda_notice',
+            title: 't',
+            message: 'm',
+            params: params,
+          );
+      expect(row({'in_app': 'false'}).shownInApp, isFalse);
+      expect(row({'push': 'false'}).shownInApp, isTrue);
+      expect(row(null).shownInApp, isTrue);
     });
   });
 }

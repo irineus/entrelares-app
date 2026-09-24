@@ -504,6 +504,19 @@ abstract final class KApp {
   static const String agendaPdfSection = 'app.agenda.pdfSection';
   static const String agendaPdfLead = 'app.agenda.pdfLead';
   static const String agendaPdfEmpty = 'app.agenda.pdfEmpty';
+  static const String agendaNotifyLabel = 'app.agenda.notifyLabel';
+  static const String agendaNotifyNone = 'app.agenda.notifyNone';
+  static const String agendaNotifySelf = 'app.agenda.notifySelf';
+  static const String agendaNotifyResponsible = 'app.agenda.notifyResponsible';
+  static const String agendaNotifyFamily = 'app.agenda.notifyFamily';
+  static const String agendaNotifyPush = 'app.agenda.notifyPush';
+  static const String agendaNotifyInApp = 'app.agenda.notifyInApp';
+  static const String agendaNotifyLead = 'app.agenda.notifyLead';
+  static const String agendaRemindLabel = 'app.agenda.remindLabel';
+  static const String agendaRemindNone = 'app.agenda.remindNone';
+  static const String agendaRemindAtStart = 'app.agenda.remindAtStart';
+  static const String agendaRemindBefore = 'app.agenda.remindBefore';
+  static const String agendaRemindNeedsStart = 'app.agenda.remindNeedsStart';
   static const String agendaRepeat = 'app.agenda.repeat';
   static const String agendaRepeatLead = 'app.agenda.repeatLead';
   static const String agendaRepeatDays = 'app.agenda.repeatDays';
@@ -840,6 +853,19 @@ abstract final class KApp {
     agendaPdfSection,
     agendaPdfLead,
     agendaPdfEmpty,
+    agendaNotifyLabel,
+    agendaNotifyNone,
+    agendaNotifySelf,
+    agendaNotifyResponsible,
+    agendaNotifyFamily,
+    agendaNotifyPush,
+    agendaNotifyInApp,
+    agendaNotifyLead,
+    agendaRemindLabel,
+    agendaRemindNone,
+    agendaRemindAtStart,
+    agendaRemindBefore,
+    agendaRemindNeedsStart,
     agendaRepeat,
     agendaRepeatLead,
     agendaRepeatDays,
@@ -1328,6 +1354,19 @@ abstract final class StringsAppPtBr {
     KApp.agendaPdfSection: '5. Agenda da criança',
     KApp.agendaPdfLead: 'O que a família registrou na agenda para os dias do período. A agenda não muda o planejamento: não troca quem fica com a criança em nenhum dia.',
     KApp.agendaPdfEmpty: 'Nenhum item na agenda no período.',
+    KApp.agendaNotifyLabel: 'Notificar',
+    KApp.agendaNotifyNone: 'Ninguém',
+    KApp.agendaNotifySelf: 'Só eu',
+    KApp.agendaNotifyResponsible: 'Responsável do dia',
+    KApp.agendaNotifyFamily: 'Família toda',
+    KApp.agendaNotifyPush: 'No celular',
+    KApp.agendaNotifyInApp: 'No app',
+    KApp.agendaNotifyLead: 'Ao salvar um item novo, quem você escolheu recebe uma notificação (você não recebe a sua). O lembrete vai para todos os escolhidos. Nunca por e-mail.',
+    KApp.agendaRemindLabel: 'Lembrete',
+    KApp.agendaRemindNone: 'Sem lembrete',
+    KApp.agendaRemindAtStart: 'Na hora',
+    KApp.agendaRemindBefore: '{0} min antes',
+    KApp.agendaRemindNeedsStart: 'Para ter lembrete, escolha o horário de início.',
     KApp.agendaRepeat: 'Repetir toda semana',
     KApp.agendaRepeatLead: 'De {0} até o último dia planejado do calendário, nos dias marcados.',
     KApp.agendaRepeatDays: 'Dias da semana',
@@ -1811,6 +1850,19 @@ abstract final class StringsAppEn {
     KApp.agendaPdfSection: '5. The child\'s agenda',
     KApp.agendaPdfLead: 'What the family recorded on the agenda for the days of the period. The agenda does not change the plan: it never changes who has the child on any day.',
     KApp.agendaPdfEmpty: 'No agenda items in the period.',
+    KApp.agendaNotifyLabel: 'Notify',
+    KApp.agendaNotifyNone: 'Nobody',
+    KApp.agendaNotifySelf: 'Only me',
+    KApp.agendaNotifyResponsible: 'The day\'s caregiver',
+    KApp.agendaNotifyFamily: 'Whole family',
+    KApp.agendaNotifyPush: 'On the phone',
+    KApp.agendaNotifyInApp: 'In the app',
+    KApp.agendaNotifyLead: 'When a new item is saved, whoever you chose gets a notification (you do not get your own). The reminder goes to everyone chosen. Never by e-mail.',
+    KApp.agendaRemindLabel: 'Reminder',
+    KApp.agendaRemindNone: 'No reminder',
+    KApp.agendaRemindAtStart: 'At the time',
+    KApp.agendaRemindBefore: '{0} min before',
+    KApp.agendaRemindNeedsStart: 'To get a reminder, set a start time.',
     KApp.agendaRepeat: 'Repeat every week',
     KApp.agendaRepeatLead: 'From {0} to the calendar\'s last planned day, on the days marked.',
     KApp.agendaRepeatDays: 'Weekdays',

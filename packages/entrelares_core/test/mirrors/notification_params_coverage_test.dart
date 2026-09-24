@@ -109,6 +109,7 @@ void main() {
       'notify_family_email_cap',
       'billing_grace_warnings_due',
       'plan_end_reminders_due',
+      'agenda_notify',
     ]) {
       expect(writers, contains(expected));
     }

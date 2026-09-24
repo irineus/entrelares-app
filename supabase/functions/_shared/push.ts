@@ -54,6 +54,14 @@ export const PUSH_TYPES: readonly string[] = [
 	// and the member who stopped opening the app is exactly the one a row in
 	// the list never reaches. Lands on "Todas", where the row always is.
 	"plan_ending",
+	// F-55. The agenda's notice (to whom the creator chose — never the creator)
+	// and its reminder (0/15/30/60 minutes before the start). Nobody on the
+	// receiving end did anything; the reminder is the product's strongest push
+	// case after the handoff ("remédio às 14h"). The creator may have said "no
+	// push" for the item: the dispatcher skips that row before pg_net. Both
+	// land on "Todas".
+	"agenda_notice",
+	"agenda_reminder",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -117,6 +125,19 @@ const K = {
 
 	titlePlanEnding: "notifRender.title.planEnding",
 	titlePlanEnded: "notifRender.title.planEnded",
+	titleAgendaNotice: "notifRender.title.agendaNotice",
+	titleAgendaReminder: "notifRender.title.agendaReminder",
+	agendaNotice: "notifRender.agendaNotice",
+	agendaRoutineNotice: "notifRender.agendaRoutineNotice",
+	agendaReminder: "notifRender.agendaReminder",
+	agendaTextSuffix: "notifRender.agendaTextSuffix",
+	agendaKindSchool: "notifRender.agendaKind.school",
+	agendaKindHealth: "notifRender.agendaKind.health",
+	agendaKindMedicine: "notifRender.agendaKind.medicine",
+	agendaKindActivity: "notifRender.agendaKind.activity",
+	agendaKindFree: "notifRender.agendaKind.free",
+	agendaKindNote: "notifRender.agendaKind.note",
+	agendaKindOther: "notifRender.agendaKind.other",
 	planEnding: "notifRender.planEnding",
 	planEnded: "notifRender.planEnded",
 } as const;
@@ -178,6 +199,19 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.planEnded": "O planejamento terminou",
 		"notifRender.planEnding": "O planejamento da família vai até {0}. Planeje os próximos meses.",
 		"notifRender.planEnded": "O último dia planejado foi {0}. Planeje os próximos meses no calendário.",
+		"notifRender.title.agendaNotice": "Novo na agenda",
+		"notifRender.title.agendaReminder": "Lembrete da agenda",
+		"notifRender.agendaNotice": "{0} adicionou à agenda de {1}: {2}.{3}",
+		"notifRender.agendaRoutineNotice": "{0} criou uma rotina na agenda a partir de {1}: {2}.{3}",
+		"notifRender.agendaReminder": "{0} ({1}).{2}",
+		"notifRender.agendaTextSuffix": " {0}",
+		"notifRender.agendaKind.school": "Escola",
+		"notifRender.agendaKind.health": "Saúde",
+		"notifRender.agendaKind.medicine": "Remédio",
+		"notifRender.agendaKind.activity": "Atividade",
+		"notifRender.agendaKind.free": "Livre",
+		"notifRender.agendaKind.note": "Nota",
+		"notifRender.agendaKind.other": "Outro",
 	},
 	"en": {
 		"notifRender.title.autoReminder": "Pending request awaiting your reply",
@@ -231,6 +265,19 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.planEnded": "Your plan has ended",
 		"notifRender.planEnding": "Your family's plan runs until {0}. Plan the next months.",
 		"notifRender.planEnded": "The last planned day was {0}. Plan the next months in the calendar.",
+		"notifRender.title.agendaNotice": "New on the agenda",
+		"notifRender.title.agendaReminder": "Agenda reminder",
+		"notifRender.agendaNotice": "{0} added to the agenda for {1}: {2}.{3}",
+		"notifRender.agendaRoutineNotice": "{0} created an agenda routine starting {1}: {2}.{3}",
+		"notifRender.agendaReminder": "{0} ({1}).{2}",
+		"notifRender.agendaTextSuffix": " {0}",
+		"notifRender.agendaKind.school": "School",
+		"notifRender.agendaKind.health": "Health",
+		"notifRender.agendaKind.medicine": "Medicine",
+		"notifRender.agendaKind.activity": "Activity",
+		"notifRender.agendaKind.free": "Free time",
+		"notifRender.agendaKind.note": "Note",
+		"notifRender.agendaKind.other": "Other",
 	},
 };
 
@@ -477,6 +524,42 @@ export function renderPush(
 				return null;
 			}
 			break;
+
+		// F-55. "What" is the item as the day sheet heads it (time, kind,
+		// child); its own text follows as written. An unknown kind is a
+		// future writer's — dropped, never guessed.
+		case "agenda_notice":
+		case "agenda_reminder": {
+			const kindKey = ({
+				school: K.agendaKindSchool,
+				health: K.agendaKindHealth,
+				medicine: K.agendaKindMedicine,
+				activity: K.agendaKindActivity,
+				free: K.agendaKindFree,
+				note: K.agendaKindNote,
+				other: K.agendaKindOther,
+			} as Record<string, string>)[kind ?? ""];
+			if (kindKey === undefined) return null;
+			const time = params["time"];
+			const what = [
+				time ? (formatTimeIn(lang, time) ?? time) : null,
+				fmt(lang, kindKey),
+				params["child"] ?? null,
+			].filter((x) => x !== null && x !== "").join(" · ");
+			const text = !msg || msg.trim() === "" ? "" : fmt(lang, K.agendaTextSuffix, [msg]);
+			if (type === "agenda_notice") {
+				titleKey = K.titleAgendaNotice;
+				body = fmt(
+					lang,
+					params["routine"] === "1" ? K.agendaRoutineNotice : K.agendaNotice,
+					[name ?? otherCap(), date, what, text],
+				);
+			} else {
+				titleKey = K.titleAgendaReminder;
+				body = fmt(lang, K.agendaReminder, [what, date, text]);
+			}
+			break;
+		}
 
 		default:
 			return null;
