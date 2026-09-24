@@ -224,4 +224,27 @@ void main() {
     await tester.tap(find.text(pt[KApp.helpLoginLink]));
     expect(opened, 1);
   });
+
+  // T-83: a signed-in person's form counts to `support.message_max_chars`; the
+  // server refuses above it, and the counter must say the same number.
+  testWidgets('signed in, the form counts to the operator maximum',
+      (tester) async {
+    final rec = _Recorder();
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_wrap(HelpScreen(
+      accountEmail: 'ana@example.com',
+      diagnostics: _diagnostics,
+      onSend: rec.send,
+      onClose: () {},
+      openMail: (_) async {},
+      loadSettings: () async => const {'support.message_max_chars': '500'},
+    )));
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<TextField>(find.descendant(
+        of: find.byKey(HelpScreen.messageKey), matching: find.byType(TextField)));
+    expect(field.maxLength, 500);
+  });
 }

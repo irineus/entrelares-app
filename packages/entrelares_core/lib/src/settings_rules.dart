@@ -72,6 +72,10 @@ class PublicSettings {
   int get dayAccountMaxChars => _int('day_account.max_chars', 1000);
   int get dayAccountDailyCap => _int('day_account.daily_cap', 10);
 
+  // T-83: the F-68 message maximum — public so the form counts to it
+  // (seed 2000; the column CHECK is 2000).
+  int get supportMessageMaxChars => _int('support.message_max_chars', 2000);
+
   // T-83: the F-23 safety poll, in seconds (degraded 25, 10–120; healthy 120,
   // 0–600, 0 = off while the socket is up).
   int get pollSecondsDegraded => _int('sync.poll_seconds_degraded', 25);

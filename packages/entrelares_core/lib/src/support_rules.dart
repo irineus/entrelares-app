@@ -72,9 +72,11 @@ abstract final class SupportRules {
 
   /// Whether [raw] is a message the server would take — counted TRIMMED, as
   /// the function counts it.
-  static bool isValidMessage(String raw) {
+  /// T-83: [max] is `support.message_max_chars` when the screen could read it
+  /// (a signed-in person); the constant otherwise.
+  static bool isValidMessage(String raw, {int max = messageMaxChars}) {
     final length = raw.trim().length;
-    return length >= messageMinChars && length <= messageMaxChars;
+    return length >= messageMinChars && length <= max;
   }
 
   /// The function's own test, deliberately loose: an address with one `@`, a

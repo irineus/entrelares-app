@@ -99,6 +99,21 @@ void serverParametersTests(GateFixture fx) {
       await expectRejected(
           () => setSetting('sync.poll_seconds_healthy', '601'),
           contains: 'de 0 a 600 segundos');
+      // T-83 (4/4)
+      await expectRejected(() => setSetting('support.anon_hourly', '21'),
+          contains: 'de 1 a 20');
+      await expectRejected(() => setSetting('support.member_daily', '101'),
+          contains: 'de 1 a 100');
+      await expectRejected(
+          () => setSetting('support.message_max_chars', '2001'),
+          contains: 'de 200 a 2000 caracteres');
+    });
+
+    test('a support limit per hour never exceeds its daily one', () async {
+      await expectRejected(() => setSetting('support.anon_hourly', '11'),
+          contains: 'support.anon_daily');
+      await expectRejected(() => setSetting('support.member_hourly', '21'),
+          contains: 'support.member_daily');
     });
 
     test('the push kill switch names only types the dispatcher pushes',

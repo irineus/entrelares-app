@@ -12,6 +12,8 @@
 /// affected is, by construction, someone who was already stuck.
 library;
 
+import 'dart:io';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:test/test.dart';
 
@@ -42,13 +44,44 @@ void main() {
     expect(SupportRules.memberDailyLimit, _readTsNumber('MEMBER_DAILY_LIMIT'));
   });
 
-  test('the function still hands the limits to the RPC', () {
-    // Agreeing constants are worth nothing if a literal was typed into the call.
+  test('the function hands the OPERATOR limits to the RPC', () {
+    // T-83: the limits are `support.*` in app_settings; the constants are only
+    // the fallbacks. Agreeing constants are worth nothing if the call used a
+    // literal, or a constant instead of the key.
     final source = repoFile(_functionPath);
     expect(source,
-        contains('p_hour_limit: byProfile ? MEMBER_HOURLY_LIMIT : ANON_HOURLY_LIMIT'));
-    expect(source,
-        contains('p_day_limit: byProfile ? MEMBER_DAILY_LIMIT : ANON_DAILY_LIMIT'));
+        contains('p_hour_limit: byProfile ? memberHourly : anonHourly'));
+    expect(source, contains('p_day_limit: byProfile ? memberDaily : anonDaily'));
+    for (final (key, constant) in const [
+      ('support.message_max_chars', 'MESSAGE_MAX_CHARS'),
+      ('support.anon_hourly', 'ANON_HOURLY_LIMIT'),
+      ('support.anon_daily', 'ANON_DAILY_LIMIT'),
+      ('support.member_hourly', 'MEMBER_HOURLY_LIMIT'),
+      ('support.member_daily', 'MEMBER_DAILY_LIMIT'),
+    ]) {
+      expect(source, contains('setting("$key", $constant)'), reason: key);
+    }
+  });
+
+  test('every fallback is the migration seed of its key', () {
+    final seeds = migrationsDirectory()
+        .listSync()
+        .whereType<File>()
+        .map((f) => f.readAsStringSync())
+        .join('\n');
+    int seed(String key) {
+      final m = RegExp("\\('${RegExp.escape(key)}', '(\\d+)'").firstMatch(seeds);
+      expect(m, isNotNull, reason: 'no migration seeds $key');
+      return int.parse(m!.group(1)!);
+    }
+
+    expect(_readTsNumber('MESSAGE_MAX_CHARS'), seed('support.message_max_chars'));
+    expect(_readTsNumber('ANON_HOURLY_LIMIT'), seed('support.anon_hourly'));
+    expect(_readTsNumber('ANON_DAILY_LIMIT'), seed('support.anon_daily'));
+    expect(_readTsNumber('MEMBER_HOURLY_LIMIT'), seed('support.member_hourly'));
+    expect(_readTsNumber('MEMBER_DAILY_LIMIT'), seed('support.member_daily'));
+    expect(PublicSettings.unloaded.supportMessageMaxChars,
+        SupportRules.messageMaxChars);
   });
 
   test('the categories are the same set on both sides', () {

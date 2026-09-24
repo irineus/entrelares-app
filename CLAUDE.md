@@ -140,7 +140,9 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # `interval '48 hours'` ao lado dela é a regra, que o item não tocou), e os números da porta
 # de suporte (F-68: tamanho da mensagem, os limites por hora/dia e as cinco categorias moram
 # em `send-support-request/index.ts`; o espelho lê esse arquivo e o CHECK da migração —
-# errar aqui recusa depois do Enviar justamente quem já estava travado), e os canais e a
+# errar aqui recusa depois do Enviar justamente quem já estava travado; desde o T-83 os
+# limites e o tamanho máximo são chaves `support.*` do app_settings, as constantes são só o
+# fallback e o espelho as prende ao seed da migração), e os canais e a
 # retenção da atividade por membro (T-78: `member_activity_days` aceita android/web/
 # web-installed no CHECK e na guarda de `touch_activity`, e o purge guarda 400 dias — o prazo
 # da §11 da política; o app chama fire-and-forget, então um canal recusado sumiria dos dados
@@ -251,7 +253,7 @@ cd app && fvm flutter build web --release --no-web-resources-cdn --dart-define=A
 # `entrelares-app@<versão do pubspec>` — a mesma string que o cliente manda, senão
 # mapas e eventos nunca se encontram — e APAGA todo .map antes de publicar, porque
 # um mapa servido da nossa origem entrega o fonte Dart inteiro a quem pedir.
-# Gate de banco (391 testes de RLS/RPC/trigger contra o projeto dev, 24/09/2026), Dart puro
+# Gate de banco (392 testes de RLS/RPC/trigger contra o projeto dev, 24/09/2026), Dart puro
 # desde o PR 16 do T-56. Exige a service_role do DEV — nunca a de produção. Sem
 # ela a suíte aborta com instruções em vez de rodar pela metade.
 cd packages/entrelares_db_gate && fvm dart analyze --fatal-infos
