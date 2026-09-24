@@ -32,6 +32,12 @@ class FamilyInvitation {
   /// profile. Null on a legacy invitation — one that will create a profile.
   final int? profileId;
 
+  /// F-50: `full` or `viewer`. A viewer invitation takes a VIEWER seat, never
+  /// a caregiver one.
+  final String memberType;
+
+  bool get isViewer => memberType == 'viewer';
+
   const FamilyInvitation({
     required this.id,
     this.familyId,
@@ -43,6 +49,7 @@ class FamilyInvitation {
     this.acceptedAt,
     this.revokedAt,
     this.profileId,
+    this.memberType = 'full',
   });
 
   /// Still usable: nobody accepted it, nobody revoked it, and the 7-day window
@@ -67,6 +74,7 @@ class FamilyInvitation {
         acceptedAt: _utc(json['accepted_at'] as String?),
         revokedAt: _utc(json['revoked_at'] as String?),
         profileId: json['profile_id'] as int?,
+        memberType: (json['member_type'] as String?) ?? 'full',
       );
 
   static DateTime? _utc(String? wire) =>

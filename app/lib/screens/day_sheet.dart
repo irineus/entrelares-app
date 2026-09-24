@@ -250,6 +250,7 @@ class _DaySheetState extends State<_DaySheet> {
   bool get _canWriteAccount {
     final me = widget.myProfile;
     return me != null &&
+        !me.isViewer &&
         !widget.offline &&
         canWriteDayAccount(
           hasAccount: (me.userId ?? '').isNotEmpty,
@@ -268,6 +269,7 @@ class _DaySheetState extends State<_DaySheet> {
         me != null &&
         (me.userId ?? '').isNotEmpty &&
         !me.hasLeft &&
+        !me.isViewer &&
         !isDayAccountDate(
             widget.date, widget.today, widget.settings.dayAccountMaxDaysBack);
   }
@@ -293,7 +295,9 @@ class _DaySheetState extends State<_DaySheet> {
 
   /// Past without the admin bypass, frozen, or offline: nothing can be saved,
   /// so there is no editor to reach.
-  bool get _readOnly => _saveBlocked || widget.offline;
+  /// F-50: a Visualizador reads every day and edits none.
+  bool get _readOnly =>
+      _saveBlocked || widget.offline || widget.myProfile?.isViewer == true;
   bool get _isFrozen => isDayFrozen(widget.date, widget.frozenDates);
 
   DayAssignment? get _assignment {

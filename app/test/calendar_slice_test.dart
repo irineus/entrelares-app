@@ -852,6 +852,35 @@ class FakeCustodyDataSource implements CustodyDataSource {
     revokedInvitations.add(invitationId);
   }
 
+  // ── F-50: the Visualizador ──
+  final List<String> viewerWrites = [];
+
+  @override
+  Future<int> createViewerInvitation(
+      {required String email, required int roleId}) async {
+    if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
+    viewerWrites.add('invite:$email:$roleId');
+    return 900 + viewerWrites.length;
+  }
+
+  @override
+  Future<void> promoteMemberToFull(int profileId) async {
+    if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
+    viewerWrites.add('promote:$profileId');
+  }
+
+  @override
+  Future<void> removeViewer(int profileId) async {
+    if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
+    viewerWrites.add('remove:$profileId');
+  }
+
+  @override
+  Future<void> leaveFamilyAsViewer() async {
+    if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
+    viewerWrites.add('leave');
+  }
+
   @override
   Future<bool> sendInvitationEmail(int invitationId) async {
     mailedInvitations.add(invitationId);

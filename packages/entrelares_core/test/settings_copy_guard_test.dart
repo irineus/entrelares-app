@@ -38,6 +38,17 @@ void main() {
       keys: [KApp.agendaFreeNotesOne, KApp.agendaFreeNotesMany],
       words: ['uma', 'one'],
     ),
+    // F-50: the free family's viewers (the invite form's free-plan line).
+    'free_viewers': (
+      seed: seeds.freeViewers,
+      keys: [KApp.viewerFreeCapOne, KApp.viewerFreeCapMany],
+      words: ['um', 'one'],
+    ),
+    'max_viewers': (
+      seed: seeds.maxViewers,
+      keys: [KApp.viewerMaxCap],
+      words: ['quatro', 'four'],
+    ),
     // T-82: server-only key, stated through the notification's `params.percent`
     // (seed 80 — the app has no PublicSettings getter for it on purpose).
     'email_quota.warn_percent': (

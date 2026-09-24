@@ -167,6 +167,8 @@ void main() {
     // F-55 PR 4: the notice and the reminder name the agenda too.
     'notifRender.agenda',
     'notifRender.title.agenda',
+    // F-50: the viewer is told it reads the agenda.
+    'app.viewer.',
   ];
 
   test('"agenda" and "nota" name the F-55 agenda, and nothing else', () {
@@ -220,6 +222,29 @@ void main() {
       if (survivors.contains(key)) continue;
       expect(word.hasMatch(en[key]), isFalse,
           reason: '$key says "${en[key]}"');
+    }
+  });
+
+  // F-50: "Visualizador" is the read-only member, and nothing else — the
+  // address is `app.viewer.`. ("Apenas visualização", the read-only day,
+  // is another word and stays free.)
+  test('"visualizador" names the F-50 viewer, and nothing else', () {
+    final pt = catalogs['pt-BR']!;
+    final word = RegExp(r'\bvisualizador(a|es|as)?\b', caseSensitive: false);
+    for (final key in [...K.allKeys, ...KApp.allKeys]) {
+      if (key.startsWith('app.viewer.')) continue;
+      expect(word.hasMatch(pt[key]), isFalse,
+          reason: '$key says "${pt[key]}"');
+    }
+  });
+
+  test('the F-50 surface calls itself the Visualizador', () {
+    final pt = catalogs['pt-BR']!;
+    expect(pt[KApp.viewerBadge], 'Visualizador');
+    expect(catalogs['en']![KApp.viewerBadge], 'Viewer');
+    for (final key in [KApp.viewerReadOnly, KApp.viewerInviteLead]) {
+      expect(RegExp(r'\bvisualizador\b', caseSensitive: false).hasMatch(pt[key]),
+          isTrue, reason: key);
     }
   });
 }

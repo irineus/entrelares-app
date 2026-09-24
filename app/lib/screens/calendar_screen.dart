@@ -314,6 +314,10 @@ class _CalendarScreenState extends State<CalendarScreen>
   void _openPendingPlan() {
     final start = _pendingPlanStart;
     if (start == null || _loading || !mounted) return;
+    if (_iAmViewer) {
+      _pendingPlanStart = null;
+      return;
+    }
     _pendingPlanStart = null;
     // A notifier write schedules no frame by itself, so ask for one — or the
     // callback waits for the next unrelated repaint.
@@ -654,7 +658,7 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   bool get _showChecklist {
     final signals = _effectiveSignals;
-    if (signals == null || _loading) return false;
+    if (signals == null || _loading || _iAmViewer) return false;
     return OnboardingSteps.shouldShowChecklist(signals,
         reopened: widget.onboarding?.checklistReopened ?? false);
   }
@@ -871,7 +875,11 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// (invited, not yet joined). Only the S-11 tombstone is left out. The
   /// swap workflow is a different question, answered per day by the sheet.
   List<Member> get _assignableMembers =>
-      _members.where((m) => !m.hasLeft).toList();
+      _members.where((m) => !m.hasLeft && !m.isViewer).toList();
+
+  /// F-50: I am a Visualizador — the calendar reads, and offers nothing to
+  /// write (the server refuses it anyway).
+  bool get _iAmViewer => _ownProfile?.isViewer == true;
 
   void _toggleDaySelection(DateTime date) {
     final d = dateOnly(date);
@@ -882,6 +890,7 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   /// Mirror of LongPressDay: entering selection always ADDS the day.
   void _onDayLongPress(DateTime date) {
+    if (_iAmViewer) return;
     HapticFeedback.mediumImpact();
     setState(() => _selectedDays.add(dateOnly(date)));
   }
@@ -1130,9 +1139,10 @@ class _CalendarScreenState extends State<CalendarScreen>
         icon: Icons.event_note_outlined,
         message: l.format(kind == 'ended' ? K.calPlanEnded : K.calPlanEnding,
             [l.formatDate(last)]),
-        actionLabel: l[K.notifPlanAction],
-        onAction: () =>
-            _openWizard(start: PlanEndRules.startAfter(last, _today)),
+        actionLabel: _iAmViewer ? null : l[K.notifPlanAction],
+        onAction: _iAmViewer
+            ? null
+            : () => _openWizard(start: PlanEndRules.startAfter(last, _today)),
       ),
     );
   }
@@ -1458,7 +1468,8 @@ class _CalendarScreenState extends State<CalendarScreen>
       // action on a notice that made no request is an invitation to answer a
       // question nobody asked.
       final answerable =
-          NoticeRequest.fromWire(first.request) != NoticeRequest.info;
+          NoticeRequest.fromWire(first.request) != NoticeRequest.info &&
+              !_iAmViewer;
       return AppBanner(
         tone: context.tokens.warning,
         icon: Icons.campaign_outlined,
@@ -1798,6 +1809,8 @@ class _CalendarScreenState extends State<CalendarScreen>
               _CalendarAction.adminMode => widget.adminMode.toggle(),
             },
             itemBuilder: (context) => [
+              // F-50: a viewer plans nothing and selects nothing.
+              if (!_iAmViewer)
               PopupMenuItem(
                 value: _CalendarAction.wizard,
                 child: ListTile(
@@ -1807,6 +1820,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                   title: Text(l[K.calWizard]),
                 ),
               ),
+              if (!_iAmViewer)
               PopupMenuItem(
                 value: _CalendarAction.selectDays,
                 child: ListTile(
@@ -1972,6 +1986,17 @@ class _CalendarScreenState extends State<CalendarScreen>
                 key: widget.tourKeys?.keyFor(TourTarget.todayCard),
                 child: _todayCard(context)),
           if (_showHandoffNudge) _handoffNudge(l),
+          if (_iAmViewer)
+            Padding(
+              key: const ValueKey('viewer-read-only'),
+              padding: const EdgeInsets.fromLTRB(
+                  Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
+              child: AppBanner(
+                tone: context.tokens.info,
+                icon: Icons.visibility_outlined,
+                message: l[KApp.viewerReadOnly],
+              ),
+            ),
           if (_planEndKind case final kind?) _planEndStrip(l, kind),
           _monthBar(context, l),
           if (_members.isEmpty && _loading)
@@ -2035,7 +2060,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                           availableHeight: box.maxHeight,
                           // U-40: only the month whose rows are in hand can
                           // say it is empty — a neighbour page gets nothing.
-                          emptyPrompt: isVisible
+                          emptyPrompt: isVisible && !_iAmViewer
                               ? _emptyPrompt
                               : EmptyMonthPrompt.none,
                           horizonNote: _horizonSentence(l),
@@ -2216,7 +2241,8 @@ class _Legend extends StatelessWidget {
     // F-27/S-11: colors are per member still IN the family (persistent
     // color_slot). F-56: a pending member has a colour and a place in the key,
     // marked so the legend does not claim someone who has not joined.
-    final active = members.where((m) => !m.hasLeft).toList()
+    // F-50: a viewer has no colour and is never on a day — no key for it.
+    final active = members.where((m) => !m.hasLeft && !m.isViewer).toList()
       ..sort((a, b) => (a.colorSlot ?? 9).compareTo(b.colorSlot ?? 9));
     // U-28 QA: it WRAPS, it does not scroll.
     //

@@ -504,6 +504,27 @@ abstract final class KApp {
   static const String agendaPdfSection = 'app.agenda.pdfSection';
   static const String agendaPdfLead = 'app.agenda.pdfLead';
   static const String agendaPdfEmpty = 'app.agenda.pdfEmpty';
+
+  // ── F-50: the Visualizador ──
+  static const String viewerBadge = 'app.viewer.badge';
+  static const String viewerSection = 'app.viewer.section';
+  static const String viewerInviteButton = 'app.viewer.inviteButton';
+  static const String viewerReadOnly = 'app.viewer.readOnly';
+  static const String viewerInviteLead = 'app.viewer.inviteLead';
+  static const String viewerInviteNeedsEmail = 'app.viewer.inviteNeedsEmail';
+  static const String viewerFreeCapOne = 'app.viewer.freeCapOne';
+  static const String viewerFreeCapMany = 'app.viewer.freeCapMany';
+  static const String viewerMaxCap = 'app.viewer.maxCap';
+  static const String viewerInviteSent = 'app.viewer.inviteSent';
+  static const String viewerPromote = 'app.viewer.promote';
+  static const String viewerPromoteConfirm = 'app.viewer.promoteConfirm';
+  static const String viewerPromoted = 'app.viewer.promoted';
+  static const String viewerRemove = 'app.viewer.remove';
+  static const String viewerRemoveConfirm = 'app.viewer.removeConfirm';
+  static const String viewerRemoved = 'app.viewer.removed';
+  static const String viewerLeaveBody = 'app.viewer.leaveBody';
+  static const String viewerLeaveButton = 'app.viewer.leaveButton';
+  static const String viewerInvitedBody = 'app.viewer.invitedBody';
   static const String agendaNotifyLabel = 'app.agenda.notifyLabel';
   static const String agendaNotifyNone = 'app.agenda.notifyNone';
   static const String agendaNotifySelf = 'app.agenda.notifySelf';
@@ -853,6 +874,25 @@ abstract final class KApp {
     agendaPdfSection,
     agendaPdfLead,
     agendaPdfEmpty,
+    viewerBadge,
+    viewerSection,
+    viewerInviteButton,
+    viewerReadOnly,
+    viewerInviteLead,
+    viewerInviteNeedsEmail,
+    viewerFreeCapOne,
+    viewerFreeCapMany,
+    viewerMaxCap,
+    viewerInviteSent,
+    viewerPromote,
+    viewerPromoteConfirm,
+    viewerPromoted,
+    viewerRemove,
+    viewerRemoveConfirm,
+    viewerRemoved,
+    viewerLeaveBody,
+    viewerLeaveButton,
+    viewerInvitedBody,
     agendaNotifyLabel,
     agendaNotifyNone,
     agendaNotifySelf,
@@ -1354,6 +1394,25 @@ abstract final class StringsAppPtBr {
     KApp.agendaPdfSection: '5. Agenda da criança',
     KApp.agendaPdfLead: 'O que a família registrou na agenda para os dias do período. A agenda não muda o planejamento: não troca quem fica com a criança em nenhum dia.',
     KApp.agendaPdfEmpty: 'Nenhum item na agenda no período.',
+    KApp.viewerBadge: 'Visualizador',
+    KApp.viewerSection: 'Visualizadores',
+    KApp.viewerInviteButton: 'Convidar visualizador',
+    KApp.viewerReadOnly: 'Você é visualizador: acompanha o plano da família sem alterar nada.',
+    KApp.viewerInviteLead: 'O visualizador vê o calendário, a agenda e os relatórios, e recebe no app e no celular as notificações informativas. Não altera nada, não entra em trocas, não vê as mensagens das trocas e não recebe e-mail.',
+    KApp.viewerInviteNeedsEmail: 'Para convidar um visualizador, informe o e-mail.',
+    KApp.viewerFreeCapOne: 'No plano gratuito, a família inclui {0} visualizador. Para convidar mais, ative o Premium.',
+    KApp.viewerFreeCapMany: 'No plano gratuito, a família inclui {0} visualizadores. Para convidar mais, ative o Premium.',
+    KApp.viewerMaxCap: 'A família já tem {0} visualizadores, o limite.',
+    KApp.viewerInviteSent: 'Convite de visualizador enviado.',
+    KApp.viewerPromote: 'Promover a responsável',
+    KApp.viewerPromoteConfirm: 'Promover {0} a responsável? {0} passa a poder cuidar de dias, pedir e aprovar trocas, e ganha uma cor. Um responsável não volta a ser visualizador.',
+    KApp.viewerPromoted: '{0} agora é responsável.',
+    KApp.viewerRemove: 'Remover visualizador',
+    KApp.viewerRemoveConfirm: 'Remover {0}? A conta de {0} é apagada na hora, com tudo o que era dela.',
+    KApp.viewerRemoved: '{0} foi removido da família.',
+    KApp.viewerLeaveBody: 'Como visualizador, ao sair você é apagado na hora: sua conta e seus dados. Nada no histórico da família depende de você.',
+    KApp.viewerLeaveButton: 'Sair e apagar minha conta',
+    KApp.viewerInvitedBody: '{0} convidou você para acompanhar o calendário da família {1} como visualizador: você vê o plano, a agenda e as notificações informativas, sem alterar nada.',
     KApp.agendaNotifyLabel: 'Notificar',
     KApp.agendaNotifyNone: 'Ninguém',
     KApp.agendaNotifySelf: 'Só eu',
@@ -1850,6 +1909,25 @@ abstract final class StringsAppEn {
     KApp.agendaPdfSection: '5. The child\'s agenda',
     KApp.agendaPdfLead: 'What the family recorded on the agenda for the days of the period. The agenda does not change the plan: it never changes who has the child on any day.',
     KApp.agendaPdfEmpty: 'No agenda items in the period.',
+    KApp.viewerBadge: 'Viewer',
+    KApp.viewerSection: 'Viewers',
+    KApp.viewerInviteButton: 'Invite viewer',
+    KApp.viewerReadOnly: 'You are a viewer: you follow the family\'s plan without changing anything.',
+    KApp.viewerInviteLead: 'A viewer sees the calendar, the agenda and the reports, and gets the informative notifications in the app and on the phone. They change nothing, take no part in swaps, do not see the swap messages and get no e-mail.',
+    KApp.viewerInviteNeedsEmail: 'To invite a viewer, enter their e-mail.',
+    KApp.viewerFreeCapOne: 'On the free plan, the family includes {0} viewer. To invite more, activate Premium.',
+    KApp.viewerFreeCapMany: 'On the free plan, the family includes {0} viewers. To invite more, activate Premium.',
+    KApp.viewerMaxCap: 'The family already has {0} viewers, the limit.',
+    KApp.viewerInviteSent: 'Viewer invitation sent.',
+    KApp.viewerPromote: 'Promote to caregiver',
+    KApp.viewerPromoteConfirm: 'Promote {0} to caregiver? {0} will be able to hold days, request and approve swaps, and gets a colour. A caregiver never goes back to being a viewer.',
+    KApp.viewerPromoted: '{0} is now a caregiver.',
+    KApp.viewerRemove: 'Remove viewer',
+    KApp.viewerRemoveConfirm: 'Remove {0}? {0}\'s account is deleted right away, with everything that was theirs.',
+    KApp.viewerRemoved: '{0} was removed from the family.',
+    KApp.viewerLeaveBody: 'As a viewer, leaving deletes you right away: your account and your data. Nothing in the family history depends on you.',
+    KApp.viewerLeaveButton: 'Leave and delete my account',
+    KApp.viewerInvitedBody: '{0} invited you to follow the {1} family\'s calendar as a viewer: you see the plan, the agenda and the informative notifications, without changing anything.',
     KApp.agendaNotifyLabel: 'Notify',
     KApp.agendaNotifyNone: 'Nobody',
     KApp.agendaNotifySelf: 'Only me',
