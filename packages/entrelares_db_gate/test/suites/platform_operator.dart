@@ -49,6 +49,8 @@ const _usageReportKeys = {
   'routines', 'events_from_routine',
   // F-55 PR 4: the reminders — counts only
   'with_reminder', 'reminders_sent',
+  // F-50: the viewers — the category per member and counts per family
+  'membership', 'viewers_used', 'viewers_cap', 'viewer_invitations_open',
 };
 
 Set<String> _keysOf(Object? node) => switch (node) {

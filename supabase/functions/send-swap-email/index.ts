@@ -316,7 +316,7 @@ async function handleInvitationEmail(
 ): Promise<Response> {
   const { data, error } = await supabase
     .from("family_invitations")
-    .select("id, family_id, email, token, created_at, expires_at, accepted_at, revoked_at, profile_id, families(name), profiles!family_invitations_invited_by_fkey(full_name, language_effective), roles(role, label_pt)")
+    .select("id, family_id, email, token, created_at, expires_at, accepted_at, revoked_at, profile_id, member_type, families(name), profiles!family_invitations_invited_by_fkey(full_name, language_effective), roles(role, label_pt)")
     .eq("id", invitationId)
     .single();
 
@@ -369,7 +369,8 @@ async function handleInvitationEmail(
     subject: t.subjInvitation(inviterName),
     // F-56: an invitation FOR a pending member states what stays (the admin's
     // name/role, as family data) and what is purged (the e-mail).
-    html: templateInvitation(lang, inviterName, familyName, roleName, inviteLink, expiresBr, validDays, data.profile_id != null),
+    // F-50: a viewer is told, before signing up, that it will only follow the plan.
+    html: templateInvitation(lang, inviterName, familyName, roleName, inviteLink, expiresBr, validDays, data.profile_id != null, data.member_type === "viewer"),
   });
 
   // F-38: admin heads-up when this invitation crossed the 80% / último milestone.
@@ -773,13 +774,13 @@ function templateReminder(lang: Lang, date: string, handoffTime: string | null, 
   );
 }
 
-function templateInvitation(lang: Lang, inviterName: string, familyName: string, roleName: string, inviteLink: string, expiresBr: string, validDays: number, forPlaceholder = false): string {
+function templateInvitation(lang: Lang, inviterName: string, familyName: string, roleName: string, inviteLink: string, expiresBr: string, validDays: number, forPlaceholder = false, asViewer = false): string {
   const t = swapText(lang);
   const roleLine = roleName ? paragraph(t.invitationRole(roleName)) : "";
   const privacy = forPlaceholder ? t.invitationPrivacyPlaceholder : t.invitationPrivacy;
   return baseTemplate(lang, t.invitationTitle,
     `${heading(t.invitationHeading)}
-     ${paragraph(t.invitationBody(inviterName, familyName))}
+     ${paragraph((asViewer ? t.invitationBodyViewer : t.invitationBody)(inviterName, familyName))}
      ${roleLine}
      ${paragraph(t.invitationExpiry(validDays, expiresBr), "last")}
      ${button(inviteLink, t.invitationButton)}

@@ -36,6 +36,11 @@ class Member {
   /// for display (built-ins translate, F-41 custom roles pass through).
   final int? roleId;
 
+  /// F-50: `full` (a caregiver) or `viewer` (sees the plan, writes nothing,
+  /// never on a day, never a swap party, never admin, no colour). The
+  /// database enforces every one of those; the client only mirrors them.
+  final String membershipType;
+
   /// The address on the profile row. Read-only in this client; changing it is
   /// a sudo-gated flow of its own.
   final String? email;
@@ -83,6 +88,7 @@ class Member {
     this.languageDetected,
     this.isAdmin = false,
     this.roleId,
+    this.membershipType = 'full',
     this.email,
     this.deletionScheduledFor,
     this.joinedViaInvite = false,
@@ -108,6 +114,9 @@ class Member {
   /// colour; the name stays on the history.
   bool get hasLeft => leftAt != null;
 
+  /// F-50: a Visualizador — reads, never writes.
+  bool get isViewer => membershipType == 'viewer';
+
   factory Member.fromJson(Map<String, dynamic> json) => Member(
         id: json['id'] as int,
         familyId: json['family_id'] as int?,
@@ -119,6 +128,7 @@ class Member {
         languageDetected: json['language_detected'] as String?,
         isAdmin: (json['is_admin'] as bool?) ?? false,
         roleId: json['role_id'] as int?,
+        membershipType: (json['membership_type'] as String?) ?? 'full',
         email: json['email'] as String?,
         deletionScheduledFor: json['deletion_scheduled_for'] == null
             ? null
@@ -150,6 +160,7 @@ class Member {
         'language_detected': languageDetected,
         'is_admin': isAdmin,
         'role_id': roleId,
+        'membership_type': membershipType,
         'email': email,
         'deletion_scheduled_for': deletionScheduledFor?.toIso8601String(),
         'joined_via_invite': joinedViaInvite,
