@@ -38,7 +38,7 @@ void childrenTests(GateFixture fx) {
               .from('children')
               .select()
               .eq('family_id', familyId)
-              .order('sort_order'))
+              .order('sort_order', ascending: true))
           .cast<Map<String, dynamic>>();
 
   group('F-55 · children', () {

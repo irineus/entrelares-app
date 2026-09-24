@@ -1554,8 +1554,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     final rows = await _client
         .from('children')
         .select()
-        .order('sort_order')
-        .order('id');
+        // postgrest-dart orders DESCENDING unless told otherwise.
+        .order('sort_order', ascending: true)
+        .order('id', ascending: true);
     return rows.map(Child.fromJson).toList();
   }
 
