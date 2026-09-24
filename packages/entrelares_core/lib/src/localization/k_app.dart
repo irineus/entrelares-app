@@ -444,6 +444,26 @@ abstract final class KApp {
   static const String pdfDayAccountCorrectionLine = 'app.dayAccount.pdfCorrectionLine';
 
   /// See `K.allKeys`.
+  // ── F-55 the child entity (PR 1): the Família row and its page; only an
+  //    admin writes, every member reads. The name is family data, shown as
+  //    typed in both languages. ──
+  static const String famChildRow = 'app.fam.childRow';
+  static const String famChildRowEmpty = 'app.fam.childRowEmpty';
+  static const String childAnd = 'app.child.and';
+  static const String childTitle = 'app.child.title';
+  static const String childLead = 'app.child.lead';
+  static const String childEmpty = 'app.child.empty';
+  static const String childAdminOnly = 'app.child.adminOnly';
+  static const String childNameLabel = 'app.child.nameLabel';
+  static const String childAdd = 'app.child.add';
+  static const String childRename = 'app.child.rename';
+  static const String childRemove = 'app.child.remove';
+  static const String childRemoveConfirm = 'app.child.removeConfirm';
+  static const String childAdded = 'app.child.added';
+  static const String childRenamed = 'app.child.renamed';
+  static const String childRemoved = 'app.child.removed';
+  static const String childErrLoad = 'app.child.errLoad';
+
   static const List<String> allKeys = [
     sessionRestoredExpired,
     sessionExpired,
@@ -712,6 +732,22 @@ abstract final class KApp {
     pdfDayAccountsEmpty,
     pdfDayAccountLine,
     pdfDayAccountCorrectionLine,
+    famChildRow,
+    famChildRowEmpty,
+    childAnd,
+    childTitle,
+    childLead,
+    childEmpty,
+    childAdminOnly,
+    childNameLabel,
+    childAdd,
+    childRename,
+    childRemove,
+    childRemoveConfirm,
+    childAdded,
+    childRenamed,
+    childRemoved,
+    childErrLoad,
   ];
 }
 
@@ -1131,6 +1167,23 @@ abstract final class StringsAppPtBr {
         'Sobre {0} — registrado por {1} em {2}.',
     KApp.pdfDayAccountCorrectionLine:
         'Sobre {0} — correção registrada por {1} em {2}.',
+    // ── F-55 the child entity ──
+    KApp.famChildRow: 'Criança',
+    KApp.famChildRowEmpty: 'Nenhuma criança cadastrada',
+    KApp.childAnd: 'e',
+    KApp.childTitle: 'Criança',
+    KApp.childLead: 'Só o primeiro nome. O relatório e a agenda do dia usam este nome.',
+    KApp.childEmpty: 'Nenhuma criança cadastrada ainda.',
+    KApp.childAdminOnly: 'Só um administrador da família cadastra ou muda a criança.',
+    KApp.childNameLabel: 'Primeiro nome',
+    KApp.childAdd: 'Cadastrar a criança',
+    KApp.childRename: 'Mudar o nome',
+    KApp.childRemove: 'Remover',
+    KApp.childRemoveConfirm: 'Remover {0} da família?',
+    KApp.childAdded: 'Criança cadastrada.',
+    KApp.childRenamed: 'Nome atualizado.',
+    KApp.childRemoved: 'Criança removida.',
+    KApp.childErrLoad: 'Não foi possível carregar a criança.',
   };
 }
 
@@ -1545,5 +1598,22 @@ abstract final class StringsAppEn {
         'About {0} — recorded by {1} on {2}.',
     KApp.pdfDayAccountCorrectionLine:
         'About {0} — correction recorded by {1} on {2}.',
+    // ── F-55 the child entity ──
+    KApp.famChildRow: 'Child',
+    KApp.famChildRowEmpty: 'No child added yet',
+    KApp.childAnd: 'and',
+    KApp.childTitle: 'Child',
+    KApp.childLead: 'First name only. The report and the day agenda use this name.',
+    KApp.childEmpty: 'No child added yet.',
+    KApp.childAdminOnly: 'Only a family administrator adds or changes the child.',
+    KApp.childNameLabel: 'First name',
+    KApp.childAdd: 'Add the child',
+    KApp.childRename: 'Change the name',
+    KApp.childRemove: 'Remove',
+    KApp.childRemoveConfirm: 'Remove {0} from the family?',
+    KApp.childAdded: 'Child added.',
+    KApp.childRenamed: 'Name updated.',
+    KApp.childRemoved: 'Child removed.',
+    KApp.childErrLoad: 'The child could not be loaded.',
   };
 }

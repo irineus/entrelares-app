@@ -69,6 +69,11 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       widget.now().year, widget.now().month, widget.now().day);
 
   final _childName = TextEditingController();
+
+  /// F-55: with the flag on and a child registered, the PDF prints the
+  /// registered name(s) and the free field disappears (owner, 24/09/2026).
+  /// Null keeps today's free field — flag off, or no child yet.
+  String? _registeredChildNames;
   bool _includeFutureSwaps = false;
 
   CustodyReport? _report;
@@ -94,9 +99,11 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
     try {
       final me = await widget.dataSource.fetchOwnProfile();
       final family = await widget.dataSource.fetchOwnFamily();
+      final registered = await _loadRegisteredChildNames();
       if (!mounted) return;
       setState(() {
         _me = me;
+        _registeredChildNames = registered;
         // F-32 mirror, fail-closed: no family row → free.
         _isPremium = Family.isPremiumFamily(family, widget.now().toUtc());
         _loading = false;
@@ -107,6 +114,22 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         _loadErrorRaw = e.toString();
         _loading = false;
       });
+    }
+  }
+
+  /// Best-effort: a failure keeps the free field, which is how the PDF has
+  /// always named the child.
+  Future<String?> _loadRegisteredChildNames() async {
+    try {
+      final settings =
+          PublicSettings(await widget.dataSource.fetchPublicSettings());
+      if (!settings.childAgendaEnabled) return null;
+      final children = await widget.dataSource.fetchChildren();
+      if (!mounted) return null;
+      return ChildRules.joinNames([for (final c in children) c.firstName],
+          and: AppL10n.of(context).l[KApp.childAnd]);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -177,7 +200,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
 
       final report = buildCustodyReport(
         familyName: family?.name ?? l[K.pdfDocFallbackFamily],
-        childName: _childName.text,
+        childName: _registeredChildNames ?? _childName.text,
         start: start,
         end: end,
         today: widget.now(),
@@ -437,12 +460,19 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
                   ],
                 ),
               const SizedBox(height: 8),
-              AppTextField(
-                label: '${l[K.pdfChildName]} ${l[K.pdfChildOptional]}',
-                hint: l[K.pdfChildPlaceholder],
-                controller: _childName,
-                maxLength: 80,
-              ),
+              if (_registeredChildNames == null)
+                AppTextField(
+                  label: '${l[K.pdfChildName]} ${l[K.pdfChildOptional]}',
+                  hint: l[K.pdfChildPlaceholder],
+                  controller: _childName,
+                  maxLength: 80,
+                )
+              else
+                AppListRow(
+                  key: const ValueKey('pdf-registered-child'),
+                  label: l[K.pdfChildName],
+                  value: _registeredChildNames,
+                ),
               // U-20: the same option as the on-screen Resumo — the numbers of
               // the two must agree.
               SwitchListTile(

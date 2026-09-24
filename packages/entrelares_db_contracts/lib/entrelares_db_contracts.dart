@@ -24,6 +24,7 @@ export 'models/account_log.dart';
 export 'models/activity_log.dart';
 export 'models/app_notification.dart';
 export 'models/care_schedule.dart';
+export 'models/child.dart';
 export 'models/day_account.dart';
 export 'models/day_notice.dart';
 export 'models/family.dart';
