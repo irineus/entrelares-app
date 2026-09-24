@@ -62,7 +62,7 @@ cd app && fvm flutter run -d web-server --web-port 8080
 # E2E (lote 3): app real em emulador contra o projeto dev — exige a service_role key
 cd app && fvm flutter test integration_test/swap_workflow_test.dart \
   --flavor dev --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev>
-# Gate de banco: 389 testes de RLS/RPC/trigger contra o projeto dev, com família
+# Gate de banco: 390 testes de RLS/RPC/trigger contra o projeto dev, com família
 # descartável. Exige a service_role do DEV (nunca a de produção); sem ela a suíte
 # aborta com instruções em vez de rodar pela metade.
 cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm dart test

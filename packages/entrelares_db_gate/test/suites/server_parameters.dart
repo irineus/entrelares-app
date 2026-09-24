@@ -92,6 +92,26 @@ void serverParametersTests(GateFixture fx) {
       await expectRejected(
           () => setSetting('session.idle_timeout_minutes', '4'),
           contains: 'de 5 a 240 minutos');
+      // T-83 (2/4)
+      await expectRejected(
+          () => setSetting('sync.poll_seconds_degraded', '9'),
+          contains: 'de 10 a 120 segundos');
+      await expectRejected(
+          () => setSetting('sync.poll_seconds_healthy', '601'),
+          contains: 'de 0 a 600 segundos');
+    });
+
+    test('the healthy poll is off or never more frequent than the degraded one',
+        () async {
+      // In range on its own (0–600), refused as a pair: with the socket up the
+      // poll is a safety net, never busier than the poll that replaces it.
+      await expectRejected(
+          () => setSetting('sync.poll_seconds_healthy', '20'),
+          contains: 'sync.poll_seconds_degraded');
+      // 0 is the documented "off", and is accepted.
+      await withSetting('sync.poll_seconds_healthy', '0', () async {
+        expect(await getSetting('sync.poll_seconds_healthy'), '0');
+      });
     });
   });
 }

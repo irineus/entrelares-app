@@ -12,6 +12,7 @@ library;
 import 'date_math.dart';
 import 'day_protection_rules.dart';
 import 'localization/k.dart';
+import 'settings_rules.dart';
 
 // ── F-20/F-22: the dynamic priority tag ──────────────────────────────────────
 
@@ -259,18 +260,28 @@ List<SwapRequestView> selectedSentByMe({
   ];
 }
 
-// ── F-23: the safety-poll cadence (mirror of Home.razor's constants) ────────
+// ── F-23: the safety-poll cadence ────────────────────────────────────────────
 // The poll survives the native Realtime until the socket proves itself under
-// real load (owner decision, 19/08/2026); removal is a future board decision.
+// real load (owner decision, 19/08/2026). T-83 (24/09/2026) made its cadence —
+// and its removal — a console decision: `sync.poll_seconds_degraded` and
+// `sync.poll_seconds_healthy` (0 = no poll while the socket is up).
 
-/// While the socket is DOWN the poll is the only fresh-data path: 25 s.
+/// The seed while the socket is DOWN (the only fresh-data path): 25 s.
 const int pollIntervalMsDown = 25000;
 
-/// With a healthy socket the poll is only a safety net: 120 s.
+/// The seed with a healthy socket (only a safety net): 120 s.
 const int pollIntervalMsHealthy = 120000;
 
-int pollIntervalMs({required bool socketConnected}) =>
-    socketConnected ? pollIntervalMsHealthy : pollIntervalMsDown;
+/// Milliseconds to the next poll, or null for NO poll (a healthy socket with
+/// the healthy key at 0). With the socket down there is always a poll.
+int? pollIntervalMs({
+  required bool socketConnected,
+  PublicSettings settings = PublicSettings.unloaded,
+}) {
+  if (!socketConnected) return settings.pollSecondsDegraded * 1000;
+  final healthy = settings.pollSecondsHealthy;
+  return healthy <= 0 ? null : healthy * 1000;
+}
 
 /// Mirror of `NavMenu.GetUnreadBadgeText`: the bell badge caps at "99+".
 /// ⚠️ The count is the OPEN REQUESTS AWAITING ME (`fetchPendingForMe`), not
