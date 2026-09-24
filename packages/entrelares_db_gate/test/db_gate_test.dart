@@ -43,6 +43,7 @@ import 'suites/notification_params.dart';
 import 'suites/oauth_onboarding.dart';
 import 'suites/optimistic_concurrency.dart';
 import 'suites/pending_member.dart';
+import 'suites/public_settings.dart';
 import 'suites/plan_end_reminders.dart';
 import 'suites/planning_horizon_gate.dart';
 import 'suites/platform_operator.dart';
@@ -133,6 +134,7 @@ void main() {
   sessionHasPasswordTests(fx);
   customRoleTests(fx);
   appSettingsTests(fx);
+  publicSettingsTests(fx);
   edgeFunctionAuthTests(fx);
   notificationParamsTests(fx);
   pushSubscriptionsTests(fx);

@@ -17,7 +17,7 @@
 # role). Anything a LOGGED-IN user calls keeps verification on, so the platform
 # rejects an anonymous request before our code runs.
 
-FUNCTIONS_NO_JWT="send-swap-email auto-approve-expired register-invitee purge-deleted send-account-email billing-webhook billing-store-verify billing-store-webhook send-auth-email send-push-notification send-support-request plan-end-reminders"
+FUNCTIONS_NO_JWT="send-swap-email auto-approve-expired register-invitee purge-deleted send-account-email billing-webhook billing-store-verify billing-store-webhook send-auth-email send-push-notification send-support-request plan-end-reminders public-settings"
 FUNCTIONS_WITH_JWT="elevate billing-checkout admin-update-member-email claim-invitation"
 
 # esm.sh 522s and rate limits have taken whole runs down on transient failure

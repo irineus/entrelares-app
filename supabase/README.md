@@ -313,6 +313,21 @@ select jobname, schedule from cron.job where jobname = 'plan-end-reminders-daily
 select * from public.plan_end_reminders order by sent_at desc limit 20;
 ```
 
+### 4.7 The `public-settings` feed (T-81) — what the landing may read
+
+`GET /functions/v1/public-settings`, **no credential** (`verify_jwt = false`),
+answers `{"values": {...}, "updated_at": ...}` with the `app_settings` rows marked
+`landing_visible` — and nothing else. The column implies `is_public` (CHECK
+`app_settings_landing_is_public`), so a server-only value cannot be published by
+mistake; the whitelist is pinned by the gate (`public_settings.dart`), so adding a
+key to the internet is a deliberate diff there AND a migration. `max-age=60`,
+`ETag` = digest of the body (not `updated_at`, which a migration may leave
+behind), `304` on `If-None-Match`, `405` for anything but GET, no CORS: the
+consumer is the landing's Worker and its deploy job (L-34). Check a project:
+```powershell
+curl.exe -s https://jptqbwfziyzlhlmoekzu.supabase.co/functions/v1/public-settings
+```
+
 ---
 
 ## 5. Authentication settings & e-mail templates (F-15 sign-up)
