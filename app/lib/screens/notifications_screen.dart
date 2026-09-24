@@ -729,7 +729,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           horizontal: Spacing.sm + Spacing.xs, vertical: Spacing.sm - 2),
       child: AppCard(
         key: ValueKey('day-notice-${notice.id}'),
-        onTap: () => _answerNotice(notice, sentence),
+        // F-50: a Visualizador reads the aviso and answers nothing.
+        onTap: _ownProfile?.isViewer == true
+            ? null
+            : () => _answerNotice(notice, sentence),
         padding: const EdgeInsets.symmetric(
             horizontal: Spacing.md, vertical: Spacing.sm + Spacing.xs),
         child: Row(
@@ -934,7 +937,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// whose params the rule cannot read offers nothing and still renders.
   Widget? _planAction(AppNotification notif, Localization l) {
     final onPlanFrom = widget.onPlanFrom;
-    if (onPlanFrom == null) return null;
+    if (onPlanFrom == null || _ownProfile?.isViewer == true) return null;
     final start =
         PlanEndRules.actionStart(notif.type, notif.paramsJson, DateTime.now());
     if (start == null) return null;

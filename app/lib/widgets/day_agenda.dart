@@ -97,7 +97,9 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
       AgendaRules.canWriteDay(widget.date, widget.today) &&
       !widget.offline &&
       widget.me != null &&
-      !widget.me!.hasLeft;
+      !widget.me!.hasLeft &&
+      // F-50: a Visualizador reads the agenda and writes nothing.
+      !widget.me!.isViewer;
 
   bool get _freeLimited => AgendaRules.freeLimited(
       isPremium: widget.isPremium ?? true,

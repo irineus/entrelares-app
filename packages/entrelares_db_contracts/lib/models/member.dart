@@ -187,5 +187,6 @@ class Member {
         colorSlot: colorSlot,
         isActiveMember: isActiveMember,
         isPendingMember: isPendingMember,
+        isViewer: isViewer,
       );
 }

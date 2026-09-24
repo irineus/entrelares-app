@@ -311,11 +311,15 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
           Text(
             // Family and inviter names are free text: rendered as TEXT, never
             // as markup (U-13 rule inherited from the web).
-            l.format(K.registerInvitedBody, [
-              invite.inviterName,
-              invite.familyName,
-              RoleCatalog.translate(invite.roleName, l.current),
-            ]),
+            // F-50: a viewer is told, before signing up, that it only follows.
+            invite.isViewer
+                ? l.format(KApp.viewerInvitedBody,
+                    [invite.inviterName, invite.familyName])
+                : l.format(K.registerInvitedBody, [
+                    invite.inviterName,
+                    invite.familyName,
+                    RoleCatalog.translate(invite.roleName, l.current),
+                  ]),
             textAlign: TextAlign.center,
           ),
         ] else ...[

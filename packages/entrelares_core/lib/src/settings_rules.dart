@@ -64,6 +64,9 @@ class PublicSettings {
   int get calendarMonthsPremium => _int('calendar_months_premium', 24);
   int get freeCaregivers => _int('free_caregivers', 2);
   int get maxCaregivers => _int('max_caregivers', 4);
+  // F-50: the viewer caps, outside the caregiver seats.
+  int get freeViewers => _int('free_viewers', 1);
+  int get maxViewers => _int('max_viewers', 4);
   int get overrideFreeDays => _int('override_free_days', 7);
   int get overridePremiumMonths => _int('override_premium_months', 6);
 
@@ -93,6 +96,7 @@ class PublicSettings {
   // turned on in dev; the SERVER refuses every write of a module whose flag
   // is off, the client only hides it.
   /// F-55 — the child entity and the day agenda.
+  bool get viewersEnabled => parseBoolSetting(values, 'feature.viewers', false);
   bool get childAgendaEnabled =>
       parseBoolSetting(values, 'feature.child_agenda', false);
 

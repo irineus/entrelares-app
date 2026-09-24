@@ -538,6 +538,25 @@ abstract class CustodyDataSource {
 
   Future<void> revokeInvitation(int invitationId);
 
+  // ── F-50: the Visualizador ───────────────────────────────────────────────
+
+  /// `create_viewer_invitation` — admin only, `feature.viewers` on, the viewer
+  /// caps (`free_viewers` / `max_viewers`), never a caregiver seat. Returns the
+  /// invitation id (the e-mail goes out through [sendInvitationEmail]).
+  Future<int> createViewerInvitation({required String email, required int roleId});
+
+  /// `promote_member_to_full` — admin only; needs a caregiver seat AND a free
+  /// colour. There is no way back.
+  Future<void> promoteMemberToFull(int profileId);
+
+  /// `remove_viewer` — admin only. The viewer is deleted outright, account
+  /// included.
+  Future<void> removeViewer(int profileId);
+
+  /// `leave_family_as_viewer` — the viewer leaves: deleted outright, account
+  /// included. Sudo-gated.
+  Future<void> leaveFamilyAsViewer();
+
   /// Best-effort: the invitation exists either way, and the copyable link is
   /// the fallback the page always shows. Returns whether the mail went out.
   Future<bool> sendInvitationEmail(int invitationId);

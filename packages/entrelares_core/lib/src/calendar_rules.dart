@@ -41,17 +41,21 @@ class MemberView {
   /// approve a swap. Never true together with [isActiveMember].
   final bool isPendingMember;
 
+  /// F-50: a Visualizador — in the family, never on a day, no colour.
+  final bool isViewer;
+
   const MemberView({
     required this.id,
     required this.fullName,
     this.colorSlot,
     this.isActiveMember = true,
     this.isPendingMember = false,
+    this.isViewer = false,
   });
 
-  /// Still in the family: active or pending. What "assignable to a day"
-  /// means — the S-11 tombstone is the only state that is neither.
-  bool get isAssignable => isActiveMember || isPendingMember;
+  /// Still in the family and able to hold a day: an active or pending
+  /// caregiver. The S-11 tombstone is neither, and a viewer (F-50) never is.
+  bool get isAssignable => (isActiveMember || isPendingMember) && !isViewer;
 }
 
 /// How a calendar day cell paints. Mirrors GetDayCssClass: the color follows

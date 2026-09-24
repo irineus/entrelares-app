@@ -134,6 +134,12 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
   // F-56: the form names the person first — that name IS the placeholder.
   final _inviteName = TextEditingController();
   int _inviteRoleId = 0;
+
+  // F-50: the viewer invitation form.
+  final TextEditingController _viewerEmail = TextEditingController();
+  int _viewerRoleId = 0;
+  bool _sendingViewer = false;
+  String? _viewerErrorKey;
   String? _inviteErrorKey;
   bool _sendingInvite = false;
 
@@ -174,25 +180,35 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     _nameDraft.dispose();
     _inviteEmail.dispose();
     _inviteName.dispose();
+    _viewerEmail.dispose();
     super.dispose();
   }
 
   bool get _isAdmin => _me?.isAdmin == true;
 
   int get _activeMemberCount =>
-      _members.where((m) => m.isActiveMember).length;
+      _members.where((m) => m.isActiveMember && !m.isViewer).length;
 
   /// F-56: a seat is held by everyone still IN the family — a pending member
   /// (invited, not yet joined) as much as a live one. Only the S-11 tombstone
   /// holds none.
-  int get _seatedMemberCount => _members.where((m) => !m.hasLeft).length;
+  int get _seatedMemberCount =>
+      _members.where((m) => !m.hasLeft && !m.isViewer).length;
+
+  /// F-50: viewers in the family plus open viewer invitations — the server's
+  /// `viewer_count()`, outside the caregiver seats.
+  int get _viewersTaken {
+    final now = DateTime.now().toUtc();
+    return _members.where((m) => m.isViewer && !m.hasLeft).length +
+        _invitations.where((i) => i.isViewer && i.isPending(now)).length;
+  }
 
   /// Open invitations that are NOT a placeholder's: a placeholder's invitation
   /// is the placeholder's seat, already counted above.
   int get _pendingInvitationCount {
     final now = DateTime.now().toUtc();
     return _invitations
-        .where((i) => i.profileId == null && i.isPending(now))
+        .where((i) => i.profileId == null && !i.isViewer && i.isPending(now))
         .length;
   }
 
@@ -629,6 +645,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             ..._members.map((m) => _memberCard(m, l)),
             const SizedBox(height: 24),
             _inviteSection(l),
+            if (_isAdmin && _settings.viewersEnabled) _viewerSection(l),
             // U-35: the three things that are not the family, one tap away.
             // The plan row is for everyone (the state is the family's); the
             // mode is the admin's tool; the deletion row appears only while
@@ -758,6 +775,11 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                   if (member.isAdmin)
                     AppBadge(
                         text: l[K.famAdminBadge], tone: context.tokens.accent),
+                  if (member.isViewer)
+                    AppBadge(
+                        key: ValueKey('viewer-badge-${member.id}'),
+                        text: l[KApp.viewerBadge],
+                        tone: context.tokens.info),
                 ],
               ),
               // F-56: what a placeholder is. The admin's two moves on it live
@@ -775,11 +797,81 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         // that slot; the tile still opens the profile on tap.
         trailing: member.isPendingMember && _isAdmin
             ? _memberMenu(member, l)
+            : member.isViewer && !member.hasLeft && _isAdmin
+            ? _viewerMenu(member, l)
             : canOpen
                 ? const Icon(Icons.chevron_right)
                 : null,
       ),
     );
+  }
+
+  /// F-50: the admin's moves on a viewer — promote (one way) and remove
+  /// (a complete delete). Both ask first.
+  Widget _viewerMenu(Member member, Localization l) {
+    return PopupMenuButton<_MemberAction>(
+      key: FamilyScreen.memberMenuKey(member.id),
+      tooltip: l[KApp.commonMoreActions],
+      icon: const Icon(Icons.more_vert),
+      onSelected: (action) => switch (action) {
+        _MemberAction.promote => _promoteViewer(member, l),
+        _MemberAction.removeViewer => _removeViewer(member, l),
+        _ => null,
+      },
+      itemBuilder: (context) => [
+        if (_settings.viewersEnabled)
+          PopupMenuItem(
+            value: _MemberAction.promote,
+            child: _menuRow(Icons.upgrade, l[KApp.viewerPromote]),
+          ),
+        PopupMenuItem(
+          value: _MemberAction.removeViewer,
+          child: _menuRow(Icons.person_remove_outlined, l[KApp.viewerRemove],
+              danger: true),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _promoteViewer(Member member, Localization l) async {
+    final confirmed = await _confirmDestructive(
+      title: l[KApp.viewerPromote],
+      message: l.format(KApp.viewerPromoteConfirm, [member.fullName]),
+      yesLabel: l[KApp.viewerPromote],
+      l: l,
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await widget.dataSource.promoteMemberToFull(member.id);
+      if (!mounted) return;
+      showAppSnack(context, l.format(KApp.viewerPromoted, [member.fullName]),
+          type: AppSnackType.success);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
+  }
+
+  Future<void> _removeViewer(Member member, Localization l) async {
+    final confirmed = await _confirmDestructive(
+      title: l[KApp.viewerRemove],
+      message: l.format(KApp.viewerRemoveConfirm, [member.fullName]),
+      yesLabel: l[KApp.viewerRemove],
+      l: l,
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await widget.dataSource.removeViewer(member.id);
+      if (!mounted) return;
+      showAppSnack(context, l.format(KApp.viewerRemoved, [member.fullName]));
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
   }
 
   /// U-47: the admin's moves on a placeholder, in ONE menu. "Convidar" only
@@ -794,6 +886,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       onSelected: (action) => switch (action) {
         _MemberAction.invite => _invitePending(member, l),
         _MemberAction.remove => _removePending(member, l),
+        _ => null,
       },
       itemBuilder: (context) => [
         if (_invitationFor(member) == null)
@@ -865,8 +958,11 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     }
 
     final now = DateTime.now().toUtc();
-    final pending = _invitations.where((i) => i.isPending(now)).toList();
-    final expired = _invitations.where((i) => i.isExpired(now)).toList();
+    // F-50: a viewer's invitation lives in the viewers' section.
+    final pending =
+        _invitations.where((i) => !i.isViewer && i.isPending(now)).toList();
+    final expired =
+        _invitations.where((i) => !i.isViewer && i.isExpired(now)).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -914,6 +1010,136 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         ],
       ],
     );
+  }
+
+  /// F-50: inviting a Visualizador — outside the caregiver seats, with its
+  /// own caps. The e-mail is required: a viewer has no placeholder to plan
+  /// for, so there is nothing to add "without an invitation".
+  Widget _viewerSection(Localization l) {
+    final theme = Theme.of(context);
+    final now = DateTime.now().toUtc();
+    final open =
+        _invitations.where((i) => i.isViewer && !i.isExpired(now) && i.isPending(now));
+    final block = ViewerRules.inviteBlock(
+      viewersTaken: _viewersTaken,
+      isPremium: _isPremium,
+      freeViewers: _settings.freeViewers,
+      maxViewers: _settings.maxViewers,
+    );
+    final free = _settings.freeViewers;
+    return Column(
+      key: const ValueKey('viewer-section'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(l[KApp.viewerSection]),
+        ...open.map((i) => _invitationCard(i, l, expired: false)),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(l[KApp.viewerInviteLead], style: theme.textTheme.bodySmall),
+              const SizedBox(height: 12),
+              if (block == ViewerInviteBlock.freeCap)
+                AppBanner(
+                  key: const ValueKey('viewer-free-cap'),
+                  tone: context.tokens.info,
+                  icon: Icons.lock_outline,
+                  // U-57: the number is the live `free_viewers`.
+                  message: l.format(
+                      free == 1 ? KApp.viewerFreeCapOne : KApp.viewerFreeCapMany,
+                      [free]),
+                  actionLabel:
+                      widget.onOpenPlan == null ? null : l[K.famSeePremium],
+                  onAction: widget.onOpenPlan == null
+                      ? null
+                      : () => _goToPremium('extra-viewer'),
+                )
+              else if (block == ViewerInviteBlock.maxCap)
+                Text(l.format(KApp.viewerMaxCap, [_settings.maxViewers]),
+                    key: const ValueKey('viewer-max-cap'),
+                    style: theme.textTheme.bodySmall)
+              else ...[
+                AppTextField(
+                  key: const ValueKey('viewer-email'),
+                  label: l[K.commonEmail],
+                  hint: l[K.famInviteEmailPlaceholder],
+                  controller: _viewerEmail,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  key: const ValueKey('viewer-role'),
+                  initialValue: _viewerRoleId == 0 ? null : _viewerRoleId,
+                  decoration: InputDecoration(labelText: l[K.famRoleInFamily]),
+                  items: [
+                    for (final role in _roles)
+                      DropdownMenuItem(
+                        value: role.id,
+                        child: Text(role.displayLabel(l.current)),
+                      ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _viewerRoleId = value ?? 0),
+                ),
+                if (_viewerErrorKey != null) ...[
+                  const SizedBox(height: 8),
+                  Text(l[_viewerErrorKey!],
+                      style: TextStyle(color: theme.colorScheme.error)),
+                ],
+                const SizedBox(height: 12),
+                FilledButton(
+                  key: const ValueKey('viewer-invite'),
+                  onPressed: _sendingViewer ? null : () => _inviteViewer(l),
+                  child: Text(_sendingViewer
+                      ? l[K.famSending]
+                      : l[KApp.viewerInviteButton]),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _inviteViewer(Localization l) async {
+    final email = _viewerEmail.text.trim();
+    final errorKey = email.isEmpty
+        ? KApp.viewerInviteNeedsEmail
+        : InviteFormRules.validationErrorKey(
+            fullName: 'viewer',
+            email: email,
+            myEmail: _me?.email,
+            roleId: _viewerRoleId,
+          );
+    if (errorKey != null) {
+      setState(() => _viewerErrorKey = errorKey);
+      return;
+    }
+    setState(() {
+      _sendingViewer = true;
+      _viewerErrorKey = null;
+    });
+    try {
+      final invitationId = await widget.dataSource
+          .createViewerInvitation(email: email, roleId: _viewerRoleId);
+      final mailed = await widget.dataSource.sendInvitationEmail(invitationId);
+      if (!mounted) return;
+      _viewerEmail.clear();
+      setState(() {
+        _viewerRoleId = 0;
+        _sendingViewer = false;
+      });
+      showAppSnack(
+          context, l[mailed ? KApp.viewerInviteSent : K.famInviteEmailFailed],
+          type: mailed ? AppSnackType.success : AppSnackType.info);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _sendingViewer = false);
+      showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
   }
 
   Widget _invitationCard(FamilyInvitation invitation, Localization l,
@@ -1093,9 +1319,12 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
 
   // ── S-11: deleting the whole family ──────────────────────────────────────
 
+  /// F-50: a viewer is never a voter, a successor or the last member.
   List<LifecycleMember> get _lifecycleMembers => _members
       .map((m) => LifecycleMember(
-          id: m.id, isActiveMember: m.isActiveMember, isAdmin: m.isAdmin))
+          id: m.id,
+          isActiveMember: m.isActiveMember && !m.isViewer,
+          isAdmin: m.isAdmin))
       .toList();
 
   List<DeletionVote> get _votes =>
@@ -1442,7 +1671,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
 }
 
 /// U-47: what a pending member's ⋮ offers.
-enum _MemberAction { invite, remove }
+enum _MemberAction { invite, remove, promote, removeViewer }
 
 /// U-47: what an invitation card's ⋮ offers.
 enum _InvitationAction { copyLink, resend, revoke }

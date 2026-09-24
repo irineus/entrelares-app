@@ -540,6 +540,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                       _isLeaving = true;
                       _router.go('/leaving');
                     },
+                    onViewerErased: () => unawaited(_gate.signOutSafely()),
                     appearance: widget.appearance,
                     onOpenHelp: () => _openHelp(from: '/family/profile'),
                   ),
@@ -1340,7 +1341,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           members: members
               .map((m) => LifecycleMember(
                   id: m.id,
-                  isActiveMember: m.isActiveMember,
+                  // F-50: a viewer does not vote.
+                  isActiveMember: m.isActiveMember && !m.isViewer,
                   isAdmin: m.isAdmin))
               .toList(),
           requesterProfileId: pending.request.requestedBy,

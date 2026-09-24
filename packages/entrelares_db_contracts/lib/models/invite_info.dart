@@ -21,12 +21,19 @@ class InviteInfo {
   /// to prefill the sign-up form. Null on a legacy invitation (no placeholder).
   final String? inviteeName;
 
+  /// F-50: `full` (a caregiver) or `viewer` — the screen says what the person
+  /// is being invited as, before they sign up.
+  final String memberType;
+
+  bool get isViewer => memberType == 'viewer';
+
   const InviteInfo({
     required this.familyName,
     required this.inviterName,
     required this.invitedEmail,
     required this.roleName,
     this.inviteeName,
+    this.memberType = 'full',
   });
 
   factory InviteInfo.fromJson(Map<String, dynamic> json) => InviteInfo(
@@ -35,5 +42,6 @@ class InviteInfo {
         invitedEmail: (json['invited_email'] as String?) ?? '',
         roleName: (json['role_name'] as String?) ?? '',
         inviteeName: json['invitee_name'] as String?,
+        memberType: (json['member_type'] as String?) ?? 'full',
       );
 }

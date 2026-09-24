@@ -1512,6 +1512,31 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<int> createViewerInvitation(
+      {required String email, required int roleId}) async {
+    final rows = await _client.rpc<dynamic>('create_viewer_invitation',
+        params: {'p_email': email.trim(), 'p_role_id': roleId});
+    return ((rows as List).single as Map)['invitation_id'] as int;
+  }
+
+  @override
+  Future<void> promoteMemberToFull(int profileId) async {
+    await _client.rpc<dynamic>('promote_member_to_full',
+        params: {'p_profile_id': profileId});
+  }
+
+  @override
+  Future<void> removeViewer(int profileId) async {
+    await _client
+        .rpc<dynamic>('remove_viewer', params: {'p_profile_id': profileId});
+  }
+
+  @override
+  Future<void> leaveFamilyAsViewer() async {
+    await _client.rpc<dynamic>('leave_family_as_viewer');
+  }
+
+  @override
   Future<bool> sendInvitationEmail(int invitationId) async {
     try {
       await _client.functions.invoke('send-swap-email', body: {

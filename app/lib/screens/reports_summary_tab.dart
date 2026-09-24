@@ -94,7 +94,9 @@ class _ReportsSummaryTabState extends State<ReportsSummaryTab> {
     }
   }
 
-  List<MemberView> get _views => [for (final m in _members) m.toView()];
+  /// F-50: a viewer holds no days — no caregiver card for it.
+  List<MemberView> get _views =>
+      [for (final m in _members) if (!m.isViewer) m.toView()];
 
   String _roleLabel(int profileId, AppLanguage language) {
     for (final m in _members) {

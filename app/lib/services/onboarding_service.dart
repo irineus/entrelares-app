@@ -55,7 +55,9 @@ class OnboardingService extends ChangeNotifier {
       return const OnboardingSignals(checklistDismissed: true);
     }
 
-    final hasOther = members.any((m) => m.id != me.id && m.isActiveMember);
+    // F-50: a viewer is not the second caregiver the checklist asks for.
+    final hasOther = members
+        .any((m) => m.id != me.id && m.isActiveMember && !m.isViewer);
     // F-56: a caregiver on the calendar with no account yet — the solo
     // parent's way of reaching out, invitation or not.
     final hasPending = members.any((m) => m.isPendingMember);

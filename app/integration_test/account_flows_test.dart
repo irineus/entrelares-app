@@ -133,10 +133,12 @@ void main() {
     await tester.enterText(
         find.widgetWithText(TextField, l[KApp.famInviteName]), 'Vovó E2E');
     await tester.pumpAndSettle();
+    // F-50: with `feature.viewers` on, the viewers' section below has its own
+    // e-mail and role — the caregiver form is the FIRST of each.
     await tester.enterText(
-        find.widgetWithText(TextField, l[K.commonEmail]), invitee);
+        find.widgetWithText(TextField, l[K.commonEmail]).first, invitee);
     await tester.pumpAndSettle();
-    await tapVisible(tester, find.byType(DropdownButtonFormField<int>));
+    await tapVisible(tester, find.byType(DropdownButtonFormField<int>).first);
     // The role list is the family's own; any built-in serves.
     await tester.tap(find.text(RoleCatalog.translate('grandmother')).last);
     await tester.pumpAndSettle();

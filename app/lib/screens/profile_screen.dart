@@ -54,6 +54,10 @@ class ProfileScreen extends StatefulWidget {
   /// keeps them there.
   final VoidCallback? onLeaving;
 
+  /// F-50: a viewer's exit deleted the account — the session has nothing
+  /// left to show, so the app signs out.
+  final VoidCallback? onViewerErased;
+
   /// Opens the Família page, where a pending family deletion is resolved.
   final VoidCallback? onOpenFamily;
 
@@ -78,6 +82,7 @@ class ProfileScreen extends StatefulWidget {
     this.profileId,
     this.deliverExport,
     this.onLeaving,
+    this.onViewerErased,
     this.onOpenFamily,
     this.onReopenOnboarding,
     this.appearance,
@@ -117,9 +122,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool get _isOwn => _target?.id == _me?.id;
   bool get _iAmAdmin => _me?.isAdmin == true;
 
+  /// F-50: a viewer is never a successor, a voter or the last member.
   List<LifecycleMember> get _lifecycleMembers => _members
       .map((m) => LifecycleMember(
-          id: m.id, isActiveMember: m.isActiveMember, isAdmin: m.isAdmin))
+          id: m.id,
+          isActiveMember: m.isActiveMember && !m.isViewer,
+          isAdmin: m.isAdmin))
       .toList();
 
   /// Leaving as the last live member is really deleting the family, and the
@@ -352,6 +360,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// export used to die in the generic failure snack. See `file_delivery.dart`.
   Future<void> _shareFile(String fileName, String json) =>
       deliverTextFile(fileName, json, mimeType: 'application/json');
+
+  /// F-50: a viewer leaves by being deleted — account included, right away.
+  Future<void> _leaveAsViewer(Localization l) async {
+    if (_leaving) return;
+    setState(() => _leaving = true);
+    try {
+      final ran = await runWithSudo(
+        context: context,
+        sudo: widget.sudo,
+        action: () => widget.dataSource.leaveFamilyAsViewer(),
+      );
+      if (!mounted) return;
+      if (!ran) {
+        setState(() => _leaving = false);
+        return;
+      }
+      widget.onViewerErased?.call();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _leaving = false);
+      showAppSnack(
+          context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
+  }
 
   Future<void> _leaveFamily(Localization l) async {
     if (_leaving) return;
@@ -876,6 +909,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _leaveSection(Localization l) {
     final theme = Theme.of(context);
     final last = _isLastMember;
+
+    // F-50: a viewer's exit is a complete delete — one sentence, one button
+    // (sudo asks for the password), no successor, no 30 days.
+    if (_me?.isViewer == true) {
+      return AppDangerZone(
+        key: const ValueKey('viewer-leave'),
+        title: l[K.profLeaveTitle],
+        intro: l[KApp.viewerLeaveBody],
+        notices: const [],
+        actionLabel: l[KApp.viewerLeaveButton],
+        onAction: _leaving ? null : () => _leaveAsViewer(l),
+      );
+    }
 
     // Blocked while the family itself is on the way out — the DB refuses too,
     // and the two flows would race for the same rows.
