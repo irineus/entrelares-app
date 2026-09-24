@@ -72,6 +72,9 @@ class PublicSettings {
   int get dayAccountMaxChars => _int('day_account.max_chars', 1000);
   int get dayAccountDailyCap => _int('day_account.daily_cap', 10);
 
+  // T-83: the S-04 inactivity sign-out, in minutes (seed 30, range 5–240).
+  int get idleTimeoutMinutes => _int('session.idle_timeout_minutes', 30);
+
   // T-82: the F-52 aviso cap, an operator parameter since 24/09/2026 (default
   // 2, range 1–3). The constant is the fallback and equals the migration seed.
   int get dayNoticeDailyCap =>

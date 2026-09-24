@@ -88,6 +88,10 @@ void serverParametersTests(GateFixture fx) {
           contains: 'de 4 a 52');
       await expectRejected(() => setSetting('usage_report.active_days', '6'),
           contains: 'de 7 a 90 dias');
+      // T-83 (1/4)
+      await expectRejected(
+          () => setSetting('session.idle_timeout_minutes', '4'),
+          contains: 'de 5 a 240 minutos');
     });
   });
 }
