@@ -101,6 +101,21 @@ void serverParametersTests(GateFixture fx) {
           contains: 'de 0 a 600 segundos');
     });
 
+    test('the push kill switch names only types the dispatcher pushes',
+        () async {
+      // T-83 (3/4): the list is read back from dispatch_push_notification's
+      // own filter — no second copy of the twelve types.
+      await withSetting('push.disabled_types', '["swap_requested"]', () async {
+        expect(await getSetting('push.disabled_types'), '["swap_requested"]');
+      });
+      await expectRejected(
+          () => setSetting('push.disabled_types', '["billing"]'),
+          contains: 'não é um tipo que gera push');
+      await expectRejected(
+          () => setSetting('push.disabled_types', '{"swap_requested": true}'),
+          contains: 'lista JSON');
+    });
+
     test('the healthy poll is off or never more frequent than the degraded one',
         () async {
       // In range on its own (0–600), refused as a pair: with the socket up the
