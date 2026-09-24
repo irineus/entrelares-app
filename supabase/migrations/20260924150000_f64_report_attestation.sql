@@ -32,7 +32,7 @@ INSERT INTO public.app_settings
 	(key, value, value_type, category, description, is_public, unit, impact, min_value, max_value, help)
 VALUES
 	('feature.report_attestation', 'false', 'bool', 'features',
-	 'Liga o relatório verificável (F-64): QR no PDF e página pública de conferência. Desligado, o servidor não emite atestado.',
+	 'Liga o relatório verificável (F-64): QR no PDF e página pública de conferência. Desligado, nada é emitido.',
 	 true, 'flag', 'critical', NULL, NULL,
 	 jsonb_build_object(
 		'controls', 'Se issue_report_attestation aceita emitir. Atestados já emitidos continuam conferíveis na página /verificar até vencer.',
