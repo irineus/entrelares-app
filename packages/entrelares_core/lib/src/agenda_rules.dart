@@ -159,4 +159,91 @@ abstract final class AgendaRules {
     }
     return null;
   }
+  // ── F-55 (PR 3): the routine ──────────────────────────────────────────────
+
+  /// `save_child_routine`'s refusal for a routine with no weekday, in its
+  /// words — the sheet says it before the round trip.
+  static const String noWeekday =
+      'Escolha pelo menos um dia da semana para a rotina.';
+
+  /// The days a routine writes: every date from [from] to [until] (both
+  /// inclusive, date-only) whose ISO weekday (`DateTime.weekday`) is in
+  /// [weekdays] — the server's loop, for the editor's preview and tests.
+  static List<DateTime> routineDays(
+      DateTime from, DateTime until, Iterable<int> weekdays) {
+    final wanted = weekdays.toSet();
+    final days = <DateTime>[];
+    var d = DateTime(from.year, from.month, from.day);
+    final last = DateTime(until.year, until.month, until.day);
+    while (!d.isAfter(last)) {
+      if (wanted.contains(d.weekday)) days.add(d);
+      d = DateTime(d.year, d.month, d.day + 1);
+    }
+    return days;
+  }
+
+  /// "seg, qua, sex" — the weekdays in week order (Monday first), each
+  /// through [abbrev] (the reader's language).
+  static String weekdaysLabel(
+          Iterable<int> weekdays, String Function(int weekday) abbrev) =>
+      (weekdays.toSet().toList()..sort()).map(abbrev).join(', ');
+
+  /// The agenda's Histórico: one line per created or deleted event — and ONE
+  /// line for what a routine wrote (or removed) in one go, the F-51 fold. A
+  /// routine's events share the batch and the instant of the transaction
+  /// that wrote them, so a re-apply is a new line, not a merge with the
+  /// first. A note converted from the observation was added by nobody: no
+  /// "added" line. Newest first; a line's events in date order.
+  static List<AgendaTrailLine<T>> trail<T>(
+    Iterable<T> events, {
+    required DateTime Function(T) date,
+    required DateTime Function(T) createdAt,
+    required DateTime? Function(T) deletedAt,
+    required String? Function(T) batchId,
+    required bool Function(T) converted,
+  }) {
+    final lines = <String, AgendaTrailLine<T>>{};
+    var seq = 0;
+    void put(T e, DateTime at, bool deleted) {
+      final batch = batchId(e);
+      final key = batch == null
+          ? 'e${seq++}'
+          : '$batch|$deleted|${at.microsecondsSinceEpoch}';
+      (lines[key] ??= AgendaTrailLine<T>(
+              key: key, at: at, deleted: deleted, batchId: batch, events: []))
+          .events
+          .add(e);
+    }
+
+    for (final e in events) {
+      if (!converted(e)) put(e, createdAt(e), false);
+      final gone = deletedAt(e);
+      if (gone != null) put(e, gone, true);
+    }
+    for (final line in lines.values) {
+      line.events.sort((a, b) => date(a).compareTo(date(b)));
+    }
+    return lines.values.toList()..sort((a, b) => b.at.compareTo(a.at));
+  }
+}
+
+/// One line of the agenda's Histórico ([AgendaRules.trail]).
+class AgendaTrailLine<T> {
+  const AgendaTrailLine({
+    required this.key,
+    required this.at,
+    required this.deleted,
+    required this.events,
+    this.batchId,
+  });
+
+  /// Stable within one load — what the reader's "show the days" remembers.
+  final String key;
+  final DateTime at;
+  final bool deleted;
+  final String? batchId;
+  final List<T> events;
+
+  /// What a routine wrote or removed in one go (folded).
+  bool get isRoutine => batchId != null;
 }

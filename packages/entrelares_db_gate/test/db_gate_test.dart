@@ -24,6 +24,7 @@ import 'suites/claim_invitation.dart';
 import 'suites/consent_and_retention.dart';
 import 'suites/_helpers.dart';
 import 'suites/agenda.dart';
+import 'suites/agenda_routine.dart';
 import 'suites/children.dart';
 import 'suites/custom_role.dart';
 import 'suites/day_account.dart';
@@ -154,6 +155,8 @@ void main() {
   // F-55 PR 2: the agenda — kinds, the free note, Premium, the past, the
   // frozen observation and the conversion.
   agendaTests(fx);
+  // F-55 PR 3: the routine — until the end of the plan, re-apply, stop.
+  agendaRoutineTests(fx);
   appSettingsTests(fx);
   publicSettingsTests(fx);
   serverParametersTests(fx);

@@ -129,4 +129,78 @@ void main() {
     expect(s.agendaMaxEventsPerDay, 20);
     expect(s.agendaTextMaxChars, 500);
   });
+
+  group('the routine (PR 3)', () {
+    test('routineDays: the marked weekdays, both ends inclusive', () {
+      // 24/09/2026 is a Thursday (4); 05/10/2026 a Monday.
+      final days = AgendaRules.routineDays(
+          today, DateTime(2026, 10, 5), [1, 4]);
+      expect(days, [
+        DateTime(2026, 9, 24),
+        DateTime(2026, 9, 28),
+        DateTime(2026, 10, 1),
+        DateTime(2026, 10, 5),
+      ]);
+      expect(AgendaRules.routineDays(today, DateTime(2026, 9, 23), [4]),
+          isEmpty);
+    });
+
+    test("weekdaysLabel: week order, deduplicated, in the reader's words",
+        () {
+      const ab = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+      expect(AgendaRules.weekdaysLabel([5, 1, 3, 1], (w) => ab[w - 1]),
+          'seg, qua, sex');
+    });
+
+    ({
+      int id,
+      DateTime date,
+      DateTime created,
+      DateTime? deleted,
+      String? batch,
+      bool converted,
+    }) ev(int id, int day,
+            {int createdMin = 0,
+            int? deletedMin,
+            String? batch,
+            bool converted = false}) =>
+        (
+          id: id,
+          date: DateTime(2026, 10, day),
+          created: DateTime.utc(2026, 9, 24, 12, createdMin),
+          deleted: deletedMin == null
+              ? null
+              : DateTime.utc(2026, 9, 24, 12, deletedMin),
+          batch: batch,
+          converted: converted,
+        );
+
+    test('trail: a routine written in one go is ONE line; a re-apply another',
+        () {
+      final lines = AgendaRules.trail(
+        [
+          ev(1, 5, batch: 'r', deletedMin: 30),
+          ev(2, 1, batch: 'r'),
+          ev(3, 12, batch: 'r', createdMin: 30),
+          ev(4, 2, createdMin: 10),
+          ev(5, 3, converted: true),
+        ],
+        date: (e) => e.date,
+        createdAt: (e) => e.created,
+        deletedAt: (e) => e.deleted,
+        batchId: (e) => e.batch,
+        converted: (e) => e.converted,
+      );
+      String shape(AgendaTrailLine l) =>
+          '${l.isRoutine ? 'R' : 'E'}${l.deleted ? '-' : '+'}'
+          '${[for (final e in l.events) (e as dynamic).id].join(',')}';
+      // Newest first: the re-apply (added 3, removed 1, same instant), then
+      // the single event, then the first application (2 and 1, by date).
+      expect(lines.map(shape).toList()..sort(),
+          ['E+4', 'R+2,1', 'R+3', 'R-1']..sort());
+      expect(lines.last.events.map((e) => e.id), [2, 1]);
+      expect(lines.last.isRoutine, isTrue);
+      expect(lines.any((l) => l.events.any((e) => e.id == 5)), isFalse);
+    });
+  });
 }

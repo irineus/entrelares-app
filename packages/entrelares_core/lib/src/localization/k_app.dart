@@ -504,6 +504,19 @@ abstract final class KApp {
   static const String agendaPdfSection = 'app.agenda.pdfSection';
   static const String agendaPdfLead = 'app.agenda.pdfLead';
   static const String agendaPdfEmpty = 'app.agenda.pdfEmpty';
+  static const String agendaRepeat = 'app.agenda.repeat';
+  static const String agendaRepeatLead = 'app.agenda.repeatLead';
+  static const String agendaRepeatDays = 'app.agenda.repeatDays';
+  static const String agendaRoutineApplied = 'app.agenda.routineApplied';
+  static const String agendaRoutinePart = 'app.agenda.routinePart';
+  static const String agendaRoutineEdit = 'app.agenda.routineEdit';
+  static const String agendaRoutineEditTitle = 'app.agenda.routineEditTitle';
+  static const String agendaRoutineEditLead = 'app.agenda.routineEditLead';
+  static const String agendaRoutineStop = 'app.agenda.routineStop';
+  static const String agendaRoutineStopConfirm = 'app.agenda.routineStopConfirm';
+  static const String agendaRoutineStopped = 'app.agenda.routineStopped';
+  static const String agendaAuditRoutineAdded = 'app.agenda.auditRoutineAdded';
+  static const String agendaAuditRoutineDeleted = 'app.agenda.auditRoutineDeleted';
 
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -827,6 +840,19 @@ abstract final class KApp {
     agendaPdfSection,
     agendaPdfLead,
     agendaPdfEmpty,
+    agendaRepeat,
+    agendaRepeatLead,
+    agendaRepeatDays,
+    agendaRoutineApplied,
+    agendaRoutinePart,
+    agendaRoutineEdit,
+    agendaRoutineEditTitle,
+    agendaRoutineEditLead,
+    agendaRoutineStop,
+    agendaRoutineStopConfirm,
+    agendaRoutineStopped,
+    agendaAuditRoutineAdded,
+    agendaAuditRoutineDeleted,
   ];
 }
 
@@ -1302,6 +1328,19 @@ abstract final class StringsAppPtBr {
     KApp.agendaPdfSection: '5. Agenda da criança',
     KApp.agendaPdfLead: 'O que a família registrou na agenda para os dias do período. A agenda não muda o planejamento: não troca quem fica com a criança em nenhum dia.',
     KApp.agendaPdfEmpty: 'Nenhum item na agenda no período.',
+    KApp.agendaRepeat: 'Repetir toda semana',
+    KApp.agendaRepeatLead: 'De {0} até o último dia planejado do calendário, nos dias marcados.',
+    KApp.agendaRepeatDays: 'Dias da semana',
+    KApp.agendaRoutineApplied: 'Rotina aplicada: {0} dia(s), até {1}.',
+    KApp.agendaRoutinePart: 'Parte de uma rotina ({0}).',
+    KApp.agendaRoutineEdit: 'Editar a rotina',
+    KApp.agendaRoutineEditTitle: 'Rotina da agenda',
+    KApp.agendaRoutineEditLead: 'A mudança vale de {0} em diante; os dias antes ficam como estão. Um item mudado à mão já saiu da rotina.',
+    KApp.agendaRoutineStop: 'Parar a rotina',
+    KApp.agendaRoutineStopConfirm: 'Parar a rotina? Os itens dela a partir de {0} saem da agenda.',
+    KApp.agendaRoutineStopped: 'Rotina parada: {0} item(ns) saíram da agenda.',
+    KApp.agendaAuditRoutineAdded: '{0} aplicou uma rotina à agenda',
+    KApp.agendaAuditRoutineDeleted: '{0} tirou uma rotina da agenda',
   };
 }
 
@@ -1772,5 +1811,18 @@ abstract final class StringsAppEn {
     KApp.agendaPdfSection: '5. The child\'s agenda',
     KApp.agendaPdfLead: 'What the family recorded on the agenda for the days of the period. The agenda does not change the plan: it never changes who has the child on any day.',
     KApp.agendaPdfEmpty: 'No agenda items in the period.',
+    KApp.agendaRepeat: 'Repeat every week',
+    KApp.agendaRepeatLead: 'From {0} to the calendar\'s last planned day, on the days marked.',
+    KApp.agendaRepeatDays: 'Weekdays',
+    KApp.agendaRoutineApplied: 'Routine applied: {0} day(s), until {1}.',
+    KApp.agendaRoutinePart: 'Part of a routine ({0}).',
+    KApp.agendaRoutineEdit: 'Edit the routine',
+    KApp.agendaRoutineEditTitle: 'Agenda routine',
+    KApp.agendaRoutineEditLead: 'The change applies from {0} on; earlier days stay as they are. An item changed by hand has already left the routine.',
+    KApp.agendaRoutineStop: 'Stop the routine',
+    KApp.agendaRoutineStopConfirm: 'Stop the routine? Its items from {0} on leave the agenda.',
+    KApp.agendaRoutineStopped: 'Routine stopped: {0} item(s) left the agenda.',
+    KApp.agendaAuditRoutineAdded: '{0} applied a routine to the agenda',
+    KApp.agendaAuditRoutineDeleted: '{0} removed a routine from the agenda',
   };
 }

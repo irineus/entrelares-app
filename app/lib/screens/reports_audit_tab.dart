@@ -381,48 +381,92 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   /// F-55: who added to the agenda and who removed from it — creation and
   /// deletion only, never each edit (owner, 24/09/2026). A note converted from
   /// the old observation was added by nobody, so it has no "added" entry.
+  /// PR 3: what a routine wrote (or removed) in one go is ONE entry, its days
+  /// one tap away — the F-51 fold.
   List<Widget> _agendaTimeline(Localization l) {
-    final entries = <({DateTime at, bool deleted, ChildEvent event})>[
-      for (final e in _agendaEvents) ...[
-        if (e.sourceScheduleId == null)
-          (at: e.createdAt, deleted: false, event: e),
-        if (e.deletedAt != null) (at: e.deletedAt!, deleted: true, event: e),
-      ],
-    ]..sort((a, b) => b.at.compareTo(a.at));
-    if (entries.isEmpty) return const [];
+    final lines = AgendaRules.trail<ChildEvent>(
+      _agendaEvents,
+      date: (e) => e.eventDate,
+      createdAt: (e) => e.createdAt,
+      deletedAt: (e) => e.deletedAt,
+      batchId: (e) => e.batchId,
+      converted: (e) => e.sourceScheduleId != null,
+    );
+    if (lines.isEmpty) return const [];
     final textTheme = Theme.of(context).textTheme;
+    String what(ChildEvent e) => [
+          ?AgendaRules.timeRange(e.startTime, e.endTime),
+          l[(AgendaKind.parse(e.kind) ?? AgendaKind.other).labelKey],
+          ...[
+            for (final c in _children)
+              if (c.id == e.childId) c.firstName
+          ],
+          ?e.body,
+        ].join(' · ');
+    String who(AgendaTrailLine<ChildEvent> x) => _nameOf(
+        x.deleted ? x.events.first.deletedBy : x.events.first.createdBy,
+        l[K.auditSystemTrigger]);
     return [
       const SizedBox(height: 12),
       Text(l[KApp.agendaSection], style: textTheme.titleSmall),
       const SizedBox(height: Spacing.xs),
-      for (final x in entries)
-        _item(
-          badge: x.deleted ? AuditBadge.deleted : AuditBadge.created,
-          icon: Icons.event_note_outlined,
-          children: [
-            Text(l.format(K.auditDayLabel, [l.formatDate(x.event.eventDate)]),
-                style: textTheme.labelSmall),
-            Text(l.format(
-                x.deleted ? KApp.agendaAuditDeleted : KApp.agendaAuditAdded, [
-              _nameOf(x.deleted ? x.event.deletedBy : x.event.createdBy,
-                  l[K.auditSystemTrigger])
-            ])),
-            Text(
-                [
-                  ?AgendaRules.timeRange(
-                      x.event.startTime, x.event.endTime),
-                  l[(AgendaKind.parse(x.event.kind) ?? AgendaKind.other)
-                      .labelKey],
-                  ...[
-                    for (final c in _children)
-                      if (c.id == x.event.childId) c.firstName
-                  ],
-                  ?x.event.body,
-                ].join(' · '),
-                style: textTheme.bodySmall),
-          ],
-          timestamp: l.formatDateTime(x.at.toLocal()),
-        ),
+      for (final x in lines)
+        if (!x.isRoutine)
+          _item(
+            badge: x.deleted ? AuditBadge.deleted : AuditBadge.created,
+            icon: Icons.event_note_outlined,
+            children: [
+              Text(
+                  l.format(K.auditDayLabel,
+                      [l.formatDate(x.events.single.eventDate)]),
+                  style: textTheme.labelSmall),
+              Text(l.format(
+                  x.deleted ? KApp.agendaAuditDeleted : KApp.agendaAuditAdded,
+                  [who(x)])),
+              Text(what(x.events.single), style: textTheme.bodySmall),
+            ],
+            timestamp: l.formatDateTime(x.at.toLocal()),
+          )
+        else
+          _item(
+            badge: x.deleted ? AuditBadge.deleted : AuditBadge.created,
+            icon: Icons.event_repeat_outlined,
+            children: [
+              Text(
+                  l.format(K.auditBatchRange, [
+                    l.formatDate(x.events.first.eventDate),
+                    l.formatDate(x.events.last.eventDate)
+                  ]),
+                  style: textTheme.labelSmall),
+              Text(l.format(
+                  x.deleted
+                      ? KApp.agendaAuditRoutineDeleted
+                      : KApp.agendaAuditRoutineAdded,
+                  [who(x)])),
+              Text(what(x.events.first), style: textTheme.bodySmall),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: Key('auditAgendaBatch-${x.key}'),
+                  onPressed: () => setState(() {
+                    if (!_expandedBatches.add(x.key)) {
+                      _expandedBatches.remove(x.key);
+                    }
+                  }),
+                  child: Text(_expandedBatches.contains(x.key)
+                      ? l[K.auditBatchHide]
+                      : l.format(K.auditBatchShow, [x.events.length])),
+                ),
+              ),
+              if (_expandedBatches.contains(x.key))
+                Text(
+                    [for (final e in x.events) l.formatDate(e.eventDate)]
+                        .join(', '),
+                    key: Key('auditAgendaBatchDays-${x.key}'),
+                    style: textTheme.bodySmall),
+            ],
+            timestamp: l.formatDateTime(x.at.toLocal()),
+          ),
     ];
   }
 
