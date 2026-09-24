@@ -53,6 +53,8 @@ const _usageReportKeys = {
   'membership', 'viewers_used', 'viewers_cap', 'viewer_invitations_open',
   // F-64: the verifiable reports — counts only
   'attestations', 'issued', 'active',
+  // F-34: the expenses — counts only
+  'expenses', 'deleted', 'settlements_pending', 'settlements_confirmed',
 };
 
 Set<String> _keysOf(Object? node) => switch (node) {

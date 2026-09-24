@@ -247,4 +247,29 @@ void main() {
           isTrue, reason: key);
     }
   });
+
+  // F-34: "despesa" names the shared-expenses module, and nothing else. The
+  // address: the expense and settle-up notifications and the app's
+  // `app.expense.` keys.
+  test('"despesa" names the F-34 expenses, and nothing else', () {
+    const prefixes = [
+      'notifRender.expense',
+      'notifRender.title.expense',
+      'notifRender.settlement',
+      'notifRender.title.settlement',
+      'app.expense.',
+    ];
+    final pt = catalogs['pt-BR']!;
+    final word = RegExp(r'despesas?', caseSensitive: false);
+    for (final key in [...K.allKeys, ...KApp.allKeys]) {
+      if (prefixes.any(key.startsWith)) continue;
+      expect(word.hasMatch(pt[key]), isFalse, reason: '$key says "${pt[key]}"');
+    }
+  });
+
+  test('the F-34 notifications call it a despesa', () {
+    final pt = catalogs['pt-BR']!;
+    expect(pt[K.notifRenderTitleExpenseAdded], 'Despesa lançada');
+    expect(catalogs['en']![K.notifRenderTitleExpenseAdded], 'Expense added');
+  });
 }

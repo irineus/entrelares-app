@@ -27,6 +27,7 @@ import 'suites/agenda.dart';
 import 'suites/agenda_routine.dart';
 import 'suites/agenda_notify.dart';
 import 'suites/viewer.dart';
+import 'suites/expenses.dart';
 import 'suites/report_attestation.dart';
 import 'suites/children.dart';
 import 'suites/custom_role.dart';
@@ -167,6 +168,8 @@ void main() {
   viewerTests(fx);
   // F-64: the verifiable report — issue, fingerprint, the public answer.
   reportAttestationTests(fx);
+  // F-34: shared expenses — the split, the trail, the confirmed settlement.
+  expenseTests(fx);
   appSettingsTests(fx);
   publicSettingsTests(fx);
   serverParametersTests(fx);
