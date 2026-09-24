@@ -281,6 +281,12 @@ async function sendAdminQuotaWarning(
     if (error) console.error(`[send-swap-email] admin lookup for quota warning failed — ${error.message}`);
     return;
   }
+  // T-82: the threshold the DB just crossed is `email_quota.warn_percent`; the
+  // e-mail says the same number the in-app notification stored.
+  const { data: pct } = await supabase.rpc("setting_int", {
+    p_key: "email_quota.warn_percent", p_default: 80,
+  });
+  const percent = Number.isInteger(pct) ? (pct as number) : 80;
   // U-13: one admin may read in English and another in Portuguese, so the
   // subject and body are built PER ADMIN rather than once for the batch.
   // deno-lint-ignore no-explicit-any
@@ -290,8 +296,8 @@ async function sendAdminQuotaWarning(
     const t = swapText(lang);
     return sendEmail(resendKey, fromEmail, fromName, {
       to: a.email,
-      subject: stage === "warn_last" ? t.subjCapLast : t.subjCap80,
-      html: stage === "warn_last" ? templateEmailCapLast(lang, appUrl) : templateEmailCap80(lang, appUrl),
+      subject: stage === "warn_last" ? t.subjCapLast : t.subjCap80(percent),
+      html: stage === "warn_last" ? templateEmailCapLast(lang, appUrl) : templateEmailCap80(lang, appUrl, percent),
     });
   }));
   console.log(`[send-swap-email] quota warning (${stage}) e-mailed to ${admins.length} admin(s) of family=${familyId}`);
@@ -310,7 +316,7 @@ async function handleInvitationEmail(
 ): Promise<Response> {
   const { data, error } = await supabase
     .from("family_invitations")
-    .select("id, family_id, email, token, expires_at, accepted_at, revoked_at, profile_id, families(name), profiles!family_invitations_invited_by_fkey(full_name, language_effective), roles(role, label_pt)")
+    .select("id, family_id, email, token, created_at, expires_at, accepted_at, revoked_at, profile_id, families(name), profiles!family_invitations_invited_by_fkey(full_name, language_effective), roles(role, label_pt)")
     .eq("id", invitationId)
     .single();
 
@@ -342,6 +348,11 @@ async function handleInvitationEmail(
     || (data.roles?.role ?? "");
   const inviteLink  = `${appUrl}/register?invite=${data.token}`;
   const expiresBr   = formatDateIn(lang, String(data.expires_at).slice(0, 10));
+  // T-82: the days THIS invitation was issued for — `invitation.valid_days` at
+  // creation, read back from the row so a later console edit never makes an old
+  // invitation's e-mail promise a different window.
+  const validDays   = Math.max(1, Math.round(
+    (new Date(data.expires_at).getTime() - new Date(data.created_at).getTime()) / 86_400_000));
 
   // S-13: don't log the invitee's e-mail (PII) — the family is enough context.
   console.log(`[send-swap-email] invitation dispatch — family=${familyName}`);
@@ -358,7 +369,7 @@ async function handleInvitationEmail(
     subject: t.subjInvitation(inviterName),
     // F-56: an invitation FOR a pending member states what stays (the admin's
     // name/role, as family data) and what is purged (the e-mail).
-    html: templateInvitation(lang, inviterName, familyName, roleName, inviteLink, expiresBr, data.profile_id != null),
+    html: templateInvitation(lang, inviterName, familyName, roleName, inviteLink, expiresBr, validDays, data.profile_id != null),
   });
 
   // F-38: admin heads-up when this invitation crossed the 80% / último milestone.
@@ -559,11 +570,11 @@ function buildEmails(
 
 // ── F-38: quota heads-up templates (admins only) ──────────────────────────────
 
-function templateEmailCap80(lang: Lang, appUrl: string): string {
+function templateEmailCap80(lang: Lang, appUrl: string, percent: number): string {
   const t = swapText(lang);
   return baseTemplate(lang, t.cap80Title,
     `${heading(t.cap80Heading)}
-     ${paragraph(t.cap80Body)}
+     ${paragraph(t.cap80Body(percent))}
      ${paragraph(t.cap80Note)}
      ${paragraph(t.cap80Upsell, "last")}
      ${button(`${appUrl}/family`, t.capButton)}`
@@ -762,7 +773,7 @@ function templateReminder(lang: Lang, date: string, handoffTime: string | null, 
   );
 }
 
-function templateInvitation(lang: Lang, inviterName: string, familyName: string, roleName: string, inviteLink: string, expiresBr: string, forPlaceholder = false): string {
+function templateInvitation(lang: Lang, inviterName: string, familyName: string, roleName: string, inviteLink: string, expiresBr: string, validDays: number, forPlaceholder = false): string {
   const t = swapText(lang);
   const roleLine = roleName ? paragraph(t.invitationRole(roleName)) : "";
   const privacy = forPlaceholder ? t.invitationPrivacyPlaceholder : t.invitationPrivacy;
@@ -770,7 +781,7 @@ function templateInvitation(lang: Lang, inviterName: string, familyName: string,
     `${heading(t.invitationHeading)}
      ${paragraph(t.invitationBody(inviterName, familyName))}
      ${roleLine}
-     ${paragraph(t.invitationExpiry(expiresBr), "last")}
+     ${paragraph(t.invitationExpiry(validDays, expiresBr), "last")}
      ${button(inviteLink, t.invitationButton)}
      ${small(`${t.invitationLinkFallback}<br/>${rawUrl(inviteLink)}`)}
      ${small(`${privacy} ${smallLink("https://entrelares.app/privacidade", t.invitationPrivacyLink)}.`, true)}`

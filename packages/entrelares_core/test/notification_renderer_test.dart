@@ -407,6 +407,9 @@ void main() {
         'Este é o último e-mail do mês no plano gratuito. As notificações aqui no app seguem normais — ative o Premium para um limite bem maior.'),
     ('email_cap_80', '{"tier":"free"}',
         'Sua família já usou 80% dos e-mails deste mês (plano gratuito). As notificações aqui no app seguem sem limite — ative o Premium para um limite bem maior.'),
+    // T-82: the stored `percent` is `email_quota.warn_percent` at write time.
+    ('email_cap_80', '{"tier":"free","percent":"70"}',
+        'Sua família já usou 70% dos e-mails deste mês (plano gratuito). As notificações aqui no app seguem sem limite — ative o Premium para um limite bem maior.'),
     ('billing', '{"kind":"grace_warning","date":"12/08/2026"}',
         'Não conseguimos confirmar o pagamento da assinatura. Se a cobrança não for regularizada até 12/08/2026, a família voltará ao Plano Gratuito. Nenhum dado é apagado — os recursos Premium apenas ficam indisponíveis.'),
     // F-70: the ISO date the RPC stores, rendered in the reader's format.

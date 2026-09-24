@@ -32,6 +32,13 @@ void main() {
       keys: [K.horizonPremium, K.horizonFree],
       words: const [],
     ),
+    // T-82: server-only key, stated through the notification's `params.percent`
+    // (seed 80 — the app has no PublicSettings getter for it on purpose).
+    'email_quota.warn_percent': (
+      seed: 80,
+      keys: [K.notifRenderTitleEmailCap80, K.notifRenderEmailCap80],
+      words: const [],
+    ),
   };
 
   final catalogs = <String, Map<String, String>>{

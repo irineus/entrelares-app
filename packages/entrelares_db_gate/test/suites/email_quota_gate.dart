@@ -44,6 +44,40 @@ void emailQuotaGateTests(GateFixture fx) {
           .length;
 
   group('EmailQuotaGateTests', () {
+    // T-82: the heads-up threshold is `email_quota.warn_percent` (default 80,
+    // range 50–95). At 60 the heads-up fires at 60 %, and the stored title,
+    // sentence and `params.percent` all say 60 — the app renders from params.
+    test('the heads-up threshold is the operator key', () async {
+      final fam = await fx.createFamily('t82warn');
+      await setPlan(fam.familyId, 'free');
+      final before = (await fx.service
+              .from('app_settings')
+              .select('value')
+              .eq('key', 'email_quota.warn_percent'))
+          .single['value'] as String;
+      await fx.service
+          .from('app_settings')
+          .update({'value': '60'}).eq('key', 'email_quota.warn_percent');
+      try {
+        expect(await consume(fam.familyId), contains('allowed'));
+        await seedCount(fam.familyId, 59);
+        expect(await consume(fam.familyId), contains('warn_80'));
+        final row = (await fx.service
+                .from('notifications')
+                .select('title, message, params')
+                .eq('recipient_profile_id', fam.adminProfile.id)
+                .eq('type', 'email_cap_80'))
+            .single;
+        expect(row['title'], 'E-mails do mês em 60%');
+        expect(row['message'] as String, contains('já usou 60%'));
+        expect((row['params'] as Map)['percent'], '60');
+      } finally {
+        await fx.service
+            .from('app_settings')
+            .update({'value': before}).eq('key', 'email_quota.warn_percent');
+      }
+    });
+
     test('a free family gets each milestone once, then is denied', () async {
       final fam = await fx.createFamily('f38');
       await setPlan(fam.familyId, 'free');
