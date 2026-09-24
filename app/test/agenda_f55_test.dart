@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
+import 'package:entrelares_db_contracts/models/child_routine.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_app/screens/day_sheet.dart';
@@ -46,7 +47,8 @@ ChildEvent event(int id, String kind,
         String? body,
         int? childId,
         int? createdBy = 2,
-        int? source}) =>
+        int? source,
+        String? batch}) =>
     ChildEvent(
       id: id,
       familyId: 7,
@@ -57,6 +59,7 @@ ChildEvent event(int id, String kind,
       childId: childId,
       createdBy: createdBy,
       sourceScheduleId: source,
+      batchId: batch,
       createdAt: DateTime.utc(2026, 9, 20, 12),
     );
 
@@ -91,6 +94,14 @@ Future<void> pumpSection(
     ),
   ));
   await tester.pumpAndSettle();
+}
+
+/// Taps a control of the editor sheet, scrolled into view first.
+Future<void> tapVisible(WidgetTester tester, String key) async {
+  final finder = find.byKey(ValueKey(key));
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
 }
 
 void main() {
@@ -314,6 +325,127 @@ void main() {
       await openSheet(tester, source(), settings: const {});
       expect(find.byKey(const ValueKey('day-agenda')), findsNothing);
       expect(find.text(l[K.editorDayNote]), findsWidgets);
+    });
+  });
+
+  group('the routine (PR 3)', () {
+    // 25/09/2026 (tomorrow) is a Friday: 5.
+    final school = ChildRoutine(
+      id: 'r1',
+      familyId: 7,
+      kind: 'school',
+      childId: 5,
+      startTime: '07:30',
+      weekdays: [1, 5],
+      startsOn: DateTime(2026, 9, 21),
+      endsOn: DateTime(2026, 10, 31),
+    );
+
+    testWidgets('a new item repeats on the marked weekdays until the plan ends',
+        (tester) async {
+      final ds = source();
+      await pumpSection(tester, ds);
+      await tester.tap(find.byKey(const ValueKey('day-agenda-add')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byKey(const ValueKey('agenda-body')), 'lancheira');
+      await tapVisible(tester, 'agenda-repeat');
+      await tester.pumpAndSettle();
+      // The sheet's own weekday comes marked; the lead names the first day.
+      final friday = tester.widget<FilterChip>(
+          find.byKey(const ValueKey('agenda-weekday-5')));
+      expect(friday.selected, isTrue);
+      expect(find.text(l.format(KApp.agendaRepeatLead, ['25/09/2026'])),
+          findsOne);
+      await tapVisible(tester, 'agenda-weekday-2');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.commonSave]));
+      await tester.pumpAndSettle();
+      expect(ds.eventWrites, ['routine:new:note:2,5:-:-:lancheira']);
+      final days = AgendaRules.routineDays(tomorrow, ds.planEnd, [2, 5]);
+      expect(
+          find.text(l.format(
+              KApp.agendaRoutineApplied, [days.length, '31/10/2026'])),
+          findsOne);
+    });
+
+    testWidgets('no weekday marked never reaches the server', (tester) async {
+      final ds = source();
+      await pumpSection(tester, ds);
+      await tester.tap(find.byKey(const ValueKey('day-agenda-add')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('agenda-body')), 'x');
+      await tapVisible(tester, 'agenda-repeat');
+      await tester.pumpAndSettle();
+      await tapVisible(tester, 'agenda-weekday-5');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.commonSave]));
+      await tester.pumpAndSettle();
+      expect(ds.eventWrites, isEmpty);
+      expect(find.text(AgendaRules.noWeekday), findsOne);
+    });
+
+    testWidgets('an item of a routine says so, and edits the routine from the day',
+        (tester) async {
+      final ds = source(events: [
+        event(1, 'school', start: '07:30', childId: 5, batch: 'r1'),
+      ])
+        ..childRoutines = [school];
+      await pumpSection(tester, ds);
+      expect(find.byKey(const ValueKey('day-agenda-routine-1')), findsOne);
+      expect(find.text(l.format(KApp.agendaRoutinePart, ['seg, sex'])),
+          findsOne);
+
+      await tester.tap(find.byKey(const ValueKey('day-agenda-edit-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('agenda-routine-edit')));
+      await tester.pumpAndSettle();
+      expect(find.text(l[KApp.agendaRoutineEditTitle]), findsOne);
+      expect(find.text(l.format(KApp.agendaRoutineEditLead, ['25/09/2026'])),
+          findsOne);
+      await tapVisible(tester, 'agenda-weekday-3');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.commonSave]));
+      await tester.pumpAndSettle();
+      expect(ds.eventWrites, ['routine:r1:school:1,3,5:5:07:30:']);
+    });
+
+    testWidgets('stopping the routine asks first, in the sheet', (tester) async {
+      final ds = source(events: [
+        event(1, 'school', start: '07:30', childId: 5, batch: 'r1'),
+      ])
+        ..childRoutines = [school];
+      await pumpSection(tester, ds);
+      await tester.tap(find.byKey(const ValueKey('day-agenda-edit-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('agenda-routine-edit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('agenda-routine-stop')));
+      await tester.pumpAndSettle();
+      expect(ds.eventWrites, isEmpty);
+      final confirm =
+          find.byKey(const ValueKey('agenda-routine-stop-confirm'));
+      expect(confirm, findsOne);
+      await tester.tap(find.descendant(
+          of: confirm, matching: find.text(l[KApp.agendaRoutineStop])));
+      await tester.pumpAndSettle();
+      expect(ds.eventWrites, ['stop:r1']);
+      expect(find.text(l.format(KApp.agendaRoutineStopped, [1])), findsOne);
+      expect(find.byKey(const ValueKey('day-agenda-empty')), findsOne);
+    });
+
+    testWidgets('an item that left its routine offers no routine door',
+        (tester) async {
+      final ds = source(events: [
+        event(1, 'school', start: '07:30', childId: 5),
+      ])
+        ..childRoutines = [school];
+      await pumpSection(tester, ds);
+      expect(find.byKey(const ValueKey('day-agenda-routine-1')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('day-agenda-edit-1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('agenda-routine-edit')), findsNothing);
+      expect(find.byKey(const ValueKey('agenda-repeat')), findsNothing);
     });
   });
 }

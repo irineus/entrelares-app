@@ -10,6 +10,7 @@ import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
+import 'package:entrelares_db_contracts/models/child_routine.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -1665,6 +1666,60 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     await _client
         .rpc<dynamic>('delete_child_event', params: {'p_event_id': id});
   }
+
+  @override
+  Future<List<ChildRoutine>> fetchChildRoutines() async {
+    final rows = await _client
+        .from('child_routines')
+        .select()
+        .isFilter('stopped_at', null)
+        .order('created_at', ascending: true);
+    return rows.map(ChildRoutine.fromJson).toList();
+  }
+
+  @override
+  Future<({String routineId, int created, DateTime until})> saveChildRoutine({
+    String? routineId,
+    required DateTime from,
+    required String kind,
+    required List<int> weekdays,
+    int? childId,
+    String? start,
+    String? end,
+    String? body,
+  }) async {
+    final event = _eventParams(
+        date: from,
+        kind: kind,
+        childId: childId,
+        start: start,
+        end: end,
+        body: body);
+    final r = Map<String, dynamic>.from(
+        await _client.rpc<dynamic>('save_child_routine', params: {
+      'p_routine_id': routineId,
+      'p_from': event['p_date'],
+      'p_kind': kind,
+      'p_weekdays': weekdays,
+      'p_child_id': childId,
+      'p_start': start,
+      'p_end': end,
+      'p_body': event['p_body'],
+    }) as Map);
+    return (
+      routineId: r['routine_id'] as String,
+      created: r['created'] as int,
+      until: DateTime.parse(r['until'] as String),
+    );
+  }
+
+  @override
+  Future<int> stopChildRoutine(
+          {required String routineId, required DateTime from}) async =>
+      await _client.rpc<dynamic>('stop_child_routine', params: {
+        'p_routine_id': routineId,
+        'p_from': _isoDay(from),
+      }) as int;
 
   // ── Lote 4: profile, account and the LGPD export ─────────────────────────
 

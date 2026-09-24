@@ -17,6 +17,7 @@ import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
+import 'package:entrelares_db_contracts/models/child_routine.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -1030,6 +1031,92 @@ class FakeCustodyDataSource implements CustodyDataSource {
               )
             : e,
     ];
+  }
+
+  // ── F-55 PR 3: the routine ──
+  List<ChildRoutine> childRoutines = [];
+
+  /// The last planned day the fake's routine reaches.
+  DateTime planEnd = DateTime(2026, 10, 31);
+
+  @override
+  Future<List<ChildRoutine>> fetchChildRoutines() async =>
+      [for (final r in childRoutines) if (!r.isStopped) r];
+
+  @override
+  Future<({String routineId, int created, DateTime until})> saveChildRoutine({
+    String? routineId,
+    required DateTime from,
+    required String kind,
+    required List<int> weekdays,
+    int? childId,
+    String? start,
+    String? end,
+    String? body,
+  }) async {
+    if (throwOnEventWrite != null) throw throwOnEventWrite!;
+    final id = routineId ?? 'r${childRoutines.length + 1}';
+    eventWrites.add('routine:${routineId ?? 'new'}:$kind:'
+        '${weekdays.join(',')}:${childId ?? '-'}:${start ?? '-'}:${body ?? ''}');
+    final days = AgendaRules.routineDays(from, planEnd, weekdays);
+    if (routineId != null) {
+      childEvents = [
+        for (final e in childEvents)
+          if (!(e.batchId == routineId && !e.eventDate.isBefore(from))) e,
+      ];
+    }
+    var next = childEvents.fold<int>(0, (m, e) => e.id > m ? e.id : m);
+    childEvents = [
+      ...childEvents,
+      for (final d in days)
+        ChildEvent(
+          id: ++next,
+          familyId: family?.id ?? 1,
+          childId: childId,
+          eventDate: d,
+          startTime: start,
+          endTime: end,
+          kind: kind,
+          body: (body ?? '').trim().isEmpty ? null : body!.trim(),
+          batchId: id,
+          createdBy: members.firstOrNull?.id,
+          createdAt: DateTime.now().toUtc(),
+        ),
+    ];
+    childRoutines = [
+      for (final r in childRoutines)
+        if (r.id != id) r,
+      ChildRoutine(
+        id: id,
+        familyId: family?.id ?? 1,
+        kind: kind,
+        childId: childId,
+        startTime: start,
+        endTime: end,
+        body: body,
+        weekdays: [...weekdays]..sort(),
+        startsOn: from,
+        endsOn: planEnd,
+      ),
+    ];
+    return (routineId: id, created: days.length, until: planEnd);
+  }
+
+  @override
+  Future<int> stopChildRoutine(
+      {required String routineId, required DateTime from}) async {
+    if (throwOnEventWrite != null) throw throwOnEventWrite!;
+    eventWrites.add('stop:$routineId');
+    final before = childEvents.length;
+    childEvents = [
+      for (final e in childEvents)
+        if (!(e.batchId == routineId && !e.eventDate.isBefore(from))) e,
+    ];
+    childRoutines = [
+      for (final r in childRoutines)
+        if (r.id != routineId) r
+    ];
+    return before - childEvents.length;
   }
 
   // ── Lote 4: profile, account and the LGPD export ──

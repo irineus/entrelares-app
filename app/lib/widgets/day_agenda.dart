@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
+import 'package:entrelares_db_contracts/models/child_routine.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import '../services/custody_data_source.dart';
 import '../theme/tokens.dart';
@@ -60,6 +61,7 @@ class DayAgendaSection extends StatefulWidget {
 class _DayAgendaSectionState extends State<DayAgendaSection> {
   List<ChildEvent>? _events;
   List<Child> _children = const [];
+  List<ChildRoutine> _routines = const [];
   bool _failed = false;
 
   @override
@@ -73,11 +75,13 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
       final results = await Future.wait([
         widget.dataSource.fetchChildEvents(widget.date, widget.date),
         widget.dataSource.fetchChildren(),
+        widget.dataSource.fetchChildRoutines(),
       ]);
       if (!mounted) return;
       setState(() {
         _events = results[0] as List<ChildEvent>;
         _children = results[1] as List<Child>;
+        _routines = results[2] as List<ChildRoutine>;
         _failed = false;
       });
     } catch (_) {
@@ -137,12 +141,19 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
         freeLimited: _freeLimited,
       );
 
+  /// The running routine [e] still belongs to (a hand edit left it).
+  ChildRoutine? _routineOf(ChildEvent e) =>
+      _routines.where((r) => r.id == e.batchId).firstOrNull;
+
   Future<void> _openEditor(Localization l, {ChildEvent? event}) async {
-    final outcome = await showAppSheet<_EditorOutcome>(
+    // The sheet says what it did, in one sentence — a routine's reads
+    // differently from a single item's.
+    final done = await showAppSheet<String>(
       context: context,
       builder: (_) => AgendaEventSheet(
         date: widget.date,
         event: event,
+        routine: event == null ? null : _routineOf(event),
         children: _children,
         settings: widget.settings,
         freeLimited: _freeLimited,
@@ -150,12 +161,8 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
         dataSource: widget.dataSource,
       ),
     );
-    if (outcome == null || !mounted) return;
-    showAppSnack(
-        context,
-        l[outcome == _EditorOutcome.deleted
-            ? KApp.agendaDeleted
-            : KApp.agendaSaved]);
+    if (done == null || !mounted) return;
+    showAppSnack(context, done);
     await _load();
   }
 
@@ -291,6 +298,14 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
                   Text(byline,
                       style: textTheme.bodySmall
                           ?.copyWith(color: tokens.textMuted)),
+                if (_routineOf(e) case final r?)
+                  Text(
+                      l.format(KApp.agendaRoutinePart, [
+                        AgendaRules.weekdaysLabel(r.weekdays, l.weekdayAbbrev)
+                      ]),
+                      key: ValueKey('day-agenda-routine-${e.id}'),
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: tokens.textMuted)),
               ],
             ),
           ),
@@ -307,13 +322,17 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
   }
 }
 
-enum _EditorOutcome { saved, deleted }
-
 /// The editor of one agenda item — new, or [event] to edit. Stacks on top of
-/// the day sheet; a refusal keeps it open with the server's sentence.
+/// the day sheet; a refusal keeps it open with the server's sentence. Pops
+/// with the sentence the snack says.
+///
+/// F-55 PR 3: a new item may repeat every week until the end of the plan (a
+/// routine); an item of a running [routine] offers to edit the routine from
+/// this day on, or to stop it.
 class AgendaEventSheet extends StatefulWidget {
   final DateTime date;
   final ChildEvent? event;
+  final ChildRoutine? routine;
   final List<Child> children;
   final PublicSettings settings;
   final bool freeLimited;
@@ -329,6 +348,7 @@ class AgendaEventSheet extends StatefulWidget {
     required this.freeLimited,
     required this.isAdmin,
     required this.dataSource,
+    this.routine,
   });
 
   @override
@@ -347,6 +367,24 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
   String? _error;
   bool _busy = false;
   bool _confirmingDelete = false;
+
+  /// A new item that repeats, or an existing routine being edited.
+  bool _repeat = false;
+  bool _editingRoutine = false;
+  late Set<int> _weekdays = {widget.date.weekday};
+
+  /// Switches the sheet to the routine's own fields, from this day on.
+  void _editRoutine(ChildRoutine r) => setState(() {
+        _editingRoutine = true;
+        _confirmingDelete = false;
+        _kind = AgendaKind.parse(r.kind) ?? AgendaKind.other;
+        _childId = r.childId;
+        _start = r.startTime;
+        _end = r.endTime;
+        _body.text = r.body ?? '';
+        _weekdays = r.weekdays.toSet();
+        _error = null;
+      });
 
   @override
   void dispose() {
@@ -380,17 +418,16 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
     });
   }
 
-  Future<void> _run(Localization l, Future<void> Function() action,
-      _EditorOutcome outcome) async {
+  Future<void> _run(Localization l, Future<String> Function() action) async {
     if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await action();
+      final done = await action();
       if (!mounted) return;
-      Navigator.of(context).pop(outcome);
+      Navigator.of(context).pop(done);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -416,27 +453,88 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
       return;
     }
     final event = widget.event;
-    _run(
-      l,
-      () => event == null
-          ? widget.dataSource.addChildEvent(
-              date: widget.date,
-              kind: _kind.wire,
-              childId: childId,
-              start: _start,
-              end: _end,
-              body: _body.text,
-            )
-          : widget.dataSource.updateChildEvent(
-              id: event.id,
-              date: widget.date,
-              kind: _kind.wire,
-              childId: childId,
-              start: _start,
-              end: _end,
-              body: _body.text,
-            ),
-      _EditorOutcome.saved,
+    if (_repeat || _editingRoutine) {
+      if (_weekdays.isEmpty) {
+        setState(() => _error = AgendaRules.noWeekday);
+        return;
+      }
+      _run(l, () async {
+        final r = await widget.dataSource.saveChildRoutine(
+          routineId: _editingRoutine ? widget.routine?.id : null,
+          from: widget.date,
+          kind: _kind.wire,
+          weekdays: (_weekdays.toList()..sort()),
+          childId: childId,
+          start: _start,
+          end: _end,
+          body: _body.text,
+        );
+        return l.format(
+            KApp.agendaRoutineApplied, [r.created, l.formatDate(r.until)]);
+      });
+      return;
+    }
+    _run(l, () async {
+      if (event == null) {
+        await widget.dataSource.addChildEvent(
+          date: widget.date,
+          kind: _kind.wire,
+          childId: childId,
+          start: _start,
+          end: _end,
+          body: _body.text,
+        );
+      } else {
+        await widget.dataSource.updateChildEvent(
+          id: event.id,
+          date: widget.date,
+          kind: _kind.wire,
+          childId: childId,
+          start: _start,
+          end: _end,
+          body: _body.text,
+        );
+      }
+      return l[KApp.agendaSaved];
+    });
+  }
+
+  Widget _weekdayPicker(Localization l) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l[KApp.agendaRepeatDays],
+            style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
+        const SizedBox(height: Spacing.xs),
+        Wrap(
+          spacing: Spacing.xs,
+          runSpacing: Spacing.xs,
+          children: [
+            for (var w = 1; w <= 7; w++)
+              FilterChip(
+                key: ValueKey('agenda-weekday-$w'),
+                label: Text(l.weekdayAbbrev(w)),
+                selected: _weekdays.contains(w),
+                onSelected: _busy
+                    ? null
+                    : (on) => setState(() {
+                          on ? _weekdays.add(w) : _weekdays.remove(w);
+                          _error = null;
+                        }),
+              ),
+          ],
+        ),
+        const SizedBox(height: Spacing.xs),
+        Text(
+            l.format(
+                _editingRoutine
+                    ? KApp.agendaRoutineEditLead
+                    : KApp.agendaRepeatLead,
+                [l.formatDate(widget.date)]),
+            style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+      ],
     );
   }
 
@@ -458,7 +556,10 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
     final textTheme = Theme.of(context).textTheme;
     final tokens = context.tokens;
     final event = widget.event;
-    final structured = _kind.isStructured;
+    final routine = widget.routine;
+    if (_editingRoutine && routine != null) {
+      return _routineFrame(l, routine);
+    }
     return AppSheetFrame(
       title: l[event == null ? KApp.agendaNewTitle : KApp.agendaEditTitle],
       busy: _busy,
@@ -483,15 +584,100 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
               key: const ValueKey('agenda-delete-confirm'),
               message: l[KApp.agendaDeleteConfirm],
               yesLabel: l[KApp.agendaDelete],
-              onYes: () => _run(
-                  l,
-                  () => widget.dataSource.deleteChildEvent(event.id),
-                  _EditorOutcome.deleted),
+              onYes: () => _run(l, () async {
+                await widget.dataSource.deleteChildEvent(event.id);
+                return l[KApp.agendaDeleted];
+              }),
               noLabel: l[K.commonCancel],
               onNo: () => setState(() => _confirmingDelete = false),
               busy: _busy,
             ),
       children: [
+        if (routine != null) ...[
+          Text(
+              l.format(KApp.agendaRoutinePart, [
+                AgendaRules.weekdaysLabel(routine.weekdays, l.weekdayAbbrev)
+              ]),
+              style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              key: const ValueKey('agenda-routine-edit'),
+              onPressed: _busy ? null : () => _editRoutine(routine),
+              icon: const Icon(Icons.event_repeat_outlined),
+              label: Text(l[KApp.agendaRoutineEdit]),
+            ),
+          ),
+          const SizedBox(height: Spacing.sm),
+        ],
+        ..._fields(l),
+        if (event == null) ...[
+          const SizedBox(height: Spacing.sm),
+          SwitchListTile(
+            key: const ValueKey('agenda-repeat'),
+            contentPadding: EdgeInsets.zero,
+            title: Text(l[KApp.agendaRepeat]),
+            value: _repeat,
+            onChanged: _busy
+                ? null
+                : (on) => setState(() {
+                      _repeat = on;
+                      _error = null;
+                    }),
+          ),
+          if (_repeat) _weekdayPicker(l),
+        ],
+      ],
+    );
+  }
+
+  /// The routine itself, from this day on: its fields, its weekdays, and the
+  /// stop (confirmed in the sheet, U-38).
+  Widget _routineFrame(Localization l, ChildRoutine routine) {
+    return AppSheetFrame(
+      title: l[KApp.agendaRoutineEditTitle],
+      busy: _busy,
+      error: _error,
+      primaryLabel: l[K.commonSave],
+      onPrimary: () => _save(l),
+      secondaryLabel: l[K.commonCancel],
+      onSecondary: () => Navigator.of(context).pop(),
+      extraAction: AppSheetDangerAction(
+        key: const ValueKey('agenda-routine-stop'),
+        label: l[KApp.agendaRoutineStop],
+        icon: Icons.event_busy_outlined,
+        onPressed:
+            _busy ? null : () => setState(() => _confirmingDelete = true),
+      ),
+      confirmation: !_confirmingDelete
+          ? null
+          : AppSheetConfirmation.destructive(
+              key: const ValueKey('agenda-routine-stop-confirm'),
+              message: l.format(
+                  KApp.agendaRoutineStopConfirm, [l.formatDate(widget.date)]),
+              yesLabel: l[KApp.agendaRoutineStop],
+              onYes: () => _run(l, () async {
+                final gone = await widget.dataSource.stopChildRoutine(
+                    routineId: routine.id, from: widget.date);
+                return l.format(KApp.agendaRoutineStopped, [gone]);
+              }),
+              noLabel: l[K.commonCancel],
+              onNo: () => setState(() => _confirmingDelete = false),
+              busy: _busy,
+            ),
+      children: [
+        ..._fields(l),
+        const SizedBox(height: Spacing.md),
+        _weekdayPicker(l),
+      ],
+    );
+  }
+
+  List<Widget> _fields(Localization l) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    final structured = _kind.isStructured;
+    return [
         Text(l[KApp.agendaKindLabel],
             style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
         const SizedBox(height: Spacing.xs),
@@ -571,7 +757,6 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
           maxLength: widget.settings.agendaTextMaxChars,
           maxLines: 4,
         ),
-      ],
-    );
+    ];
   }
 }

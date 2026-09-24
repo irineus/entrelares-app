@@ -15,6 +15,7 @@ import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
+import 'package:entrelares_db_contracts/models/child_routine.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -598,6 +599,31 @@ abstract class CustodyDataSource {
 
   /// A soft delete: the row stays with who and when.
   Future<void> deleteChildEvent(int id);
+
+  // ── F-55 PR 3: the routine ───────────────────────────────────────────────
+
+  /// The family's routines still running (not stopped).
+  Future<List<ChildRoutine>> fetchChildRoutines();
+
+  /// Creates a routine ([routineId] null) or re-applies one from [from] on:
+  /// every [weekdays] day (ISO, 1 = Monday) from [from] to the last planned
+  /// day becomes an event. Server-enforced, per day, with the single event's
+  /// rule; one refused day refuses the whole routine, naming the day.
+  Future<({String routineId, int created, DateTime until})> saveChildRoutine({
+    String? routineId,
+    required DateTime from,
+    required String kind,
+    required List<int> weekdays,
+    int? childId,
+    String? start,
+    String? end,
+    String? body,
+  });
+
+  /// Removes the routine's events from [from] on and stops it. Returns how
+  /// many events left the agenda.
+  Future<int> stopChildRoutine(
+      {required String routineId, required DateTime from});
 
   // ── Lote 4: profile, account and the LGPD export ──────────────────────────
 
