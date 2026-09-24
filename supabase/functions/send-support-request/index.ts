@@ -48,9 +48,11 @@ import {
   type SupportCategory,
 } from "../_shared/i18n.ts";
 
-// ── The numbers. ONE home: `record_support_request` receives them from here and
-// `SupportRules` (core) mirrors them — `support_constants_mirror_test` reads this
-// file, so a change here without the client turns the core lane red.
+// ── The numbers. Since T-83 the limits and the message maximum are operator
+// parameters (`support.*` in app_settings); these constants are their FALLBACKS
+// and equal the migration seeds, and `SupportRules` (core) mirrors them —
+// `support_constants_mirror_test` reads this file and the migration. The message
+// minimum and the e-mail maximum stay constants.
 const MESSAGE_MIN_CHARS = 10;
 const MESSAGE_MAX_CHARS = 2000;
 const EMAIL_MAX_CHARS = 254;
@@ -217,8 +219,21 @@ serve(async (req: Request) => {
     const category = CATEGORIES.find((c) => c === payload.category);
     if (!category) return jsonResponse({ error: "invalid_category" }, 400);
 
+    // T-83: the operator's numbers, each with its constant as the fallback.
+    const setting = async (key: string, fallback: number): Promise<number> => {
+      const { data } = await admin.rpc("setting_int", { p_key: key, p_default: fallback });
+      return Number.isInteger(data) ? (data as number) : fallback;
+    };
+    const [messageMaxChars, anonHourly, anonDaily, memberHourly, memberDaily] = await Promise.all([
+      setting("support.message_max_chars", MESSAGE_MAX_CHARS),
+      setting("support.anon_hourly", ANON_HOURLY_LIMIT),
+      setting("support.anon_daily", ANON_DAILY_LIMIT),
+      setting("support.member_hourly", MEMBER_HOURLY_LIMIT),
+      setting("support.member_daily", MEMBER_DAILY_LIMIT),
+    ]);
+
     const message = (payload.message ?? "").trim();
-    if (message.length < MESSAGE_MIN_CHARS || message.length > MESSAGE_MAX_CHARS) {
+    if (message.length < MESSAGE_MIN_CHARS || message.length > messageMaxChars) {
       return jsonResponse({ error: "invalid_message" }, 400);
     }
 
@@ -260,8 +275,8 @@ serve(async (req: Request) => {
       p_diagnostics: diagnostics,
       p_language: lang,
       p_ip_hash: byProfile || isTest ? null : await ipHashOf(req, serviceKey),
-      p_hour_limit: byProfile ? MEMBER_HOURLY_LIMIT : ANON_HOURLY_LIMIT,
-      p_day_limit: byProfile ? MEMBER_DAILY_LIMIT : ANON_DAILY_LIMIT,
+      p_hour_limit: byProfile ? memberHourly : anonHourly,
+      p_day_limit: byProfile ? memberDaily : anonDaily,
     });
     if (recordError) {
       console.error(`[send-support-request] record failed: ${recordError.message}`);

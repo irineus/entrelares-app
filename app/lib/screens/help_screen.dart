@@ -41,6 +41,10 @@ class HelpScreen extends StatefulWidget {
   /// Opens a `mailto:`. A seam for tests; production launches the mail app.
   final Future<void> Function(Uri uri)? openMail;
 
+  /// T-83: reads the public settings for `support.message_max_chars`. Only a
+  /// signed-in person can read them; null (signed out) keeps the seed.
+  final Future<Map<String, String>> Function()? loadSettings;
+
   const HelpScreen({
     super.key,
     required this.accountEmail,
@@ -48,6 +52,7 @@ class HelpScreen extends StatefulWidget {
     required this.onSend,
     required this.onClose,
     this.openMail,
+    this.loadSettings,
   });
 
   static const Key categoryKey = ValueKey('help-category');
@@ -71,6 +76,22 @@ class _HelpScreenState extends State<HelpScreen> {
   SupportOutcome? _failure;
   SupportResult? _sent;
 
+  /// T-83: the operator's maximum when it could be read, the seed otherwise.
+  int _maxChars = SupportRules.messageMaxChars;
+
+  @override
+  void initState() {
+    super.initState();
+    final load = widget.loadSettings;
+    if (load != null) {
+      load().then((values) {
+        if (!mounted) return;
+        setState(() =>
+            _maxChars = PublicSettings(values).supportMessageMaxChars);
+      }).catchError((_) {/* the seed stands */});
+    }
+  }
+
   @override
   void dispose() {
     _message.dispose();
@@ -84,7 +105,8 @@ class _HelpScreenState extends State<HelpScreen> {
 
   Future<void> _send() async {
     setState(() => _submitted = true);
-    final messageOk = SupportRules.isValidMessage(_message.text);
+    final messageOk =
+        SupportRules.isValidMessage(_message.text, max: _maxChars);
     final emailOk = _signedIn || SupportRules.isValidEmail(_email.text);
     if (!messageOk || !emailOk) return;
 
@@ -176,7 +198,8 @@ class _HelpScreenState extends State<HelpScreen> {
       };
 
   Widget _form(Localization l) {
-    final messageError = _submitted && !SupportRules.isValidMessage(_message.text)
+    final messageError = _submitted &&
+            !SupportRules.isValidMessage(_message.text, max: _maxChars)
         ? l.format(KApp.helpMessageTooShort, ['${SupportRules.messageMinChars}'])
         : null;
     final emailError =
@@ -222,7 +245,7 @@ class _HelpScreenState extends State<HelpScreen> {
           hint: l[KApp.helpMessageHint],
           controller: _message,
           maxLines: 6,
-          maxLength: SupportRules.messageMaxChars,
+          maxLength: _maxChars,
           showCounter: true,
           enabled: !_busy,
           textCapitalization: TextCapitalization.sentences,

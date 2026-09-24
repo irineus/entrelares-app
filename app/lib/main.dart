@@ -334,6 +334,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           final signedIn = _phase == _AuthPhase.authed;
           return HelpScreen(
             accountEmail: signedIn ? _client.auth.currentUser?.email : null,
+            loadSettings: signedIn ? _dataSource.fetchPublicSettings : null,
             diagnostics: currentSupportDiagnostics(
               appVersion: Env.appVersion,
               language: _l.current.code,
