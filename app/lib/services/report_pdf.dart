@@ -46,11 +46,23 @@ Future<ReportFonts> loadReportFonts() async {
 /// [compress] exists for the tests: an uncompressed document keeps its text
 /// readable in the bytes, which is how the suite proves a sentence really
 /// reached the page instead of only the model.
+/// F-64: what a verifiable PDF carries — the QR's URL, the address printed
+/// under it, and until when it can be checked.
+class ReportStamp {
+  final String url;
+  final String address;
+  final DateTime untilLocal;
+
+  const ReportStamp(
+      {required this.url, required this.address, required this.untilLocal});
+}
+
 Future<Uint8List> buildReportPdf(
   CustodyReport report,
   Localization l, {
   bool compress = true,
   ReportFonts? fonts,
+  ReportStamp? stamp,
 }) async {
   final faces = fonts ?? await loadReportFonts();
   final theme = pw.ThemeData.withFont(base: faces.regular, bold: faces.bold);
@@ -87,6 +99,10 @@ Future<Uint8List> buildReportPdf(
       ),
       build: (context) => [
         ..._header(report, l),
+        if (stamp != null) ...[
+          _stampBlock(stamp, l),
+          pw.SizedBox(height: 10),
+        ],
         _paragraph(stripRichText(l[K.pdfDocImmutability]), size: 8.5),
         pw.SizedBox(height: 14),
         ..._summarySection(report, l),
@@ -126,6 +142,53 @@ Future<Uint8List> buildReportPdf(
 
   return doc.save();
 }
+
+/// F-64: the QR and the sentence that says what it opens. The QR is inside
+/// the bytes that get fingerprinted — it is part of the document it attests.
+pw.Widget _stampBlock(ReportStamp stamp, Localization l) => pw.Container(
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey400, width: 0.6),
+      ),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.UrlLink(
+            destination: stamp.url,
+            child: pw.BarcodeWidget(
+              barcode: pw.Barcode.qrCode(),
+              data: stamp.url,
+              width: 64,
+              height: 64,
+            ),
+          ),
+          pw.SizedBox(width: 10),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(l[K.pdfDocAttestTitle],
+                    style: pw.TextStyle(
+                        fontSize: 9.5, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 3),
+                pw.UrlLink(
+                  destination: stamp.url,
+                  child: _paragraph(
+                      l.format(K.pdfDocAttestBody, [stamp.address]),
+                      size: 8),
+                ),
+                pw.SizedBox(height: 2),
+                _paragraph(
+                    l.format(K.pdfDocAttestUntil,
+                        [l.formatDate(stamp.untilLocal)]),
+                    size: 8,
+                    color: PdfColors.grey700),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
 
 List<pw.Widget> _header(CustodyReport report, Localization l) => [
       pw.Text(l[K.pdfDocTitle],

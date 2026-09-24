@@ -97,6 +97,8 @@ class PublicSettings {
   // is off, the client only hides it.
   /// F-55 — the child entity and the day agenda.
   bool get viewersEnabled => parseBoolSetting(values, 'feature.viewers', false);
+  bool get reportAttestationEnabled =>
+      parseBoolSetting(values, 'feature.report_attestation', false);
   bool get childAgendaEnabled =>
       parseBoolSetting(values, 'feature.child_agenda', false);
 

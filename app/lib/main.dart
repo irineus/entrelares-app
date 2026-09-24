@@ -35,6 +35,7 @@ import 'screens/policy_update_screen.dart';
 import 'screens/premium_return_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/verify_report_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/update_password_screen.dart';
@@ -285,6 +286,15 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           // provider does — the fail-closed switch is the console config.
           googleEnabled: AuthProviders.googleEnabled(),
           onSignInWithGoogle: _signInWithGoogle,
+        ),
+      ),
+      // F-64: the public check of a verifiable report — no session needed
+      // (RouteRules.isVerify), the id never titled nor tracked.
+      GoRoute(
+        path: '/verificar/:id',
+        builder: (_, state) => VerifyReportScreen(
+          dataSource: _dataSource,
+          id: state.pathParameters['id'] ?? '',
         ),
       ),
       GoRoute(

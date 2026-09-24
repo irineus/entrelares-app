@@ -11,6 +11,7 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/child_routine.dart';
+import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -1705,6 +1706,48 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     await _client
         .rpc<dynamic>('delete_child_event', params: {'p_event_id': id});
   }
+
+  @override
+  Future<({String id, DateTime expiresAt})> issueReportAttestation(
+      DateTime from, DateTime to) async {
+    final r = Map<String, dynamic>.from(await _client.rpc<dynamic>(
+        'issue_report_attestation',
+        params: {'p_from': _isoDay(from), 'p_to': _isoDay(to)}) as Map);
+    return (
+      id: r['id'] as String,
+      expiresAt: DateTime.parse(r['expires_at'] as String).toUtc(),
+    );
+  }
+
+  @override
+  Future<void> attachReportHash(String id, String sha256) async {
+    await _client.rpc<dynamic>('attach_report_hash',
+        params: {'p_id': id, 'p_sha256': sha256});
+  }
+
+  @override
+  Future<List<ReportAttestation>> fetchReportAttestations() async {
+    // postgrest-dart orders DESCENDING unless told otherwise — newest first
+    // is exactly what the list wants, said out loud.
+    final rows = await _client
+        .from('report_attestations')
+        .select('id, period_from, period_to, issued_at, expires_at, revoked_at, sha256')
+        .order('issued_at', ascending: false)
+        .limit(50);
+    return rows.map(ReportAttestation.fromJson).toList();
+  }
+
+  @override
+  Future<void> revokeReportAttestation(String id) async {
+    await _client
+        .rpc<dynamic>('revoke_report_attestation', params: {'p_id': id});
+  }
+
+  @override
+  Future<Map<String, dynamic>> verifyReportAttestation(String id) async =>
+      Map<String, dynamic>.from(await _client.rpc<dynamic>(
+          'verify_report_attestation',
+          params: {'p_id': id}) as Map);
 
   @override
   Future<List<ChildRoutine>> fetchChildRoutines() async {

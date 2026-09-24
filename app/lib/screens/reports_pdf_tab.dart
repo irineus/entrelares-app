@@ -7,15 +7,18 @@ import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
 import '../theme/tokens.dart';
 import 'package:printing/printing.dart';
+import 'package:crypto/crypto.dart' show sha256;
 
 import '../env.dart';
 import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
+import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import '../services/custody_data_source.dart';
 import '../services/report_pdf.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/app_snack.dart';
 import '../widgets/rich_label.dart';
 
 /// "Relatório do histórico em PDF" (F-33) — port of `ReportsPdf.razor`, and
@@ -77,6 +80,10 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
 
   /// F-55: the agenda is on for this build — the PDF prints section 5.
   bool _agendaOn = false;
+
+  /// F-64: `feature.report_attestation` — the PDF goes out with its QR.
+  bool _attestOn = false;
+  List<ReportAttestation> _attestations = const [];
   bool _includeFutureSwaps = false;
 
   CustodyReport? _report;
@@ -127,6 +134,8 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       final settings =
           PublicSettings(await widget.dataSource.fetchPublicSettings());
       _agendaOn = settings.childAgendaEnabled;
+      _attestOn = settings.reportAttestationEnabled;
+      if (_attestOn) unawaited(_loadAttestations());
       if (!settings.childAgendaEnabled) return null;
       final children = await widget.dataSource.fetchChildren();
       if (!mounted) return null;
@@ -296,7 +305,37 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         ],
       );
 
-      final bytes = await buildReportPdf(report, l);
+      // F-64: the server attests the period FIRST, so the QR can be inside
+      // the bytes it fingerprints. A refusal (flag, Premium, a viewer) is
+      // not an error: the PDF goes out as it always did, without the QR.
+      String? attestId;
+      ReportStamp? stamp;
+      if (_attestOn && _isPremium && _me?.isViewer != true) {
+        try {
+          final issued =
+              await widget.dataSource.issueReportAttestation(start, end);
+          attestId = issued.id;
+          stamp = ReportStamp(
+            url: AttestationRules.url(Env.current.webOrigin, issued.id),
+            address: AttestationRules.address(Env.current.webOrigin, issued.id),
+            untilLocal: issued.expiresAt.toLocal(),
+          );
+        } catch (_) {/* no QR — the document itself stands */}
+      }
+      final bytes = await buildReportPdf(report, l, stamp: stamp);
+      var hashFailed = false;
+      if (attestId != null) {
+        try {
+          await widget.dataSource
+              .attachReportHash(attestId, sha256.convert(bytes).toString());
+        } catch (_) {
+          hashFailed = true;
+        }
+        unawaited(_loadAttestations());
+      }
+      if (hashFailed && mounted) {
+        showAppSnack(context, l[KApp.attestHashFailed], type: AppSnackType.info);
+      }
       // T-78: the period KIND only — never the dates or the header name.
       unawaited(widget.dataSource.analytics?.trackEvent(
               AnalyticsEvents.pdfExport,
@@ -366,6 +405,10 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
           if (_report != null && _bytes != null) ...[
             const SizedBox(height: 12),
             _readyCard(l),
+          ],
+          if (_attestOn && _attestations.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _attestationsCard(l),
           ],
         ],
       ],
@@ -565,6 +608,91 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   /// second reader of the same document; the useful native step is handing the
   /// file to the system — share sheet or the print dialog (which is where
   /// Android's own "Save as PDF" lives).
+  Future<void> _loadAttestations() async {
+    try {
+      final rows = await widget.dataSource.fetchReportAttestations();
+      if (!mounted) return;
+      setState(() => _attestations = rows);
+    } catch (_) {/* the list is a convenience; the PDF never waits on it */}
+  }
+
+  AttestationState _stateOf(ReportAttestation a) {
+    if (a.revokedAt != null) return AttestationState.revoked;
+    if (!a.expiresAt.isAfter(widget.now().toUtc())) {
+      return AttestationState.expired;
+    }
+    return a.sha256 == null ? AttestationState.pending : AttestationState.valid;
+  }
+
+  /// F-64: the family's issued reports; the admin revokes one that should no
+  /// longer count (the QR then says "revogado").
+  Widget _attestationsCard(Localization l) {
+    final theme = Theme.of(context);
+    final canRevoke = _me?.isAdmin == true;
+    String period(ReportAttestation a) => a.periodFrom == null
+        ? ''
+        : '${l.formatDate(a.periodFrom!)} – ${l.formatDate(a.periodTo!)}';
+    String stateLabel(AttestationState st) => l[switch (st) {
+          AttestationState.valid => KApp.attestStateValid,
+          AttestationState.pending => KApp.attestStatePending,
+          AttestationState.revoked => KApp.attestStateRevoked,
+          _ => KApp.attestStateExpired,
+        }];
+    return AppCard(
+      key: const ValueKey('attestations-card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l[KApp.attestSection], style: theme.textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text(l[KApp.attestSectionLead], style: theme.textTheme.bodySmall),
+          const SizedBox(height: 8),
+          for (final a in _attestations)
+            Row(
+              key: ValueKey('attestation-${a.id}'),
+              children: [
+                Expanded(
+                  child: Text(l.format(KApp.attestRowState,
+                      [period(a), stateLabel(_stateOf(a))])),
+                ),
+                if (canRevoke &&
+                    (_stateOf(a) == AttestationState.valid ||
+                        _stateOf(a) == AttestationState.pending))
+                  TextButton(
+                    key: ValueKey('attestation-revoke-${a.id}'),
+                    onPressed: () => _revoke(a, l, period(a)),
+                    child: Text(l[KApp.attestRevoke]),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _revoke(
+      ReportAttestation a, Localization l, String periodText) async {
+    final yes = await showDestructiveConfirm(
+      context: context,
+      title: l[KApp.attestRevoke],
+      message: l.format(KApp.attestRevokeConfirm, [periodText]),
+      yesLabel: l[KApp.attestRevoke],
+      noLabel: l[K.commonCancel],
+    );
+    if (!yes || !mounted) return;
+    try {
+      await widget.dataSource.revokeReportAttestation(a.id);
+      if (!mounted) return;
+      showAppSnack(context, l[KApp.attestRevoked2]);
+      await _loadAttestations();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(
+          context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
+  }
+
   Widget _readyCard(Localization l) {
     final report = _report!;
     return Card(

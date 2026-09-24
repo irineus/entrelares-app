@@ -746,6 +746,9 @@ abstract final class K {
   static const String pdfDocApproverMessage = 'pdf.doc.approverMessage';
   static const String pdfDocFooter = 'pdf.doc.footer';
   static const String pdfDocLearnMore = 'pdf.doc.learnMore';
+  static const String pdfDocAttestTitle = 'pdf.doc.attestTitle';
+  static const String pdfDocAttestBody = 'pdf.doc.attestBody';
+  static const String pdfDocAttestUntil = 'pdf.doc.attestUntil';
   static const String pdfDocActionInsert = 'pdf.doc.action.insert';
   static const String pdfDocActionDelete = 'pdf.doc.action.delete';
   static const String pdfDocActionUpdate = 'pdf.doc.action.update';
@@ -1885,6 +1888,9 @@ abstract final class K {
     pdfDocApproverMessage,
     pdfDocFooter,
     pdfDocLearnMore,
+    pdfDocAttestTitle,
+    pdfDocAttestBody,
+    pdfDocAttestUntil,
     pdfDocActionInsert,
     pdfDocActionDelete,
     pdfDocActionUpdate,
