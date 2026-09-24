@@ -1279,6 +1279,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       myProfile: _ownProfile,
       allProfiles: _members,
       offline: _offline,
+      onOpenPlan: widget.onOpenPlan,
     );
     if (outcome != null) {
       _load(silent: true);

@@ -16,6 +16,7 @@ import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/app_notification.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
+import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -921,6 +922,114 @@ class FakeCustodyDataSource implements CustodyDataSource {
     if (throwOnChildWrite != null) throw throwOnChildWrite!;
     childWrites.add('remove:$childId');
     children = [for (final c in children) if (c.id != childId) c];
+  }
+
+  // ── F-55 PR 2: the day agenda ──
+  List<ChildEvent> childEvents = [];
+  Object? throwOnEventWrite;
+  Object? throwOnEventRead;
+  final List<String> eventWrites = [];
+
+  @override
+  Future<List<ChildEvent>> fetchChildEvents(DateTime from, DateTime to,
+      {bool includeDeleted = false}) async {
+    if (throwOnEventRead != null) throw throwOnEventRead!;
+    final a = DateTime(from.year, from.month, from.day);
+    final b = DateTime(to.year, to.month, to.day);
+    return [
+      for (final e in childEvents)
+        if (!e.eventDate.isBefore(a) &&
+            !e.eventDate.isAfter(b) &&
+            (includeDeleted || !e.isDeleted))
+          e,
+    ];
+  }
+
+  @override
+  Future<int> addChildEvent({
+    required DateTime date,
+    required String kind,
+    int? childId,
+    String? start,
+    String? end,
+    String? body,
+  }) async {
+    if (throwOnEventWrite != null) throw throwOnEventWrite!;
+    eventWrites.add('add:$kind:${childId ?? '-'}:${start ?? '-'}:'
+        '${end ?? '-'}:${body ?? ''}');
+    final id = childEvents.fold<int>(0, (m, e) => e.id > m ? e.id : m) + 1;
+    childEvents = [
+      ...childEvents,
+      ChildEvent(
+        id: id,
+        familyId: family?.id ?? 1,
+        childId: childId,
+        eventDate: DateTime(date.year, date.month, date.day),
+        startTime: start,
+        endTime: end,
+        kind: kind,
+        body: (body ?? '').trim().isEmpty ? null : body!.trim(),
+        createdBy: members.firstOrNull?.id,
+        createdAt: DateTime.now().toUtc(),
+      ),
+    ];
+    return id;
+  }
+
+  @override
+  Future<void> updateChildEvent({
+    required int id,
+    required DateTime date,
+    required String kind,
+    int? childId,
+    String? start,
+    String? end,
+    String? body,
+  }) async {
+    if (throwOnEventWrite != null) throw throwOnEventWrite!;
+    eventWrites.add('update:$id:$kind:${start ?? '-'}:${body ?? ''}');
+    childEvents = [
+      for (final e in childEvents)
+        e.id == id
+            ? ChildEvent(
+                id: e.id,
+                familyId: e.familyId,
+                childId: childId,
+                eventDate: DateTime(date.year, date.month, date.day),
+                startTime: start,
+                endTime: end,
+                kind: kind,
+                body: (body ?? '').trim().isEmpty ? null : body!.trim(),
+                createdBy: e.createdBy,
+                createdAt: e.createdAt,
+              )
+            : e,
+    ];
+  }
+
+  @override
+  Future<void> deleteChildEvent(int id) async {
+    if (throwOnEventWrite != null) throw throwOnEventWrite!;
+    eventWrites.add('delete:$id');
+    childEvents = [
+      for (final e in childEvents)
+        e.id == id
+            ? ChildEvent(
+                id: e.id,
+                familyId: e.familyId,
+                childId: e.childId,
+                eventDate: e.eventDate,
+                startTime: e.startTime,
+                endTime: e.endTime,
+                kind: e.kind,
+                body: e.body,
+                createdBy: e.createdBy,
+                createdAt: e.createdAt,
+                deletedBy: members.firstOrNull?.id,
+                deletedAt: DateTime.now().toUtc(),
+              )
+            : e,
+    ];
   }
 
   // ── Lote 4: profile, account and the LGPD export ──

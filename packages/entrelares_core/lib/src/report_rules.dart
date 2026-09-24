@@ -13,6 +13,7 @@
 /// reads under RLS.
 library;
 
+import 'agenda_rules.dart';
 import 'audit_rules.dart';
 import 'calendar_rules.dart' show MemberView;
 import 'date_math.dart';
@@ -442,6 +443,56 @@ List<ReportDayAccount> reportDayAccountsInOrder(
         return byDay != 0 ? byDay : a.writtenAtLocal.compareTo(b.writtenAtLocal);
       });
 
+/// F-55: one agenda item as section 5 of the document prints it — the day,
+/// the hours, the kind in the reader's language, the child, the text. Built by
+/// the caller from the live (not deleted) events of the period.
+class ReportAgendaItem {
+  final DateTime date;
+
+  /// "07:30–12:00", "07:30", or null.
+  final String? timeRange;
+  final String kindLabel;
+  final String? childName;
+  final String? body;
+
+  /// The start (`HH:mm`, null when untimed) and the instant it was written —
+  /// the order within a day ([reportAgendaInOrder]).
+  final String? start;
+  final DateTime createdAt;
+
+  const ReportAgendaItem({
+    required this.date,
+    required this.kindLabel,
+    required this.createdAt,
+    this.timeRange,
+    this.childName,
+    this.body,
+    this.start,
+  });
+}
+
+/// The agenda of a period in reading order: by day, then as the day sheet
+/// reads it (untimed first, then by start, then as written).
+List<ReportAgendaItem> reportAgendaInOrder(Iterable<ReportAgendaItem> items) {
+  final byDay = <DateTime, List<ReportAgendaItem>>{};
+  for (final i in items) {
+    byDay.putIfAbsent(dateOnly(i.date), () => []).add(i);
+  }
+  final days = byDay.keys.toList()..sort();
+  return [
+    for (final d in days)
+      ...AgendaRules.timeline(
+        byDay[d]!,
+        (i) => AgendaEntry(
+          id: 0,
+          kind: AgendaKind.other,
+          start: i.start,
+          createdAt: i.createdAt,
+        ),
+      ),
+  ];
+}
+
 class CustodyReport {
   final String familyName;
 
@@ -474,6 +525,11 @@ class CustodyReport {
   /// order ([reportDayAccountsInOrder]).
   final List<ReportDayAccount> dayAccounts;
 
+  /// F-55: section 5 — the agenda of the period, in reading order. NULL when
+  /// the agenda is off for this build (the section is not printed at all);
+  /// empty when it is on and the period has nothing.
+  final List<ReportAgendaItem>? agenda;
+
   const CustodyReport({
     required this.familyName,
     required this.childName,
@@ -488,6 +544,7 @@ class CustodyReport {
     required this.includesFutureSwaps,
     this.caregiverTimelines = const [],
     this.dayAccounts = const [],
+    this.agenda,
   });
 
   int get totalDays =>
@@ -525,6 +582,8 @@ CustodyReport buildCustodyReport({
   // F-67: section 4. Enrichment like the others — absent, it prints its
   // empty line.
   List<ReportDayAccount> dayAccounts = const [],
+  // F-55: section 5. Null leaves the section out (the agenda is off).
+  List<ReportAgendaItem>? agenda,
 }) {
   final stats = caregiverStats(
     members: members,
@@ -571,6 +630,7 @@ CustodyReport buildCustodyReport({
             l: l,
           ),
     dayAccounts: reportDayAccountsInOrder(dayAccounts),
+    agenda: agenda == null ? null : reportAgendaInOrder(agenda),
   );
 }
 

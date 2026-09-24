@@ -68,3 +68,17 @@ Future<CareSchedule> readDayById(SupabaseClient who, int id) async =>
 Future<void> saveDay(SupabaseClient who, CareSchedule day) async {
   await who.from('care_schedules').update(day.toUpdateJson()).eq('id', day.id);
 }
+
+/// T-84 — a phase-6 `feature.*` flag, read and written on the shared dev
+/// project. The entrypoint turns `feature.child_agenda` OFF for the whole run
+/// (with it on, the F-55 guard freezes `care_schedules.notes`, which older
+/// suites edit as their generic field) and each agenda suite turns it ON for
+/// its own groups only.
+Future<String> readFlag(GateFixture fx, String key) async => (await fx.service
+        .from('app_settings')
+        .select('value')
+        .eq('key', key))
+    .single['value'] as String;
+
+Future<void> writeFlag(GateFixture fx, String key, String value) =>
+    fx.service.from('app_settings').update({'value': value}).eq('key', key);

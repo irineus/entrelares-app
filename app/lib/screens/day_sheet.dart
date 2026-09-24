@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
+import '../widgets/day_agenda.dart';
 import '../widgets/ui/ui.dart';
 import '../theme/tokens.dart';
 
@@ -82,6 +83,7 @@ Future<DaySheetOutcome?> showDaySheet({
   PublicSettings settings = PublicSettings.unloaded,
   Iterable<DateTime> frozenDates = const [],
   bool offline = false,
+  VoidCallback? onOpenPlan,
 }) {
   return showAppSheet<DaySheetOutcome>(
     context: context,
@@ -102,6 +104,7 @@ Future<DaySheetOutcome?> showDaySheet({
       settings: settings,
       frozenDates: frozenDates,
       offline: offline,
+      onOpenPlan: onOpenPlan,
     ),
   );
 }
@@ -140,6 +143,9 @@ class _DaySheet extends StatefulWidget {
   /// server, so no write is attempted or parked for later.
   final bool offline;
 
+  /// F-55: where the agenda's Premium CTA lands (`/family/plan`).
+  final VoidCallback? onOpenPlan;
+
   const _DaySheet({
     required this.date,
     required this.day,
@@ -157,6 +163,7 @@ class _DaySheet extends StatefulWidget {
     required this.settings,
     required this.frozenDates,
     this.offline = false,
+    this.onOpenPlan,
   });
 
   @override
@@ -785,6 +792,9 @@ class _DaySheetState extends State<_DaySheet> {
   /// observation differs from the one on the day today (the STORED text, not
   /// the editor's — a revert does not save the editor's fields).
   Future<bool> _shouldAskRevertNotes() async {
+    // F-55: with the agenda on the observation is read-only and the revert
+    // moves no text (the server ignores the choice too).
+    if (_agendaOn) return false;
     final snapshot =
         await widget.dataSource.fetchPreEditNotes(widget.date);
     if (snapshot == null) return false;
@@ -997,6 +1007,7 @@ class _DaySheetState extends State<_DaySheet> {
           ..._reportForm(l)
         else if (!editing) ...[
           _summary(l, day, assignment),
+          if (_agendaOn) _agenda(),
           ..._accountsSection(l),
         ],
         if (editing) ...[
@@ -1007,10 +1018,31 @@ class _DaySheetState extends State<_DaySheet> {
             const SizedBox(height: Spacing.md),
           ],
           ..._form(l),
+          if (_agendaOn) _agenda(),
         ],
       ],
     );
   }
+
+  /// F-55: the agenda is on for this family's build (`feature.child_agenda`).
+  bool get _agendaOn => widget.settings.childAgendaEnabled;
+
+  Widget _agenda() => DayAgendaSection(
+        date: widget.date,
+        today: widget.today,
+        dataSource: widget.dataSource,
+        settings: widget.settings,
+        isPremium: widget.isPremium,
+        me: widget.myProfile,
+        allProfiles: widget.allProfiles,
+        offline: widget.offline,
+        onOpenPlan: widget.onOpenPlan == null
+            ? null
+            : () {
+                Navigator.of(context).pop();
+                widget.onOpenPlan!();
+              },
+      );
 
   /// F-67: the day's relatos under the summary, in the order they were
   /// written; a corrected one stays, in the undone style, with the instant
@@ -1177,7 +1209,7 @@ class _DaySheetState extends State<_DaySheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _statePills(l, day, assignment),
-        if (notes.isNotEmpty) ...[
+        if (notes.isNotEmpty && !_agendaOn) ...[
           const SizedBox(height: Spacing.md),
           Text(l[K.editorDayNote],
               style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
@@ -1442,20 +1474,24 @@ class _DaySheetState extends State<_DaySheet> {
       // U-28 QA: the explanation left the helper line for an ⓘ on the label.
       // `AppTextField` keeps the integrated label, which the owner named as the
       // best thing the port brought — so it stays a field, with a tip beside it.
-      Row(
-        children: [
-          Expanded(
-            child: AppTextField(
-              label: l[K.editorDayNote],
-              hint: l[K.editorDayNotePlaceholder],
-              controller: _notes,
-              maxLength: 100,
+      // F-55: with the agenda on, the observation IS the agenda's Nota — the
+      // field leaves, and the section under the form takes its place.
+      if (!_agendaOn) ...[
+        Row(
+          children: [
+            Expanded(
+              child: AppTextField(
+                label: l[K.editorDayNote],
+                hint: l[K.editorDayNotePlaceholder],
+                controller: _notes,
+                maxLength: 100,
+              ),
             ),
-          ),
-          AppInfoTip(message: l[K.editorDayNoteHint]),
-        ],
-      ),
-      const SizedBox(height: Spacing.md),
+            AppInfoTip(message: l[K.editorDayNoteHint]),
+          ],
+        ),
+        const SizedBox(height: Spacing.md),
+      ],
 
       // ── Handoff time (T-27: transition days only) ──
       //

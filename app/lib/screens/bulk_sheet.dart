@@ -444,7 +444,10 @@ class _BulkSheetState extends State<_BulkSheet> {
           }
         }
 
-        final notesText = _notes.text.trim();
+        // F-55: with the agenda on the observation is read-only — the batch
+        // neither writes nor clears it.
+        final notesText =
+            widget.settings.childAgendaEnabled ? '' : _notes.text.trim();
         final handoffWire = proposedHandoff == null
             ? null
             : '${proposedHandoff.hour.toString().padLeft(2, '0')}:'
@@ -553,7 +556,7 @@ class _BulkSheetState extends State<_BulkSheet> {
           bulkActualParentId: _actualParentId,
           clearActual: _clearActual,
           bulkNotes: notesText.isEmpty ? null : notesText,
-          clearNotes: _clearNotes,
+          clearNotes: _clearNotes && !widget.settings.childAgendaEnabled,
           bulkHour: _handoff?.hour ?? -1,
           clearHandoff: _clearHandoff,
           proposedHandoff: proposedHandoff,
@@ -841,6 +844,8 @@ class _BulkSheetState extends State<_BulkSheet> {
                       // section label above the field REPEATED the field's
                       // own integrated label — the checkbox rides beside the
                       // field instead, the way the day sheet parks its ⓘ.
+                      // F-55: with the agenda on, the observation is read-only.
+                      if (!widget.settings.childAgendaEnabled)
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [

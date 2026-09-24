@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
 import '../theme/tokens.dart';
 
+import 'package:entrelares_db_contracts/models/child.dart';
+import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
@@ -65,6 +67,12 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   /// "by affected date" reading those tabs give the calendar changes.
   List<DayAccount> _dayAccounts = const [];
 
+  /// F-55: the agenda events whose DAY falls in the period, deleted ones
+  /// included — the record says who added and who removed. Empty with the
+  /// agenda off.
+  List<ChildEvent> _agendaEvents = const [];
+  List<Child> _children = const [];
+
   /// F-45: log id → the request whose resolution produced that log.
   Map<int, SwapOrigin> _origins = const {};
 
@@ -91,6 +99,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
       _activity = const [];
       _account = const [];
       _dayAccounts = const [];
+      _agendaEvents = const [];
       _origins = const {};
       _expandedBatches.clear();
     });
@@ -100,6 +109,8 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
       var activity = const <ActivityLog>[];
       var account = const <AccountLog>[];
       var dayAccounts = const <DayAccount>[];
+      var agendaEvents = const <ChildEvent>[];
+      var children = _children;
       var hasMore = false;
       Family? family = _family;
 
@@ -119,6 +130,19 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
           activity =
               await widget.dataSource.fetchActivityLogsForPeriod(start, end);
           dayAccounts = await widget.dataSource.fetchDayAccounts(start, end);
+          // F-55: best-effort — a failure costs the agenda lines, never the
+          // calendar trail.
+          try {
+            final settings = PublicSettings(
+                await widget.dataSource.fetchPublicSettings());
+            if (settings.childAgendaEnabled) {
+              agendaEvents = await widget.dataSource
+                  .fetchChildEvents(start, end, includeDeleted: true);
+              children = await widget.dataSource.fetchChildren();
+            }
+          } catch (_) {
+            agendaEvents = const [];
+          }
       }
 
       final origins = await _originsFor(activity);
@@ -129,6 +153,8 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
         _activity = activity;
         _account = account;
         _dayAccounts = dayAccounts;
+        _agendaEvents = agendaEvents;
+        _children = children;
         _family = family;
         _origins = origins;
         _hasMore = hasMore;
@@ -349,7 +375,56 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   List<Widget> _scheduleTimeline(Localization l) => [
         ..._calendarChanges(l),
         ..._dayAccountTimeline(l),
+        ..._agendaTimeline(l),
       ];
+
+  /// F-55: who added to the agenda and who removed from it — creation and
+  /// deletion only, never each edit (owner, 24/09/2026). A note converted from
+  /// the old observation was added by nobody, so it has no "added" entry.
+  List<Widget> _agendaTimeline(Localization l) {
+    final entries = <({DateTime at, bool deleted, ChildEvent event})>[
+      for (final e in _agendaEvents) ...[
+        if (e.sourceScheduleId == null)
+          (at: e.createdAt, deleted: false, event: e),
+        if (e.deletedAt != null) (at: e.deletedAt!, deleted: true, event: e),
+      ],
+    ]..sort((a, b) => b.at.compareTo(a.at));
+    if (entries.isEmpty) return const [];
+    final textTheme = Theme.of(context).textTheme;
+    return [
+      const SizedBox(height: 12),
+      Text(l[KApp.agendaSection], style: textTheme.titleSmall),
+      const SizedBox(height: Spacing.xs),
+      for (final x in entries)
+        _item(
+          badge: x.deleted ? AuditBadge.deleted : AuditBadge.created,
+          icon: Icons.event_note_outlined,
+          children: [
+            Text(l.format(K.auditDayLabel, [l.formatDate(x.event.eventDate)]),
+                style: textTheme.labelSmall),
+            Text(l.format(
+                x.deleted ? KApp.agendaAuditDeleted : KApp.agendaAuditAdded, [
+              _nameOf(x.deleted ? x.event.deletedBy : x.event.createdBy,
+                  l[K.auditSystemTrigger])
+            ])),
+            Text(
+                [
+                  ?AgendaRules.timeRange(
+                      x.event.startTime, x.event.endTime),
+                  l[(AgendaKind.parse(x.event.kind) ?? AgendaKind.other)
+                      .labelKey],
+                  ...[
+                    for (final c in _children)
+                      if (c.id == x.event.childId) c.firstName
+                  ],
+                  ?x.event.body,
+                ].join(' · '),
+                style: textTheme.bodySmall),
+          ],
+          timestamp: l.formatDateTime(x.at.toLocal()),
+        ),
+    ];
+  }
 
   /// F-67: the period's relatos as entries of their own kind, after the
   /// calendar changes — the day each is ABOUT on the first line, the instant
@@ -404,8 +479,11 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
 
   List<Widget> _calendarChanges(Localization l) {
     if (_activity.isEmpty) {
-      // A period with relatos and no calendar change is not "empty".
-      if (_dayAccounts.isNotEmpty) return const [];
+      // A period with relatos (or agenda entries) and no calendar change is
+      // not "empty".
+      if (_dayAccounts.isNotEmpty || _agendaEvents.isNotEmpty) {
+        return const [];
+      }
       return [
         _emptyState(Icons.history, l[K.auditEmptyTitle], l[K.auditEmptyBody])
       ];

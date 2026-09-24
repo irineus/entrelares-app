@@ -42,6 +42,9 @@ const _usageReportKeys = {
   'oldest_pending_created_at',
   // notices, day_accounts
   'total', 'by_outcome', 'outcome', 'corrections',
+  // F-55: the agenda — counts only (weeks gain `agenda_events`)
+  'agenda', 'agenda_events', 'children', 'events_active', 'events_ahead',
+  'events_deleted', 'notes_active', 'converted', 'by_kind', 'kind',
 };
 
 Set<String> _keysOf(Object? node) => switch (node) {
@@ -815,6 +818,21 @@ void platformOperatorTests(GateFixture fx) {
         'note': '$marker-outcome',
       });
 
+      // F-55: a child and an agenda event, both carrying the marker — the
+      // report counts them and says neither the name nor the text.
+      final child = (await fx.service
+              .from('children')
+              .insert({'family_id': fam.familyId, 'first_name': '$marker-kid'})
+              .select('id'))
+          .single['id'] as int;
+      await fx.service.from('child_events').insert({
+        'family_id': fam.familyId,
+        'child_id': child,
+        'event_date': isoDate(days[1]),
+        'kind': 'school',
+        'body': '$marker-agenda',
+      });
+
       await fx.service.from('day_accounts').insert({
         'family_id': fam.familyId,
         'account_date': isoDate(addDays(today, -1)),
@@ -918,6 +936,12 @@ void platformOperatorTests(GateFixture fx) {
           {'outcome': 'cancelled', 'count': 1}
         ]);
         expect((report['day_accounts'] as Map)['total'], 1);
+        final agenda = report['agenda'] as Map<String, dynamic>;
+        expect(agenda['children'], 1);
+        expect(agenda['events_active'], 1);
+        expect(agenda['by_kind'], [
+          {'kind': 'school', 'count': 1}
+        ]);
 
         expect(report['weeks'] as List, hasLength(12));
       } finally {
