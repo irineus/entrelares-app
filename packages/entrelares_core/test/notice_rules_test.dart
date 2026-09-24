@@ -6,8 +6,12 @@
 // reachable only from the carer whose day it is, with no stated estimate. Both
 // halves are asserted here and again in the DB gate — the client MIRRORS, the
 // database ENFORCES, and a mirror nobody checks is how the two drift.
+import 'dart:io';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:test/test.dart';
+
+import 'mirrors/repo_files.dart';
 
 void main() {
   group('wire values', () {
@@ -388,8 +392,22 @@ void main() {
   });
 
   group('the numbers the UI says out loud', () {
-    test('the cap is two, and the note ceiling is shared with the answer', () {
-      expect(noticeMaxPerSenderPerDay, 2);
+    test('the cap fallback is the migration seed, and the key rules it', () {
+      // T-82: the number lives in `day_notice.daily_cap`; the constant only
+      // speaks before the settings load, and must say what the seed says.
+      final seed = RegExp(r"\('day_notice\.daily_cap', '(\d+)'")
+          .firstMatch(migrationsDirectory()
+              .listSync()
+              .whereType<File>()
+              .map((f) => f.readAsStringSync())
+              .join('\n'));
+      expect(seed, isNotNull, reason: 'no migration seeds day_notice.daily_cap');
+      expect(noticeMaxPerSenderPerDay, int.parse(seed!.group(1)!));
+      expect(PublicSettings.unloaded.dayNoticeDailyCap, noticeMaxPerSenderPerDay);
+      expect(PublicSettings(const {'day_notice.daily_cap': '3'}).dayNoticeDailyCap, 3);
+    });
+
+    test('the note ceiling is shared with the answer', () {
       expect(noticeNoteMaxLength, 140);
       expect(noticeAnswerNoteMaxLength, noticeNoteMaxLength);
     });

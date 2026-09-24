@@ -107,6 +107,11 @@ const List<int> noticeEtaOptions = [15, 30, 60];
 /// conversation, and the cap is the main thing holding this item away from
 /// F-35. The number is stated in the UI BEFORE it blocks — a cap that only
 /// announces itself by refusing reads as a bug.
+///
+/// T-82 (24/09/2026): the live number is `day_notice.daily_cap` in
+/// `app_settings` (range 1–3), read through `PublicSettings.dayNoticeDailyCap`;
+/// this constant is only its fallback before the settings load, and a test
+/// pins it to the migration's seed.
 const int noticeMaxPerSenderPerDay = 2;
 
 /// The optional free line. Short on purpose: it explains the closed reason, it

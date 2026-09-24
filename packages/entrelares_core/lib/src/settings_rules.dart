@@ -8,6 +8,8 @@
 /// lookup+parse seam so the fallback behaviour is tested without a client.
 library;
 
+import 'notice_rules.dart' show noticeMaxPerSenderPerDay;
+
 /// The integer at [key], or [fallback] when the map is null (settings never
 /// loaded), the key is missing, or the value is not a valid integer.
 ///
@@ -69,6 +71,11 @@ class PublicSettings {
   int get dayAccountMaxDaysBack => _int('day_account.max_days_back', 30);
   int get dayAccountMaxChars => _int('day_account.max_chars', 1000);
   int get dayAccountDailyCap => _int('day_account.daily_cap', 10);
+
+  // T-82: the F-52 aviso cap, an operator parameter since 24/09/2026 (default
+  // 2, range 1–3). The constant is the fallback and equals the migration seed.
+  int get dayNoticeDailyCap =>
+      _int('day_notice.daily_cap', noticeMaxPerSenderPerDay);
 
   // T-39 billing (F-48 promotional prices: 549, not 490 — Asaas refuses
   // Pix/boleto charges under R$ 5,00). Enabled=false shows the waitlist.
