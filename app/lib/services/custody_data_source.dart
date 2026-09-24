@@ -17,6 +17,7 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/child_routine.dart';
+import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -621,6 +622,27 @@ abstract class CustodyDataSource {
 
   /// A soft delete: the row stays with who and when.
   Future<void> deleteChildEvent(int id);
+
+  // ── F-64: the verifiable report ──────────────────────────────────────────
+
+  /// `issue_report_attestation` — the server attests a summary (initials and
+  /// counts) of [from]..[to]. Refused with `feature.report_attestation` off or
+  /// without Premium; the PDF then goes out without its QR.
+  Future<({String id, DateTime expiresAt})> issueReportAttestation(
+      DateTime from, DateTime to);
+
+  /// `attach_report_hash` — the SHA-256 of the final PDF bytes, once.
+  Future<void> attachReportHash(String id, String sha256);
+
+  /// The family's issued reports, newest first.
+  Future<List<ReportAttestation>> fetchReportAttestations();
+
+  /// `revoke_report_attestation` — admin only.
+  Future<void> revokeReportAttestation(String id);
+
+  /// `verify_report_attestation` — PUBLIC (anon): the closed state and, while
+  /// valid, the period, the attested summary and the fingerprint.
+  Future<Map<String, dynamic>> verifyReportAttestation(String id);
 
   // ── F-55 PR 3: the routine ───────────────────────────────────────────────
 

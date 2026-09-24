@@ -18,6 +18,7 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/child_routine.dart';
+import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -1074,6 +1075,41 @@ class FakeCustodyDataSource implements CustodyDataSource {
       ? ''
       : ':notify=${n.to.wire}/${n.push ? 'push' : '-'}/'
           '${n.inApp ? 'app' : '-'}/${n.remindMinutes ?? '-'}';
+
+  // ── F-64: the verifiable report ──
+  List<ReportAttestation> attestations = [];
+  Object? throwOnIssue;
+  Object? throwOnAttach;
+  final List<String> attestWrites = [];
+  Map<String, dynamic> verifyAnswer = const {'state': 'unknown'};
+
+  @override
+  Future<({String id, DateTime expiresAt})> issueReportAttestation(
+      DateTime from, DateTime to) async {
+    if (throwOnIssue != null) throw throwOnIssue!;
+    const id = '3f2c9a1e-7b4d-4c2a-9e8f-0a1b2c3d4e5f';
+    attestWrites.add('issue');
+    return (id: id, expiresAt: DateTime.utc(2027, 9, 24));
+  }
+
+  @override
+  Future<void> attachReportHash(String id, String sha256) async {
+    if (throwOnAttach != null) throw throwOnAttach!;
+    attestWrites.add('hash:$sha256');
+  }
+
+  @override
+  Future<List<ReportAttestation>> fetchReportAttestations() async =>
+      attestations;
+
+  @override
+  Future<void> revokeReportAttestation(String id) async {
+    attestWrites.add('revoke:$id');
+  }
+
+  @override
+  Future<Map<String, dynamic>> verifyReportAttestation(String id) async =>
+      verifyAnswer;
 
   // ── F-55 PR 3: the routine ──
   List<ChildRoutine> childRoutines = [];

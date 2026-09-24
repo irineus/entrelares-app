@@ -10,6 +10,7 @@ export 'src/activity_rules.dart';
 export 'src/admin_mode_offer.dart';
 export 'src/agenda_rules.dart';
 export 'src/viewer_rules.dart';
+export 'src/attestation_rules.dart';
 export 'src/analytics_catalog.dart';
 export 'src/analytics_rules.dart';
 export 'src/appearance_rules.dart';

@@ -191,7 +191,7 @@ class Env {
   /// Mirrors `pubspec.yaml`'s `version:` — the web's `AppVersion.Display`.
   /// Only the F-17 export reads it, and a stale value there would misdate an
   /// LGPD record, so `env_version_test.dart` fails the build if the two drift.
-  static const String appVersion = '2.8.17+149';
+  static const String appVersion = '2.8.18+150';
 }
 
 /// T-62 — the PUBLIC Firebase Web config of one environment, plus its VAPID

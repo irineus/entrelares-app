@@ -525,6 +525,41 @@ abstract final class KApp {
   static const String viewerLeaveBody = 'app.viewer.leaveBody';
   static const String viewerLeaveButton = 'app.viewer.leaveButton';
   static const String viewerInvitedBody = 'app.viewer.invitedBody';
+  // ── F-64: the verifiable report ──
+  static const String attestPageTitle = 'app.attest.pageTitle';
+  static const String attestValid = 'app.attest.valid';
+  static const String attestPending = 'app.attest.pending';
+  static const String attestRevoked = 'app.attest.revoked';
+  static const String attestExpired = 'app.attest.expired';
+  static const String attestUnknown = 'app.attest.unknown';
+  static const String attestError = 'app.attest.error';
+  static const String attestIssuedAt = 'app.attest.issuedAt';
+  static const String attestPeriod = 'app.attest.period';
+  static const String attestValidUntil = 'app.attest.validUntil';
+  static const String attestFingerprint = 'app.attest.fingerprint';
+  static const String attestSummary = 'app.attest.summary';
+  static const String attestDaysPlanned = 'app.attest.daysPlanned';
+  static const String attestDaysBy = 'app.attest.daysBy';
+  static const String attestDaysSwapped = 'app.attest.daysSwapped';
+  static const String attestSwaps = 'app.attest.swaps';
+  static const String attestDayAccounts = 'app.dayAccount.attestCount';
+  static const String attestInitialsNote = 'app.attest.initialsNote';
+  static const String attestCompare = 'app.attest.compare';
+  static const String attestCompareHint = 'app.attest.compareHint';
+  static const String attestMatch = 'app.attest.match';
+  static const String attestMismatch = 'app.attest.mismatch';
+  static const String attestNoPicker = 'app.attest.noPicker';
+  static const String attestSection = 'app.attest.section';
+  static const String attestSectionLead = 'app.attest.sectionLead';
+  static const String attestRowState = 'app.attest.rowState';
+  static const String attestStateValid = 'app.attest.stateValid';
+  static const String attestStatePending = 'app.attest.statePending';
+  static const String attestStateRevoked = 'app.attest.stateRevoked';
+  static const String attestStateExpired = 'app.attest.stateExpired';
+  static const String attestRevoke = 'app.attest.revoke';
+  static const String attestRevokeConfirm = 'app.attest.revokeConfirm';
+  static const String attestRevoked2 = 'app.attest.revokedDone';
+  static const String attestHashFailed = 'app.attest.hashFailed';
   static const String agendaNotifyLabel = 'app.agenda.notifyLabel';
   static const String agendaNotifyNone = 'app.agenda.notifyNone';
   static const String agendaNotifySelf = 'app.agenda.notifySelf';
@@ -893,6 +928,40 @@ abstract final class KApp {
     viewerLeaveBody,
     viewerLeaveButton,
     viewerInvitedBody,
+    attestPageTitle,
+    attestValid,
+    attestPending,
+    attestRevoked,
+    attestExpired,
+    attestUnknown,
+    attestError,
+    attestIssuedAt,
+    attestPeriod,
+    attestValidUntil,
+    attestFingerprint,
+    attestSummary,
+    attestDaysPlanned,
+    attestDaysBy,
+    attestDaysSwapped,
+    attestSwaps,
+    attestDayAccounts,
+    attestInitialsNote,
+    attestCompare,
+    attestCompareHint,
+    attestMatch,
+    attestMismatch,
+    attestNoPicker,
+    attestSection,
+    attestSectionLead,
+    attestRowState,
+    attestStateValid,
+    attestStatePending,
+    attestStateRevoked,
+    attestStateExpired,
+    attestRevoke,
+    attestRevokeConfirm,
+    attestRevoked2,
+    attestHashFailed,
     agendaNotifyLabel,
     agendaNotifyNone,
     agendaNotifySelf,
@@ -1413,6 +1482,40 @@ abstract final class StringsAppPtBr {
     KApp.viewerLeaveBody: 'Como visualizador, ao sair você é apagado na hora: sua conta e seus dados. Nada no histórico da família depende de você.',
     KApp.viewerLeaveButton: 'Sair e apagar minha conta',
     KApp.viewerInvitedBody: '{0} convidou você para acompanhar o calendário da família {1} como visualizador: você vê o plano, a agenda e as notificações informativas, sem alterar nada.',
+    KApp.attestPageTitle: 'Conferir relatório',
+    KApp.attestValid: 'Este relatório foi emitido pelo Entrelares e está válido.',
+    KApp.attestPending: 'Este relatório foi iniciado, mas o PDF não foi concluído: não há impressão digital para conferir.',
+    KApp.attestRevoked: 'Este relatório foi revogado pela família em {0}. Ele não vale mais como conferência.',
+    KApp.attestExpired: 'Este relatório venceu em {0}. A conferência vale por um prazo; depois dele, o resumo é apagado.',
+    KApp.attestUnknown: 'Não encontramos este relatório. Confira se o endereço está completo.',
+    KApp.attestError: 'Não foi possível consultar agora. Tente de novo em instantes.',
+    KApp.attestIssuedAt: 'Emitido em',
+    KApp.attestPeriod: 'Período',
+    KApp.attestValidUntil: 'Conferível até',
+    KApp.attestFingerprint: 'Impressão digital (SHA-256) do PDF',
+    KApp.attestSummary: 'O que o Entrelares registrou no período',
+    KApp.attestDaysPlanned: 'Dias planejados: {0}',
+    KApp.attestDaysBy: '{0}: {1} dia(s)',
+    KApp.attestDaysSwapped: 'Dias mudados por troca: {0}',
+    KApp.attestSwaps: 'Pedidos de troca: {0}',
+    KApp.attestDayAccounts: 'Relatos: {0}',
+    KApp.attestInitialsNote: 'Os responsáveis aparecem por iniciais: esta página é pública e não mostra nomes.',
+    KApp.attestCompare: 'Conferir um PDF',
+    KApp.attestCompareHint: 'Escolha o arquivo (ou arraste-o para esta página). Ele é lido só no seu aparelho: nada é enviado.',
+    KApp.attestMatch: 'Confere: este PDF é o documento emitido.',
+    KApp.attestMismatch: 'Não confere: este PDF não é o documento emitido, ou foi alterado.',
+    KApp.attestNoPicker: 'Para conferir o arquivo, abra esta página num navegador de computador ou compare a impressão digital acima com a do arquivo.',
+    KApp.attestSection: 'Relatórios verificáveis emitidos',
+    KApp.attestSectionLead: 'Cada PDF gerado sai com um QR que abre a página de conferência. O administrador pode revogar um relatório que não deve mais valer.',
+    KApp.attestRowState: '{0} · {1}',
+    KApp.attestStateValid: 'Válido',
+    KApp.attestStatePending: 'Não concluído',
+    KApp.attestStateRevoked: 'Revogado',
+    KApp.attestStateExpired: 'Vencido',
+    KApp.attestRevoke: 'Revogar',
+    KApp.attestRevokeConfirm: 'Revogar o relatório de {0}? Quem conferir o QR verá que ele foi revogado.',
+    KApp.attestRevoked2: 'Relatório revogado.',
+    KApp.attestHashFailed: 'O PDF foi gerado, mas a impressão digital não foi gravada: a página de conferência dirá "não concluído". Gere de novo para um PDF conferível.',
     KApp.agendaNotifyLabel: 'Notificar',
     KApp.agendaNotifyNone: 'Ninguém',
     KApp.agendaNotifySelf: 'Só eu',
@@ -1928,6 +2031,40 @@ abstract final class StringsAppEn {
     KApp.viewerLeaveBody: 'As a viewer, leaving deletes you right away: your account and your data. Nothing in the family history depends on you.',
     KApp.viewerLeaveButton: 'Leave and delete my account',
     KApp.viewerInvitedBody: '{0} invited you to follow the {1} family\'s calendar as a viewer: you see the plan, the agenda and the informative notifications, without changing anything.',
+    KApp.attestPageTitle: 'Check a report',
+    KApp.attestValid: 'This report was issued by Entrelares and is valid.',
+    KApp.attestPending: 'This report was started, but the PDF was never finished: there is no fingerprint to check.',
+    KApp.attestRevoked: 'This report was revoked by the family on {0}. It no longer counts as a check.',
+    KApp.attestExpired: 'This report expired on {0}. A check is valid for a limited time; after it, the summary is deleted.',
+    KApp.attestUnknown: 'We could not find this report. Check that the address is complete.',
+    KApp.attestError: 'Could not check right now. Try again in a moment.',
+    KApp.attestIssuedAt: 'Issued on',
+    KApp.attestPeriod: 'Period',
+    KApp.attestValidUntil: 'Can be checked until',
+    KApp.attestFingerprint: 'PDF fingerprint (SHA-256)',
+    KApp.attestSummary: 'What Entrelares recorded in the period',
+    KApp.attestDaysPlanned: 'Planned days: {0}',
+    KApp.attestDaysBy: '{0}: {1} day(s)',
+    KApp.attestDaysSwapped: 'Days changed by a swap: {0}',
+    KApp.attestSwaps: 'Swap requests: {0}',
+    KApp.attestDayAccounts: 'Day accounts: {0}',
+    KApp.attestInitialsNote: 'Caregivers appear by initials: this page is public and shows no names.',
+    KApp.attestCompare: 'Check a PDF',
+    KApp.attestCompareHint: 'Choose the file (or drop it on this page). It is read on your device only: nothing is sent.',
+    KApp.attestMatch: 'Match: this PDF is the document that was issued.',
+    KApp.attestMismatch: 'No match: this PDF is not the document that was issued, or it was altered.',
+    KApp.attestNoPicker: 'To check the file, open this page in a computer\'s browser, or compare the fingerprint above with the file\'s.',
+    KApp.attestSection: 'Verifiable reports issued',
+    KApp.attestSectionLead: 'Each PDF comes with a QR that opens the check page. The admin can revoke a report that should no longer count.',
+    KApp.attestRowState: '{0} · {1}',
+    KApp.attestStateValid: 'Valid',
+    KApp.attestStatePending: 'Not finished',
+    KApp.attestStateRevoked: 'Revoked',
+    KApp.attestStateExpired: 'Expired',
+    KApp.attestRevoke: 'Revoke',
+    KApp.attestRevokeConfirm: 'Revoke the report for {0}? Whoever checks the QR will see it was revoked.',
+    KApp.attestRevoked2: 'Report revoked.',
+    KApp.attestHashFailed: 'The PDF was generated, but its fingerprint was not recorded: the check page will say "not finished". Generate again for a checkable PDF.',
     KApp.agendaNotifyLabel: 'Notify',
     KApp.agendaNotifyNone: 'Nobody',
     KApp.agendaNotifySelf: 'Only me',

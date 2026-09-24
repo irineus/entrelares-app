@@ -22,4 +22,5 @@ export 'fit.dart';
 export 'signals.dart';
 export 'surfaces.dart';
 export 'sheets.dart';
+export 'confirm_sheet.dart';
 export 'skeleton.dart';

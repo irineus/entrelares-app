@@ -48,6 +48,9 @@ abstract final class DocumentTitle {
         return segments.length == 1 ? K.updatePwdPageTitle : K.notFoundTitle;
       case 'help':
         return segments.length == 1 ? KApp.helpTitle : K.notFoundTitle;
+      case 'verificar':
+        // F-64: `/verificar/<id>` — the id is a capability and never titled.
+        return segments.length == 2 ? KApp.attestPageTitle : K.notFoundTitle;
       case 'onboarding':
         return segments.length == 1 ? KApp.onbFounderTitle : K.notFoundTitle;
       case 'leaving':
@@ -112,6 +115,7 @@ abstract final class DocumentTitle {
     RouteRules.updatePassword,
     RouteRules.onboarding,
     RouteRules.help,
+    '/verificar/3f2c9a1e-7b4d-4c2a-9e8f-0a1b2c3d4e5f',
     FamilyLifecycleRules.leavingRoute,
     FamilyLifecycleRules.policyUpdateRoute,
     '/premium/retorno',

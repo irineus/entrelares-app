@@ -59,6 +59,14 @@ abstract final class RouteRules {
   /// either side of the login (`/update-password`'s shape).
   static const String help = '/help';
 
+  /// F-64: the public check of a verifiable report — `/verificar/<id>`, the
+  /// URL the PDF's QR opens. Reachable in EVERY phase: the lawyer holding the
+  /// paper has no account, and a signed-in reader must not be bounced to the
+  /// calendar either.
+  static const String verifyPrefix = '/verificar/';
+
+  static bool isVerify(String location) => location.startsWith(verifyPrefix);
+
   /// Reachable without a session. `/update-password` is here even though the
   /// recovery visitor is technically authenticated: opening it anonymously
   /// shows the web's own "invalid session" message instead of bouncing.
@@ -83,7 +91,8 @@ abstract final class RouteRules {
     onboarding,
   };
 
-  static bool isPublic(String location) => publicRoutes.contains(location);
+  static bool isPublic(String location) =>
+      publicRoutes.contains(location) || isVerify(location);
 
   /// Where the router should send this visitor; null means "stay here".
   ///
@@ -103,7 +112,8 @@ abstract final class RouteRules {
         // F-57: a profile-less session is confined to the onboarding screen —
         // the S-11 leaving confinement's shape, for the opposite end of the
         // account's life.
-        AuthPhase.onboarding => location == onboarding ? null : onboarding,
+        AuthPhase.onboarding =>
+            location == onboarding || isVerify(location) ? null : onboarding,
         AuthPhase.authed =>
             anonymousOnlyRoutes.contains(location) ? home : null,
       };
