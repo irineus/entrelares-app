@@ -27,6 +27,7 @@ import 'suites/agenda.dart';
 import 'suites/agenda_routine.dart';
 import 'suites/agenda_notify.dart';
 import 'suites/viewer.dart';
+import 'suites/report_attestation.dart';
 import 'suites/children.dart';
 import 'suites/custom_role.dart';
 import 'suites/day_account.dart';
@@ -164,6 +165,8 @@ void main() {
   // F-50: the Visualizador — its caps, no write path, no swap read, the
   // informative notifications, promotion one way, a complete exit.
   viewerTests(fx);
+  // F-64: the verifiable report — issue, fingerprint, the public answer.
+  reportAttestationTests(fx);
   appSettingsTests(fx);
   publicSettingsTests(fx);
   serverParametersTests(fx);

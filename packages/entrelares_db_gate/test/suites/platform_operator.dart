@@ -51,6 +51,8 @@ const _usageReportKeys = {
   'with_reminder', 'reminders_sent',
   // F-50: the viewers — the category per member and counts per family
   'membership', 'viewers_used', 'viewers_cap', 'viewer_invitations_open',
+  // F-64: the verifiable reports — counts only
+  'attestations', 'issued', 'active',
 };
 
 Set<String> _keysOf(Object? node) => switch (node) {
