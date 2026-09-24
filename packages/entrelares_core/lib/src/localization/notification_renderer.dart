@@ -307,6 +307,13 @@ abstract final class NotificationRenderer {
                 : K.notifRenderSettlementRejected,
             [name ?? l[K.notifRenderFbOtherCap], _money(p, l)!, date]);
 
+      // ── The family chat (F-35) ──
+      // Who wrote, and the text as they wrote it (already cut by the server
+      // at 140 characters for the notice; the Conversa holds the whole).
+      case 'chat_message' when p['msg'] != null:
+        return l.format(K.notifRenderChatMessage,
+            [name ?? l[K.notifRenderFbOtherCap], p['msg']!]);
+
       // ── The agenda speaks (F-55 PR 4) ──
       // "What" is the item as the day sheet heads it — time, kind, child —
       // and the item's own text follows as written. An unknown `kind` is a
@@ -519,6 +526,9 @@ abstract final class NotificationRenderer {
       'agenda_reminder' => p['date'] != null && _agendaKind(kind) != null
           ? K.notifRenderTitleAgendaReminder
           : null,
+      // F-35: the chat's heading is the same for every text.
+      'chat_message' =>
+        p['msg'] != null ? K.notifRenderTitleChatMessage : null,
       // F-34: the heading only where the body is rebuilt too.
       'expense_changed' => p['date'] != null && p['amount'] != null
           ? switch (kind) {

@@ -812,6 +812,8 @@ abstract final class StringsEn {
     K.notifRenderExpenseCategoryFood: 'Food',
     K.notifRenderExpenseCategoryTransport: 'Transport',
     K.notifRenderExpenseCategoryOther: 'Other',
+    K.notifRenderTitleChatMessage: 'Family chat',
+    K.notifRenderChatMessage: '{0}: {1}',
     K.notifRenderTitleAgendaNotice: 'New on the agenda',
     K.notifRenderTitleAgendaReminder: 'Agenda reminder',
     K.notifRenderAgendaNotice: '{0} added to the agenda for {1}: {2}.{3}',

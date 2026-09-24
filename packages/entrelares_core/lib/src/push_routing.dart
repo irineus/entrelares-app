@@ -24,6 +24,10 @@ enum NotificationLanding {
   /// "Todas" — the notice is a receipt; this is the tab that always holds
   /// the row that was tapped.
   history,
+
+  /// F-35 — the Conversa: a chat notice opens the conversation itself, where
+  /// the text is, not the notification that announced it.
+  chat,
 }
 
 abstract final class PushRouting {
@@ -62,6 +66,14 @@ abstract final class PushRouting {
   /// the wrong guess in that direction merely shows a full list instead of an
   /// empty one.
   static NotificationLanding landingFor(String? type, {String? kind}) =>
+      _chat.contains(type)
+          ? NotificationLanding.chat
+          : _landingForNotice(type, kind: kind);
+
+  /// F-35: the types that open the Conversa.
+  static const Set<String> _chat = {'chat_message'};
+
+  static NotificationLanding _landingForNotice(String? type, {String? kind}) =>
       _actionable.contains(type) ||
               (type == 'day_notice' &&
                   _actionableNoticeKinds.contains(kind))

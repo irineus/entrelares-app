@@ -69,6 +69,11 @@ export const PUSH_TYPES: readonly string[] = [
 	"expense_changed",
 	"settlement_requested",
 	"settlement_answered",
+	// F-35. A caregiver wrote in the family chat. To every reader but the
+	// author (viewers included); a reader who silenced the chat gets
+	// a params.push of false and the dispatcher never calls this. Lands on
+	// the Conversa tab. Never e-mail.
+	"chat_message",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -151,6 +156,8 @@ const K = {
 	expenseCategoryFood: "notifRender.expenseCategory.food",
 	expenseCategoryTransport: "notifRender.expenseCategory.transport",
 	expenseCategoryOther: "notifRender.expenseCategory.other",
+	titleChatMessage: "notifRender.title.chatMessage",
+	chatMessage: "notifRender.chatMessage",
 	titleAgendaNotice: "notifRender.title.agendaNotice",
 	titleAgendaReminder: "notifRender.title.agendaReminder",
 	agendaNotice: "notifRender.agendaNotice",
@@ -244,6 +251,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.expenseCategory.food": "Alimentação",
 		"notifRender.expenseCategory.transport": "Transporte",
 		"notifRender.expenseCategory.other": "Outros",
+		"notifRender.title.chatMessage": "Conversa da família",
+		"notifRender.chatMessage": "{0}: {1}",
 		"notifRender.title.agendaNotice": "Novo na agenda",
 		"notifRender.title.agendaReminder": "Lembrete da agenda",
 		"notifRender.agendaNotice": "{0} adicionou à agenda de {1}: {2}.{3}",
@@ -329,6 +338,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.expenseCategory.food": "Food",
 		"notifRender.expenseCategory.transport": "Transport",
 		"notifRender.expenseCategory.other": "Other",
+		"notifRender.title.chatMessage": "Family chat",
+		"notifRender.chatMessage": "{0}: {1}",
 		"notifRender.title.agendaNotice": "New on the agenda",
 		"notifRender.title.agendaReminder": "Agenda reminder",
 		"notifRender.agendaNotice": "{0} added to the agenda for {1}: {2}.{3}",
@@ -674,6 +685,14 @@ export function renderPush(
 			titleKey = kind === "confirmed" ? K.titleSettlementConfirmed : K.titleSettlementRejected;
 			body = fmt(lang, kind === "confirmed" ? K.settlementConfirmed : K.settlementRejected,
 				[name ?? otherCap(), money, date]);
+			break;
+		}
+
+		// F-35. Who wrote and the text (the server already cut it at 140).
+		case "chat_message": {
+			if (msg === undefined) return null;
+			titleKey = K.titleChatMessage;
+			body = fmt(lang, K.chatMessage, [name ?? otherCap(), msg]);
 			break;
 		}
 

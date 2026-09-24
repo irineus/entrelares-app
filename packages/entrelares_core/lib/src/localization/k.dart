@@ -918,6 +918,9 @@ abstract final class K {
   static const String notifRenderExpenseCategoryFood = 'notifRender.expenseCategory.food';
   static const String notifRenderExpenseCategoryTransport = 'notifRender.expenseCategory.transport';
   static const String notifRenderExpenseCategoryOther = 'notifRender.expenseCategory.other';
+  // ── The family chat (F-35) ──
+  static const String notifRenderTitleChatMessage = 'notifRender.title.chatMessage';
+  static const String notifRenderChatMessage = 'notifRender.chatMessage';
 
   // ── The agenda speaks (F-55 PR 4) ──
   // The kind labels repeat `KApp.agendaKind*` on purpose: the push catalog
@@ -2052,6 +2055,8 @@ abstract final class K {
     notifRenderExpenseCategoryFood,
     notifRenderExpenseCategoryTransport,
     notifRenderExpenseCategoryOther,
+    notifRenderTitleChatMessage,
+    notifRenderChatMessage,
     notifRenderTitleAgendaNotice,
     notifRenderTitleAgendaReminder,
     notifRenderAgendaNotice,

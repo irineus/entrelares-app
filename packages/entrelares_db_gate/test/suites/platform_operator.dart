@@ -55,6 +55,8 @@ const _usageReportKeys = {
   'attestations', 'issued', 'active',
   // F-34: the expenses — counts only
   'expenses', 'deleted', 'settlements_pending', 'settlements_confirmed',
+  // F-35: the Conversa — counts only
+  'chat', 'messages', 'messages_30d', 'authors', 'chat_push_muted',
 };
 
 Set<String> _keysOf(Object? node) => switch (node) {
