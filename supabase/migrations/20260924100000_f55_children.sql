@@ -29,7 +29,7 @@ INSERT INTO public.app_settings
 	(key, value, value_type, category, description, is_public, unit, impact, help)
 VALUES
 	('feature.child_agenda', 'false', 'bool', 'features',
-	 'Liga a agenda da criança (F-55): o cadastro da criança e os eventos do dia. Desligado, o módulo some do app e o servidor recusa as escritas.',
+	 'Liga a agenda da criança (F-55): cadastro da criança e eventos do dia. Desligado, o servidor recusa as escritas.',
 	 true, 'flag', 'critical',
 	 jsonb_build_object(
 		'controls', 'Se o app mostra o cadastro da criança (Família → Criança) e a agenda do dia, e se add_child / rename_child / remove_child (e, a partir do PR 2, os eventos) aceitam escrever.',
