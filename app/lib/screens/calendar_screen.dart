@@ -323,11 +323,19 @@ class _CalendarScreenState extends State<CalendarScreen>
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
+  /// Whether the screen is visible and wants fresh data — separate from
+  /// [_pollTimer], which is null ALSO when the healthy poll is off (T-83): a
+  /// socket that drops must still bring the degraded poll back.
+  bool _polling = false;
+
   void _schedulePoll() {
+    _polling = true;
     _pollTimer?.cancel();
-    _pollTimer = Timer(
-        Duration(milliseconds: pollIntervalMs(socketConnected: _socketConnected)),
-        () {
+    _pollTimer = null;
+    final ms = pollIntervalMs(
+        socketConnected: _socketConnected, settings: _settings);
+    if (ms == null) return; // T-83: healthy socket, poll turned off
+    _pollTimer = Timer(Duration(milliseconds: ms), () {
       if (mounted) _load(silent: true);
       _schedulePoll();
     });
@@ -342,6 +350,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       _schedulePoll();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
+      _polling = false;
       _pollTimer?.cancel();
       _pollTimer = null;
     }
@@ -461,7 +470,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         }
         if (connected != _socketConnected) {
           _socketConnected = connected;
-          if (_pollTimer != null) _schedulePoll();
+          if (_polling) _schedulePoll();
         }
       },
     );

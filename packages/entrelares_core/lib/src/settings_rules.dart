@@ -72,6 +72,11 @@ class PublicSettings {
   int get dayAccountMaxChars => _int('day_account.max_chars', 1000);
   int get dayAccountDailyCap => _int('day_account.daily_cap', 10);
 
+  // T-83: the F-23 safety poll, in seconds (degraded 25, 10–120; healthy 120,
+  // 0–600, 0 = off while the socket is up).
+  int get pollSecondsDegraded => _int('sync.poll_seconds_degraded', 25);
+  int get pollSecondsHealthy => _int('sync.poll_seconds_healthy', 120);
+
   // T-83: the S-04 inactivity sign-out, in minutes (seed 30, range 5–240).
   int get idleTimeoutMinutes => _int('session.idle_timeout_minutes', 30);
 

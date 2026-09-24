@@ -559,6 +559,22 @@ void main() {
     test('25 s with the socket down, 120 s healthy — web constants', () {
       expect(pollIntervalMs(socketConnected: false), 25000);
       expect(pollIntervalMs(socketConnected: true), 120000);
+      expect(pollIntervalMs(socketConnected: false), pollIntervalMsDown);
+      expect(pollIntervalMs(socketConnected: true), pollIntervalMsHealthy);
+    });
+
+    test('T-83: the cadence is the operator keys; 0 turns the healthy poll off',
+        () {
+      const s = PublicSettings({
+        'sync.poll_seconds_degraded': '15',
+        'sync.poll_seconds_healthy': '300',
+      });
+      expect(pollIntervalMs(socketConnected: false, settings: s), 15000);
+      expect(pollIntervalMs(socketConnected: true, settings: s), 300000);
+      const off = PublicSettings({'sync.poll_seconds_healthy': '0'});
+      expect(pollIntervalMs(socketConnected: true, settings: off), isNull);
+      // With the socket down there is ALWAYS a poll — it is the only path.
+      expect(pollIntervalMs(socketConnected: false, settings: off), 25000);
     });
   });
 
