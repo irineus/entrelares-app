@@ -112,8 +112,12 @@ void serverParametersTests(GateFixture fx) {
     test('a support limit per hour never exceeds its daily one', () async {
       await expectRejected(() => setSetting('support.anon_hourly', '11'),
           contains: 'support.anon_daily');
-      await expectRejected(() => setSetting('support.member_hourly', '21'),
-          contains: 'support.member_daily');
+      // Both in range (1–20 / 1–100): the daily one lowered to 10, eleven per
+      // hour is the pair that must be refused.
+      await withSetting('support.member_daily', '10', () async {
+        await expectRejected(() => setSetting('support.member_hourly', '11'),
+            contains: 'support.member_daily');
+      });
     });
 
     test('the push kill switch names only types the dispatcher pushes',
