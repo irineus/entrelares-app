@@ -110,6 +110,7 @@ interface Profile {
   language_effective?: string | null;
   family_id: number;
   left_at: string | null;
+  membership_type?: string | null;
   deletion_scheduled_for: string | null;
 }
 
@@ -232,7 +233,7 @@ serve(async (req: Request) => {
 
     const { data: subjectRow } = await supabase
       .from("profiles")
-      .select("id, full_name, email, family_id, left_at, deletion_scheduled_for, language_effective")
+      .select("id, full_name, email, family_id, left_at, deletion_scheduled_for, language_effective, membership_type")
       .eq("id", profileId)
       .maybeSingle();
 
@@ -248,10 +249,12 @@ serve(async (req: Request) => {
 
     const { data: others } = await supabase
       .from("profiles")
-      .select("id, full_name, email, family_id, left_at, deletion_scheduled_for, language_effective")
+      .select("id, full_name, email, family_id, left_at, deletion_scheduled_for, language_effective, membership_type")
       .eq("family_id", s.family_id)
       .is("left_at", null)
       .not("user_id", "is", null)
+      // F-50: a viewer is never written to — in-app and push only.
+      .eq("membership_type", "full")
       .neq("id", s.id);
 
     const messages: { to: string; subject: string; html: string }[] = [];
@@ -267,8 +270,11 @@ serve(async (req: Request) => {
       if (!planEnd || !/^\d{4}-\d{2}-\d{2}$/.test(planEnd)) {
         return jsonResponse({ error: "Payload inválido: planEnd ausente." }, 400);
       }
-      // A member who left between the job and this call is not written to.
-      if (s.left_at) return jsonResponse({ sent: 0, suppressed: 0, failed: 0 });
+      // A member who left between the job and this call is not written to,
+      // and a viewer (F-50) is never written to.
+      if (s.left_at || s.membership_type === "viewer") {
+        return jsonResponse({ sent: 0, suppressed: 0, failed: 0 });
+      }
       const lang = langOf(s);
       const t = account(lang);
       const day = formatDateIn(lang, planEnd);

@@ -30,6 +30,7 @@ final memberRow = <String, dynamic>{
   'language_detected': 'pt-BR',
   'is_admin': true,
   'role_id': 1,
+  'membership_type': 'full',
   'email': 'ana@example.com',
   'deletion_scheduled_for': '2026-10-01T03:00:00.000Z',
   'joined_via_invite': true,

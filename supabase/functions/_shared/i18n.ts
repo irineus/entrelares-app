@@ -246,6 +246,8 @@ export interface SwapStrings {
   invitationTitle: string;
   invitationHeading: string;
   invitationBody: (inviter: string, family: string) => string;
+  /** F-50: the same invitation, to someone invited as a VIEWER. */
+  invitationBodyViewer: (inviter: string, family: string) => string;
   invitationRole: (role: string) => string;
   /** T-82: the days THIS invitation is valid for (`invitation.valid_days` when it was created). */
   invitationExpiry: (days: number, date: string) => string;
@@ -358,6 +360,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     invitationTitle: "Convite para o Entrelares",
     invitationHeading: "Você foi convidado(a)!",
     invitationBody: (i, f) => `<strong>${i}</strong> convidou você para gerenciar juntos o calendário de guarda compartilhada da <strong>${f}</strong>.`,
+    invitationBodyViewer: (i, f) => `<strong>${i}</strong> convidou você para acompanhar o calendário de guarda compartilhada da <strong>${f}</strong> como visualizador: você vê o plano, a agenda e as notificações informativas no aplicativo, sem alterar nada.`,
     invitationRole: (r) => `Você entrará como <strong>${r}</strong>.`,
     invitationExpiry: (n, d) => `Toque no botão abaixo para criar a sua conta. Este convite é válido por <strong>${n} ${n === 1 ? "dia" : "dias"}</strong>, até <strong>${d}</strong>.`,
     invitationButton: "Criar minha conta",
@@ -465,6 +468,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     invitationTitle: "Invitation to Entrelares",
     invitationHeading: "You have been invited!",
     invitationBody: (i, f) => `<strong>${i}</strong> invited you to manage the shared custody calendar of <strong>${f}</strong> together.`,
+    invitationBodyViewer: (i, f) => `<strong>${i}</strong> invited you to follow the shared custody calendar of <strong>${f}</strong> as a viewer: you see the plan, the agenda and the informative notifications in the app, without changing anything.`,
     invitationRole: (r) => `You will join as <strong>${r}</strong>.`,
     invitationExpiry: (n, d) => `Tap the button below to create your account. This invitation is valid for <strong>${n} ${n === 1 ? "day" : "days"}</strong>, until <strong>${d}</strong>.`,
     invitationButton: "Create my account",
