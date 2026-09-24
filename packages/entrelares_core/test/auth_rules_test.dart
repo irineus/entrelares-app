@@ -1,7 +1,11 @@
 // S-01/S-04 mirrors — same numbers as Login.razor and MainLayout.razor, so
 // the two clients throttle and expire identically.
+import 'dart:io';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:test/test.dart';
+
+import 'mirrors/repo_files.dart';
 
 void main() {
   group('LoginThrottle.lockoutSecondsFor (S-01)', () {
@@ -59,6 +63,27 @@ void main() {
           InactivityPolicy.expired(
               now.subtract(const Duration(hours: 5)), now),
           isTrue);
+    });
+
+    test('T-83: the operator key sets the timeout; the seed is the migration seed',
+        () {
+      expect(InactivityPolicy.timeoutFor(PublicSettings.unloaded),
+          InactivityPolicy.timeout);
+      final ten = InactivityPolicy.timeoutFor(
+          PublicSettings(const {'session.idle_timeout_minutes': '10'}));
+      expect(ten, const Duration(minutes: 10));
+      expect(InactivityPolicy.expired(now.subtract(const Duration(minutes: 10)), now, ten),
+          isTrue);
+      expect(InactivityPolicy.expired(now.subtract(const Duration(minutes: 9)), now, ten),
+          isFalse);
+      final seed = RegExp(r"\('session\.idle_timeout_minutes', '(\d+)'").firstMatch(
+          migrationsDirectory()
+              .listSync()
+              .whereType<File>()
+              .map((f) => f.readAsStringSync())
+              .join('\n'));
+      expect(seed, isNotNull);
+      expect(InactivityPolicy.timeout.inMinutes, int.parse(seed!.group(1)!));
     });
 
     test('a future interaction (clock skew) never expires', () {

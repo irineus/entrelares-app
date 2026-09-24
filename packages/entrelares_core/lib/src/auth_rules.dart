@@ -1,4 +1,5 @@
 import 'localization/k.dart';
+import 'settings_rules.dart';
 
 /// S-01 — progressive client-side login throttling, the mirror of
 /// `Login.razor`'s rule in the web app. The server is not involved: this
@@ -27,14 +28,22 @@ abstract final class LoginThrottle {
 /// Only the threshold decision is a rule; WHAT counts as interaction (pointer
 /// events, app resume) is the shell's business.
 abstract final class InactivityPolicy {
+  /// The seed. T-83 (24/09/2026): the live number is
+  /// `session.idle_timeout_minutes` (5–240), read through [timeoutFor]; this
+  /// applies before the settings load and whenever they cannot.
   static const Duration timeout = Duration(minutes: 30);
+
+  /// The timeout the operator set, or the seed.
+  static Duration timeoutFor(PublicSettings settings) =>
+      Duration(minutes: settings.idleTimeoutMinutes);
 
   /// How often the shell re-checks — same 30 s cadence as the web's poll.
   static const Duration pollInterval = Duration(seconds: 30);
 
-  static bool expired(DateTime lastInteraction, DateTime now) =>
+  static bool expired(DateTime lastInteraction, DateTime now,
+          [Duration limit = timeout]) =>
       !now.difference(lastInteraction).isNegative &&
-      now.difference(lastInteraction) >= timeout;
+      now.difference(lastInteraction) >= limit;
 }
 
 /// The `/update-password` form's validation, mirror of `UpdatePassword.razor`

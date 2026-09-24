@@ -231,6 +231,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   DateTime _lastInteraction = DateTime.now();
   Timer? _inactivityTimer;
 
+  /// T-83: `session.idle_timeout_minutes`, read once per signed-in session.
+  /// The seed until it answers — and for good if it never does.
+  Duration _idleTimeout = InactivityPolicy.timeout;
+
   /// Second belt of the adoption loop guard (the web's sessionStorage flag):
   /// even if the local persist failed, one process never adopts twice.
   static bool _adoptedThisProcess = false;
@@ -883,11 +887,13 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       unawaited(_offlineCache.clear());
       _profileGatesDeferred = false;
       _activity.reset();
+      _idleTimeout = InactivityPolicy.timeout;
     }
     if (phase == _AuthPhase.authed) {
       _lastInteraction = DateTime.now();
       _inactivityTimer ??= Timer.periodic(
           InactivityPolicy.pollInterval, (_) => _checkInactivity());
+      unawaited(_loadIdleTimeout());
       // The bell badge lives with the authenticated phase (count + its
       // workflow Realtime trigger).
       _badge.start();
@@ -1076,9 +1082,24 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     } catch (_) {/* the notification and its e-mail still arrive */}
   }
 
+  /// T-83: never awaited by the sign-in — a slow or failed read keeps the
+  /// seed, which is the S-04 behaviour the app always had.
+  Future<void> _loadIdleTimeout() async {
+    try {
+      final settings =
+          PublicSettings(await _dataSource.fetchPublicSettings());
+      if (_phase == _AuthPhase.authed) {
+        _idleTimeout = InactivityPolicy.timeoutFor(settings);
+      }
+    } catch (_) {/* the seed stands */}
+  }
+
   void _checkInactivity() {
     if (_phase != _AuthPhase.authed) return;
-    if (!InactivityPolicy.expired(_lastInteraction, DateTime.now())) return;
+    if (!InactivityPolicy.expired(
+        _lastInteraction, DateTime.now(), _idleTimeout)) {
+      return;
+    }
     _expiredReason = SessionExpiredReason.inactivity;
     _setPhase(_AuthPhase.anon);
     // Local-first is fine: navigation never waits on the network (lesson 1.3).
