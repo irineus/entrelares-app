@@ -1132,6 +1132,16 @@ class FakeCustodyDataSource implements CustodyDataSource {
   @override
   Future<List<ChatRead>> fetchChatReads() async => chatReads;
 
+  /// The chat channel's listener, so a test can deliver a change.
+  void Function()? chatListener;
+
+  @override
+  Future<void Function()> watchChatChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus}) async {
+    chatListener = onChange;
+    return () => chatListener = null;
+  }
+
   @override
   Future<int> sendChatMessage(
       {required String body, int? quoteId, DateTime? quotedDay}) async {

@@ -303,37 +303,48 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (widget.dayRequest?.value != null) _onDayRequest();
   }
 
-  /// F-35: the day a cited Conversa text asked for, held until its month is
-  /// the one on screen and loaded.
+  /// F-35: the day a cited Conversa text asked for, held until a load that
+  /// STARTED after the request has put its month on screen.
   DateTime? _pendingDay;
+
+  /// Every [_load] takes the next number. A cited day opens only on a load
+  /// numbered above [_pendingDayAfter]: the swap it names is usually minutes
+  /// old, and a month read before it (or an older poll finishing late, for
+  /// the previous month) would open the day as if nothing were pending —
+  /// editable on the first tap, the owner's validation of 25/09/2026.
+  int _loadSeq = 0;
+  int _pendingDayAfter = 0;
 
   void _onDayRequest() {
     final day = widget.dayRequest?.value;
     if (day == null) return;
     widget.dayRequest!.value = null;
     _pendingDay = DateTime(day.year, day.month, day.day);
+    _pendingDayAfter = _loadSeq;
     final month = DateTime(day.year, day.month);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if ((month.year != _visibleMonth.year ||
               month.month != _visibleMonth.month) &&
           _pageController.hasClients) {
+        // The page change loads the cited month itself.
         _pageController.jumpToPage(_pageForMonth(month));
+      } else {
+        _load(silent: true);
       }
-      _openPendingDay();
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
-  void _openPendingDay() {
+  void _openPendingDay(int completedLoad) {
     final day = _pendingDay;
-    if (day == null || _loading || !mounted) return;
-    if (day.year != _visibleMonth.year || day.month != _visibleMonth.month) {
-      return;
-    }
+    if (day == null || !mounted || completedLoad <= _pendingDayAfter) return;
+    if (!_isOnScreen(DateTime(day.year, day.month))) return;
     _pendingDay = null;
+    // The same action a tap on the cell takes: a day with a pending request
+    // opens the approval panel, anything else the day sheet.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _openDay(day);
+      if (mounted) _openDayAsTapped(day);
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
@@ -393,6 +404,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     // load + a new timer on return.
     if (state == AppLifecycleState.resumed) {
       _load(silent: true);
+      _loadHorizonInputs();
       _schedulePoll();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
@@ -469,26 +481,49 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (reconnected && mounted) _load(silent: true);
   }
 
+  /// Whether [_settings] holds a real read. The seeded fallbacks keep every
+  /// `feature.*` flag OFF, so a read that failed at start-up — the first one
+  /// of a cold start races the session refresh — hid the agenda for the whole
+  /// session: this used to run once, from initState (validation, 25/09/2026).
+  bool _settingsRead = false;
+  bool _horizonInFlight = false;
+
   /// Defensive like the web: neither read may break the calendar — entitlement
   /// falls to premium, settings to the seeded fallbacks (no wrongful block).
+  /// Retried by every [_load] until the settings arrive, and on every resume
+  /// (an operator's kill switch reaches an open app).
   Future<void> _loadHorizonInputs() async {
-    Family? family;
-    var failed = false;
+    if (_horizonInFlight) return;
+    _horizonInFlight = true;
     try {
-      family = await widget.dataSource.fetchOwnFamily();
-    } catch (_) {
-      failed = true;
+      Family? family;
+      var failed = false;
+      try {
+        family = await widget.dataSource.fetchOwnFamily();
+      } catch (_) {
+        failed = true;
+      }
+      PublicSettings? settings;
+      try {
+        final values = await widget.dataSource.fetchPublicSettings();
+        // An empty answer is RLS saying "no session yet", not a table with
+        // no rows — it is a failed read, and it keeps the last good one.
+        if (values.isNotEmpty) settings = PublicSettings(values);
+      } catch (_) {/* seeded fallbacks, retried by the next load */}
+      if (!mounted) return;
+      setState(() {
+        if (!failed || _family == null) {
+          _family = family;
+          _entitlementFailed = failed;
+        }
+        if (settings != null) {
+          _settings = settings;
+          _settingsRead = true;
+        }
+      });
+    } finally {
+      _horizonInFlight = false;
     }
-    var settings = PublicSettings.unloaded;
-    try {
-      settings = PublicSettings(await widget.dataSource.fetchPublicSettings());
-    } catch (_) {/* seeded fallbacks */}
-    if (!mounted) return;
-    setState(() {
-      _family = family;
-      _entitlementFailed = failed;
-      _settings = settings;
-    });
   }
 
   Future<void> _watch() async {
@@ -548,9 +583,11 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Future<void> _load({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
+    final seq = ++_loadSeq;
     // Captured once: a swipe during the load must not date one month's rows
     // as another's.
     final month = _visibleMonth;
+    if (!_settingsRead) unawaited(_loadHorizonInputs());
     try {
       final members = await widget.dataSource.fetchMembers();
       // Best-effort: a family whose roles fail to load still gets its
@@ -628,7 +665,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         _loadError = null;
       });
       _openPendingPlan();
-      _openPendingDay();
+      _openPendingDay(seq);
       final readAt = DateTime.now();
       widget.connectivity?.loadedData(readAt);
       // T-18: only the CURRENT month is worth a device copy — the door-of-the-
@@ -945,6 +982,11 @@ class _CalendarScreenState extends State<CalendarScreen>
       _toggleDaySelection(date);
       return;
     }
+    _openDayAsTapped(date);
+  }
+
+  /// What a tap on [date]'s cell opens — also a day cited in the Conversa.
+  void _openDayAsTapped(DateTime date) {
     // Web parity (HandleDayClick): a day with a pending request opens the
     // frozen panel instead of the editor — for everyone, admins included.
     final frozen = _frozenByIso[CareSchedule.isoDate(date)];

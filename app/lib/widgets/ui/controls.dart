@@ -28,6 +28,10 @@ class AppTextField extends StatelessWidget {
   final bool obscureText;
   final bool enabled;
   final int? maxLines;
+
+  /// With [maxLines], the field grows from this many lines to that many as
+  /// the text wraps; null keeps it [maxLines] tall from the start.
+  final int? minLines;
   final int? maxLength;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
@@ -61,6 +65,7 @@ class AppTextField extends StatelessWidget {
     this.obscureText = false,
     this.enabled = true,
     this.maxLines = 1,
+    this.minLines,
     this.maxLength,
     this.keyboardType,
     this.textInputAction,
@@ -83,6 +88,7 @@ class AppTextField extends StatelessWidget {
       obscureText: obscureText,
       enabled: enabled,
       maxLines: obscureText ? 1 : maxLines,
+      minLines: obscureText ? null : minLines,
       maxLength: maxLength,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
