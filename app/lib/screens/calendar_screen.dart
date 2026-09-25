@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
@@ -24,6 +25,7 @@ import '../widgets/account_button.dart';
 import '../widgets/admin_mode_offer.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
+import '../widgets/day_agenda.dart';
 import '../widgets/slot_pill.dart';
 import '../widgets/today_card.dart';
 import 'bulk_sheet.dart';
@@ -117,6 +119,9 @@ class CalendarScreen extends StatefulWidget {
   /// sends the admin to `/family/plan` (U-49). Null leaves it a sentence.
   final VoidCallback? onOpenPlan;
 
+  /// F-55: the agenda's "add the child" door (`/family/children`).
+  final VoidCallback? onOpenChildren;
+
   /// U-55: where the "Definir horário" strip's dismissal is kept on this
   /// device. Null (tests, hosts without storage) keeps it for the session.
   final HandoffNudgePrefs? handoffNudgePrefs;
@@ -147,6 +152,7 @@ class CalendarScreen extends StatefulWidget {
       this.onOpenFamily,
       this.onOpenNotifications,
       this.onOpenPlan,
+      this.onOpenChildren,
       this.handoffNudgePrefs,
       this.planRequest,
       this.dayRequest});
@@ -352,6 +358,11 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// F-70: the family's last planned day, read with every load (best-effort).
   DateTime? _lastPlannedDay;
 
+  /// F-55 on the grid (owner's validation, 25/09/2026): each day's live
+  /// agenda items, in the day sheet's order, for the month on screen.
+  Map<String, List<ChildEvent>> _agendaByIso = const {};
+  void Function()? _unwatchAgenda;
+
   /// F-70: the day a plan-end notification asked the wizard to open on, held
   /// until the month has loaded — the wizard needs the members to offer.
   DateTime? _pendingPlanStart;
@@ -511,6 +522,11 @@ class _CalendarScreenState extends State<CalendarScreen>
         if (values.isNotEmpty) settings = PublicSettings(values);
       } catch (_) {/* seeded fallbacks, retried by the next load */}
       if (!mounted) return;
+      // The month's agenda marks wait on this flag: a first read that lands
+      // after the first load reloads once, so the marks do not wait a poll.
+      final agendaTurnedOn = settings != null &&
+          settings.childAgendaEnabled &&
+          !_settings.childAgendaEnabled;
       setState(() {
         if (!failed || _family == null) {
           _family = family;
@@ -521,9 +537,33 @@ class _CalendarScreenState extends State<CalendarScreen>
           _settingsRead = true;
         }
       });
+      if (agendaTurnedOn && _loadedMonth != null) _load(silent: true);
     } finally {
       _horizonInFlight = false;
     }
+  }
+
+  /// The month's live items per day, in the day sheet's order — the first
+  /// one is the one the cell draws.
+  static Map<String, List<ChildEvent>> _groupAgenda(List<ChildEvent> events) {
+    final byIso = <String, List<ChildEvent>>{};
+    for (final e in events) {
+      if (e.isDeleted) continue;
+      (byIso[CareSchedule.isoDate(e.eventDate)] ??= []).add(e);
+    }
+    return {
+      for (final entry in byIso.entries)
+        entry.key: AgendaRules.timeline(
+          entry.value,
+          (e) => AgendaEntry(
+            id: e.id,
+            kind: AgendaKind.parse(e.kind) ?? AgendaKind.other,
+            start: e.startTime,
+            end: e.endTime,
+            createdAt: e.createdAt,
+          ),
+        ),
+    };
   }
 
   Future<void> _watch() async {
@@ -555,6 +595,15 @@ class _CalendarScreenState extends State<CalendarScreen>
         }
       },
     );
+    // F-55: an agenda item written on another device marks its day here.
+    try {
+      _unwatchAgenda = await widget.dataSource.watchAgendaChanges(() {
+        _changeDebounce?.cancel();
+        _changeDebounce = Timer(_changeDebounceWindow, () {
+          if (mounted) _load(silent: true);
+        });
+      });
+    } catch (_) {/* the poll and the next load still read it */}
     // Lote 3: the workflow channel — a request opened/resolved by the other
     // member repaints the frozen days without a manual refresh.
     _unwatchWorkflow = await widget.dataSource.watchWorkflowChanges(() {
@@ -572,6 +621,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     widget.dayRequest?.removeListener(_onDayRequest);
     _unwatch?.call();
     _unwatchWorkflow?.call();
+    _unwatchAgenda?.call();
     _pollTimer?.cancel();
     _changeDebounce?.cancel();
     _pageController.dispose();
@@ -635,6 +685,19 @@ class _CalendarScreenState extends State<CalendarScreen>
       try {
         lastPlannedDay = await widget.dataSource.fetchLastPlannedDay();
       } catch (_) {/* keep whatever we had */}
+      // F-55: the month's agenda marks. Best-effort like the avisos, and
+      // asked only while the module is on for this family.
+      var agendaByIso = _agendaByIso;
+      if (_settings.childAgendaEnabled) {
+        try {
+          final events = await widget.dataSource.fetchChildEvents(
+              DateTime(month.year, month.month, 1),
+              DateTime(month.year, month.month + 1, 0));
+          agendaByIso = _groupAgenda(events);
+        } catch (_) {/* keep whatever we had */}
+      } else {
+        agendaByIso = const {};
+      }
       var todayNotices = _todayNotices;
       var yesterdayRow = _yesterdayRow;
       try {
@@ -659,6 +722,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         _todayNotices = todayNotices;
         _yesterdayRow = yesterdayRow;
         _lastPlannedDay = lastPlannedDay;
+        _agendaByIso = agendaByIso;
         _loadedMonth = month;
         _openInvitation = openInvitation;
         _loading = false;
@@ -1376,6 +1440,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       allProfiles: _members,
       offline: _offline,
       onOpenPlan: widget.onOpenPlan,
+      onOpenChildren: widget.onOpenChildren,
     );
     if (outcome != null) {
       _load(silent: true);
@@ -2132,6 +2197,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                           month: month,
                           daysByIso: isVisible ? _daysByIso : const {},
                           frozenByIso: isVisible ? _frozenByIso : const {},
+                          agendaByIso: isVisible ? _agendaByIso : const {},
                           ownProfileId: _ownProfile?.id,
                           views: views,
                           today: _today,
@@ -2384,6 +2450,7 @@ class _MonthGrid extends StatelessWidget {
   final DateTime month;
   final Map<String, CareSchedule> daysByIso;
   final Map<String, SwapRequest> frozenByIso;
+  final Map<String, List<ChildEvent>> agendaByIso;
   final int? ownProfileId;
   final List<MemberView> views;
   final DateTime today;
@@ -2406,6 +2473,7 @@ class _MonthGrid extends StatelessWidget {
     required this.month,
     required this.daysByIso,
     required this.frozenByIso,
+    this.agendaByIso = const {},
     required this.ownProfileId,
     required this.views,
     required this.today,
@@ -2580,6 +2648,9 @@ class _MonthGrid extends StatelessWidget {
                           DateTime(month.year, month.month, day))],
                       AppL10n.of(context).l),
                   views: views,
+                  agenda: agendaByIso[CareSchedule.isoDate(
+                          DateTime(month.year, month.month, day))] ??
+                      const [],
                   isToday: CareSchedule.isoDate(
                           DateTime(month.year, month.month, day)) ==
                       todayIso,
@@ -2696,6 +2767,9 @@ class _DayCell extends StatelessWidget {
   final CareSchedule? day;
   final _FrozenMark? frozenMark;
   final List<MemberView> views;
+
+  /// F-55: the day's live agenda items, first one first.
+  final List<ChildEvent> agenda;
   final bool isToday;
   final bool isSelected;
 
@@ -2710,12 +2784,79 @@ class _DayCell extends StatelessWidget {
     required this.day,
     required this.frozenMark,
     required this.views,
+    this.agenda = const [],
     required this.isToday,
     required this.isSelected,
     required this.type,
     required this.onTap,
     required this.onLongPress,
   });
+
+  /// "Agenda: Escola 10:30" / "Agenda: Escola 10:30 e mais 2".
+  String _agendaAloud(Localization l) {
+    final first = agenda.first;
+    final kind = AgendaKind.parse(first.kind) ?? AgendaKind.other;
+    final what = [
+      l[kind.labelKey],
+      if (first.startTime != null) l.formatTimeString(first.startTime!),
+    ].join(' ');
+    return agenda.length == 1
+        ? l.format(KApp.agendaCellAria, [what])
+        : l.format(KApp.agendaCellAriaMore, [what, agenda.length - 1]);
+  }
+
+  /// The day number — and, on a day with agenda items, the first item's icon
+  /// beside it, with a small "+" on its shoulder when more follow (owner's
+  /// validation, 25/09/2026). The first line, because the third is the
+  /// handoff time or the frozen mark and was already the tightest (U-39).
+  ///
+  /// The icon holds the step's size while the number follows the reader's
+  /// scale: at 1.3× a scaled icon plus a "+" beside it overflowed the 360 dp
+  /// cell by 8 px (the worst-case test). The "+" sits inside a box reserved
+  /// for it, never beside the icon; the rare line that still does not fit
+  /// shrinks as a whole, never below the product's floor (U-48).
+  Widget _numberLine(BuildContext context, AppTokens tokens, Color? ink) {
+    final number = Text('${date.day}',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            fontSize: type.number, height: 1, color: ink));
+    if (agenda.isEmpty) return number;
+    final size = type.number;
+    final color = ink ?? tokens.textMuted;
+    final kind = AgendaKind.parse(agenda.first.kind) ?? AgendaKind.other;
+    final icon = Icon(agendaKindIcon(kind), size: size, color: color);
+    return AppShrinkToFit(
+      alignment: Alignment.center,
+      child: Row(
+        key: ValueKey('cell-agenda-${date.day}'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          number,
+          SizedBox(width: size * 0.15),
+          if (agenda.length == 1)
+            icon
+          else
+            SizedBox(
+              width: size * 1.4,
+              height: size,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  PositionedDirectional(start: 0, top: 0, child: icon),
+                  PositionedDirectional(
+                    end: 0,
+                    top: -size * 0.2,
+                    child: Icon(Icons.add,
+                        key: ValueKey('cell-agenda-more-${date.day}'),
+                        size: size * 0.6,
+                        color: color),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2767,6 +2908,8 @@ class _DayCell extends StatelessWidget {
       else if (day?.handoffTime != null)
         '${l[K.editorHandoffTime]} '
             '${l.formatTimeString(day!.handoffTime!)}',
+      // The agenda mark is drawn for the eye; this is the same fact aloud.
+      if (agenda.isNotEmpty) _agendaAloud(l),
     ].join(', ');
 
     return Semantics(
@@ -2843,11 +2986,8 @@ class _DayCell extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('${date.day}',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontSize: type.number,
-                            height: 1,
-                            color: assigned ? slot.tone.onContainer : null)),
+                    _numberLine(context, tokens,
+                        assigned ? slot.tone.onContainer : null),
                     const SizedBox(height: DayCellType.gap),
                     DayCellAvatar(
                       radius: type.avatarRadius,

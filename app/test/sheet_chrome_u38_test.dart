@@ -43,11 +43,16 @@ Widget _host(Widget child) => MaterialApp(
   ),
 );
 
-void _usePhone(WidgetTester tester) {
-  tester.view.physicalSize = _phone;
+void _usePhone(WidgetTester tester, {Size size = _phone}) {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 }
+
+/// The day sheet's form fits a 700 dp phone since the compact form (owner's
+/// validation, 25/09/2026) — which was the point. Its pinned-row tests need a
+/// body that scrolls, so they run on a short phone, where it still does.
+const Size _shortPhone = Size(360, 560);
 
 /// Visible as the reader holds the phone: on the screen AND reachable by a
 /// tap at its centre. The second half is the one that matters — a banner at
@@ -370,7 +375,7 @@ void main() {
       (tester) async {
         final day = futureDay;
         if (day == null) return;
-        _usePhone(tester);
+        _usePhone(tester, size: _shortPhone);
         // U-56: an ADMIN, because only she still sees the planned-parent
         // field — the tallest form, the one that scrolls on a 700 dp phone.
         final ds = FakeCustodyDataSource(
@@ -404,7 +409,7 @@ void main() {
     ) async {
       final day = futureDay;
       if (day == null) return;
-      _usePhone(tester);
+      _usePhone(tester, size: _shortPhone);
       final ds = FakeCustodyDataSource(
         members: [_anaAdmin, bruno],
         days: [row(7, dayOfMonth(day), 1)],
@@ -413,7 +418,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openDayEditor(tester, day);
-      await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno').first);
+      await tapSheet(tester, memberChip('Bruno').first);
       await _scrollBodyToTop(tester);
       await tester.tap(find.text(_pt[K.commonSave]));
       await tester.pumpAndSettle();

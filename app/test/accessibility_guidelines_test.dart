@@ -87,6 +87,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'agenda_validation_test.dart' as agv;
 import 'calendar_slice_test.dart' as cal;
 import 'custom_roles_test.dart' as roles;
 import 'family_page_test.dart' as fam;
@@ -491,6 +492,18 @@ void main() {
       await cal.openDay(tester, cal.today.day);
       expect(find.byKey(daySheetEditKey), findsNothing);
       await _measure(tester, 'day sheet editor');
+    });
+
+    // Owner's validation, 25/09/2026: the agenda mark on the worst cells —
+    // two-digit days, two-letter avatars, a handoff time, a frozen day, more
+    // than one item — and the compact day sheet over them.
+    _scene('calendar with agenda marks, worst cells', (tester, dark) async {
+      final ds = agv.worstCaseAgendaSource();
+      await tester.pumpWidget(_calendar(ds, dark: dark));
+      await tester.pumpAndSettle();
+      await _measure(tester, 'calendar with agenda marks');
+      await cal.openDay(tester, 10);
+      await _measure(tester, 'compact day sheet');
     });
 
     // F-67 Part B: the past day's door for an admin and the question it

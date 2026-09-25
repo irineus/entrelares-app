@@ -593,6 +593,10 @@ abstract class CustodyDataSource {
 
   // ── F-55 PR 2: the day agenda ────────────────────────────────────────────
 
+  /// Listens for child_events changes — the calendar's agenda marks follow a
+  /// write on another device. Returns a dispose callback.
+  Future<void Function()> watchAgendaChanges(void Function() onChange);
+
   /// The family's agenda events in [from]..[to] (date-only, inclusive).
   /// [includeDeleted] brings the soft-deleted rows too — the Histórico says
   /// that they were removed; the day sheet shows only the live ones.

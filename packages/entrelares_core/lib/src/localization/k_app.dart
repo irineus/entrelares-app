@@ -456,6 +456,11 @@ abstract final class KApp {
   static const String childAdminOnly = 'app.child.adminOnly';
   static const String childNameLabel = 'app.child.nameLabel';
   static const String childAdd = 'app.child.add';
+  // Owner's validation, 25/09/2026: the day sheet's "no swap" chip, short.
+  static const String editorNoSwap = 'app.editor.noSwap';
+  // The calendar cell's agenda mark, for a screen reader.
+  static const String agendaCellAria = 'app.agenda.cellAria';
+  static const String agendaCellAriaMore = 'app.agenda.cellAriaMore';
   static const String childRename = 'app.child.rename';
   static const String childRemove = 'app.child.remove';
   static const String childRemoveConfirm = 'app.child.removeConfirm';
@@ -989,6 +994,9 @@ abstract final class KApp {
     childAdminOnly,
     childNameLabel,
     childAdd,
+    editorNoSwap,
+    agendaCellAria,
+    agendaCellAriaMore,
     childRename,
     childRemove,
     childRemoveConfirm,
@@ -1664,6 +1672,9 @@ abstract final class StringsAppPtBr {
     KApp.childAdminOnly: 'Só um administrador da família cadastra ou muda a criança.',
     KApp.childNameLabel: 'Primeiro nome',
     KApp.childAdd: 'Cadastrar a criança',
+    KApp.editorNoSwap: 'Sem troca',
+    KApp.agendaCellAria: 'agenda: {0}',
+    KApp.agendaCellAriaMore: 'agenda: {0} e mais {1}',
     KApp.childRename: 'Mudar o nome',
     KApp.childRemove: 'Remover',
     KApp.childRemoveConfirm: 'Remover {0} da família? A agenda de {0} sai junto.',
@@ -2335,6 +2346,9 @@ abstract final class StringsAppEn {
     KApp.childAdminOnly: 'Only a family administrator adds or changes the child.',
     KApp.childNameLabel: 'First name',
     KApp.childAdd: 'Add the child',
+    KApp.editorNoSwap: 'No swap',
+    KApp.agendaCellAria: 'agenda: {0}',
+    KApp.agendaCellAriaMore: 'agenda: {0} and {1} more',
     KApp.childRename: 'Change the name',
     KApp.childRemove: 'Remove',
     KApp.childRemoveConfirm: 'Remove {0} from the family? {0}\'s agenda goes with it.',
