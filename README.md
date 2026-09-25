@@ -290,7 +290,8 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   `<link rel="manifest">` do `index.html`, sem o qual o navegador nem lê o manifest: faltando
   qualquer uma a API devolve lista VAZIA, igualzinho a "não instalado". Fora do Chrome
   Android não aparece nada (fail-closed, forma do T-38), e o convite para INSTALAR fica de
-  fora de propósito enquanto a Play não for pública — é checkbox do T-59. Regra pura em
+  fora de propósito enquanto a Play não era pública; ela é pública desde 25/09/2026 (T-59) e o
+  convite é o card F-72 — até ele, o web continua só oferecendo o app JÁ instalado. Regra pura em
   `ChannelHandoffRules`; as quatro fontes e a ausência de App Link em `/` são presas no
   `web_channel_test`. **A resposta do navegador chega DEPOIS do shell montar, e o shell é
   construído por um `builder` de rota do go_router, que guarda as páginas em cache e só roda

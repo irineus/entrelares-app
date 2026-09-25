@@ -911,6 +911,8 @@ abstract final class K {
   static const String notifRenderTitleSettlementRejected = 'notifRender.title.settlementRejected';
   static const String notifRenderSettlementConfirmed = 'notifRender.settlementConfirmed';
   static const String notifRenderSettlementRejected = 'notifRender.settlementRejected';
+  static const String notifRenderTitleSettlementReminder = 'notifRender.title.settlementReminder';
+  static const String notifRenderSettlementReminder = 'notifRender.settlementReminder';
   static const String notifRenderExpenseCategorySchool = 'notifRender.expenseCategory.school';
   static const String notifRenderExpenseCategoryHealth = 'notifRender.expenseCategory.health';
   static const String notifRenderExpenseCategoryClothes = 'notifRender.expenseCategory.clothes';
@@ -2048,6 +2050,8 @@ abstract final class K {
     notifRenderTitleSettlementRejected,
     notifRenderSettlementConfirmed,
     notifRenderSettlementRejected,
+    notifRenderTitleSettlementReminder,
+    notifRenderSettlementReminder,
     notifRenderExpenseCategorySchool,
     notifRenderExpenseCategoryHealth,
     notifRenderExpenseCategoryClothes,

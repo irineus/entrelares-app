@@ -1622,6 +1622,20 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       '${d.day.toString().padLeft(2, '0')}';
 
   @override
+  Future<void Function()> watchAgendaChanges(void Function() onChange) async {
+    final channel = _client
+        .channel('agenda_changes_${_channelSeq++}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'child_events',
+          callback: (_) => onChange(),
+        )
+        .subscribe();
+    return () => _client.removeChannel(channel);
+  }
+
+  @override
   Future<List<ChildEvent>> fetchChildEvents(DateTime from, DateTime to,
       {bool includeDeleted = false}) async {
     var query = _client
@@ -1784,6 +1798,27 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
           params: {'p_up_to': upToId}) as int;
 
   @override
+  Future<void Function()> watchChatChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus}) async {
+    final channel = _client
+        .channel('chat_changes_${_channelSeq++}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'chat_messages',
+          callback: (_) => onChange(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'chat_reads',
+          callback: (_) => onChange(),
+        )
+        .subscribe(_statusCallback(onStatus));
+    return () => _client.removeChannel(channel);
+  }
+
+  @override
   Future<bool> fetchChatPushMuted() async {
     final rows = await _client.from('chat_prefs').select('push_muted').limit(1);
     return rows.isNotEmpty && rows.first['push_muted'] == true;
@@ -1944,6 +1979,28 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   @override
   Future<void> cancelSettlement(int id) async {
     await _client.rpc<dynamic>('cancel_settlement', params: {'p_id': id});
+  }
+
+  @override
+  Future<void> remindSettlement({int? childId, required int toProfileId}) async {
+    await _client.rpc<dynamic>('remind_settlement',
+        params: {'p_child_id': childId, 'p_to': toProfileId});
+  }
+
+  @override
+  Future<void Function()> watchExpenseChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus}) async {
+    var channel = _client.channel('expense_changes_${_channelSeq++}');
+    for (final table in ['expenses', 'expense_shares', 'expense_settlements']) {
+      channel = channel.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: table,
+        callback: (_) => onChange(),
+      );
+    }
+    channel.subscribe(_statusCallback(onStatus));
+    return () => _client.removeChannel(channel);
   }
 
   @override

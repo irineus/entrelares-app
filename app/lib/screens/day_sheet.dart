@@ -84,6 +84,7 @@ Future<DaySheetOutcome?> showDaySheet({
   Iterable<DateTime> frozenDates = const [],
   bool offline = false,
   VoidCallback? onOpenPlan,
+  VoidCallback? onOpenChildren,
 }) {
   return showAppSheet<DaySheetOutcome>(
     context: context,
@@ -105,6 +106,7 @@ Future<DaySheetOutcome?> showDaySheet({
       frozenDates: frozenDates,
       offline: offline,
       onOpenPlan: onOpenPlan,
+      onOpenChildren: onOpenChildren,
     ),
   );
 }
@@ -146,6 +148,9 @@ class _DaySheet extends StatefulWidget {
   /// F-55: where the agenda's Premium CTA lands (`/family/plan`).
   final VoidCallback? onOpenPlan;
 
+  /// Where the agenda's "add the child" door lands (`/family/children`).
+  final VoidCallback? onOpenChildren;
+
   const _DaySheet({
     required this.date,
     required this.day,
@@ -164,6 +169,7 @@ class _DaySheet extends StatefulWidget {
     required this.frozenDates,
     this.offline = false,
     this.onOpenPlan,
+    this.onOpenChildren,
   });
 
   @override
@@ -872,14 +878,37 @@ class _DaySheetState extends State<_DaySheet> {
       required ValueChanged<int>? onSelected}) {
     final slot =
         context.tokens.slot(profileSlotIndex(id, widget.memberViews));
+    final key = ValueKey('member-chip:$label');
+    final avatar = AppAvatar(
+      initials: displayInitials(id, widget.memberViews),
+      slot: slot,
+      radius: 14,
+    );
+    if (!selected) {
+      // Owner's validation, 25/09/2026: only the chosen one wears its name —
+      // the others are their initial in their colour, the calendar's own
+      // legend, and a row of four fits where two did. The name is still the
+      // chip's accessible label, and a long press shows it.
+      return Tooltip(
+        message: label,
+        excludeFromSemantics: true,
+        child: ChoiceChip(
+          key: key,
+          showCheckmark: false,
+          labelPadding: EdgeInsets.zero,
+          padding: const EdgeInsets.all(Spacing.xs),
+          label: Semantics(
+              label: label, child: ExcludeSemantics(child: avatar)),
+          selected: false,
+          onSelected: onSelected == null ? null : (_) => onSelected(id),
+        ),
+      );
+    }
     return ChoiceChip(
+      key: key,
       // The carer wears the same identity here as on the grid — same fill, so
       // the chip and the day they own are recognisably the same person.
-      avatar: AppAvatar(
-        initials: displayInitials(id, widget.memberViews),
-        slot: slot,
-        radius: 14,
-      ),
+      avatar: avatar,
       // U-29: the check REPLACED the avatar on the selected chip — the one
       // chip whose identity matters most lost its initial and colour. The
       // fill already says "selected" (the same reason AppSegmented turned
@@ -1046,6 +1075,7 @@ class _DaySheetState extends State<_DaySheet> {
                 Navigator.of(context).pop();
                 widget.onOpenPlan!();
               },
+        onOpenChildren: widget.onOpenChildren,
       );
 
   /// F-67: the day's relatos under the summary, in the order they were
@@ -1379,18 +1409,19 @@ class _DaySheetState extends State<_DaySheet> {
       // read as one long list of controls with no idea where one question ended
       // and the next began. U-56: a card nobody here can answer is not shown —
       // the pill on top already names the carer.
+      //
+      // Owner's validation, 25/09/2026: the cards became the input's frame,
+      // title on the border — the same question in less than half the height,
+      // so the agenda under the form starts on the first screen.
       if (_showPlannedField) ...[
-      AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-      // U-29: the "(Planejado)" explainer left the label for the ⓘ, as the
-      // English catalog had already done. The S-09 lock hint outranks it.
-      AppFieldLabel(l[K.editorScheduledParent],
-          info: _scheduledLocked
-              ? l[K.editorLockedHint]
-              : l[K.editorScheduledParentHint]),
-      Wrap(
+      AppFieldGroup(
+        // U-29: the "(Planejado)" explainer left the label for the ⓘ, as the
+        // English catalog had already done. The S-09 lock hint outranks it.
+        label: l[K.editorScheduledParent],
+        info: _scheduledLocked
+            ? l[K.editorLockedHint]
+            : l[K.editorScheduledParentHint],
+        child: Wrap(
         spacing: 8,
         children: [
           // S-11 QA: a departed assignee still shows by name (consult).
@@ -1409,10 +1440,8 @@ class _DaySheetState extends State<_DaySheet> {
                     : (id) => setState(() => _scheduledParentId = id)),
         ],
       ),
-          ],
-        ),
       ),
-      const SizedBox(height: Spacing.sm),
+      const SizedBox(height: Spacing.md),
       ],
 
       // ── Actual parent — general since lote 3: changing it on today/future
@@ -1427,23 +1456,21 @@ class _DaySheetState extends State<_DaySheet> {
             ]),
             icon: Icons.person_off_outlined)
       else
-      AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
       // U-28 QA put the "Trocado" fact on this label as a badge, because the
       // form had lost every line that said it. U-56: the pills lead the form
       // again and the dashed "Trocado" pill says it right above — a badge here
       // said it twice.
-      AppFieldLabel(
-        l[K.editorActualParent],
+      AppFieldGroup(
+        label: l[K.editorActualParent],
         info: l[K.editorActualParentHint],
-      ),
-      Wrap(
+        child: Wrap(
         spacing: 8,
         children: [
           ChoiceChip(
-            label: Text(l[K.editorSameAsPlanned]),
+            key: const ValueKey('actual-no-swap'),
+            // The frame already asks "Responsável real": "Sem troca" is the
+            // whole answer (was "Mesmo que o planejado (Sem troca)").
+            label: Text(l[KApp.editorNoSwap]),
             selected: _actualParentId == 0,
             onSelected: (_) => setState(() => _actualParentId = 0),
           ),
@@ -1464,15 +1491,9 @@ class _DaySheetState extends State<_DaySheet> {
                   onSelected: (id) => setState(() => _actualParentId = id)),
         ],
       ),
-          ],
-        ),
       ),
-      const SizedBox(height: Spacing.sm),
+      const SizedBox(height: Spacing.md),
 
-      AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
       // ── Day note ──
       //
       // U-28 QA: the explanation left the helper line for an ⓘ on the label.
@@ -1504,6 +1525,7 @@ class _DaySheetState extends State<_DaySheet> {
       // minute list was a three-screen scroll to reach "30".
       AppTimeField(
         fieldKey: const Key('handoff'),
+        labelOnFrame: true,
         label: l[K.editorHandoffTime],
         info: l[K.editorHandoffHint],
         optionalLabel: l[K.commonOptional],
@@ -1536,9 +1558,6 @@ class _DaySheetState extends State<_DaySheet> {
                     )
                   : const SizedBox.shrink(),
         ),
-          ],
-        ),
-      ),
 
       // ── F-44: only shown when saving will actually open a swap/revert
       //    request — keeps it apart from the day-scoped "Observação do dia" ──

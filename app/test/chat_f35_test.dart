@@ -4,8 +4,12 @@
 // what the client adds: the fixed notice, the read marks it writes (only when
 // something is new), "lida por", reply-by-quoting, the cited day that opens
 // the calendar, search, the silencing, the viewer and Premium states, and
-// the two tabs of Comunicação with their counters.
+// the two tabs of Comunicação with their counters. Since the owner's
+// validation (25/09/2026): a text or a mark from another device arrives
+// without a refresh, is marked read only while the Conversa is on screen, and
+// the column fits what the keyboard leaves on a phone.
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -58,29 +62,43 @@ FakeCustodyDataSource source(
       ..chatActorId = members.first.id;
 
 Future<void> pumpChat(WidgetTester tester, FakeCustodyDataSource ds,
-    {ValueChanged<DateTime>? onOpenDay}) async {
-  await tester.binding.setSurfaceSize(const Size(420, 1400));
+    {ValueChanged<DateTime>? onOpenDay,
+    Size size = const Size(420, 1400),
+    ValueListenable<bool>? onScreen}) async {
+  await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
+  Widget chat = ChatView(
+      dataSource: ds,
+      onOpenPlan: () {},
+      onOpenDay: onOpenDay,
+      now: () => today);
+  // go_router's shell turns the tickers of an inactive branch off; this is
+  // the same signal.
+  if (onScreen != null) {
+    final inner = chat;
+    chat = ValueListenableBuilder<bool>(
+        valueListenable: onScreen,
+        builder: (_, on, _) => TickerMode(enabled: on, child: inner));
+  }
   await tester.pumpWidget(AppL10n(
     l: Localization(AppLanguage.ptBr),
     setLanguage: (_) async {},
-    child: MaterialApp(
-      home: Scaffold(
-        body: ChatView(
-            dataSource: ds,
-            onOpenPlan: () {},
-            onOpenDay: onOpenDay,
-            now: () => today),
-      ),
-    ),
+    child: MaterialApp(home: Scaffold(body: chat)),
   ));
+  await tester.pumpAndSettle();
+}
+
+/// Another device wrote: the channel fires, the debounce passes.
+Future<void> deliver(WidgetTester tester, FakeCustodyDataSource ds) async {
+  ds.chatListener!();
+  await tester.pump(const Duration(milliseconds: 350));
   await tester.pumpAndSettle();
 }
 
 void main() {
   final l = Localization(AppLanguage.ptBr);
 
-  testWidgets('the notice is fixed on top; opening marks what is new',
+  testWidgets('the notice opens the conversation; opening marks what is new',
       (tester) async {
     final ds = source()
       ..chatMessages = [text(1, 2, 'Busco às 18h.'), text(2, 1, 'Ok!')];
@@ -192,6 +210,70 @@ void main() {
   testWidgets('flag off: no Conversa', (tester) async {
     await pumpChat(tester, source(settings: const {}));
     expect(find.byKey(const ValueKey('chat-off')), findsOne);
+  });
+
+  testWidgets('a text from another device arrives without a refresh and, on '
+      'screen, is marked read', (tester) async {
+    final ds = source()..chatMessages = [text(1, 2, 'Busco às 18h.')];
+    await pumpChat(tester, ds);
+    expect(ds.chatWrites, ['read:1']);
+
+    ds.chatMessages = [...ds.chatMessages, text(2, 2, 'Chegamos.')];
+    await deliver(tester, ds);
+    expect(find.text('Chegamos.'), findsOne);
+    expect(ds.chatWrites, ['read:1', 'read:2']);
+  });
+
+  testWidgets('the other side reading shows on the author\'s "lida por" '
+      'without a refresh', (tester) async {
+    final ds = source()..chatMessages = [text(1, 1, 'Levo a mochila.')];
+    await pumpChat(tester, ds);
+    expect(
+        tester.widget<Text>(find.byKey(const ValueKey('chat-read-1'))).data,
+        l[KApp.chatNotRead]);
+
+    ds.chatReads = [
+      ChatRead(
+          messageId: 1, profileId: 2, readAt: DateTime.utc(2026, 9, 24, 13, 5)),
+    ];
+    await deliver(tester, ds);
+    expect(
+        tester.widget<Text>(find.byKey(const ValueKey('chat-read-1'))).data,
+        contains('Bruno Lima'));
+  });
+
+  testWidgets('off screen a text arrives unread; back on the Conversa it is '
+      'marked', (tester) async {
+    final onScreen = ValueNotifier(true);
+    addTearDown(onScreen.dispose);
+    final ds = source()..chatMessages = [text(1, 1, 'Oi.')];
+    await pumpChat(tester, ds, onScreen: onScreen);
+
+    onScreen.value = false; // another tab of the bar
+    await tester.pump();
+    ds.chatMessages = [...ds.chatMessages, text(2, 2, 'Tudo certo?')];
+    await deliver(tester, ds);
+    expect(ds.chatWrites, isEmpty);
+
+    onScreen.value = true;
+    await tester.pumpAndSettle();
+    expect(ds.chatWrites, ['read:2']);
+  });
+
+  testWidgets('the composer starts at one line and fits above a keyboard',
+      (tester) async {
+    final ds = source()
+      ..chatMessages = [for (var i = 1; i <= 6; i++) text(i, 2, 'Texto $i.')];
+    // What a 360 dp phone leaves under the app bars with the keyboard up.
+    await pumpChat(tester, ds, size: const Size(360, 300));
+    expect(tester.takeException(), isNull);
+    final field = tester.widget<TextField>(find.descendant(
+        of: find.byKey(const ValueKey('chat-composer')),
+        matching: find.byType(TextField)));
+    expect(field.minLines, 1);
+    expect(field.maxLines, 5);
+    // The notice scrolls with the texts: at the end, it is off screen.
+    expect(find.byKey(const ValueKey('chat-notice')), findsNothing);
   });
 
   testWidgets('Comunicação: two tabs with counters; a chat push opens the '

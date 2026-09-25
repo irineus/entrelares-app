@@ -28,6 +28,10 @@ class AppTextField extends StatelessWidget {
   final bool obscureText;
   final bool enabled;
   final int? maxLines;
+
+  /// With [maxLines], the field grows from this many lines to that many as
+  /// the text wraps; null keeps it [maxLines] tall from the start.
+  final int? minLines;
   final int? maxLength;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
@@ -61,6 +65,7 @@ class AppTextField extends StatelessWidget {
     this.obscureText = false,
     this.enabled = true,
     this.maxLines = 1,
+    this.minLines,
     this.maxLength,
     this.keyboardType,
     this.textInputAction,
@@ -83,6 +88,7 @@ class AppTextField extends StatelessWidget {
       obscureText: obscureText,
       enabled: enabled,
       maxLines: obscureText ? 1 : maxLines,
+      minLines: obscureText ? null : minLines,
       maxLength: maxLength,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
@@ -304,6 +310,10 @@ class AppTimeField extends StatelessWidget {
   /// validation stays on the field), drawn by the decoration like any input.
   final String? errorText;
 
+  /// The label on the field's border, like a text field's, instead of a line
+  /// above it — the compact day sheet (owner's validation, 25/09/2026).
+  final bool labelOnFrame;
+
   const AppTimeField({
     super.key,
     required this.label,
@@ -318,6 +328,7 @@ class AppTimeField extends StatelessWidget {
     this.enabled = true,
     this.fieldKey,
     this.errorText,
+    this.labelOnFrame = false,
   });
 
   Future<void> _pick(BuildContext context) async {
@@ -339,7 +350,9 @@ class AppTimeField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (trailing == null)
+        if (labelOnFrame)
+          const SizedBox.shrink()
+        else if (trailing == null)
           labelRow
         else
           Row(children: [Expanded(child: labelRow), trailing!]),
@@ -356,6 +369,10 @@ class AppTimeField extends StatelessWidget {
               isEmpty: current == null,
               decoration: InputDecoration(
                 enabled: enabled,
+                label: labelOnFrame
+                    ? AppFrameLabel(label,
+                        info: info, optionalLabel: optionalLabel)
+                    : null,
                 hintText: emptyText,
                 errorText: errorText,
                 // A sentence, not a word: at 360 dp one line ellipsizes it.

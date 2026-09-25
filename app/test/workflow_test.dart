@@ -33,7 +33,7 @@ Future<void> longPressDay(WidgetTester tester, int day) async {
 }
 
 Future<void> tapChip(WidgetTester tester, String label) async {
-  final finder = find.widgetWithText(ChoiceChip, label).last;
+  final finder = (label.startsWith('member-chip:') ? find.byKey(ValueKey(label)) : find.widgetWithText(ChoiceChip, label)).last;
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);
@@ -63,7 +63,7 @@ void main() {
     // Before picking an actual there is no F-44 field.
     expect(find.text(pt[K.editorMessagePlaceholder]), findsNothing);
 
-    await tapChip(tester, 'Bruno');
+    await tapChip(tester, 'member-chip:Bruno');
     // F-44 appears once the save would open a workflow.
     expect(find.text(pt[K.editorMessagePlaceholder]), findsOneWidget);
     await tester.enterText(
@@ -103,7 +103,7 @@ void main() {
     await openDayEditor(tester, day);
 
     // Set the actual back to "same as planned" → revert scenario.
-    await tapChip(tester, pt[K.editorSameAsPlanned]);
+    await tapChip(tester, pt[KApp.editorNoSwap]);
     await tapSave(tester);
 
     // The F-47 question interrupts the save.
@@ -135,7 +135,7 @@ void main() {
     await tester.pumpAndSettle();
     await openDayEditor(tester, day);
 
-    await tapChip(tester, pt[K.editorSameAsPlanned]);
+    await tapChip(tester, pt[KApp.editorNoSwap]);
     await tapSave(tester);
 
     expect(find.text(pt[K.editorRevertNotesQuestion]), findsNothing);

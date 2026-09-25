@@ -28,6 +28,7 @@ import 'screens/home_shell.dart';
 import 'screens/leaving_screen.dart';
 import 'screens/login_screen.dart';
 import 'routing/app_route_gate.dart';
+import 'routing/router_location.dart';
 import 'screens/not_found_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/oauth_onboarding_screen.dart';
@@ -479,6 +480,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   onOpenFamily: () => _router.go('/family'),
                   onOpenNotifications: () => _router.go('/notifications'),
                   onOpenPlan: () => _router.go('/family/plan'),
+                  onOpenChildren: () => _router.go('/family/children'),
                   handoffNudgePrefs: _handoffNudgePrefs,
                   planRequest: _planRequest,
                   dayRequest: _dayRequest),
@@ -684,6 +686,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// never got past the splash does not construct a router just to tear it
   /// down.
   bool _routerLive = false;
+
+  /// Detaches the document title from the router's delegate (see
+  /// [_ensureRouterListeners]).
+  VoidCallback? _stopDocumentTitle;
 
   /// S-11: this member asked to leave, so the app is closed to them until they
   /// cancel or sign out (mirror of `MainLayout.EnforceLeaving`).
@@ -923,7 +929,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _authSub?.cancel();
     if (_routerLive) {
       _router.routeInformationProvider.removeListener(_trackPageView);
-      _router.routeInformationProvider.removeListener(_refreshDocumentTitle);
+      _stopDocumentTitle?.call();
     }
     _inactivityTimer?.cancel();
     _adminMode.dispose();
@@ -1028,7 +1034,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     if (_routerLive) return;
     _routerLive = true;
     _router.routeInformationProvider.addListener(_trackPageView);
-    _router.routeInformationProvider.addListener(_refreshDocumentTitle);
+    // The title hears the DELEGATE, not the provider: the redirect a phase
+    // ping re-runs — sign-in to the calendar, sign-out to Login — reaches the
+    // provider without a notification, and the tab kept naming the screen the
+    // reader had just left (23/09/2026, [RouterLocation]).
+    _stopDocumentTitle = RouterLocation.listen(_router, _refreshDocumentTitle);
   }
 
   /// U-48: the browser's tab and history name the SCREEN, not just the
@@ -1046,7 +1056,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     final prefix = environmentTitlePrefix(isProduction: Env.current.isProduction);
     if (!_routerLive) return '$prefix${DocumentTitle.brand}';
     return DocumentTitle.compose(
-      _router.routeInformationProvider.value.uri.toString(),
+      RouterLocation.of(_router),
       _l,
       environmentPrefix: prefix,
     );

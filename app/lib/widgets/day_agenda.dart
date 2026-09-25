@@ -1,4 +1,5 @@
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:entrelares_db_contracts/models/child.dart';
@@ -23,6 +24,18 @@ import 'ui/ui.dart';
 /// the free note cap. The section only decides what to OFFER — a door the
 /// server would refuse is not shown, and a refusal it still sends is said in
 /// its own words.
+/// The icon of an agenda kind — the day sheet's list and the calendar cell
+/// wear the same one (owner's validation, 25/09/2026).
+IconData agendaKindIcon(AgendaKind kind) => switch (kind) {
+      AgendaKind.school => Icons.school_outlined,
+      AgendaKind.health => Icons.local_hospital_outlined,
+      AgendaKind.medicine => Icons.medication_outlined,
+      AgendaKind.activity => Icons.sports_soccer_outlined,
+      AgendaKind.free => Icons.wb_sunny_outlined,
+      AgendaKind.note => Icons.sticky_note_2_outlined,
+      AgendaKind.other => Icons.event_note_outlined,
+    };
+
 class DayAgendaSection extends StatefulWidget {
   final DateTime date;
   final DateTime today;
@@ -41,6 +54,10 @@ class DayAgendaSection extends StatefulWidget {
   /// Opens `/family/plan` — every Premium gate CTA lands there (U-35).
   final VoidCallback? onOpenPlan;
 
+  /// Opens `/family/children` — the admin's way from "add the child first"
+  /// to the page that adds it.
+  final VoidCallback? onOpenChildren;
+
   const DayAgendaSection({
     super.key,
     required this.date,
@@ -52,6 +69,7 @@ class DayAgendaSection extends StatefulWidget {
     required this.allProfiles,
     this.offline = false,
     this.onOpenPlan,
+    this.onOpenChildren,
   });
 
   @override
@@ -64,10 +82,40 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
   List<ChildRoutine> _routines = const [];
   bool _failed = false;
 
+  /// The day sheet lives in the calendar's branch, so the bar stays under it:
+  /// an admin can leave it open, add the child under Família and come back to
+  /// the same section. Owner's validation, 25/09/2026: the agenda still said
+  /// "add the child first" until the app restarted. Coming back re-reads.
+  ValueListenable<TickerModeData>? _activeBranch;
+  bool _wasActive = true;
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = TickerMode.getValuesNotifier(context);
+    if (!identical(active, _activeBranch)) {
+      _activeBranch?.removeListener(_onBranchChanged);
+      _activeBranch = active..addListener(_onBranchChanged);
+      _wasActive = active.value.enabled;
+    }
+  }
+
+  void _onBranchChanged() {
+    final active = _activeBranch?.value.enabled ?? true;
+    if (active && !_wasActive && mounted) _load();
+    _wasActive = active;
+  }
+
+  @override
+  void dispose() {
+    _activeBranch?.removeListener(_onBranchChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -148,6 +196,15 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
       _routines.where((r) => r.id == e.batchId).firstOrNull;
 
   Future<void> _openEditor(Localization l, {ChildEvent? event}) async {
+    // The children again, right before the editor needs them: the first child
+    // is usually added minutes before the first agenda item.
+    try {
+      final children = await widget.dataSource.fetchChildren();
+      if (!mounted) return;
+      setState(() => _children = children);
+    } catch (_) {/* the list already read stands */}
+    if (!mounted) return;
+    final openChildren = widget.onOpenChildren;
     // The sheet says what it did, in one sentence — a routine's reads
     // differently from a single item's.
     final done = await showAppSheet<String>(
@@ -161,6 +218,14 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
         freeLimited: _freeLimited,
         isAdmin: widget.me?.isAdmin == true,
         dataSource: widget.dataSource,
+        // The day sheet closes too: the page that adds the child is a tab
+        // away, and the agenda re-reads on the way back.
+        onOpenChildren: openChildren == null
+            ? null
+            : () {
+                if (mounted) Navigator.of(context).pop();
+                openChildren();
+              },
       ),
     );
     if (done == null || !mounted) return;
@@ -256,15 +321,7 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
     );
   }
 
-  static IconData _icon(AgendaKind kind) => switch (kind) {
-        AgendaKind.school => Icons.school_outlined,
-        AgendaKind.health => Icons.local_hospital_outlined,
-        AgendaKind.medicine => Icons.medication_outlined,
-        AgendaKind.activity => Icons.sports_soccer_outlined,
-        AgendaKind.free => Icons.wb_sunny_outlined,
-        AgendaKind.note => Icons.sticky_note_2_outlined,
-        AgendaKind.other => Icons.event_note_outlined,
-      };
+  static IconData _icon(AgendaKind kind) => agendaKindIcon(kind);
 
   Widget _entry(Localization l, ChildEvent e) {
     final textTheme = Theme.of(context).textTheme;
@@ -341,6 +398,9 @@ class AgendaEventSheet extends StatefulWidget {
   final bool isAdmin;
   final CustodyDataSource dataSource;
 
+  /// The admin's "add the child" door when [children] is empty.
+  final VoidCallback? onOpenChildren;
+
   const AgendaEventSheet({
     super.key,
     required this.date,
@@ -351,6 +411,7 @@ class AgendaEventSheet extends StatefulWidget {
     required this.isAdmin,
     required this.dataSource,
     this.routine,
+    this.onOpenChildren,
   });
 
   @override
@@ -725,14 +786,32 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
         ),
         if (structured) ...[
           const SizedBox(height: Spacing.md),
-          if (widget.children.isEmpty)
+          if (widget.children.isEmpty) ...[
             Text(
                 l[widget.isAdmin
                     ? KApp.agendaNoChildAdmin
                     : KApp.agendaNoChildMember],
-                style: textTheme.bodySmall?.copyWith(color: tokens.textMuted))
-          else if (widget.children.length > 1)
+                style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+            if (widget.isAdmin && widget.onOpenChildren != null)
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  key: const ValueKey('agenda-add-child'),
+                  icon: const Icon(Icons.child_care_outlined),
+                  label: Text(l[KApp.childAdd]),
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          Navigator.of(context).pop();
+                          widget.onOpenChildren!();
+                        },
+                ),
+              ),
+          ] else if (widget.children.length > 1)
             DropdownButtonFormField<int>(
+              // A name or label never pushes the field past the screen
+              // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
+              isExpanded: true,
               key: const ValueKey('agenda-child'),
               initialValue: _childId,
               decoration:

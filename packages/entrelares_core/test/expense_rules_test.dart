@@ -123,4 +123,29 @@ void main() {
       ]);
     });
   });
+
+  group('room — mirror of settlement_room (owner, 25/09/2026)', () {
+    test('two caregivers: the debt, net of what already waits', () {
+      final net = {1: 5000, 2: -5000};
+      expect(ExpenseLedger.room(net, const [], from: 2, to: 1), 5000);
+      expect(
+          ExpenseLedger.room(
+              net, const [(from: 2, to: 1, amountCents: 2000)],
+              from: 2, to: 1),
+          3000);
+    });
+    test('who is owed has nothing to pay', () {
+      expect(ExpenseLedger.room({1: 5000, 2: -5000}, const [], from: 1, to: 2),
+          lessThanOrEqualTo(0));
+    });
+    test('no expense at all: nothing to pay', () {
+      expect(ExpenseLedger.room(const {}, const [], from: 1, to: 2), 0);
+    });
+    test('three caregivers: the smaller of the debt and the credit', () {
+      // 3 owes 9000; 1 is owed 3000, 2 is owed 6000.
+      final net = {1: 3000, 2: 6000, 3: -9000};
+      expect(ExpenseLedger.room(net, const [], from: 3, to: 1), 3000);
+      expect(ExpenseLedger.room(net, const [], from: 3, to: 2), 6000);
+    });
+  });
 }

@@ -953,6 +953,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final successorPicker = !_needsSuccessor
         ? null
         : DropdownButtonFormField<int>(
+            // A name or label never pushes the field past the screen
+            // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
+            isExpanded: true,
             initialValue: _successorId,
             decoration: InputDecoration(
               labelText: l[K.profSuccessorLabel],

@@ -593,6 +593,10 @@ abstract class CustodyDataSource {
 
   // ── F-55 PR 2: the day agenda ────────────────────────────────────────────
 
+  /// Listens for child_events changes — the calendar's agenda marks follow a
+  /// write on another device. Returns a dispose callback.
+  Future<void Function()> watchAgendaChanges(void Function() onChange);
+
   /// The family's agenda events in [from]..[to] (date-only, inclusive).
   /// [includeDeleted] brings the soft-deleted rows too — the Histórico says
   /// that they were removed; the day sheet shows only the live ones.
@@ -673,6 +677,13 @@ abstract class CustodyDataSource {
   /// (capped at 100 — the badge prints "99+" past that).
   Future<int> fetchChatUnreadCount(int profileId);
 
+  /// Listens for chat_messages inserts and chat_reads changes — a text or a
+  /// read mark written on another device reaches an open Conversa and the
+  /// counters without a pull (owner's validation, 25/09/2026). [onStatus] as
+  /// in [watchChanges]. Returns a dispose callback.
+  Future<void Function()> watchChatChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus});
+
   // ── F-34: shared expenses ────────────────────────────────────────────────
 
   /// The family's expenses with their shares, newest first. A viewer reads
@@ -722,6 +733,16 @@ abstract class CustodyDataSource {
 
   /// The one who recorded it takes it back while it waits.
   Future<void> cancelSettlement(int id);
+
+  /// "Lembrar": the one who is owed reminds [toProfileId] — refused while the
+  /// debt is not open or inside `expenses.reminder_cooldown_hours`.
+  Future<void> remindSettlement({int? childId, required int toProfileId});
+
+  /// Listens for expense, share and settle-up changes, so both phones see a
+  /// payment and its confirmation as they happen (owner's validation,
+  /// 25/09/2026). [onStatus] as in [watchChanges].
+  Future<void Function()> watchExpenseChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus});
 
   // ── F-55 PR 3: the routine ───────────────────────────────────────────────
 

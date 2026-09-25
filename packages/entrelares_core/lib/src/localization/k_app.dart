@@ -456,6 +456,11 @@ abstract final class KApp {
   static const String childAdminOnly = 'app.child.adminOnly';
   static const String childNameLabel = 'app.child.nameLabel';
   static const String childAdd = 'app.child.add';
+  // Owner's validation, 25/09/2026: the day sheet's "no swap" chip, short.
+  static const String editorNoSwap = 'app.editor.noSwap';
+  // The calendar cell's agenda mark, for a screen reader.
+  static const String agendaCellAria = 'app.agenda.cellAria';
+  static const String agendaCellAriaMore = 'app.agenda.cellAriaMore';
   static const String childRename = 'app.child.rename';
   static const String childRemove = 'app.child.remove';
   static const String childRemoveConfirm = 'app.child.removeConfirm';
@@ -599,16 +604,12 @@ abstract final class KApp {
   static const String expenseEmptyBody = 'app.expense.emptyBody';
   static const String expenseGroupFamily = 'app.expense.groupFamily';
   static const String expenseGroupLabel = 'app.expense.groupLabel';
-  static const String expenseBalance = 'app.expense.balance';
   static const String expenseBalanceEven = 'app.expense.balanceEven';
   static const String expensePays = 'app.expense.pays';
-  static const String expenseNetGets = 'app.expense.netGets';
-  static const String expenseNetOwes = 'app.expense.netOwes';
   static const String expenseSettle = 'app.expense.settle';
   static const String expenseSettleTitle = 'app.expense.settleTitle';
   static const String expenseSettleLead = 'app.expense.settleLead';
   static const String expenseSettleTo = 'app.expense.settleTo';
-  static const String expenseSettleNobody = 'app.expense.settleNobody';
   static const String expenseAmount = 'app.expense.amount';
   static const String expenseSettleSent = 'app.expense.settleSent';
   static const String expensePending = 'app.expense.pending';
@@ -621,7 +622,27 @@ abstract final class KApp {
   static const String expenseConfirmed = 'app.expense.confirmed';
   static const String expenseRejected = 'app.expense.rejected';
   static const String expenseTakenBack = 'app.expense.takenBack';
-  static const String expenseListSection = 'app.expense.listSection';
+  // Owner's validation, 25/09/2026: the balance card and the activity list.
+  static const String expenseMyBalance = 'app.expense.myBalance';
+  static const String expenseHeadOwe = 'app.expense.headOwe';
+  static const String expenseHeadGets = 'app.expense.headGets';
+  static const String expenseRowYouOwe = 'app.expense.rowYouOwe';
+  static const String expenseRowOwesYou = 'app.expense.rowOwesYou';
+  static const String expenseOthers = 'app.expense.others';
+  static const String expensePay = 'app.expense.pay';
+  static const String expenseRemind = 'app.expense.remind';
+  static const String expenseReminded = 'app.expense.reminded';
+  static const String expenseSettleOver = 'app.expense.settleOver';
+  static const String expenseMovements = 'app.expense.movements';
+  static const String expenseFilterAll = 'app.expense.filterAll';
+  static const String expenseFilterExpenses = 'app.expense.filterExpenses';
+  static const String expenseFilterPayments = 'app.expense.filterPayments';
+  static const String expensePaymentRow = 'app.expense.paymentRow';
+  static const String expenseYouLent = 'app.expense.youLent';
+  static const String expenseYourShare = 'app.expense.yourShare';
+  static const String expenseNotYours = 'app.expense.notYours';
+  static const String expenseYouPaid = 'app.expense.youPaid';
+  static const String expenseYouReceived = 'app.expense.youReceived';
   static const String expenseRow = 'app.expense.row';
   static const String expenseDesc = 'app.expense.desc';
   static const String expenseCategory = 'app.expense.category';
@@ -989,6 +1010,9 @@ abstract final class KApp {
     childAdminOnly,
     childNameLabel,
     childAdd,
+    editorNoSwap,
+    agendaCellAria,
+    agendaCellAriaMore,
     childRename,
     childRemove,
     childRemoveConfirm,
@@ -1125,16 +1149,12 @@ abstract final class KApp {
     expenseEmptyBody,
     expenseGroupFamily,
     expenseGroupLabel,
-    expenseBalance,
     expenseBalanceEven,
     expensePays,
-    expenseNetGets,
-    expenseNetOwes,
     expenseSettle,
     expenseSettleTitle,
     expenseSettleLead,
     expenseSettleTo,
-    expenseSettleNobody,
     expenseAmount,
     expenseSettleSent,
     expensePending,
@@ -1147,7 +1167,26 @@ abstract final class KApp {
     expenseConfirmed,
     expenseRejected,
     expenseTakenBack,
-    expenseListSection,
+    expenseMyBalance,
+    expenseHeadOwe,
+    expenseHeadGets,
+    expenseRowYouOwe,
+    expenseRowOwesYou,
+    expenseOthers,
+    expensePay,
+    expenseRemind,
+    expenseReminded,
+    expenseSettleOver,
+    expenseMovements,
+    expenseFilterAll,
+    expenseFilterExpenses,
+    expenseFilterPayments,
+    expensePaymentRow,
+    expenseYouLent,
+    expenseYourShare,
+    expenseNotYours,
+    expenseYouPaid,
+    expenseYouReceived,
     expenseRow,
     expenseDesc,
     expenseCategory,
@@ -1664,6 +1703,9 @@ abstract final class StringsAppPtBr {
     KApp.childAdminOnly: 'Só um administrador da família cadastra ou muda a criança.',
     KApp.childNameLabel: 'Primeiro nome',
     KApp.childAdd: 'Cadastrar a criança',
+    KApp.editorNoSwap: 'Sem troca',
+    KApp.agendaCellAria: 'agenda: {0}',
+    KApp.agendaCellAriaMore: 'agenda: {0} e mais {1}',
     KApp.childRename: 'Mudar o nome',
     KApp.childRemove: 'Remover',
     KApp.childRemoveConfirm: 'Remover {0} da família? A agenda de {0} sai junto.',
@@ -1801,16 +1843,12 @@ abstract final class StringsAppPtBr {
     KApp.expenseEmptyBody: 'Lance o que foi gasto com a criança — escola, saúde, roupas — e escolha como dividir.',
     KApp.expenseGroupFamily: 'Família',
     KApp.expenseGroupLabel: 'Grupo de despesas',
-    KApp.expenseBalance: 'Saldo',
     KApp.expenseBalanceEven: 'Tudo acertado: ninguém deve nada.',
     KApp.expensePays: '{0} paga {1} a {2}',
-    KApp.expenseNetGets: '{0}: tem a receber {1}',
-    KApp.expenseNetOwes: '{0}: deve {1}',
     KApp.expenseSettle: 'Registrar pagamento',
     KApp.expenseSettleTitle: 'Acertar contas',
     KApp.expenseSettleLead: 'Registre um pagamento que você fez. Ele só entra no saldo quando quem recebeu confirmar.',
     KApp.expenseSettleTo: 'Pago a',
-    KApp.expenseSettleNobody: 'Ninguém mais na família tem conta para confirmar um pagamento.',
     KApp.expenseAmount: 'Valor (R\$)',
     KApp.expenseSettleSent: 'Pagamento registrado. Falta a confirmação de quem recebeu.',
     KApp.expensePending: 'Pagamentos esperando confirmação',
@@ -1823,7 +1861,26 @@ abstract final class StringsAppPtBr {
     KApp.expenseConfirmed: 'Pagamento confirmado.',
     KApp.expenseRejected: 'Pagamento marcado como não recebido.',
     KApp.expenseTakenBack: 'Registro desfeito.',
-    KApp.expenseListSection: 'Despesas lançadas',
+    KApp.expenseMyBalance: 'Seu saldo',
+    KApp.expenseHeadOwe: 'Você deve {0}',
+    KApp.expenseHeadGets: 'Você tem a receber {0}',
+    KApp.expenseRowYouOwe: 'você deve {0}',
+    KApp.expenseRowOwesYou: 'deve a você {0}',
+    KApp.expenseOthers: 'Entre os outros',
+    KApp.expensePay: 'Pagar',
+    KApp.expenseRemind: 'Lembrar',
+    KApp.expenseReminded: 'Lembrete enviado.',
+    KApp.expenseSettleOver: 'O valor passa do que você deve a {0} ({1}).',
+    KApp.expenseMovements: 'Movimentações',
+    KApp.expenseFilterAll: 'Tudo',
+    KApp.expenseFilterExpenses: 'Despesas',
+    KApp.expenseFilterPayments: 'Pagamentos',
+    KApp.expensePaymentRow: 'Pagamento: {0} → {1}',
+    KApp.expenseYouLent: 'você emprestou {0}',
+    KApp.expenseYourShare: 'sua parte {0}',
+    KApp.expenseNotYours: 'não envolve você',
+    KApp.expenseYouPaid: 'você pagou',
+    KApp.expenseYouReceived: 'você recebeu',
     KApp.expenseRow: '{0} · {1} · pago por {2}',
     KApp.expenseDesc: 'Descrição',
     KApp.expenseCategory: 'Categoria',
@@ -2335,6 +2392,9 @@ abstract final class StringsAppEn {
     KApp.childAdminOnly: 'Only a family administrator adds or changes the child.',
     KApp.childNameLabel: 'First name',
     KApp.childAdd: 'Add the child',
+    KApp.editorNoSwap: 'No swap',
+    KApp.agendaCellAria: 'agenda: {0}',
+    KApp.agendaCellAriaMore: 'agenda: {0} and {1} more',
     KApp.childRename: 'Change the name',
     KApp.childRemove: 'Remove',
     KApp.childRemoveConfirm: 'Remove {0} from the family? {0}\'s agenda goes with it.',
@@ -2472,16 +2532,12 @@ abstract final class StringsAppEn {
     KApp.expenseEmptyBody: 'Add what was spent on the child — school, health, clothes — and choose how to split it.',
     KApp.expenseGroupFamily: 'Family',
     KApp.expenseGroupLabel: 'Expense group',
-    KApp.expenseBalance: 'Balance',
     KApp.expenseBalanceEven: 'All settled: nobody owes anything.',
     KApp.expensePays: '{0} pays {1} to {2}',
-    KApp.expenseNetGets: '{0}: is owed {1}',
-    KApp.expenseNetOwes: '{0}: owes {1}',
     KApp.expenseSettle: 'Record a payment',
     KApp.expenseSettleTitle: 'Settle up',
     KApp.expenseSettleLead: 'Record a payment you made. It counts in the balance only once the person who received it confirms.',
     KApp.expenseSettleTo: 'Paid to',
-    KApp.expenseSettleNobody: 'Nobody else in the family has an account to confirm a payment.',
     KApp.expenseAmount: 'Amount (R\$)',
     KApp.expenseSettleSent: 'Payment recorded. It waits for the receiver to confirm.',
     KApp.expensePending: 'Payments awaiting confirmation',
@@ -2494,7 +2550,26 @@ abstract final class StringsAppEn {
     KApp.expenseConfirmed: 'Payment confirmed.',
     KApp.expenseRejected: 'Payment marked as not received.',
     KApp.expenseTakenBack: 'Record taken back.',
-    KApp.expenseListSection: 'Expenses added',
+    KApp.expenseMyBalance: 'Your balance',
+    KApp.expenseHeadOwe: 'You owe {0}',
+    KApp.expenseHeadGets: 'You are owed {0}',
+    KApp.expenseRowYouOwe: 'you owe {0}',
+    KApp.expenseRowOwesYou: 'owes you {0}',
+    KApp.expenseOthers: 'Between the others',
+    KApp.expensePay: 'Pay',
+    KApp.expenseRemind: 'Remind',
+    KApp.expenseReminded: 'Reminder sent.',
+    KApp.expenseSettleOver: 'The amount is more than you owe {0} ({1}).',
+    KApp.expenseMovements: 'Activity',
+    KApp.expenseFilterAll: 'All',
+    KApp.expenseFilterExpenses: 'Expenses',
+    KApp.expenseFilterPayments: 'Payments',
+    KApp.expensePaymentRow: 'Payment: {0} → {1}',
+    KApp.expenseYouLent: 'you lent {0}',
+    KApp.expenseYourShare: 'your share {0}',
+    KApp.expenseNotYours: 'does not involve you',
+    KApp.expenseYouPaid: 'you paid',
+    KApp.expenseYouReceived: 'you received',
     KApp.expenseRow: '{0} · {1} · paid by {2}',
     KApp.expenseDesc: 'Description',
     KApp.expenseCategory: 'Category',

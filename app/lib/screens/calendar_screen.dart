@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
@@ -24,6 +25,7 @@ import '../widgets/account_button.dart';
 import '../widgets/admin_mode_offer.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
+import '../widgets/day_agenda.dart';
 import '../widgets/slot_pill.dart';
 import '../widgets/today_card.dart';
 import 'bulk_sheet.dart';
@@ -117,6 +119,9 @@ class CalendarScreen extends StatefulWidget {
   /// sends the admin to `/family/plan` (U-49). Null leaves it a sentence.
   final VoidCallback? onOpenPlan;
 
+  /// F-55: the agenda's "add the child" door (`/family/children`).
+  final VoidCallback? onOpenChildren;
+
   /// U-55: where the "Definir horário" strip's dismissal is kept on this
   /// device. Null (tests, hosts without storage) keeps it for the session.
   final HandoffNudgePrefs? handoffNudgePrefs;
@@ -147,6 +152,7 @@ class CalendarScreen extends StatefulWidget {
       this.onOpenFamily,
       this.onOpenNotifications,
       this.onOpenPlan,
+      this.onOpenChildren,
       this.handoffNudgePrefs,
       this.planRequest,
       this.dayRequest});
@@ -303,43 +309,59 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (widget.dayRequest?.value != null) _onDayRequest();
   }
 
-  /// F-35: the day a cited Conversa text asked for, held until its month is
-  /// the one on screen and loaded.
+  /// F-35: the day a cited Conversa text asked for, held until a load that
+  /// STARTED after the request has put its month on screen.
   DateTime? _pendingDay;
+
+  /// Every [_load] takes the next number. A cited day opens only on a load
+  /// numbered above [_pendingDayAfter]: the swap it names is usually minutes
+  /// old, and a month read before it (or an older poll finishing late, for
+  /// the previous month) would open the day as if nothing were pending —
+  /// editable on the first tap, the owner's validation of 25/09/2026.
+  int _loadSeq = 0;
+  int _pendingDayAfter = 0;
 
   void _onDayRequest() {
     final day = widget.dayRequest?.value;
     if (day == null) return;
     widget.dayRequest!.value = null;
     _pendingDay = DateTime(day.year, day.month, day.day);
+    _pendingDayAfter = _loadSeq;
     final month = DateTime(day.year, day.month);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if ((month.year != _visibleMonth.year ||
               month.month != _visibleMonth.month) &&
           _pageController.hasClients) {
+        // The page change loads the cited month itself.
         _pageController.jumpToPage(_pageForMonth(month));
+      } else {
+        _load(silent: true);
       }
-      _openPendingDay();
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
-  void _openPendingDay() {
+  void _openPendingDay(int completedLoad) {
     final day = _pendingDay;
-    if (day == null || _loading || !mounted) return;
-    if (day.year != _visibleMonth.year || day.month != _visibleMonth.month) {
-      return;
-    }
+    if (day == null || !mounted || completedLoad <= _pendingDayAfter) return;
+    if (!_isOnScreen(DateTime(day.year, day.month))) return;
     _pendingDay = null;
+    // The same action a tap on the cell takes: a day with a pending request
+    // opens the approval panel, anything else the day sheet.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _openDay(day);
+      if (mounted) _openDayAsTapped(day);
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   /// F-70: the family's last planned day, read with every load (best-effort).
   DateTime? _lastPlannedDay;
+
+  /// F-55 on the grid (owner's validation, 25/09/2026): each day's live
+  /// agenda items, in the day sheet's order, for the month on screen.
+  Map<String, List<ChildEvent>> _agendaByIso = const {};
+  void Function()? _unwatchAgenda;
 
   /// F-70: the day a plan-end notification asked the wizard to open on, held
   /// until the month has loaded — the wizard needs the members to offer.
@@ -393,6 +415,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     // load + a new timer on return.
     if (state == AppLifecycleState.resumed) {
       _load(silent: true);
+      _loadHorizonInputs();
       _schedulePoll();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
@@ -469,26 +492,119 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (reconnected && mounted) _load(silent: true);
   }
 
+  /// Whether [_settings] holds a real read. The seeded fallbacks keep every
+  /// `feature.*` flag OFF, so a read that failed at start-up — the first one
+  /// of a cold start races the session refresh — hid the agenda for the whole
+  /// session: this used to run once, from initState (validation, 25/09/2026).
+  bool _settingsRead = false;
+  bool _horizonInFlight = false;
+
+  /// A read asked for while one was in flight — it runs when that one ends.
+  bool _horizonAgain = false;
+
+  /// The retry of a failed settings read, on its own clock. Owner's second
+  /// validation round, 25/09/2026: retrying only from [_load] was not enough —
+  /// with a healthy socket and the healthy poll off (T-83) the next load may
+  /// never come, and a retry asked for while the first read still hung was
+  /// dropped. The agenda stayed off until the app restarted, again.
+  Timer? _settingsRetry;
+  int _settingsAttempt = 0;
+  static const List<int> _settingsBackoffSeconds = [2, 5, 10, 30, 60];
+
+  void _scheduleSettingsRetry() {
+    if (_settingsRead || _settingsRetry != null || !mounted) return;
+    final i = _settingsAttempt < _settingsBackoffSeconds.length
+        ? _settingsAttempt
+        : _settingsBackoffSeconds.length - 1;
+    _settingsAttempt++;
+    _settingsRetry = Timer(Duration(seconds: _settingsBackoffSeconds[i]), () {
+      _settingsRetry = null;
+      if (mounted && !_settingsRead) _loadHorizonInputs();
+    });
+  }
+
   /// Defensive like the web: neither read may break the calendar — entitlement
   /// falls to premium, settings to the seeded fallbacks (no wrongful block).
+  /// A failed settings read retries by itself (2, 5, 10, 30 s, then every
+  /// minute) until it lands; every [_load] and every resume read again too (an
+  /// operator's kill switch reaches an open app).
   Future<void> _loadHorizonInputs() async {
-    Family? family;
-    var failed = false;
-    try {
-      family = await widget.dataSource.fetchOwnFamily();
-    } catch (_) {
-      failed = true;
+    if (_horizonInFlight) {
+      _horizonAgain = true;
+      return;
     }
-    var settings = PublicSettings.unloaded;
+    _horizonInFlight = true;
     try {
-      settings = PublicSettings(await widget.dataSource.fetchPublicSettings());
-    } catch (_) {/* seeded fallbacks */}
-    if (!mounted) return;
-    setState(() {
-      _family = family;
-      _entitlementFailed = failed;
-      _settings = settings;
-    });
+      Family? family;
+      var failed = false;
+      try {
+        family = await widget.dataSource.fetchOwnFamily();
+      } catch (_) {
+        failed = true;
+      }
+      PublicSettings? settings;
+      try {
+        final values = await widget.dataSource.fetchPublicSettings();
+        // An empty answer is RLS saying "no session yet", not a table with
+        // no rows — it is a failed read, and it keeps the last good one.
+        if (values.isNotEmpty) settings = PublicSettings(values);
+      } catch (_) {/* seeded fallbacks, retried by the next load */}
+      if (!mounted) return;
+      // The month's agenda marks wait on this flag: a first read that lands
+      // after the first load reloads once, so the marks do not wait a poll.
+      final agendaTurnedOn = settings != null &&
+          settings.childAgendaEnabled &&
+          !_settings.childAgendaEnabled;
+      setState(() {
+        if (!failed || _family == null) {
+          _family = family;
+          _entitlementFailed = failed;
+        }
+        if (settings != null) {
+          _settings = settings;
+          _settingsRead = true;
+        }
+      });
+      if (agendaTurnedOn && _loadedMonth != null) _load(silent: true);
+    } finally {
+      _horizonInFlight = false;
+      if (mounted) {
+        if (_settingsRead) {
+          _settingsAttempt = 0;
+          _settingsRetry?.cancel();
+          _settingsRetry = null;
+        }
+        if (_horizonAgain) {
+          _horizonAgain = false;
+          unawaited(_loadHorizonInputs());
+        } else {
+          _scheduleSettingsRetry();
+        }
+      }
+    }
+  }
+
+  /// The month's live items per day, in the day sheet's order — the first
+  /// one is the one the cell draws.
+  static Map<String, List<ChildEvent>> _groupAgenda(List<ChildEvent> events) {
+    final byIso = <String, List<ChildEvent>>{};
+    for (final e in events) {
+      if (e.isDeleted) continue;
+      (byIso[CareSchedule.isoDate(e.eventDate)] ??= []).add(e);
+    }
+    return {
+      for (final entry in byIso.entries)
+        entry.key: AgendaRules.timeline(
+          entry.value,
+          (e) => AgendaEntry(
+            id: e.id,
+            kind: AgendaKind.parse(e.kind) ?? AgendaKind.other,
+            start: e.startTime,
+            end: e.endTime,
+            createdAt: e.createdAt,
+          ),
+        ),
+    };
   }
 
   Future<void> _watch() async {
@@ -520,6 +636,15 @@ class _CalendarScreenState extends State<CalendarScreen>
         }
       },
     );
+    // F-55: an agenda item written on another device marks its day here.
+    try {
+      _unwatchAgenda = await widget.dataSource.watchAgendaChanges(() {
+        _changeDebounce?.cancel();
+        _changeDebounce = Timer(_changeDebounceWindow, () {
+          if (mounted) _load(silent: true);
+        });
+      });
+    } catch (_) {/* the poll and the next load still read it */}
     // Lote 3: the workflow channel — a request opened/resolved by the other
     // member repaints the frozen days without a manual refresh.
     _unwatchWorkflow = await widget.dataSource.watchWorkflowChanges(() {
@@ -537,8 +662,10 @@ class _CalendarScreenState extends State<CalendarScreen>
     widget.dayRequest?.removeListener(_onDayRequest);
     _unwatch?.call();
     _unwatchWorkflow?.call();
+    _unwatchAgenda?.call();
     _pollTimer?.cancel();
     _changeDebounce?.cancel();
+    _settingsRetry?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -548,9 +675,11 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Future<void> _load({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
+    final seq = ++_loadSeq;
     // Captured once: a swipe during the load must not date one month's rows
     // as another's.
     final month = _visibleMonth;
+    if (!_settingsRead) unawaited(_loadHorizonInputs());
     try {
       final members = await widget.dataSource.fetchMembers();
       // Best-effort: a family whose roles fail to load still gets its
@@ -598,6 +727,19 @@ class _CalendarScreenState extends State<CalendarScreen>
       try {
         lastPlannedDay = await widget.dataSource.fetchLastPlannedDay();
       } catch (_) {/* keep whatever we had */}
+      // F-55: the month's agenda marks. Best-effort like the avisos, and
+      // asked only while the module is on for this family.
+      var agendaByIso = _agendaByIso;
+      if (_settings.childAgendaEnabled) {
+        try {
+          final events = await widget.dataSource.fetchChildEvents(
+              DateTime(month.year, month.month, 1),
+              DateTime(month.year, month.month + 1, 0));
+          agendaByIso = _groupAgenda(events);
+        } catch (_) {/* keep whatever we had */}
+      } else {
+        agendaByIso = const {};
+      }
       var todayNotices = _todayNotices;
       var yesterdayRow = _yesterdayRow;
       try {
@@ -622,13 +764,14 @@ class _CalendarScreenState extends State<CalendarScreen>
         _todayNotices = todayNotices;
         _yesterdayRow = yesterdayRow;
         _lastPlannedDay = lastPlannedDay;
+        _agendaByIso = agendaByIso;
         _loadedMonth = month;
         _openInvitation = openInvitation;
         _loading = false;
         _loadError = null;
       });
       _openPendingPlan();
-      _openPendingDay();
+      _openPendingDay(seq);
       final readAt = DateTime.now();
       widget.connectivity?.loadedData(readAt);
       // T-18: only the CURRENT month is worth a device copy — the door-of-the-
@@ -945,6 +1088,11 @@ class _CalendarScreenState extends State<CalendarScreen>
       _toggleDaySelection(date);
       return;
     }
+    _openDayAsTapped(date);
+  }
+
+  /// What a tap on [date]'s cell opens — also a day cited in the Conversa.
+  void _openDayAsTapped(DateTime date) {
     // Web parity (HandleDayClick): a day with a pending request opens the
     // frozen panel instead of the editor — for everyone, admins included.
     final frozen = _frozenByIso[CareSchedule.isoDate(date)];
@@ -1334,6 +1482,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       allProfiles: _members,
       offline: _offline,
       onOpenPlan: widget.onOpenPlan,
+      onOpenChildren: widget.onOpenChildren,
     );
     if (outcome != null) {
       _load(silent: true);
@@ -2090,6 +2239,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                           month: month,
                           daysByIso: isVisible ? _daysByIso : const {},
                           frozenByIso: isVisible ? _frozenByIso : const {},
+                          agendaByIso: isVisible ? _agendaByIso : const {},
                           ownProfileId: _ownProfile?.id,
                           views: views,
                           today: _today,
@@ -2342,6 +2492,7 @@ class _MonthGrid extends StatelessWidget {
   final DateTime month;
   final Map<String, CareSchedule> daysByIso;
   final Map<String, SwapRequest> frozenByIso;
+  final Map<String, List<ChildEvent>> agendaByIso;
   final int? ownProfileId;
   final List<MemberView> views;
   final DateTime today;
@@ -2364,6 +2515,7 @@ class _MonthGrid extends StatelessWidget {
     required this.month,
     required this.daysByIso,
     required this.frozenByIso,
+    this.agendaByIso = const {},
     required this.ownProfileId,
     required this.views,
     required this.today,
@@ -2538,6 +2690,9 @@ class _MonthGrid extends StatelessWidget {
                           DateTime(month.year, month.month, day))],
                       AppL10n.of(context).l),
                   views: views,
+                  agenda: agendaByIso[CareSchedule.isoDate(
+                          DateTime(month.year, month.month, day))] ??
+                      const [],
                   isToday: CareSchedule.isoDate(
                           DateTime(month.year, month.month, day)) ==
                       todayIso,
@@ -2654,6 +2809,9 @@ class _DayCell extends StatelessWidget {
   final CareSchedule? day;
   final _FrozenMark? frozenMark;
   final List<MemberView> views;
+
+  /// F-55: the day's live agenda items, first one first.
+  final List<ChildEvent> agenda;
   final bool isToday;
   final bool isSelected;
 
@@ -2668,12 +2826,79 @@ class _DayCell extends StatelessWidget {
     required this.day,
     required this.frozenMark,
     required this.views,
+    this.agenda = const [],
     required this.isToday,
     required this.isSelected,
     required this.type,
     required this.onTap,
     required this.onLongPress,
   });
+
+  /// "Agenda: Escola 10:30" / "Agenda: Escola 10:30 e mais 2".
+  String _agendaAloud(Localization l) {
+    final first = agenda.first;
+    final kind = AgendaKind.parse(first.kind) ?? AgendaKind.other;
+    final what = [
+      l[kind.labelKey],
+      if (first.startTime != null) l.formatTimeString(first.startTime!),
+    ].join(' ');
+    return agenda.length == 1
+        ? l.format(KApp.agendaCellAria, [what])
+        : l.format(KApp.agendaCellAriaMore, [what, agenda.length - 1]);
+  }
+
+  /// The day number — and, on a day with agenda items, the first item's icon
+  /// beside it, with a small "+" on its shoulder when more follow (owner's
+  /// validation, 25/09/2026). The first line, because the third is the
+  /// handoff time or the frozen mark and was already the tightest (U-39).
+  ///
+  /// The icon holds the step's size while the number follows the reader's
+  /// scale: at 1.3× a scaled icon plus a "+" beside it overflowed the 360 dp
+  /// cell by 8 px (the worst-case test). The "+" sits inside a box reserved
+  /// for it, never beside the icon; the rare line that still does not fit
+  /// shrinks as a whole, never below the product's floor (U-48).
+  Widget _numberLine(BuildContext context, AppTokens tokens, Color? ink) {
+    final number = Text('${date.day}',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            fontSize: type.number, height: 1, color: ink));
+    if (agenda.isEmpty) return number;
+    final size = type.number;
+    final color = ink ?? tokens.textMuted;
+    final kind = AgendaKind.parse(agenda.first.kind) ?? AgendaKind.other;
+    final icon = Icon(agendaKindIcon(kind), size: size, color: color);
+    return AppShrinkToFit(
+      alignment: Alignment.center,
+      child: Row(
+        key: ValueKey('cell-agenda-${date.day}'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          number,
+          SizedBox(width: size * 0.15),
+          if (agenda.length == 1)
+            icon
+          else
+            SizedBox(
+              width: size * 1.4,
+              height: size,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  PositionedDirectional(start: 0, top: 0, child: icon),
+                  PositionedDirectional(
+                    end: 0,
+                    top: -size * 0.2,
+                    child: Icon(Icons.add,
+                        key: ValueKey('cell-agenda-more-${date.day}'),
+                        size: size * 0.6,
+                        color: color),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2725,6 +2950,8 @@ class _DayCell extends StatelessWidget {
       else if (day?.handoffTime != null)
         '${l[K.editorHandoffTime]} '
             '${l.formatTimeString(day!.handoffTime!)}',
+      // The agenda mark is drawn for the eye; this is the same fact aloud.
+      if (agenda.isNotEmpty) _agendaAloud(l),
     ].join(', ');
 
     return Semantics(
@@ -2801,11 +3028,8 @@ class _DayCell extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('${date.day}',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontSize: type.number,
-                            height: 1,
-                            color: assigned ? slot.tone.onContainer : null)),
+                    _numberLine(context, tokens,
+                        assigned ? slot.tone.onContainer : null),
                     const SizedBox(height: DayCellType.gap),
                     DayCellAvatar(
                       radius: type.avatarRadius,

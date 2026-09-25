@@ -195,7 +195,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openDay(tester, day);
-      await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno'));
+      await tapSheet(tester, memberChip('Bruno'));
       await tapSheet(tester, find.text('Salvar'));
       await tester.runAsync(() => Future<void>.delayed(Duration.zero));
 

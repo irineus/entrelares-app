@@ -80,6 +80,7 @@ class NotificationsScreen extends StatefulWidget {
     'expense_changed',
     'settlement_requested',
     'settlement_answered',
+    'settlement_reminder',
   };
 
   static Key expenseActionKey(int id) => Key('notif-expense-$id');

@@ -19,6 +19,7 @@ class NotificationBadge extends ChangeNotifier {
 
   int get total => count + chatUnread;
   void Function()? _unwatch;
+  void Function()? _unwatchChat;
   bool _disposed = false;
 
   NotificationBadge(this._dataSource);
@@ -28,6 +29,13 @@ class NotificationBadge extends ChangeNotifier {
     await refresh();
     if (_disposed || _unwatch != null) return;
     _unwatch = await _dataSource.watchWorkflowChanges(() => refresh());
+    // F-35: a text read on another device of mine drops the Conversa's
+    // counter here too; a new text already arrives as a notification row.
+    try {
+      _unwatchChat = await _dataSource.watchChatChanges(() {
+        if (chatOn) refresh();
+      });
+    } catch (_) {/* the workflow channel and the reads still count */}
     if (_disposed) stop();
   }
 
@@ -35,6 +43,8 @@ class NotificationBadge extends ChangeNotifier {
   void stop() {
     _unwatch?.call();
     _unwatch = null;
+    _unwatchChat?.call();
+    _unwatchChat = null;
     _set(0, 0);
   }
 
@@ -70,6 +80,8 @@ class NotificationBadge extends ChangeNotifier {
     _disposed = true;
     _unwatch?.call();
     _unwatch = null;
+    _unwatchChat?.call();
+    _unwatchChat = null;
     super.dispose();
   }
 }

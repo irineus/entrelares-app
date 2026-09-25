@@ -963,6 +963,15 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Object? throwOnEventRead;
   final List<String> eventWrites = [];
 
+  /// The agenda channel's listener, so a test can deliver a change.
+  void Function()? agendaListener;
+
+  @override
+  Future<void Function()> watchAgendaChanges(void Function() onChange) async {
+    agendaListener = onChange;
+    return () => agendaListener = null;
+  }
+
   @override
   Future<List<ChildEvent>> fetchChildEvents(DateTime from, DateTime to,
       {bool includeDeleted = false}) async {
@@ -1131,6 +1140,16 @@ class FakeCustodyDataSource implements CustodyDataSource {
 
   @override
   Future<List<ChatRead>> fetchChatReads() async => chatReads;
+
+  /// The chat channel's listener, so a test can deliver a change.
+  void Function()? chatListener;
+
+  @override
+  Future<void Function()> watchChatChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus}) async {
+    chatListener = onChange;
+    return () => chatListener = null;
+  }
 
   @override
   Future<int> sendChatMessage(
@@ -1334,6 +1353,24 @@ class FakeCustodyDataSource implements CustodyDataSource {
       ...settlements
     ];
     return id;
+  }
+
+  Object? throwOnRemind;
+
+  @override
+  Future<void> remindSettlement({int? childId, required int toProfileId}) async {
+    if (throwOnRemind != null) throw throwOnRemind!;
+    expenseWrites.add('remind:$toProfileId');
+  }
+
+  /// The expense channel's listener, so a test can deliver a change.
+  void Function()? expenseListener;
+
+  @override
+  Future<void Function()> watchExpenseChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus}) async {
+    expenseListener = onChange;
+    return () => expenseListener = null;
   }
 
   ExpenseSettlement _withStatus(ExpenseSettlement s, String status) =>
@@ -1796,6 +1833,10 @@ int? get futureDay {
   return today.day == lastDay ? null : today.day + 1;
 }
 
+/// A member's chip in the day sheet, by the name it shows — only the chosen
+/// chip prints it; the others are the avatar (owner's validation, 25/09/2026).
+Finder memberChip(String name) => find.byKey(ValueKey('member-chip:$name'));
+
 Future<void> openDay(WidgetTester tester, int day) async {
   final finder = find.text('$day').last;
   await tester.ensureVisible(finder);
@@ -1893,7 +1934,7 @@ void main() {
     expect(find.text(Localization(AppLanguage.ptBr)[K.editorScheduledParent]),
         findsOneWidget);
 
-    await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno'));
+    await tapSheet(tester, memberChip('Bruno'));
     await tapSheet(tester, find.text('Salvar'));
 
     expect(ds.inserted, hasLength(1));

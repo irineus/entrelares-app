@@ -230,6 +230,9 @@ class _ReportsSummaryTabState extends State<ReportsSummaryTab> {
                     child: Semantics(
                       label: l[K.repByMonth],
                       child: DropdownButtonFormField<int>(
+                        // A name or label never pushes the field past the screen
+                        // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
+                        isExpanded: true,
                         initialValue: _month,
                         items: [
                           for (var m = 1; m <= 12; m++)
@@ -252,6 +255,9 @@ class _ReportsSummaryTabState extends State<ReportsSummaryTab> {
                   child: Semantics(
                     label: l[K.repByYear],
                     child: DropdownButtonFormField<int>(
+                      // A name or label never pushes the field past the screen
+                      // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
+                      isExpanded: true,
                       initialValue: _year,
                       items: [
                         // U-49: one range for the three report tabs (this one
