@@ -42,12 +42,14 @@ Future<void> pumpOnboarding(
   SharedPreferences prefs, {
   Future<void> Function()? onCompleted,
   Future<void> Function()? onSignOut,
+  String? initialInviteToken,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 1600));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(wrap(OauthOnboardingScreen(
     dataSource: ds,
     prefs: prefs,
+    initialInviteToken: initialInviteToken,
     onSignOut: onSignOut ?? () async {},
     onCompleted: onCompleted ?? () async {},
   )));
@@ -325,6 +327,29 @@ void main() {
       // Used up: the stash must not survive the claim.
       expect(prefs.getString(OauthOnboardingScreen.pendingInviteTokenKey),
           isNull);
+    });
+
+    testWidgets('F-71: the native door claims from MEMORY, no stash',
+        (tester) async {
+      final ds = FakeCustodyDataSource(members: const [], days: const [])
+        ..inviteInfo = invite;
+      // Nothing in prefs: the native Google door never leaves the app, so the
+      // token rides in memory from the register screen to this one.
+      final prefs = await prefsWith(const {});
+      await pumpOnboarding(tester, ds, prefs, initialInviteToken: token);
+
+      expect(find.text(pt[K.registerInvitedTitle]), findsOneWidget);
+      await tester.enterText(
+          find.widgetWithText(TextField, pt[K.registerFullName]), 'Ana');
+      await tester.tap(find.byType(Checkbox));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, pt[KApp.onbClaimCta]));
+      await tester.pumpAndSettle();
+
+      expect(ds.claims.single['token'], token);
+      expect(prefs.getString(OauthOnboardingScreen.pendingInviteTokenKey),
+          isNull,
+          reason: 'the native door writes no stash at any point');
     });
 
     testWidgets('the S-11 migration question is asked, then confirmed',

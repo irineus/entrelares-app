@@ -60,6 +60,9 @@ class LoginScreen extends StatefulWidget {
   final Future<bool>? googleEnabled;
   final Future<void> Function()? onSignInWithGoogle;
 
+  /// F-71 — where the web's GIS button delivers its ID token (native flow).
+  final Future<void> Function(String idToken)? onGoogleIdToken;
+
   const LoginScreen(
       {super.key,
       required this.onSignIn,
@@ -68,6 +71,7 @@ class LoginScreen extends StatefulWidget {
       required this.prefs,
       this.googleEnabled,
       this.onSignInWithGoogle,
+      this.onGoogleIdToken,
       this.onHelp,
       this.expiredReason = SessionExpiredReason.none});
 
@@ -289,6 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   GoogleSignInButton(
                     enabled: widget.googleEnabled!,
                     onPressed: widget.onSignInWithGoogle!,
+                    onIdToken: widget.onGoogleIdToken,
                   ),
                 // U-28: the rule the web draws here. Everything above it is
                 // signing in; everything below is about the app. Without it the

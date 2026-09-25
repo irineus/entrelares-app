@@ -37,6 +37,18 @@
 #     reports NOTHING, silently, because a reporter that may never break the app
 #     swallows its own transport failure. `web_channel_test` reads the host out
 #     of `Env.sentryDsn` and fails the build if the two ever drift.
+#   * F-71 (Fulcrum 02.3) — the ONE third-party script this CSP admits, and
+#     only its exact path: `https://accounts.google.com/gsi/client`. The native
+#     Google door on the web hands its ID token only to Google's own button
+#     (GIS `renderButton`), which the owner accepted on 24/09/2026, and Google
+#     does not allow the GIS client to be self-hosted — so the T-62 answer
+#     (vendor it) does not exist here. Around it, Google's published CSP for
+#     GIS and nothing wider: the button's iframe (`frame-src .../gsi/`), its
+#     stylesheet (`style-src .../gsi/style`) and its calls (`connect-src
+#     .../gsi/`). `frame-src` restates `'self' blob:` because naming it
+#     REPLACES the `child-src` fallback for frames (the PDF print iframe is a
+#     blob). The script only loads on a page that shows the button — the app
+#     initializes the plugin lazily. `web_channel_test` pins each path.
 #   * L-29 — `X-Robots-Tag: noindex`, on EVERY path. `_redirects` answers 200
 #     with the same `index.html` for any address, so to a crawler this host is
 #     an endless set of identical pages titled "Entrelares" with no text (the
@@ -55,7 +67,7 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cloud.umami.is https://fonts.gstatic.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://o4511910022217728.ingest.us.sentry.io; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'self' blob: https://accounts.google.com/gsi/; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cloud.umami.is https://fonts.gstatic.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://o4511910022217728.ingest.us.sentry.io https://accounts.google.com/gsi/; frame-ancestors 'none'
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Cache control

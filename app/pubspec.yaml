@@ -26,7 +26,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 #   +N    — rises on EVERY merge to main, strictly monotonic: Play burns a
 #           versionCode by UPLOAD and never accepts it again (store/README §6).
 # Env.appVersion mirrors this line — env_version_test pins the two together.
-version: 2.8.21+153
+version: 2.8.22+154
 
 environment:
   sdk: ^3.12.2
@@ -102,6 +102,15 @@ dependencies:
   http: ^1.6.0
   firebase_core: ^4.14.0
   firebase_messaging: ^16.6.0
+  # F-71 (Fulcrum 02.3): the Google door without a browser redirect. The ID
+  # token comes from the device (Credential Manager on Android, the GIS button
+  # on the web) and is exchanged with `signInWithIdToken` — the redirect's
+  # `GET /auth/v1/authorize` is answered 410 behind the Fulcrum gateway. No
+  # nonce: 7.x does not expose one, and GoTrue accepts "neither side".
+  google_sign_in: ^7.2.0
+  # The web half's button (`renderButton`) lives in the web implementation's
+  # `web_only.dart`, imported only under a conditional import.
+  google_sign_in_web: ^1.1.3
 
 dev_dependencies:
   flutter_test:

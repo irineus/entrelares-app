@@ -22,6 +22,8 @@ class Env {
     required this.androidPackage,
     this.webPush = WebPushConfig.none,
     this.sentryDsn = '',
+    required this.googleWebClientId,
+    required this.nativeGoogleSignIn,
   });
 
   final String name;
@@ -101,6 +103,30 @@ class Env {
   /// never half-configured.
   final String sentryDsn;
 
+  /// F-71 (Fulcrum 02.3) — the OAuth **Web** client of THIS environment's
+  /// Google Cloud project, the one whose consent screen says "Entrelares"
+  /// (Fulcrum 02.1/02.2). PUBLIC: a client id identifies an application, not a
+  /// person, and every page that renders the GIS button ships it. It is the
+  /// `serverClientId` on Android — Credential Manager mints the ID token FOR
+  /// this audience — and the `clientId` of the GIS button on the web. The
+  /// Supabase provider lists it among its accepted client ids, so the token's
+  /// `aud` is one GoTrue trusts. It lives in the project that also owns the
+  /// flavour's push (`entrelares-dev` / `entrelares-prod`), so its numeric
+  /// prefix is the same project number as [WebPushConfig.messagingSenderId] —
+  /// `env_google_client_test` pins that, because a dev build holding the
+  /// production id asks Google for a token the dev project's GoTrue refuses,
+  /// and says nothing about why.
+  final String googleWebClientId;
+
+  /// F-71 — whether the Google door exchanges an ID token obtained on the
+  /// device (`signInWithIdToken`) instead of the browser redirect
+  /// (`signInWithOAuth`). The redirect's `GET /auth/v1/authorize` is answered
+  /// **410** behind the Fulcrum gateway, so the app cannot move there with it.
+  /// Rolled out per flavour on purpose (owner, 24/09/2026): dev first — the
+  /// PR's APK and `qa.entrelares.app` — and production in a one-line PR once
+  /// dev has been exercised; PR 3 then removes the redirect altogether.
+  final bool nativeGoogleSignIn;
+
   /// Dev/QA — the spike's original target. Still runs the legacy anon JWT
   /// until S-17 (app repo) retires it.
   static const dev = Env._(
@@ -136,6 +162,12 @@ class Env {
     // the environment nobody's family lives in.
     sentryDsn: 'https://745aa4d38b3b07ac90ce48a267ea4181'
         '@o4511910022217728.ingest.us.sentry.io/4512066983559168',
+    // F-71: `entrelares-dev`'s Web client (Fulcrum 02.2). Its JavaScript
+    // origins are loopback and `qa.entrelares.app` — Google takes no wildcard,
+    // so a per-PR preview never renders the GIS button.
+    googleWebClientId:
+        '51960618124-vfauicf9qbt4hhvv3ct49abiivllq3p7.apps.googleusercontent.com',
+    nativeGoogleSignIn: true,
   );
 
   /// Production — the exact public values `web.entrelares.app` serves every
@@ -171,6 +203,12 @@ class Env {
     // product is breaking for real families, on either channel.
     sentryDsn: 'https://207fdf4ae55dd391583ecaa369b3319b'
         '@o4511910022217728.ingest.us.sentry.io/4512066983231488',
+    // F-71: `entrelares-prod`'s Web client (Fulcrum 02.2), origins
+    // `web.entrelares.app`.
+    googleWebClientId:
+        '575356979434-8fnls1hls3kb9nj1afcvf1cdu4m9hrhi.apps.googleusercontent.com',
+    // Still the redirect until dev has been exercised (F-71 PR 2 flips it).
+    nativeGoogleSignIn: false,
   );
 
   /// How the WEB build says "production". `flutter build web` accepts no
@@ -191,7 +229,7 @@ class Env {
   /// Mirrors `pubspec.yaml`'s `version:` — the web's `AppVersion.Display`.
   /// Only the F-17 export reads it, and a stale value there would misdate an
   /// LGPD record, so `env_version_test.dart` fails the build if the two drift.
-  static const String appVersion = '2.8.21+153';
+  static const String appVersion = '2.8.22+154';
 }
 
 /// T-62 — the PUBLIC Firebase Web config of one environment, plus its VAPID

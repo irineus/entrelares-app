@@ -35,6 +35,11 @@ class OauthOnboardingScreen extends StatefulWidget {
   final AnalyticsService? analytics;
   final SharedPreferences prefs;
 
+  /// F-71 — the invitation a NATIVE Google sign-in started from. That door
+  /// never leaves the app, so the token arrives in memory; only the redirect
+  /// (still production's until F-71 PR 2) parks it in [prefs].
+  final String? initialInviteToken;
+
   /// "Entrar com outra conta" — this session is confined here, so signing out
   /// is the only other door.
   final Future<void> Function() onSignOut;
@@ -47,6 +52,7 @@ class OauthOnboardingScreen extends StatefulWidget {
     required this.dataSource,
     this.analytics,
     required this.prefs,
+    this.initialInviteToken,
     required this.onSignOut,
     required this.onCompleted,
   });
@@ -91,7 +97,7 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
     super.initState();
     _sessionEmail = widget.dataSource.sessionEmail();
     _fullName.text = widget.dataSource.sessionDisplayName() ?? '';
-    final token =
+    final token = widget.initialInviteToken ??
         widget.prefs.getString(OauthOnboardingScreen.pendingInviteTokenKey);
     if (token != null && token.trim().isNotEmpty) {
       _inviteToken = token.trim();

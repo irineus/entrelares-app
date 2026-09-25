@@ -408,6 +408,31 @@ void main() {
       expect(scriptSrc.where((s) => s.contains('firebase')), isEmpty);
     });
 
+    test('F-71: the CSP admits the GIS button and nothing wider of Google',
+        () {
+      final csp = _csp(_web('_headers').readAsStringSync())!;
+      // The one third-party SCRIPT this CSP allows, and only its exact path:
+      // the GIS client cannot be vendored (Google forbids self-hosting it),
+      // and the native Google door on the web is its button.
+      final scriptSrc = _sources(csp, 'script-src');
+      expect(scriptSrc, contains('https://accounts.google.com/gsi/client'),
+          reason: 'without it the GIS button never renders on the web');
+      expect(
+          scriptSrc.where((s) =>
+              s.contains('google.com') &&
+              s != 'https://accounts.google.com/gsi/client'),
+          isEmpty,
+          reason: 'only the GIS client path, never the whole host');
+      expect(_sources(csp, 'frame-src'),
+          containsAll(["'self'", 'blob:', 'https://accounts.google.com/gsi/']),
+          reason: 'frame-src replaces the child-src fallback for frames, so '
+              'it has to restate the print iframe (blob) beside the button');
+      expect(_sources(csp, 'style-src'),
+          contains('https://accounts.google.com/gsi/style'));
+      expect(_sources(csp, 'connect-src'),
+          contains('https://accounts.google.com/gsi/'));
+    });
+
     test('the worker is never registered over the app shell', () {
       // The FlutterFire layer registers `serviceWorkerScriptPath` with NO
       // `{scope}`, which takes scope `/` — where Flutter's own worker lives.
