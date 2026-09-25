@@ -187,6 +187,11 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # tela promete o antigo. Frase nova que afirma um desses números entra no registro do teste.
 cd packages/entrelares_db_contracts && fvm dart analyze --fatal-infos
 cd app && fvm flutter analyze && fvm flutter test
+# Fulcrum (25/09/2026): gateway_url_test (prod nunca aponta para *.supabase.co),
+# no_oauth_redirect_test e no_supabase_outside_adapters_test — este é a DEFINIÇÃO DA PORTA:
+# só os arquivos listados nele importam o cliente Supabase, chamam /auth|rest|functions|
+# storage|realtime/v1 à mão ou leem Env.supabaseUrl/Key. Encolher a lista é progresso;
+# crescer pede o motivo no PR.
 # The four source gates live in that suite: no_literal_snack_test (catalog strings),
 # no_color_literal_test (U-27 — colours only in lib/theme/tokens.dart),
 # no_emoji_in_ui_test (U-31 — nenhum emoji em lib/, nos dois catálogos nem em
