@@ -757,17 +757,6 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// [_setPhase] into one `sign-in` event; null once reported.
   String? _signInMethod;
 
-  /// T-78: the Google door leaves the app (redirect / custom tab) and the
-  /// session comes back through the gate or the auth listener, where nothing
-  /// says which door it was. The marker says so, and dies on first read.
-  static const String _pendingGoogleKey = 'analytics.pendingGoogleSignIn';
-
-  String _consumeSignInMarker(String fallback) {
-    final google = widget.prefs.getBool(_pendingGoogleKey) ?? false;
-    if (google) unawaited(widget.prefs.remove(_pendingGoogleKey));
-    return google ? 'google' : fallback;
-  }
-
   /// T-78: the admin-mode state last reported, so a notifier ping that did
   /// not change it is not a toggle.
   bool _adminModeReported = false;
@@ -899,7 +888,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         case AuthChangeEvent.signedIn:
           if (_phase == _AuthPhase.anon) {
             _expiredReason = SessionExpiredReason.none;
-            _signInMethod ??= _consumeSignInMarker('link');
+            _signInMethod ??= 'link';
             // F-57: the OAuth return lands here (deep link / web redirect) —
             // and an OAuth session may have NO profile yet, so the phase is
             // resolved from the profile, never assumed.
@@ -1248,7 +1237,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _expiredReason = !alive && hadSession
         ? SessionExpiredReason.restored
         : SessionExpiredReason.none;
-    if (alive) _signInMethod = _consumeSignInMarker('restore');
+    if (alive) _signInMethod = 'restore';
     if (verdict == RestoredSession.offline) {
       // T-18: the profile read would only spend postgrest's retries (~7 s)
       // under the splash to fail anyway. Open on what the device has; the
@@ -1278,36 +1267,16 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     await _resolveAuthedPhase();
   }
 
-  /// F-57 — the Google door. On Android the redirect returns through the
-  /// per-flavor custom scheme (see [DeepLinkUrls.oauthCallback]); on web the
-  /// page itself round-trips to its own origin and `Supabase.initialize`
-  /// consumes the code on the way back in. Errors are the button's to show.
+  /// The Google door on Android (F-71): Credential Manager mints the ID token
+  /// on the device, and [_signInWithGoogleIdToken] exchanges it. The web never
+  /// calls this — its button is Google's (GIS) and hands the token straight
+  /// to [_signInWithGoogleIdToken]. The browser redirect is gone (F-71 PR 3):
+  /// behind the Fulcrum gateway `GET /auth/v1/authorize` answers 410, and
+  /// `no_oauth_redirect_test` keeps `signInWithOAuth` out of `lib/`.
   Future<void> _signInWithGoogle({String? inviteToken}) async {
-    if (Env.current.nativeGoogleSignIn) {
-      // F-71: Android asks the device for the token; the web never gets here
-      // on this flow — its button is Google's and calls
-      // [_signInWithGoogleIdToken] directly.
-      final idToken = await GoogleIdentity.idTokenFromDevice();
-      if (idToken == null) return; // the person closed the picker
-      await _signInWithGoogleIdToken(idToken, inviteToken: inviteToken);
-      return;
-    }
-    final token = inviteToken?.trim() ?? '';
-    if (token.isNotEmpty) {
-      // The stash IS the state: the OAuth round-trip keeps no widget alive,
-      // so the onboarding screen re-reads the token from prefs.
-      await widget.prefs
-          .setString(OauthOnboardingScreen.pendingInviteTokenKey, token);
-    }
-    // T-78: best-effort — a storage refusal only makes this sign-in read as
-    // `link`/`restore`, never blocks it.
-    try {
-      await widget.prefs.setBool(_pendingGoogleKey, true);
-    } catch (_) {}
-    await _client.auth.signInWithOAuth(
-      OAuthProvider.google,
-      redirectTo: kIsWeb ? Uri.base.origin : DeepLinkUrls.oauthCallback,
-    );
+    final idToken = await GoogleIdentity.idTokenFromDevice();
+    if (idToken == null) return; // the person closed the picker
+    await _signInWithGoogleIdToken(idToken, inviteToken: inviteToken);
   }
 
   /// F-71 (Fulcrum 02.3) — the Google door without a redirect: an ID token
