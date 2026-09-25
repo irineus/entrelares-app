@@ -252,23 +252,22 @@ Confirm it exists (does not print the secret):
 select name from vault.secrets where name = 'service_role_key';
 ```
 
-**4.4 Create the job** — Cron → **Jobs → Create Job**:
-- **Name:** `auto-approve-expired-hourly`
-- **Schedule:** `0 * * * *` (top of every hour)
-- **Command:** use exactly this (⚠️ **not** the Dashboard's default — see the gotcha):
-  ```sql
-  select net.http_post(
-    url := 'https://<project-ref>.supabase.co/functions/v1/auto-approve-expired',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')),
-    body := '{}'::jsonb,
-    timeout_milliseconds := 30000
-  );
-  ```
+**4.4 The job — created by a migration, never by hand** (Fulcrum 04.2.1,
+25/09/2026). `20260925110000_fulcrum_0421_dashboard_crons.sql` schedules
+**`auto-approve-expired-hourly`** (`0 * * * *`) with `cron.schedule`, which
+upserts by name. Until then it was created here, in the Dashboard. Fulcrum's
+daily backup does not carry `cron.job`, so a restore — or a backend switch —
+brought back every job EXCEPT these two, silently. The command reads the SAME
+Vault secrets as the other migration jobs (`functions_base_url`, `secret_key`
+on `apikey`, runbook § 11): a project armed for push is armed for this. **Do not
+create or edit it in the Dashboard**: the next `db push` of a migration that
+touches it wins, and a hand-made one is exactly what a restore loses. To check:
+```sql
+select jobname, schedule, active from cron.job order by jobid;
+```
 
-> **⚠️ Gotcha (this cost us a debugging session).** If you accept the Dashboard's
-> generated command it comes as `headers := '{}'` and `timeout_milliseconds := 1000`,
+> **⚠️ Gotcha (this cost us a debugging session — kept for any NEW job).** If you
+> accept the Dashboard's generated command it comes as `headers := '{}'` and `timeout_milliseconds := 1000`,
 > and it **fails silently**: an empty-`headers` call carries no credential at all,
 > so it is refused — the cron shows a "Last Run" but nothing happens. **Always**
 > include the key header (via the Vault secret above) and a real timeout
@@ -284,16 +283,13 @@ select name from vault.secrets where name = 'service_role_key';
 
 ### 4.5 Schedule the `purge-deleted` cron (S-11)
 
-Same mechanics as 4.4 — a daily job that hard-deletes accounts past their
-30-day grace (and, from PR2, families). The function has `verify_jwt` on, so
-the `Authorization: Bearer <service_role_key>` header (Vault secret from 4.3)
-is mandatory, exactly like the gotcha above.
+Same as 4.4 — **created by the same migration, never by hand**: a daily job that
+hard-deletes accounts past their 30-day grace (and, from PR2, families).
 
 - **Name:** `purge-deleted-daily`
 - **Schedule:** `0 4 * * *` (daily, 04:00 UTC — off-peak; grace is measured in
   days, so hourly is unnecessary)
-- **Command:** as in 4.4 but with
-  `url := 'https://<project-ref>.supabase.co/functions/v1/purge-deleted'`.
+- **Command:** as in 4.4, calling `…/purge-deleted`.
 
 ### 4.6 The `plan-end-reminders` cron (F-70) — nothing to do by hand
 
@@ -799,8 +795,9 @@ besides the sections above. Consolidated July 2026 (desktop-session handoff):
    new address) — the S-10 design leans on it for the e-mail change path.
    Check the auth rate limits while there (section 5.5).
 7. **Crons on prod** (section 4): `auto-approve-expired-hourly` and
-   `purge-deleted-daily` are per-project — create them on prod with the prod
-   ref URL (pg_cron + pg_net + Vault secret first, sections 4.1–4.3).
+   `purge-deleted-daily` come with the migrations since Fulcrum 04.2.1 — what
+   the project needs is pg_cron + pg_net and the Vault secrets
+   (`functions_base_url`, `secret_key`) BEFORE the `db push`.
 8. **Backup (T-19) goes live only on `master`**: create the private R2 bucket
    `guarda-backups` + a bucket-scoped token, add the 4 secrets
    (`BACKUP_PASSPHRASE` — keep an offline copy, it is the GPG decryption
@@ -1858,6 +1855,10 @@ No seu ambiente local, o arquivo git-ignored `e2e.local.env` na raiz do repo
 recebe a **secret key do DEV** em `E2E_SUPABASE_SERVICE_ROLE_KEY` (nunca a de prod).
 
 ### 10.4 Migrar os crons para o header `apikey`
+
+> **Histórico.** Desde o Fulcrum 04.2.1 (25/09/2026) os dois jobs nascem da
+> migration `20260925110000_fulcrum_0421_dashboard_crons.sql`, já no formato
+> `apikey` + Vault — este passo manual não se aplica mais a projeto nenhum.
 
 Os dois jobs criados nas seções 4.4/4.5 mandam a chave em `Authorization: Bearer`
 — **chave nova é recusada ali**. Por projeto:
