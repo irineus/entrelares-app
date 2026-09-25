@@ -329,11 +329,11 @@ calendar time, so recruit testers early rather than when a build is ready.
    [`supabase/README.md`](../supabase/README.md) §12. Do it **before** the track goes public:
    these are the product's first users, and the promise is already public.
 
-> **The closed test ended on 01/09/2026.** What follows it — production access, the listing
-> going public, and the checkboxes that come with it — is tracked as **T-59** in
+> **The closed test ended on 01/09/2026, and the listing is PUBLIC since 25/09/2026.** Production
+> access (granted 21/09/2026), the launch checklist and the risks accepted for it are recorded on
 > the **T-59** card ([board](https://app.notion.com/3c82f3f4b9b2810aaff5e49014f748ef)), not here —
-> `backlog/` stopped being the record on 07/09/2026 (T-63). The account-deletion URL of §4 is one
-> of its checkboxes, tracked as **S-19**.
+> `backlog/` stopped being the record on 07/09/2026 (T-63). The Closed testing – Alpha track is
+> retired (T-79): new builds climb Internal → Production only, as §6 describes.
 
 ## 6 · Publishing a new Android build — the pipeline (T-79, 22/09/2026)
 
