@@ -213,6 +213,45 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(pt[KApp.authGoogleErr]), findsOneWidget);
     });
+
+    testWidgets('F-71: closing the account picker is a choice, not an error',
+        (tester) async {
+      // The native door returns normally when the person backs out of
+      // Google's own sheet (`GoogleIdentity.idTokenFromDevice` → null).
+      var pressed = 0;
+      await pumpButton(tester,
+          enabled: Future.value(true), onPressed: () async => pressed++);
+      await tester.tap(find.byType(OutlinedButton));
+      await tester.pumpAndSettle();
+      expect(pressed, 1);
+      expect(find.text(pt[KApp.authGoogleErr]), findsNothing);
+    });
+  });
+
+  group('F-71: outside the web the button stays ours', () {
+    testWidgets('a token callback does not swap in the GIS button off the web',
+        (tester) async {
+      // GIS exists only on the web; Android keeps the U-45 button even when
+      // the screen wires the web's token callback.
+      await tester.pumpWidget(AppL10n(
+        l: pt,
+        setLanguage: (_) async {},
+        child: MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: GoogleSignInButton(
+                enabled: Future.value(true),
+                onPressed: () async {},
+                onIdToken: (_) async {},
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byType(OutlinedButton), findsOneWidget);
+      expect(find.text(pt[KApp.authGoogle]), findsOneWidget);
+    });
   });
 
   group('both doors carry it', () {

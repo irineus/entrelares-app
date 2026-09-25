@@ -51,6 +51,7 @@ import 'services/connectivity_status.dart';
 import 'services/auth_providers.dart';
 import 'services/crash_reporter.dart';
 import 'services/custody_data_source.dart';
+import 'services/google_identity.dart';
 import 'services/handoff_nudge_prefs.dart';
 import 'services/install_hint.dart';
 import 'services/installed_app.dart';
@@ -289,6 +290,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           // provider does — the fail-closed switch is the console config.
           googleEnabled: AuthProviders.googleEnabled(),
           onSignInWithGoogle: _signInWithGoogle,
+          onGoogleIdToken: (idToken) => _signInWithGoogleIdToken(idToken),
         ),
       ),
       // F-64: the public check of a verifiable report — no session needed
@@ -313,6 +315,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           // to happen HERE — the OAuth redirect leaves the widget tree behind.
           onSignInWithGoogle: ({String? inviteToken}) =>
               _signInWithGoogle(inviteToken: inviteToken),
+          onGoogleIdToken: (idToken, {String? inviteToken}) =>
+              _signInWithGoogleIdToken(idToken, inviteToken: inviteToken),
         ),
       ),
       // F-57: where a deferred (social-login) session becomes a member —
@@ -324,8 +328,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           dataSource: _dataSource,
           analytics: _analytics,
           prefs: widget.prefs,
+          // F-71: the native door never leaves the app, so the invitation
+          // stays in memory instead of in the prefs stash.
+          initialInviteToken: _pendingInviteToken,
           onSignOut: _signOut,
           onCompleted: () async {
+            _pendingInviteToken = null;
             await _resolveAuthedPhase();
             if (mounted) _router.go('/');
           },
@@ -1275,6 +1283,15 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// page itself round-trips to its own origin and `Supabase.initialize`
   /// consumes the code on the way back in. Errors are the button's to show.
   Future<void> _signInWithGoogle({String? inviteToken}) async {
+    if (Env.current.nativeGoogleSignIn) {
+      // F-71: Android asks the device for the token; the web never gets here
+      // on this flow — its button is Google's and calls
+      // [_signInWithGoogleIdToken] directly.
+      final idToken = await GoogleIdentity.idTokenFromDevice();
+      if (idToken == null) return; // the person closed the picker
+      await _signInWithGoogleIdToken(idToken, inviteToken: inviteToken);
+      return;
+    }
     final token = inviteToken?.trim() ?? '';
     if (token.isNotEmpty) {
       // The stash IS the state: the OAuth round-trip keeps no widget alive,
@@ -1292,6 +1309,35 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       redirectTo: kIsWeb ? Uri.base.origin : DeepLinkUrls.oauthCallback,
     );
   }
+
+  /// F-71 (Fulcrum 02.3) — the Google door without a redirect: an ID token
+  /// minted on the device (Credential Manager / the GIS button) for this
+  /// environment's Web client, exchanged by GoTrue. Nothing leaves the app, so
+  /// the invitation stays in memory ([_pendingInviteToken]) until the
+  /// onboarding screen claims it — no prefs stash. No nonce (see
+  /// `GoogleIdentity`). Errors are the button's to show.
+  Future<void> _signInWithGoogleIdToken(String idToken,
+      {String? inviteToken}) async {
+    final token = inviteToken?.trim() ?? '';
+    _pendingInviteToken = token.isEmpty ? null : token;
+    // T-78: named BEFORE the await — the auth listener sees the session
+    // arrive while anonymous and must not call it an e-mail link.
+    _signInMethod = 'google';
+    try {
+      await _client.auth
+          .signInWithIdToken(provider: OAuthProvider.google, idToken: idToken);
+    } catch (_) {
+      _signInMethod = null;
+      rethrow;
+    }
+    _expiredReason = SessionExpiredReason.none;
+    // An account with no profile yet lands on /onboarding, like the redirect.
+    await _resolveAuthedPhase();
+  }
+
+  /// F-71 — the invitation a native Google sign-in started from, kept until
+  /// the onboarding screen claims it or the session ends.
+  String? _pendingInviteToken;
 
   /// F-57 — a validated session is AUTHED only if it has a profile; a
   /// deferred OAuth sign-up has none yet and lives on the onboarding screen.
@@ -1380,6 +1426,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     // Set BEFORE the call: the auth event may arrive before or after the
     // await returns, and only this flag makes that order irrelevant.
     _userSignOut = true;
+    _pendingInviteToken = null;
     await _gate.signOutSafely();
     _identity.clear();
     // Lesson 1.3: navigate ALWAYS (the auth listener also fires on success).

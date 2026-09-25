@@ -1,9 +1,17 @@
-import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart'
+    show GoogleSignInException;
+
+import '../env.dart';
+import '../services/google_identity.dart';
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
 import 'app_l10n.dart';
+import 'google_web_button.dart';
 
 /// F-57 — "Continuar com Google", shared by the login and register screens.
 ///
@@ -23,15 +31,77 @@ import 'app_l10n.dart';
 /// scopes Google requires no submission at all. The spec still binds: it is
 /// Google's published guideline for this button, and it is the surface a
 /// person meets one screen before handing over their identity.
-class GoogleSignInButton extends StatelessWidget {
+///
+/// **F-71 — on the web with the native flow, the button is Google's.** GIS
+/// hands an ID token only to its own `renderButton`, so there the widget below
+/// is replaced by it and [onIdToken] receives each token the button produces.
+/// Everywhere else (Android, and every build still on the redirect) it is the
+/// U-45 button calling [onPressed].
+class GoogleSignInButton extends StatefulWidget {
   final Future<bool> enabled;
   final Future<void> Function() onPressed;
+
+  /// F-71: where the GIS button's ID token goes (web, native flow only).
+  final Future<void> Function(String idToken)? onIdToken;
 
   const GoogleSignInButton({
     super.key,
     required this.enabled,
     required this.onPressed,
+    this.onIdToken,
   });
+
+  @override
+  State<GoogleSignInButton> createState() => _GoogleSignInButtonState();
+}
+
+class _GoogleSignInButtonState extends State<GoogleSignInButton> {
+  StreamSubscription<String>? _tokens;
+
+  /// The web's GIS button replaces ours only when the environment is on the
+  /// native flow AND the caller can take a token.
+  bool get _gis =>
+      kIsWeb && Env.current.nativeGoogleSignIn && widget.onIdToken != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_gis) {
+      _tokens = GoogleIdentity.webIdTokens().listen(
+        (token) => _run(() => widget.onIdToken!(token)),
+        onError: (Object e) {
+          if (e is GoogleSignInException && GoogleIdentity.isBackOut(e.code)) {
+            return;
+          }
+          _reportFailure();
+        },
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _tokens?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _run(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (_) {
+      _reportFailure();
+    }
+  }
+
+  /// The one failure mode that is OURS to report: the sign-in could not even
+  /// start, or the token was refused. Backing out of Google's own sheet is a
+  /// choice, and says nothing.
+  void _reportFailure() {
+    if (!mounted) return;
+    final l = AppL10n.of(context).l;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(l[KApp.authGoogleErr])));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,9 +115,35 @@ class GoogleSignInButton extends StatelessWidget {
     final ink = dark ? GoogleBrand.darkText : GoogleBrand.lightText;
 
     return FutureBuilder<bool>(
-      future: enabled,
+      future: widget.enabled,
       builder: (context, snapshot) {
         if (snapshot.data != true) return const SizedBox.shrink();
+        if (_gis) {
+          // F-71: the GIS script loads only here, once the provider exists —
+          // a page that never shows the button never fetches it.
+          return Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: FutureBuilder<void>(
+              future: GoogleIdentity.ensureInitialized(),
+              builder: (context, init) {
+                if (init.connectionState != ConnectionState.done ||
+                    init.hasError) {
+                  return const SizedBox(height: GoogleBrand.height);
+                }
+                return LayoutBuilder(
+                  builder: (context, box) => SizedBox(
+                    height: GoogleBrand.height,
+                    child: googleWebButton(
+                      dark: dark,
+                      width: box.maxWidth,
+                      locale: AppL10n.of(context).l.current.code,
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        }
         // The spacing rides INSIDE the visible state, so the disabled state
         // collapses to nothing instead of leaving a hole in the layout.
         return Padding(
@@ -85,19 +181,10 @@ class GoogleSignInButton extends StatelessWidget {
                 // the button is full width, so the target stays generous.
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              onPressed: () async {
-                try {
-                  await onPressed();
-                } catch (_) {
-                  // The redirect could not even launch (no browser, platform
-                  // refusal) — the one failure mode that is OURS to report;
-                  // everything after the launch belongs to the provider page.
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(l[KApp.authGoogleErr])));
-                  }
-                }
-              },
+              // The redirect could not even launch (no browser, platform
+              // refusal), or the device's token was refused — the failures
+              // that are OURS to report; a closed picker is not one (F-71).
+              onPressed: () => _run(widget.onPressed),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

@@ -54,6 +54,11 @@ class RegisterScreen extends StatefulWidget {
   final Future<bool>? googleEnabled;
   final Future<void> Function({String? inviteToken})? onSignInWithGoogle;
 
+  /// F-71 — where the web's GIS button delivers its ID token (native flow),
+  /// with this screen's invitation, if any.
+  final Future<void> Function(String idToken, {String? inviteToken})?
+      onGoogleIdToken;
+
   const RegisterScreen({
     this.analytics,
     super.key,
@@ -62,6 +67,7 @@ class RegisterScreen extends StatefulWidget {
     required this.onBackToLogin,
     this.googleEnabled,
     this.onSignInWithGoogle,
+    this.onGoogleIdToken,
     this.inviteToken,
   });
 
@@ -614,6 +620,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       enabled: widget.googleEnabled!,
       onPressed: () =>
           widget.onSignInWithGoogle!(inviteToken: widget.inviteToken),
+      onIdToken: widget.onGoogleIdToken == null
+          ? null
+          : (idToken) => widget.onGoogleIdToken!(idToken,
+              inviteToken: widget.inviteToken),
     );
   }
 
