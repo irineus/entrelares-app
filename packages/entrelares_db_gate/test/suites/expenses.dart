@@ -13,6 +13,10 @@ import 'day_notice.dart' show saoPauloToday;
 /// * **edits and deletes** leave an append-only trail no one can rewrite;
 /// * **the one difference from Splitwise** — a settlement counts only once the
 ///   RECEIVER confirms it;
+/// * **a payment settles a debt, never creates one** (owner's validation,
+///   25/09/2026) — capped by what is owed, counting what already waits;
+/// * **Lembrar** — only who is owed, once per `expenses.reminder_cooldown_hours`,
+///   with no amount in the text;
 /// * **a viewer** sees no expense; another family touches nothing;
 /// * **notifications** reach the participants, never the actor.
 void expenseTests(GateFixture fx) {
@@ -174,12 +178,17 @@ void expenseTests(GateFixture fx) {
           .eq('expense_id', expenseId));
     });
 
+    Future<int> settle(SupabaseClient who, int to, int amount) async =>
+        await who.rpc<dynamic>('request_settlement', params: {
+          'p_child_id': null,
+          'p_to': to,
+          'p_amount': amount,
+        }) as int;
+
+    // Here the admin paid both live expenses (1000 + 1000, the first one was
+    // deleted): the member owes the admin 1000.
     test('a settlement waits for the RECEIVER', () async {
-      final id = await fam.member.rpc<dynamic>('request_settlement', params: {
-        'p_child_id': null,
-        'p_to': fam.adminProfile.id,
-        'p_amount': 5000,
-      }) as int;
+      final id = await settle(fam.member, fam.adminProfile.id, 600);
       await expectRejected(
           () => fam.member.rpc<dynamic>('answer_settlement',
               params: {'p_id': id, 'p_received': true}),
@@ -211,6 +220,54 @@ void expenseTests(GateFixture fx) {
               .eq('recipient_profile_id', fam.memberProfile.id)
               .eq('type', 'settlement_answered'),
           isNotEmpty);
+    });
+
+    test('a payment settles a debt, never creates one', () async {
+      // The member still owes 400 after the 600 confirmed above.
+      await expectRejected(() => settle(fam.member, fam.adminProfile.id, 500),
+          contains: 'passa do que você deve');
+      await expectRejected(() => settle(fam.admin, fam.memberProfile.id, 100),
+          contains: 'não tem saldo a pagar');
+      // Partial is fine — and what waits counts, so it cannot be paid twice.
+      final waiting = await settle(fam.member, fam.adminProfile.id, 300);
+      await expectRejected(() => settle(fam.member, fam.adminProfile.id, 200),
+          contains: 'passa do que você deve');
+      await fam.member
+          .rpc<dynamic>('cancel_settlement', params: {'p_id': waiting});
+      await settle(fam.member, fam.adminProfile.id, 400);
+    });
+
+    test('Lembrar: only who is owed, once per cooldown, no amount', () async {
+      // The 400 above waits: the member owes nothing open — nothing to remind.
+      await expectRejected(
+          () => fam.admin.rpc<dynamic>('remind_settlement',
+              params: {'p_child_id': null, 'p_to': fam.memberProfile.id}),
+          contains: 'não tem acerto pendente');
+      // A new expense the admin paid opens a debt again.
+      await add(fam.admin, amount: 800);
+      await fam.admin.rpc<dynamic>('remind_settlement',
+          params: {'p_child_id': null, 'p_to': fam.memberProfile.id});
+      final told = await fx.service
+          .from('notifications')
+          .select()
+          .eq('recipient_profile_id', fam.memberProfile.id)
+          .eq('type', 'settlement_reminder');
+      expect(told, hasLength(1));
+      expect(told.single['message'], isNot(contains(r'R$')));
+      expect((told.single['params'] as Map)['name'], isNotEmpty);
+
+      await expectRejected(
+          () => fam.admin.rpc<dynamic>('remind_settlement',
+              params: {'p_child_id': null, 'p_to': fam.memberProfile.id}),
+          contains: 'já lembrou');
+      // Who owes cannot "remind" who is owed.
+      await expectRejected(
+          () => fam.member.rpc<dynamic>('remind_settlement',
+              params: {'p_child_id': null, 'p_to': fam.adminProfile.id}),
+          contains: 'não tem acerto pendente');
+      // Nobody reads the reminders table directly (no grant at all).
+      await expectRejected(
+          () => fam.admin.from('expense_reminders').select('id'));
     });
 
     test('the expense notice reaches the participants, never the actor',

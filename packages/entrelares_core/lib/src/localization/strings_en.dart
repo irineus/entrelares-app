@@ -805,6 +805,8 @@ abstract final class StringsEn {
     K.notifRenderTitleSettlementRejected: 'Settle-up not confirmed',
     K.notifRenderSettlementConfirmed: '{0} confirmed receiving {1} ({2}).',
     K.notifRenderSettlementRejected: '{0} did not confirm receiving {1} ({2}).',
+    K.notifRenderTitleSettlementReminder: 'Settle-up reminder',
+    K.notifRenderSettlementReminder: '{0} sent a reminder about the settle-up pending between you. See the balance in Expenses.',
     K.notifRenderExpenseCategorySchool: 'School',
     K.notifRenderExpenseCategoryHealth: 'Health',
     K.notifRenderExpenseCategoryClothes: 'Clothes',

@@ -203,6 +203,23 @@ abstract final class ExpenseLedger {
     return net;
   }
 
+  /// How much [from] may still pay [to] — mirror of `public.settlement_room`
+  /// (owner's validation, 25/09/2026): the smaller of the payer's debt and the
+  /// receiver's credit, each net of the payments still [pending]. Zero or less
+  /// means there is nothing to pay; the server refuses the same.
+  static int room(Map<int, int> net, Iterable<LedgerPayment> pending,
+      {required int from, required int to}) {
+    var out = 0;
+    var into = 0;
+    for (final p in pending) {
+      if (p.from == from) out += p.amountCents;
+      if (p.to == to) into += p.amountCents;
+    }
+    final owes = -(net[from] ?? 0) - out;
+    final owed = (net[to] ?? 0) - into;
+    return owes < owed ? owes : owed;
+  }
+
   /// "Simplify debts": the fewest payments that settle [net] — the largest
   /// debtor pays the largest creditor, again and again. Deterministic (ties
   /// to the lowest profile id), so two phones show the same suggestion.

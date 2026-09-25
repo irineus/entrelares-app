@@ -1982,6 +1982,28 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<void> remindSettlement({int? childId, required int toProfileId}) async {
+    await _client.rpc<dynamic>('remind_settlement',
+        params: {'p_child_id': childId, 'p_to': toProfileId});
+  }
+
+  @override
+  Future<void Function()> watchExpenseChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus}) async {
+    var channel = _client.channel('expense_changes_${_channelSeq++}');
+    for (final table in ['expenses', 'expense_shares', 'expense_settlements']) {
+      channel = channel.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: table,
+        callback: (_) => onChange(),
+      );
+    }
+    channel.subscribe(_statusCallback(onStatus));
+    return () => _client.removeChannel(channel);
+  }
+
+  @override
   Future<List<ChildRoutine>> fetchChildRoutines() async {
     final rows = await _client
         .from('child_routines')

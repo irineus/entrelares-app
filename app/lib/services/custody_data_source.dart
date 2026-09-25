@@ -734,6 +734,16 @@ abstract class CustodyDataSource {
   /// The one who recorded it takes it back while it waits.
   Future<void> cancelSettlement(int id);
 
+  /// "Lembrar": the one who is owed reminds [toProfileId] — refused while the
+  /// debt is not open or inside `expenses.reminder_cooldown_hours`.
+  Future<void> remindSettlement({int? childId, required int toProfileId});
+
+  /// Listens for expense, share and settle-up changes, so both phones see a
+  /// payment and its confirmation as they happen (owner's validation,
+  /// 25/09/2026). [onStatus] as in [watchChanges].
+  Future<void Function()> watchExpenseChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus});
+
   // ── F-55 PR 3: the routine ───────────────────────────────────────────────
 
   /// The family's routines still running (not stopped).

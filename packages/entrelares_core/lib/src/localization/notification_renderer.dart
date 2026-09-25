@@ -306,6 +306,10 @@ abstract final class NotificationRenderer {
                 ? K.notifRenderSettlementConfirmed
                 : K.notifRenderSettlementRejected,
             [name ?? l[K.notifRenderFbOtherCap], _money(p, l)!, date]);
+      // Who reminded, and nothing else: the amount stays inside the app.
+      case 'settlement_reminder':
+        return l.format(K.notifRenderSettlementReminder,
+            [name ?? l[K.notifRenderFbOtherCap]]);
 
       // ── The family chat (F-35) ──
       // Who wrote, and the text as they wrote it (already cut by the server
@@ -541,6 +545,7 @@ abstract final class NotificationRenderer {
       'settlement_requested' => p['date'] != null && p['amount'] != null
           ? K.notifRenderTitleSettlementRequested
           : null,
+      'settlement_reminder' => K.notifRenderTitleSettlementReminder,
       'settlement_answered' => p['date'] != null && p['amount'] != null
           ? switch (kind) {
               'confirmed' => K.notifRenderTitleSettlementConfirmed,

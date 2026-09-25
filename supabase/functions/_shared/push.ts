@@ -69,6 +69,10 @@ export const PUSH_TYPES: readonly string[] = [
 	"expense_changed",
 	"settlement_requested",
 	"settlement_answered",
+	// F-34 after the owner's validation (25/09/2026): the one who is owed
+	// reminds the one who owes — no amount in the text, at most one per pair
+	// per `expenses.reminder_cooldown_hours`. Lands on "Todas". Never e-mail.
+	"settlement_reminder",
 	// F-35. A caregiver wrote in the family chat. To every reader but the
 	// author (viewers included); a reader who silenced the chat gets
 	// a params.push of false and the dispatcher never calls this. Lands on
@@ -149,6 +153,8 @@ const K = {
 	titleSettlementRejected: "notifRender.title.settlementRejected",
 	settlementConfirmed: "notifRender.settlementConfirmed",
 	settlementRejected: "notifRender.settlementRejected",
+	titleSettlementReminder: "notifRender.title.settlementReminder",
+	settlementReminder: "notifRender.settlementReminder",
 	expenseCategorySchool: "notifRender.expenseCategory.school",
 	expenseCategoryHealth: "notifRender.expenseCategory.health",
 	expenseCategoryClothes: "notifRender.expenseCategory.clothes",
@@ -244,6 +250,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.settlementRejected": "Acerto não confirmado",
 		"notifRender.settlementConfirmed": "{0} confirmou que recebeu {1} ({2}).",
 		"notifRender.settlementRejected": "{0} não confirmou que recebeu {1} ({2}).",
+		"notifRender.title.settlementReminder": "Lembrete de acerto",
+		"notifRender.settlementReminder": "{0} lembrou do acerto pendente entre vocês. Veja o saldo em Despesas.",
 		"notifRender.expenseCategory.school": "Escola",
 		"notifRender.expenseCategory.health": "Saúde",
 		"notifRender.expenseCategory.clothes": "Roupas",
@@ -331,6 +339,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.settlementRejected": "Settle-up not confirmed",
 		"notifRender.settlementConfirmed": "{0} confirmed receiving {1} ({2}).",
 		"notifRender.settlementRejected": "{0} did not confirm receiving {1} ({2}).",
+		"notifRender.title.settlementReminder": "Settle-up reminder",
+		"notifRender.settlementReminder": "{0} sent a reminder about the settle-up pending between you. See the balance in Expenses.",
 		"notifRender.expenseCategory.school": "School",
 		"notifRender.expenseCategory.health": "Health",
 		"notifRender.expenseCategory.clothes": "Clothes",
@@ -685,6 +695,13 @@ export function renderPush(
 			titleKey = kind === "confirmed" ? K.titleSettlementConfirmed : K.titleSettlementRejected;
 			body = fmt(lang, kind === "confirmed" ? K.settlementConfirmed : K.settlementRejected,
 				[name ?? otherCap(), money, date]);
+			break;
+		}
+
+		// Who reminded — and nothing else: the amount stays inside the app.
+		case "settlement_reminder": {
+			titleKey = K.titleSettlementReminder;
+			body = fmt(lang, K.settlementReminder, [name ?? otherCap()]);
 			break;
 		}
 

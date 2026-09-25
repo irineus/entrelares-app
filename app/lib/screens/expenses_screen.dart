@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:entrelares_db_contracts/models/child.dart';
@@ -23,6 +26,14 @@ import '../widgets/ui/ui.dart';
 /// One group per child. A viewer never sees this tab (the shell hides it and
 /// RLS returns nothing); a family without Premium reads what it has, and the
 /// writes are replaced by the Premium banner.
+///
+/// Owner's validation, 25/09/2026: the balance reads as "Seu saldo" — one
+/// number, then a line per person with **Pagar** only where the reader owes
+/// and **Lembrar** only where the reader is owed (a payment is capped by the
+/// debt, here and on the server); the list is the group's activity, expenses
+/// and confirmed payments together, each saying what it did to the reader's
+/// balance; and the screen follows the other phone live (Realtime, the T-83
+/// poll as the net, a re-read whenever it comes back on screen).
 class ExpensesScreen extends StatefulWidget {
   final CustodyDataSource dataSource;
 
@@ -46,7 +57,11 @@ class ExpensesScreen extends StatefulWidget {
 /// registered child keeps its expenses here).
 const int _familyGroup = -1;
 
-class _ExpensesScreenState extends State<ExpensesScreen> {
+/// The activity list's filter.
+enum _Show { all, expenses, payments }
+
+class _ExpensesScreenState extends State<ExpensesScreen>
+    with WidgetsBindingObserver {
   bool _loading = true;
   bool _loadFailed = false;
   PublicSettings _settings = PublicSettings.unloaded;
@@ -57,18 +72,115 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   List<Expense> _expenses = const [];
   List<ExpenseSettlement> _settlements = const [];
   int _group = _familyGroup;
+  _Show _show = _Show.all;
+
+  void Function()? _unwatch;
+  bool _socketConnected = false;
+  Timer? _changeDebounce;
+  Timer? _pollTimer;
+  ValueListenable<TickerModeData>? _activeBranch;
+  bool _wasActive = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+    _watch();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _loadFailed = false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = TickerMode.getValuesNotifier(context);
+    if (!identical(active, _activeBranch)) {
+      _activeBranch?.removeListener(_onVisibilityChanged);
+      _activeBranch = active..addListener(_onVisibilityChanged);
+      _wasActive = active.value.enabled;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) =>
+      _onVisibilityChanged();
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _activeBranch?.removeListener(_onVisibilityChanged);
+    _unwatch?.call();
+    _changeDebounce?.cancel();
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  bool get _onScreen {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    return (_activeBranch?.value.enabled ?? true) &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed);
+  }
+
+  /// Back on screen: what changed meanwhile (a money screen never shows a
+  /// balance it has not just read).
+  void _onVisibilityChanged() {
+    if (!mounted) return;
+    final on = _onScreen;
+    if (on && !_wasActive) _load(silent: true);
+    _wasActive = on;
+    _schedulePoll();
+  }
+
+  Future<void> _watch() async {
+    try {
+      final unwatch = await widget.dataSource.watchExpenseChanges(
+        () {
+          // One expense is a row plus its shares — a burst on the channel.
+          _changeDebounce?.cancel();
+          _changeDebounce = Timer(const Duration(milliseconds: 400), () {
+            if (mounted) _load(silent: true);
+          });
+        },
+        onStatus: (connected) {
+          if (!mounted || connected == _socketConnected) return;
+          _socketConnected = connected;
+          if (connected) _load(silent: true);
+          _schedulePoll();
+        },
+      );
+      if (!mounted) {
+        unwatch();
+        return;
+      }
+      _unwatch = unwatch;
+    } catch (_) {/* the poll below is the net */}
+    _schedulePoll();
+  }
+
+  /// T-83's cadence, only while the screen is on.
+  void _schedulePoll() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (!mounted || !_onScreen || !_settings.expensesEnabled) return;
+    final ms = pollIntervalMs(
+        socketConnected: _socketConnected, settings: _settings);
+    if (ms == null) return;
+    _pollTimer = Timer(Duration(milliseconds: ms), () async {
+      if (!mounted) return;
+      await _load(silent: true);
+      _schedulePoll();
     });
+  }
+
+  /// [silent]: a change on the channel, a poll or a return — the screen
+  /// keeps what it shows until the new read lands, and a failed one keeps it.
+  Future<void> _load({bool silent = false}) async {
+    if (silent && (_loading || _loadFailed)) return;
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _loadFailed = false;
+      });
+    }
     try {
       final results = await Future.wait<Object?>([
         widget.dataSource.fetchPublicSettings(),
@@ -110,8 +222,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         if (!groups.contains(_group)) _group = groups.first;
         _loading = false;
       });
+      if (!silent) _schedulePoll();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || silent) return;
       setState(() {
         _loading = false;
         _loadFailed = true;
@@ -163,6 +276,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   String _money(int cents, Localization l) =>
       ExpenseRules.brl(cents, english: l.isEnglish);
 
+  String _firstName(int profileId, Localization l) {
+    final full = _name(profileId, l);
+    return full.split(' ').first;
+  }
+
   // ── actions ────────────────────────────────────────────────────────────
 
   Future<void> _openEditor(Localization l, {Expense? editing}) async {
@@ -184,24 +302,34 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 
   Future<void> _openSettle(Localization l,
-      {int? toProfileId, int? amountCents}) async {
+      {required int toProfileId, required int maxCents}) async {
     final sent = await showAppSheet<bool>(
       context: context,
       builder: (_) => _SettleSheet(
         dataSource: widget.dataSource,
         settings: _settings,
-        candidates: [
-          for (final m in _eligible)
-            if (m.id != _me!.id) m
-        ],
+        toName: _name(toProfileId, l),
         childId: _groupChildId,
         toProfileId: toProfileId,
-        amountCents: amountCents,
+        maxCents: maxCents,
       ),
     );
     if (sent != true || !mounted) return;
     showAppSnack(context, l[KApp.expenseSettleSent]);
     await _load();
+  }
+
+  Future<void> _remind(Localization l, int toProfileId) async {
+    try {
+      await widget.dataSource
+          .remindSettlement(childId: _groupChildId, toProfileId: toProfileId);
+      if (!mounted) return;
+      showAppSnack(context, l[KApp.expenseReminded]);
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(
+          context, translateSaveError(e.toString(), l[K.errSaveFailed], l));
+    }
   }
 
   Future<void> _runSettlement(
@@ -312,6 +440,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       for (final s in settlements)
         if (s.isPending) s
     ];
+    final pendingPayments = [
+      for (final s in pending)
+        (from: s.fromProfile, to: s.toProfile, amountCents: s.amountCents)
+    ];
+    // Nothing happened in this group yet: no balance to show, one action.
+    final quiet = expenses.isEmpty && settlements.isEmpty;
     final canWrite = _canWrite;
     final me = _me!;
 
@@ -358,67 +492,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             ),
             const SizedBox(height: Spacing.md),
           ],
-          AppCard(
-            key: const ValueKey('expenses-balance'),
-            title: l[KApp.expenseBalance],
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (suggestions.isEmpty)
-                  Text(l[KApp.expenseBalanceEven])
-                else ...[
-                  for (final e in net.entries)
-                    if (e.value != 0)
-                      Text(
-                        l.format(
-                            e.value > 0
-                                ? KApp.expenseNetGets
-                                : KApp.expenseNetOwes,
-                            [_name(e.key, l), _money(e.value, l)]),
-                        style: textTheme.bodySmall,
-                      ),
-                  const SizedBox(height: Spacing.sm),
-                  for (final p in suggestions)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: Spacing.xs),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              l.format(KApp.expensePays, [
-                                _name(p.from, l),
-                                _money(p.amountCents, l),
-                                _name(p.to, l),
-                              ]),
-                              key: ValueKey('expenses-pays-${p.from}-${p.to}'),
-                              style: textTheme.titleSmall,
-                            ),
-                          ),
-                          if (canWrite && p.from == me.id)
-                            TextButton(
-                              key: ValueKey('expenses-settle-${p.to}'),
-                              onPressed: () => _openSettle(l,
-                                  toProfileId: p.to,
-                                  amountCents: p.amountCents),
-                              child: Text(l[KApp.expenseSettle]),
-                            ),
-                        ],
-                      ),
-                    ),
-                ],
-                if (canWrite && suggestions.every((p) => p.from != me.id))
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: TextButton.icon(
-                      key: const ValueKey('expenses-settle'),
-                      onPressed: () => _openSettle(l),
-                      icon: const Icon(Icons.payments_outlined),
-                      label: Text(l[KApp.expenseSettle]),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          if (!quiet)
+            _balanceCard(context, l,
+                net: net,
+                suggestions: suggestions,
+                pendingPayments: pendingPayments,
+                canWrite: canWrite),
           if (pending.isNotEmpty) ...[
             AppSectionHeader(title: l[KApp.expensePending]),
             for (final s in pending)
@@ -486,9 +565,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ),
           ],
           AppSectionHeader(
-            title: l[KApp.expenseListSection],
-            trailing: canWrite
-                ? TextButton.icon(
+            title: l[KApp.expenseMovements],
+            // Owner's validation: adding an expense is THE action here — the
+            // payment lives on the balance, next to the debt it settles.
+            trailing: canWrite && !quiet
+                ? FilledButton.tonalIcon(
                     key: const ValueKey('expenses-add'),
                     onPressed: () => _openEditor(l),
                     icon: const Icon(Icons.add),
@@ -496,33 +577,274 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   )
                 : null,
           ),
-          if (expenses.isEmpty)
+          if (quiet) ...[
             AppEmptyState(
               key: const ValueKey('expenses-empty'),
               icon: Icons.receipt_long_outlined,
               title: l[KApp.expenseEmpty],
               body: canWrite ? l[KApp.expenseEmptyBody] : null,
-            )
-          else
-            for (final e in expenses)
-              Card(
-                key: ValueKey('expense-${e.id}'),
-                margin: const EdgeInsets.only(bottom: Spacing.sm),
-                child: ListTile(
-                  onTap: () => _openDetail(l, e),
-                  title: Text(e.description,
-                      maxLines: 2, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(l.format(KApp.expenseRow, [
-                    l.formatDate(e.spentOn),
-                    l[(ExpenseCategory.parse(e.category) ??
-                            ExpenseCategory.other)
-                        .labelKey],
-                    _name(e.paidBy, l),
-                  ])),
-                  trailing: Text(_money(e.amountCents, l),
-                      style: textTheme.titleSmall),
+            ),
+            // The one thing to do on an empty group, as its main button.
+            if (canWrite)
+              Center(
+                child: FilledButton.icon(
+                  key: const ValueKey('expenses-add'),
+                  onPressed: () => _openEditor(l),
+                  icon: const Icon(Icons.add),
+                  label: Text(l[KApp.expenseAdd]),
                 ),
               ),
+          ] else ...[
+            // Chips, as Comunicação filters its lists: three segments did not
+            // fit a 360 dp phone and hid "Pagamentos" behind a scroll.
+            Wrap(
+              key: const ValueKey('expenses-filter'),
+              spacing: Spacing.sm,
+              children: [
+                for (final (value, key) in [
+                  (_Show.all, KApp.expenseFilterAll),
+                  (_Show.expenses, KApp.expenseFilterExpenses),
+                  (_Show.payments, KApp.expenseFilterPayments),
+                ])
+                  ChoiceChip(
+                    key: ValueKey('expenses-filter-${value.name}'),
+                    label: Text(l[key]),
+                    selected: _show == value,
+                    onSelected: (_) => setState(() => _show = value),
+                  ),
+              ],
+            ),
+            const SizedBox(height: Spacing.sm),
+            for (final row in _activity(expenses, settlements))
+              if (row.expense != null)
+                _expenseRow(context, l, row.expense!)
+              else
+                _paymentRow(context, l, row.payment!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Expenses and confirmed payments, newest first, as the filter asks.
+  List<({DateTime at, Expense? expense, ExpenseSettlement? payment})> _activity(
+      List<Expense> expenses, List<ExpenseSettlement> settlements) {
+    final rows = <({DateTime at, Expense? expense, ExpenseSettlement? payment})>[
+      if (_show != _Show.payments)
+        for (final e in expenses) (at: e.spentOn, expense: e, payment: null),
+      if (_show != _Show.expenses)
+        for (final s in settlements)
+          if (s.isConfirmed)
+            (
+              at: (s.answeredAt ?? s.createdAt).toLocal(),
+              expense: null,
+              payment: s,
+            ),
+    ];
+    rows.sort((a, b) {
+      final day = DateTime(b.at.year, b.at.month, b.at.day)
+          .compareTo(DateTime(a.at.year, a.at.month, a.at.day));
+      if (day != 0) return day;
+      return (b.expense?.id ?? b.payment!.id)
+          .compareTo(a.expense?.id ?? a.payment!.id);
+    });
+    return rows;
+  }
+
+  /// What an expense did to the reader's balance, in one colored line.
+  Widget _effectLine(BuildContext context, String text, ToneColors? tone) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    return Text(text,
+        style: textTheme.labelMedium
+            ?.copyWith(color: tone?.onContainer ?? tokens.textMuted));
+  }
+
+  Widget _expenseRow(BuildContext context, Localization l, Expense e) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    final me = _me!.id;
+    final mine = e.shares
+        .where((s) => s.profileId == me)
+        .fold<int>(0, (sum, s) => sum + s.shareCents);
+    final Widget effect;
+    if (e.paidBy == me && e.amountCents - mine > 0) {
+      effect = _effectLine(
+          context,
+          l.format(KApp.expenseYouLent, [_money(e.amountCents - mine, l)]),
+          tokens.success);
+    } else if (e.paidBy != me && mine > 0) {
+      effect = _effectLine(context,
+          l.format(KApp.expenseYourShare, [_money(mine, l)]), tokens.danger);
+    } else {
+      effect = _effectLine(context, l[KApp.expenseNotYours], null);
+    }
+    return Card(
+      key: ValueKey('expense-${e.id}'),
+      margin: const EdgeInsets.only(bottom: Spacing.sm),
+      child: ListTile(
+        onTap: () => _openDetail(l, e),
+        title: Text(e.description,
+            maxLines: 2, overflow: TextOverflow.ellipsis),
+        subtitle: Text(l.format(KApp.expenseRow, [
+          l.formatDate(e.spentOn),
+          l[(ExpenseCategory.parse(e.category) ?? ExpenseCategory.other)
+              .labelKey],
+          _name(e.paidBy, l),
+        ])),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(_money(e.amountCents, l), style: textTheme.titleSmall),
+            KeyedSubtree(key: ValueKey('expense-effect-${e.id}'), child: effect),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _paymentRow(
+      BuildContext context, Localization l, ExpenseSettlement s) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    final me = _me!.id;
+    final effect = s.fromProfile == me
+        ? _effectLine(context, l[KApp.expenseYouPaid], tokens.success)
+        : s.toProfile == me
+            ? _effectLine(context, l[KApp.expenseYouReceived], tokens.danger)
+            : _effectLine(context, l[KApp.expenseNotYours], null);
+    return Card(
+      key: ValueKey('payment-${s.id}'),
+      margin: const EdgeInsets.only(bottom: Spacing.sm),
+      child: ListTile(
+        leading: const Icon(Icons.payments_outlined),
+        title: Text(l.format(KApp.expensePaymentRow,
+            [_firstName(s.fromProfile, l), _firstName(s.toProfile, l)])),
+        subtitle: Text(l.formatDate((s.answeredAt ?? s.createdAt).toLocal())),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(_money(s.amountCents, l), style: textTheme.titleSmall),
+            effect,
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// "Seu saldo": the reader's number, then one line per person they owe or
+  /// who owes them (the "fewest payments" suggestion), with the one action
+  /// that line allows; the others' debts, if any, under their own heading.
+  Widget _balanceCard(BuildContext context, Localization l,
+      {required Map<int, int> net,
+      required List<LedgerPayment> suggestions,
+      required List<LedgerPayment> pendingPayments,
+      required bool canWrite}) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    final me = _me!.id;
+    final mine = net[me] ?? 0;
+    final head = mine < 0
+        ? (l.format(KApp.expenseHeadOwe, [_money(-mine, l)]), tokens.danger)
+        : mine > 0
+            ? (l.format(KApp.expenseHeadGets, [_money(mine, l)]), tokens.success)
+            : (l[KApp.expenseBalanceEven], tokens.neutral);
+    final iOwe = [for (final p in suggestions) if (p.from == me) p];
+    final oweMe = [for (final p in suggestions) if (p.to == me) p];
+    final others = [
+      for (final p in suggestions)
+        if (p.from != me && p.to != me) p
+    ];
+
+    Widget line(int profileId, String what, ToneColors tone, Widget? action,
+            Key key) =>
+        Padding(
+          key: key,
+          padding: const EdgeInsets.only(top: Spacing.sm),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_name(profileId, l), style: textTheme.titleSmall),
+                    Text(what,
+                        style: textTheme.bodyMedium
+                            ?.copyWith(color: tone.onContainer)),
+                  ],
+                ),
+              ),
+              ?action,
+            ],
+          ),
+        );
+
+    return AppCard(
+      key: const ValueKey('expenses-balance'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l[KApp.expenseMyBalance],
+              style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
+          const SizedBox(height: Spacing.xs),
+          Text(head.$1,
+              key: const ValueKey('expenses-my-balance'),
+              style: textTheme.headlineSmall
+                  ?.copyWith(color: head.$2.onContainer)),
+          for (final p in iOwe)
+            line(
+              p.to,
+              l.format(KApp.expenseRowYouOwe, [_money(p.amountCents, l)]),
+              tokens.danger,
+              () {
+                final room = ExpenseLedger.room(net, pendingPayments,
+                    from: me, to: p.to);
+                if (!canWrite || room <= 0) return null;
+                return FilledButton(
+                  key: ValueKey('expenses-pay-${p.to}'),
+                  onPressed: () => _openSettle(l,
+                      toProfileId: p.to,
+                      maxCents: room < p.amountCents ? room : p.amountCents),
+                  child: Text(l[KApp.expensePay]),
+                );
+              }(),
+              ValueKey('expenses-owe-${p.to}'),
+            ),
+          for (final p in oweMe)
+            line(
+              p.from,
+              l.format(KApp.expenseRowOwesYou, [_money(p.amountCents, l)]),
+              tokens.success,
+              canWrite
+                  ? OutlinedButton(
+                      key: ValueKey('expenses-remind-${p.from}'),
+                      onPressed: () => _remind(l, p.from),
+                      child: Text(l[KApp.expenseRemind]),
+                    )
+                  : null,
+              ValueKey('expenses-owed-${p.from}'),
+            ),
+          if (others.isNotEmpty) ...[
+            const SizedBox(height: Spacing.md),
+            Text(l[KApp.expenseOthers],
+                style:
+                    textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
+            for (final p in others)
+              Padding(
+                padding: const EdgeInsets.only(top: Spacing.xs),
+                child: Text(
+                  l.format(KApp.expensePays, [
+                    _name(p.from, l),
+                    _money(p.amountCents, l),
+                    _name(p.to, l),
+                  ]),
+                  key: ValueKey('expenses-pays-${p.from}-${p.to}'),
+                  style: textTheme.bodySmall,
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -864,18 +1186,21 @@ class _ExpenseEditorSheetState extends State<ExpenseEditorSheet> {
 class _SettleSheet extends StatefulWidget {
   final CustodyDataSource dataSource;
   final PublicSettings settings;
-  final List<Member> candidates;
+  final String toName;
   final int? childId;
-  final int? toProfileId;
-  final int? amountCents;
+  final int toProfileId;
+
+  /// What the reader may pay this person: the debt, net of the payments
+  /// still waiting (the server refuses more — `settlement_room`).
+  final int maxCents;
 
   const _SettleSheet({
     required this.dataSource,
     required this.settings,
-    required this.candidates,
+    required this.toName,
     required this.childId,
-    this.toProfileId,
-    this.amountCents,
+    required this.toProfileId,
+    required this.maxCents,
   });
 
   @override
@@ -883,8 +1208,6 @@ class _SettleSheet extends StatefulWidget {
 }
 
 class _SettleSheetState extends State<_SettleSheet> {
-  late int? _to = widget.toProfileId ??
-      (widget.candidates.length == 1 ? widget.candidates.first.id : null);
   final TextEditingController _amount = TextEditingController();
   String? _error;
   bool _busy = false;
@@ -895,11 +1218,8 @@ class _SettleSheetState extends State<_SettleSheet> {
     super.didChangeDependencies();
     if (_seeded) return;
     _seeded = true;
-    final cents = widget.amountCents;
-    if (cents != null) {
-      _amount.text = ExpenseRules.formatHundredths(cents,
-          english: AppL10n.of(context).l.isEnglish);
-    }
+    _amount.text = ExpenseRules.formatHundredths(widget.maxCents,
+        english: AppL10n.of(context).l.isEnglish);
   }
 
   @override
@@ -913,10 +1233,13 @@ class _SettleSheetState extends State<_SettleSheet> {
     final amount = ExpenseRules.parseHundredths(_amount.text);
     final maxAmount = widget.settings.expenseMaxAmountCents;
     String? error;
-    if (_to == null) {
-      error = l[KApp.expenseSettleTo];
-    } else if (amount == null || amount <= 0) {
+    if (amount == null || amount <= 0) {
       error = l[KApp.expenseErrAmount];
+    } else if (amount > widget.maxCents) {
+      error = l.format(KApp.expenseSettleOver, [
+        widget.toName,
+        ExpenseRules.brl(widget.maxCents, english: l.isEnglish),
+      ]);
     } else if (amount > maxAmount) {
       error = l.format(KApp.expenseErrMax,
           [ExpenseRules.brl(maxAmount, english: l.isEnglish)]);
@@ -931,7 +1254,9 @@ class _SettleSheetState extends State<_SettleSheet> {
     });
     try {
       await widget.dataSource.requestSettlement(
-          childId: widget.childId, toProfileId: _to!, amountCents: amount!);
+          childId: widget.childId,
+          toProfileId: widget.toProfileId,
+          amountCents: amount!);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -946,38 +1271,28 @@ class _SettleSheetState extends State<_SettleSheet> {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
-    final none = widget.candidates.isEmpty;
     return AppSheetFrame(
       title: l[KApp.expenseSettleTitle],
       error: _error,
       busy: _busy,
-      primaryLabel: none ? null : l[KApp.expenseSettle],
-      onPrimary: none ? null : () => _send(l),
+      primaryLabel: l[KApp.expenseSettle],
+      onPrimary: () => _send(l),
       secondaryLabel: l[K.commonCancel],
       onSecondary: () => Navigator.of(context).pop(),
       children: [
-        Text(l[none ? KApp.expenseSettleNobody : KApp.expenseSettleLead]),
-        if (!none) ...[
-          const SizedBox(height: Spacing.md),
-          DropdownButtonFormField<int>(
-            key: const ValueKey('settle-to'),
-            initialValue: _to,
-            decoration: InputDecoration(labelText: l[KApp.expenseSettleTo]),
-            items: [
-              for (final m in widget.candidates)
-                DropdownMenuItem(value: m.id, child: Text(m.fullName)),
-            ],
-            onChanged: (id) => setState(() => _to = id),
-          ),
-          const SizedBox(height: Spacing.sm),
-          AppTextField(
-            key: const ValueKey('settle-amount'),
-            label: l[KApp.expenseAmount],
-            controller: _amount,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
-          ),
-        ],
+        Text(l[KApp.expenseSettleLead]),
+        const SizedBox(height: Spacing.md),
+        AppListRow(
+            label: l[KApp.expenseSettleTo],
+            value: widget.toName,
+            key: const ValueKey('settle-to')),
+        const SizedBox(height: Spacing.sm),
+        AppTextField(
+          key: const ValueKey('settle-amount'),
+          label: l[KApp.expenseAmount],
+          controller: _amount,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        ),
       ],
     );
   }
