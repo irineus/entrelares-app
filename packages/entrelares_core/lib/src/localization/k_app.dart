@@ -667,6 +667,44 @@ abstract final class KApp {
   static const String expensePdfChange = 'app.expense.pdfChange';
   static const String expensePdfUpdated = 'app.expense.pdfUpdated';
   static const String expensePdfDeleted = 'app.expense.pdfDeleted';
+  // ── F-35: the family's Conversa ──
+  static const String chatNav = 'app.chat.nav';
+  static const String chatTabChat = 'app.chat.tabChat';
+  static const String chatTabNotifications = 'app.chat.tabNotifications';
+  static const String chatTabCount = 'app.chat.tabCount';
+  static const String chatNotice = 'app.chat.notice';
+  static const String chatEmpty = 'app.chat.empty';
+  static const String chatHint = 'app.chat.hint';
+  static const String chatSend = 'app.chat.send';
+  static const String chatReply = 'app.chat.reply';
+  static const String chatQuoting = 'app.chat.quoting';
+  static const String chatCancelQuote = 'app.chat.cancelQuote';
+  static const String chatCiteDay = 'app.chat.citeDay';
+  static const String chatCitedDay = 'app.chat.citedDay';
+  static const String chatRemoveDay = 'app.chat.removeDay';
+  static const String chatReadBy = 'app.chat.readBy';
+  static const String chatNotRead = 'app.chat.notRead';
+  static const String chatReadEntry = 'app.chat.readEntry';
+  static const String chatSearch = 'app.chat.search';
+  static const String chatSearchClose = 'app.chat.searchClose';
+  static const String chatSearchEmpty = 'app.chat.searchEmpty';
+  static const String chatMute = 'app.chat.mute';
+  static const String chatMuteLead = 'app.chat.muteLead';
+  static const String chatMuted = 'app.chat.muted';
+  static const String chatUnmuted = 'app.chat.unmuted';
+  static const String chatReadOnly = 'app.chat.readOnly';
+  static const String chatPremium = 'app.chat.premium';
+  static const String chatOff = 'app.chat.off';
+  static const String chatErrLoad = 'app.chat.errLoad';
+  static const String chatTooLong = 'app.chat.tooLong';
+  static const String chatYou = 'app.chat.you';
+  static const String chatFormerMember = 'app.chat.formerMember';
+  static const String chatSendFailed = 'app.chat.sendFailed';
+  static const String chatPdfInclude = 'app.chat.pdfInclude';
+  static const String chatPdfSection = 'app.chat.pdfSection';
+  static const String chatPdfLead = 'app.chat.pdfLead';
+  static const String chatPdfEmpty = 'app.chat.pdfEmpty';
+  static const String chatPdfReply = 'app.chat.pdfReply';
 
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -1149,6 +1187,43 @@ abstract final class KApp {
     expensePdfChange,
     expensePdfUpdated,
     expensePdfDeleted,
+    chatNav,
+    chatTabChat,
+    chatTabNotifications,
+    chatTabCount,
+    chatNotice,
+    chatEmpty,
+    chatHint,
+    chatSend,
+    chatReply,
+    chatQuoting,
+    chatCancelQuote,
+    chatCiteDay,
+    chatCitedDay,
+    chatRemoveDay,
+    chatReadBy,
+    chatNotRead,
+    chatReadEntry,
+    chatSearch,
+    chatSearchClose,
+    chatSearchEmpty,
+    chatMute,
+    chatMuteLead,
+    chatMuted,
+    chatUnmuted,
+    chatReadOnly,
+    chatPremium,
+    chatOff,
+    chatErrLoad,
+    chatTooLong,
+    chatYou,
+    chatFormerMember,
+    chatSendFailed,
+    chatPdfInclude,
+    chatPdfSection,
+    chatPdfLead,
+    chatPdfEmpty,
+    chatPdfReply,
   ];
 }
 
@@ -1783,6 +1858,43 @@ abstract final class StringsAppPtBr {
     KApp.expensePdfChange: '{0} — {1}: {2}',
     KApp.expensePdfUpdated: 'alterou "{0}" (antes: {1})',
     KApp.expensePdfDeleted: 'apagou "{0}" ({1})',
+    KApp.chatNav: 'Comunicação',
+    KApp.chatTabChat: 'Conversa',
+    KApp.chatTabNotifications: 'Notificações',
+    KApp.chatTabCount: '{0} ({1})',
+    KApp.chatNotice: 'O que se escreve aqui é permanente: não se edita nem se apaga, toda a família lê, e pode ir ao PDF ou a um processo.',
+    KApp.chatEmpty: 'A conversa da família começa aqui.',
+    KApp.chatHint: 'Escreva para a família',
+    KApp.chatSend: 'Enviar',
+    KApp.chatReply: 'Responder citando',
+    KApp.chatQuoting: 'Respondendo a {0}',
+    KApp.chatCancelQuote: 'Tirar a citação',
+    KApp.chatCiteDay: 'Citar um dia',
+    KApp.chatCitedDay: 'Dia citado: {0}',
+    KApp.chatRemoveDay: 'Tirar o dia citado',
+    KApp.chatReadBy: 'Lida por {0}',
+    KApp.chatNotRead: 'Ainda não lida',
+    KApp.chatReadEntry: '{0} ({1})',
+    KApp.chatSearch: 'Buscar na conversa',
+    KApp.chatSearchClose: 'Fechar a busca',
+    KApp.chatSearchEmpty: 'Nada encontrado para "{0}".',
+    KApp.chatMute: 'Silenciar o push da Conversa',
+    KApp.chatMuteLead: 'A notificação continua no app; só o celular deixa de tocar.',
+    KApp.chatMuted: 'Push da Conversa silenciado.',
+    KApp.chatUnmuted: 'Push da Conversa ligado.',
+    KApp.chatReadOnly: 'Você acompanha o plano: lê a Conversa, mas não escreve nela.',
+    KApp.chatPremium: 'Escrever na Conversa é um recurso Premium. Sem o Premium, o que já foi dito fica para leitura.',
+    KApp.chatOff: 'A Conversa ainda não está disponível.',
+    KApp.chatErrLoad: 'Não foi possível carregar a Conversa.',
+    KApp.chatTooLong: 'Um envio é limitado a {0} caracteres.',
+    KApp.chatYou: 'Você',
+    KApp.chatFormerMember: 'Ex-membro',
+    KApp.chatSendFailed: 'Não foi possível enviar. Tente de novo.',
+    KApp.chatPdfInclude: 'Incluir a Conversa do período',
+    KApp.chatPdfSection: '{0}. Conversa da família',
+    KApp.chatPdfLead: 'O que a família escreveu na Conversa no período, na ordem, como foi escrito. Nada na Conversa se edita ou se apaga.',
+    KApp.chatPdfEmpty: 'Nada foi escrito na Conversa no período.',
+    KApp.chatPdfReply: 'em resposta a {0}',
   };
 }
 
@@ -2412,5 +2524,42 @@ abstract final class StringsAppEn {
     KApp.expensePdfChange: '{0} — {1}: {2}',
     KApp.expensePdfUpdated: 'changed "{0}" (before: {1})',
     KApp.expensePdfDeleted: 'deleted "{0}" ({1})',
+    KApp.chatNav: 'Inbox',
+    KApp.chatTabChat: 'Chat',
+    KApp.chatTabNotifications: 'Notifications',
+    KApp.chatTabCount: '{0} ({1})',
+    KApp.chatNotice: 'What is written here is permanent: it cannot be edited or deleted, the whole family reads it, and it may go into the PDF or a court case.',
+    KApp.chatEmpty: 'The family chat starts here.',
+    KApp.chatHint: 'Write to the family',
+    KApp.chatSend: 'Send',
+    KApp.chatReply: 'Reply quoting',
+    KApp.chatQuoting: 'Replying to {0}',
+    KApp.chatCancelQuote: 'Remove the quote',
+    KApp.chatCiteDay: 'Cite a day',
+    KApp.chatCitedDay: 'Day cited: {0}',
+    KApp.chatRemoveDay: 'Remove the cited day',
+    KApp.chatReadBy: 'Read by {0}',
+    KApp.chatNotRead: 'Not read yet',
+    KApp.chatReadEntry: '{0} ({1})',
+    KApp.chatSearch: 'Search the chat',
+    KApp.chatSearchClose: 'Close the search',
+    KApp.chatSearchEmpty: 'Nothing found for "{0}".',
+    KApp.chatMute: 'Silence the chat\'s push',
+    KApp.chatMuteLead: 'The notification stays in the app; only the phone stops ringing.',
+    KApp.chatMuted: 'Chat push silenced.',
+    KApp.chatUnmuted: 'Chat push on.',
+    KApp.chatReadOnly: 'You follow the plan: you read the chat, but do not write in it.',
+    KApp.chatPremium: 'Writing in the chat is a Premium feature. Without Premium, what was said stays readable.',
+    KApp.chatOff: 'The chat is not available yet.',
+    KApp.chatErrLoad: 'Could not load the chat.',
+    KApp.chatTooLong: 'A text is limited to {0} characters.',
+    KApp.chatYou: 'You',
+    KApp.chatFormerMember: 'Former member',
+    KApp.chatSendFailed: 'Could not send. Try again.',
+    KApp.chatPdfInclude: 'Include the period\'s chat',
+    KApp.chatPdfSection: '{0}. Family chat',
+    KApp.chatPdfLead: 'What the family wrote in the chat during the period, in order, as written. Nothing in the chat is edited or deleted.',
+    KApp.chatPdfEmpty: 'Nothing was written in the chat in the period.',
+    KApp.chatPdfReply: 'in reply to {0}',
   };
 }

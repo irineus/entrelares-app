@@ -85,6 +85,11 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   /// (never for a viewer, who reads no expense).
   bool _expensesOn = false;
 
+  /// F-35: the Conversa is on; the reader may add its section (off by
+  /// default — it is the one section a reader chooses to hand over).
+  bool _chatOn = false;
+  bool _includeChat = false;
+
   /// F-64: `feature.report_attestation` — the PDF goes out with its QR.
   bool _attestOn = false;
   List<ReportAttestation> _attestations = const [];
@@ -139,6 +144,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
           PublicSettings(await widget.dataSource.fetchPublicSettings());
       _agendaOn = settings.childAgendaEnabled;
       _expensesOn = settings.expensesEnabled;
+      _chatOn = settings.chatEnabled;
       _attestOn = settings.reportAttestationEnabled;
       if (_attestOn) unawaited(_loadAttestations());
       if (!settings.childAgendaEnabled) return null;
@@ -236,6 +242,37 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
     );
   }
 
+  /// F-35: the period's Conversa texts, oldest first, with who each one
+  /// replied to.
+  Future<List<ReportChatLine>> _reportChat(Localization l, DateTime start,
+      DateTime end, List<Member> members) async {
+    String name(int id) {
+      for (final m in members) {
+        if (m.id == id && m.fullName.trim().isNotEmpty) return m.fullName;
+      }
+      return l[KApp.chatFormerMember];
+    }
+
+    final all = await widget.dataSource.fetchChatMessages();
+    final byId = {for (final m in all) m.id: m};
+    final endExclusive = DateTime(end.year, end.month, end.day + 1);
+    return [
+      for (final m in all)
+        if (!m.createdAt.toLocal().isBefore(start) &&
+            m.createdAt.toLocal().isBefore(endExclusive))
+          ReportChatLine(
+            atLocal: m.createdAt.toLocal(),
+            authorName: name(m.authorProfileId),
+            body: m.body,
+            replyTo: byId[m.quoteId] == null
+                ? null
+                : '${name(byId[m.quoteId]!.authorProfileId)}, '
+                    '${l.formatDateTimeShort(byId[m.quoteId]!.createdAt.toLocal())}',
+            citedDay: m.quotedDay,
+          ),
+    ];
+  }
+
   (DateTime, DateTime)? _resolvePeriod(Localization l) {
     switch (_kind) {
       case _PeriodKind.month:
@@ -328,6 +365,16 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         } catch (_) {/* the section prints its empty line */}
       }
 
+      // F-35: the Conversa section — only when ticked; a failure prints its
+      // empty line.
+      List<ReportChatLine>? chat;
+      if (_chatOn && _includeChat) {
+        chat = const [];
+        try {
+          chat = await _reportChat(l, start, end, members);
+        } catch (_) {/* the section prints its empty line */}
+      }
+
       String roleLabelOf(int profileId) {
         for (final m in members) {
           if (m.id != profileId) continue;
@@ -387,6 +434,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         ],
         agenda: agenda,
         expenses: expenses,
+        chat: chat,
         dayAccounts: [
           for (final a in dayAccounts)
             ReportDayAccount(
@@ -659,6 +707,16 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
                     style: Theme.of(context).textTheme.bodySmall),
                 onChanged: (v) => setState(() => _includeFutureSwaps = v),
               ),
+              if (_chatOn)
+                SwitchListTile(
+                  key: const ValueKey('pdf-include-chat'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  value: _includeChat,
+                  title: Text(l[KApp.chatPdfInclude],
+                      style: Theme.of(context).textTheme.bodySmall),
+                  onChanged: (v) => setState(() => _includeChat = v),
+                ),
               if (_errorText != null) ...[
                 const SizedBox(height: 4),
                 AppBanner(

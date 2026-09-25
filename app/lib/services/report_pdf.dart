@@ -121,6 +121,15 @@ Future<Uint8List> buildReportPdf(
           ..._expensesSection(
               report.expenses!, report.agenda == null ? 5 : 6, l),
         ],
+        if (report.chat != null) ...[
+          pw.SizedBox(height: 14),
+          ..._chatSection(
+              report.chat!,
+              5 +
+                  (report.agenda == null ? 0 : 1) +
+                  (report.expenses == null ? 0 : 1),
+              l),
+        ],
         pw.SizedBox(height: 16),
         pw.Divider(color: PdfColors.grey400),
         _paragraph(
@@ -540,6 +549,40 @@ List<pw.Widget> _expensesSection(
               style: small),
       ],
     ],
+  ];
+}
+
+/// F-35: the Conversa of the period, in order, as written — immutable on the
+/// server, so the PDF says exactly what the family said.
+List<pw.Widget> _chatSection(
+    List<ReportChatLine> lines, int number, Localization l) {
+  return [
+    _sectionTitle(l.format(KApp.chatPdfSection, [number])),
+    _paragraph(l[KApp.chatPdfLead], size: 8.5),
+    pw.SizedBox(height: 4),
+    if (lines.isEmpty)
+      _paragraph(l[KApp.chatPdfEmpty])
+    else
+      for (final c in lines)
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 4),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                  [
+                    '${l.formatDateTime(c.atLocal)} — ${c.authorName}',
+                    if (c.replyTo != null)
+                      l.format(KApp.chatPdfReply, [c.replyTo!]),
+                    if (c.citedDay != null)
+                      l.format(KApp.chatCitedDay, [l.formatDate(c.citedDay!)]),
+                  ].join(' · '),
+                  style: pw.TextStyle(
+                      fontSize: 8.5, fontWeight: pw.FontWeight.bold)),
+              pw.Text(c.body, style: const pw.TextStyle(fontSize: 8.5)),
+            ],
+          ),
+        ),
   ];
 }
 

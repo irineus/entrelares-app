@@ -119,6 +119,13 @@ class PublicSettings {
   int get expenseMaxAmountCents =>
       _int('expenses.max_amount_cents', 10000000);
 
+  // F-35 — the family's Conversa (the RPCs read the same keys).
+  bool get chatEnabled => parseBoolSetting(values, 'feature.chat', false);
+  bool get chatPremiumOnly =>
+      parseBoolSetting(values, 'chat.premium_only', true);
+  int get chatMessageMaxChars => _int('chat.message_max_chars', 2000);
+  int get chatMessagesPerHour => _int('chat.messages_per_hour', 60);
+
   // T-39 billing (F-48 promotional prices: 549, not 490 — Asaas refuses
   // Pix/boleto charges under R$ 5,00). Enabled=false shows the waitlist.
   bool get billingEnabled => parseBoolSetting(values, 'billing.enabled', false);

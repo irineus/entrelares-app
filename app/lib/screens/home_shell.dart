@@ -130,6 +130,10 @@ class HomeShell extends StatelessWidget {
   /// The branch always exists; this only decides whether the bar offers it.
   final ValueListenable<bool>? expensesTab;
 
+  /// F-35: whether the Conversa is on — the third tab is then "Comunicação"
+  /// and the bell counts unread texts too ([NotificationBadge.total]).
+  final ValueListenable<bool>? chatTab;
+
   /// The shell's branch order (main.dart): Calendário, Família, Notificações,
   /// Despesas, Relatórios.
   static const int expensesBranch = 3;
@@ -148,7 +152,8 @@ class HomeShell extends StatelessWidget {
       this.installHint,
       this.connectivity,
       this.tourKeys,
-      this.expensesTab});
+      this.expensesTab,
+      this.chatTab});
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +262,7 @@ class HomeShell extends StatelessWidget {
         },
       ),
       bottomNavigationBar: ListenableBuilder(
-        listenable: Listenable.merge([badge, expensesTab]),
+        listenable: Listenable.merge([badge, expensesTab, chatTab]),
         builder: (context, _) {
           // A host without the Despesas branch (four branches: the tests'
           // shells) keeps the four tabs it always had.
@@ -265,6 +270,9 @@ class HomeShell extends StatelessWidget {
           final hasExpensesBranch = total > 4;
           final withExpenses =
               hasExpensesBranch && (expensesTab?.value ?? false);
+          final commLabel = (chatTab?.value ?? false)
+              ? l[KApp.chatNav]
+              : l[K.navNotificationsShort];
           // The branches the bar offers, in order; a hidden branch keeps its
           // index so a route never moves.
           final branches = [
@@ -274,7 +282,7 @@ class HomeShell extends StatelessWidget {
           final labels = [
             l[K.navCalendar],
             l[K.navFamily],
-            l[K.navNotificationsShort],
+            commLabel,
             if (withExpenses) l[KApp.expenseNav],
             l[K.navReports],
           ];
@@ -289,9 +297,7 @@ class HomeShell extends StatelessWidget {
               // F-34: five tabs show every label only while they all fit at
               // the SDK's own ceiling (1.3×) with the real font; otherwise
               // only the selected one speaks, the others keep their icon.
-              labelBehavior: five && !navLabelsFitAtCeiling(context, labels)
-                  ? NavigationDestinationLabelBehavior.onlyShowSelected
-                  : null,
+              labelBehavior: five ? navFiveTabBehavior(context, labels) : null,
               onDestinationSelected: (index) {
                 final branch = branches[index];
                 shell.goBranch(branch,
@@ -323,7 +329,7 @@ class HomeShell extends StatelessWidget {
                                 : K.navNotificationsManyPending,
                             [badge.count])
                         : null,
-                    label: l[K.navNotificationsShort]),
+                    label: commLabel),
                 if (withExpenses)
                   NavigationDestination(
                       key: const ValueKey('nav-expenses'),
@@ -533,8 +539,9 @@ class HomeShell extends StatelessWidget {
             : null,
         excludeSemantics: true,
         child: Badge(
-          isLabelVisible: badge.count > 0,
-          label: Text(bellBadgeText(badge.count)),
+          // F-35: requests waiting on me plus unread Conversa texts.
+          isLabelVisible: badge.total > 0,
+          label: Text(bellBadgeText(badge.total)),
           child: icon,
         ),
       );
@@ -613,6 +620,48 @@ class _NavLabelFit extends StatelessWidget {
     return MediaQuery.withClampedTextScaling(
         maxScaleFactor: ceiling, child: child);
   }
+}
+
+/// F-34 + F-35 (owner, 24/09/2026) — the five-tab bar in three steps, by the
+/// labels' real width:
+///
+/// 1. every label fits its slot at the SDK's ceiling (1.3×) → all labels;
+/// 2. every label ALONE fits at the five-tab floor (0.85×) → the selected
+///    label only;
+/// 3. otherwise → icons only. "Comunicação" is 85.6 dp at 1.0× and a 360 dp
+///    phone's slot is 70 dp, so on such a phone the bar is icons — the name
+///    stays in the tooltip and in what the screen reader says.
+NavigationDestinationLabelBehavior? navFiveTabBehavior(
+    BuildContext context, List<String> labels) {
+  if (navLabelsFitAtCeiling(context, labels)) return null;
+  if (navLabelsFitAtScale(context, labels, _NavLabelFit.fiveTabFloor,
+      sideGap: 1)) {
+    return NavigationDestinationLabelBehavior.onlyShowSelected;
+  }
+  return NavigationDestinationLabelBehavior.alwaysHide;
+}
+
+/// Whether every label fits its slot at [scale] (less [sideGap] a side).
+bool navLabelsFitAtScale(BuildContext context, List<String> labels,
+    double scale,
+    {double sideGap = 2}) {
+  final style = NavigationBarTheme.of(context)
+      .labelTextStyle
+      ?.resolve(const {WidgetState.selected});
+  if (style?.fontSize == null || labels.isEmpty) return true;
+  final slot = MediaQuery.sizeOf(context).width / labels.length - 2 * sideGap;
+  for (final label in labels) {
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: TextScaler.linear(scale),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    if (width > slot) return false;
+  }
+  return true;
 }
 
 /// F-34 — whether every label of the bar fits its slot at the SDK's ceiling

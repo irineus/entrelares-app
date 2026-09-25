@@ -10,6 +10,14 @@ import 'custody_data_source.dart';
 class NotificationBadge extends ChangeNotifier {
   final CustodyDataSource _dataSource;
   int count = 0;
+
+  /// F-35: texts of others in the Conversa I have not read — counted only
+  /// while [chatOn] (the module's flag, set by the app). The bar's bell shows
+  /// [total]: pending requests plus unread texts.
+  int chatUnread = 0;
+  bool chatOn = false;
+
+  int get total => count + chatUnread;
   void Function()? _unwatch;
   bool _disposed = false;
 
@@ -27,7 +35,7 @@ class NotificationBadge extends ChangeNotifier {
   void stop() {
     _unwatch?.call();
     _unwatch = null;
-    _set(0);
+    _set(0, 0);
   }
 
   /// Best-effort: a failed read keeps the last known count (web parity — the
@@ -36,17 +44,24 @@ class NotificationBadge extends ChangeNotifier {
     try {
       final me = await _dataSource.fetchOwnProfile();
       if (me == null) {
-        _set(0);
+        _set(0, 0);
         return;
       }
       final pending = await _dataSource.fetchPendingForMe(me.id);
-      _set(pending.length);
+      var unread = 0;
+      if (chatOn) {
+        try {
+          unread = await _dataSource.fetchChatUnreadCount(me.id);
+        } catch (_) {/* the pending count still stands */}
+      }
+      _set(pending.length, unread);
     } catch (_) {/* keep the last count */}
   }
 
-  void _set(int value) {
-    if (_disposed || value == count) return;
+  void _set(int value, int unread) {
+    if (_disposed || (value == count && unread == chatUnread)) return;
     count = value;
+    chatUnread = unread;
     notifyListeners();
   }
 

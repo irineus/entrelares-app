@@ -84,6 +84,11 @@ class NotificationsScreen extends StatefulWidget {
 
   static Key expenseActionKey(int id) => Key('notif-expense-$id');
 
+  /// F-35: inside Comunicação — no Scaffold of its own (the host's app bar
+  /// and tabs sit above), and the three lists become chips (no tabs inside
+  /// tabs). Off, the screen is exactly what it was.
+  final bool embedded;
+
   const NotificationsScreen(
       {super.key,
       required this.dataSource,
@@ -94,6 +99,7 @@ class NotificationsScreen extends StatefulWidget {
       this.analytics,
       this.onPlanFrom,
       this.onOpenExpenses,
+      this.embedded = false,
       this.landing,
       this.landingNonce});
 
@@ -340,6 +346,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
+    final body = _body(l);
+    if (widget.embedded) return body;
     return Scaffold(
       appBar: AppBar(
           title: Text(l[K.notifPageTitle]),
@@ -355,8 +363,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ),
             const AppAccountButton(),
           ]),
-      body: Column(
+      body: body,
+    );
+  }
+
+  Widget _body(Localization l) {
+    return Column(
         children: [
+          if (widget.embedded) _chipsRow(l) else
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: AppSegmented<_Tab>(
@@ -415,6 +429,49 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         },
             ),
           ),
+        ],
+      );
+  }
+
+  /// F-35: the three lists as chips, with the push control's icon at the end
+  /// of the row (the host's app bar carries no screen actions).
+  Widget _chipsRow(Localization l) {
+    final incomingCount = _incoming.length + _openNotices.length;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Wrap(
+              spacing: Spacing.sm,
+              runSpacing: Spacing.xs,
+              children: [
+                for (final (tab, label) in [
+                  (
+                    _Tab.incoming,
+                    incomingCount == 0
+                        ? l[K.notifTabIncoming]
+                        : '${l[K.notifTabIncoming]} ($incomingCount)'
+                  ),
+                  (_Tab.sent, l[K.notifTabSent]),
+                  (_Tab.history, l[K.notifTabHistory]),
+                ])
+                  ChoiceChip(
+                    key: ValueKey('notif-chip-${tab.name}'),
+                    label: Text(label),
+                    selected: _tab == tab,
+                    onSelected: (_) => setState(() => _tab = tab),
+                  ),
+              ],
+            ),
+          ),
+          if (_pushState == PushState.on)
+            IconButton(
+              key: NotificationsScreen.pushStatusKey,
+              icon: const Icon(Icons.notifications_active_outlined),
+              tooltip: l[KApp.pushStatusOnTooltip],
+              onPressed: () => _openPushSheet(l),
+            ),
         ],
       ),
     );

@@ -564,6 +564,24 @@ class ReportExpenses {
       lines.isEmpty && payments.isEmpty && changes.isEmpty;
 }
 
+/// F-35: one Conversa text as the PDF prints it — built by the caller from
+/// the period's texts; [replyTo] is "Name, dd/MM HH:mm" of the quoted text.
+class ReportChatLine {
+  final DateTime atLocal;
+  final String authorName;
+  final String body;
+  final String? replyTo;
+  final DateTime? citedDay;
+
+  const ReportChatLine({
+    required this.atLocal,
+    required this.authorName,
+    required this.body,
+    this.replyTo,
+    this.citedDay,
+  });
+}
+
 class CustodyReport {
   final String familyName;
 
@@ -605,6 +623,10 @@ class CustodyReport {
   /// the reader is a viewer, who never sees expenses).
   final ReportExpenses? expenses;
 
+  /// F-35: the Conversa section — only when the reader ticked it. NULL leaves
+  /// it out.
+  final List<ReportChatLine>? chat;
+
   const CustodyReport({
     required this.familyName,
     required this.childName,
@@ -621,6 +643,7 @@ class CustodyReport {
     this.dayAccounts = const [],
     this.agenda,
     this.expenses,
+    this.chat,
   });
 
   int get totalDays =>
@@ -662,6 +685,8 @@ CustodyReport buildCustodyReport({
   List<ReportAgendaItem>? agenda,
   // F-34: the expenses section, already assembled. Null leaves it out.
   ReportExpenses? expenses,
+  // F-35: the Conversa section, already in order. Null leaves it out.
+  List<ReportChatLine>? chat,
 }) {
   final stats = caregiverStats(
     members: members,
@@ -710,6 +735,7 @@ CustodyReport buildCustodyReport({
     dayAccounts: reportDayAccountsInOrder(dayAccounts),
     agenda: agenda == null ? null : reportAgendaInOrder(agenda),
     expenses: expenses,
+    chat: chat,
   );
 }
 

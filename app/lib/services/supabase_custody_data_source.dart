@@ -11,6 +11,7 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/child_routine.dart';
+import 'package:entrelares_db_contracts/models/chat_message.dart';
 import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
@@ -1749,6 +1750,69 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       Map<String, dynamic>.from(await _client.rpc<dynamic>(
           'verify_report_attestation',
           params: {'p_id': id}) as Map);
+
+  @override
+  Future<List<ChatMessage>> fetchChatMessages() async {
+    final rows = await _client
+        .from('chat_messages')
+        .select('id, author_profile_id, body, quote_id, quoted_day, created_at')
+        .order('id', ascending: true);
+    return rows.map(ChatMessage.fromJson).toList();
+  }
+
+  @override
+  Future<List<ChatRead>> fetchChatReads() async {
+    final rows = await _client
+        .from('chat_reads')
+        .select('message_id, profile_id, read_at')
+        .order('read_at', ascending: true);
+    return rows.map(ChatRead.fromJson).toList();
+  }
+
+  @override
+  Future<int> sendChatMessage(
+          {required String body, int? quoteId, DateTime? quotedDay}) async =>
+      await _client.rpc<dynamic>('send_chat_message', params: {
+        'p_body': body,
+        'p_quote_id': quoteId,
+        'p_day': quotedDay == null ? null : _isoDay(quotedDay),
+      }) as int;
+
+  @override
+  Future<int> markChatRead(int upToId) async =>
+      await _client.rpc<dynamic>('mark_chat_read',
+          params: {'p_up_to': upToId}) as int;
+
+  @override
+  Future<bool> fetchChatPushMuted() async {
+    final rows = await _client.from('chat_prefs').select('push_muted').limit(1);
+    return rows.isNotEmpty && rows.first['push_muted'] == true;
+  }
+
+  @override
+  Future<void> setChatPushMuted(bool muted) async {
+    await _client
+        .rpc<dynamic>('set_chat_push_muted', params: {'p_muted': muted});
+  }
+
+  @override
+  Future<int> fetchChatUnreadCount(int profileId) async {
+    // postgrest-dart orders DESCENDING unless told; the newest mark is wanted.
+    final last = await _client
+        .from('chat_reads')
+        .select('message_id')
+        .eq('profile_id', profileId)
+        .order('message_id', ascending: false)
+        .limit(1);
+    final after = last.isEmpty ? 0 : last.first['message_id'] as int;
+    final rows = await _client
+        .from('chat_messages')
+        .select('id')
+        .gt('id', after)
+        .neq('author_profile_id', profileId)
+        .limit(100);
+    return rows.length;
+  }
 
   @override
   Future<List<Expense>> fetchExpenses(
