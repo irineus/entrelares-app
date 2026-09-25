@@ -186,7 +186,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openDayEditor(tester, future);
-      final brunoChip = find.widgetWithText(ChoiceChip, 'Bruno').first;
+      final brunoChip = memberChip('Bruno').first;
       await tapSheet(tester, brunoChip);
       expect(find.text(pt[KApp.adminOfferChangePlanned]), findsOneWidget);
 

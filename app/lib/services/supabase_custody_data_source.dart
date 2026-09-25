@@ -1622,6 +1622,20 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       '${d.day.toString().padLeft(2, '0')}';
 
   @override
+  Future<void Function()> watchAgendaChanges(void Function() onChange) async {
+    final channel = _client
+        .channel('agenda_changes_${_channelSeq++}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'child_events',
+          callback: (_) => onChange(),
+        )
+        .subscribe();
+    return () => _client.removeChannel(channel);
+  }
+
+  @override
   Future<List<ChildEvent>> fetchChildEvents(DateTime from, DateTime to,
       {bool includeDeleted = false}) async {
     var query = _client

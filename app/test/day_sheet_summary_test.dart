@@ -104,10 +104,10 @@ void main() {
     await tester.pump();
     expect(saveEnabled(tester), isFalse);
 
-    await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno'));
+    await tapSheet(tester, memberChip('Bruno'));
     expect(saveEnabled(tester), isTrue, reason: 'the real carer is a change');
     await tapSheet(
-        tester, find.widgetWithText(ChoiceChip, pt[K.editorSameAsPlanned]));
+        tester, find.widgetWithText(ChoiceChip, pt[KApp.editorNoSwap]));
     expect(saveEnabled(tester), isFalse);
 
     expect(ds.inserted, isEmpty);
@@ -150,7 +150,7 @@ void main() {
 
     await openDay(tester, day);
     expect(find.text(pt[K.editorScheduledParent]), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, 'Ana'), findsWidgets);
+    expect(memberChip('Ana'), findsWidgets);
     expect(find.byKey(const ValueKey('day-summary-responsible')), findsNothing);
     expect(editPencil, findsNothing);
     expect(closeX, findsOneWidget);

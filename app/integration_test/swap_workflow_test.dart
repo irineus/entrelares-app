@@ -175,8 +175,9 @@ void main() {
     await openDay(tester, targetDay);
     // U-56: the seeded day (ahead) opens in the editor, one tap.
     await expectEditor(tester);
-    final memberChip =
-        find.widgetWithText(ChoiceChip, family.member.fullName.split(' ').first);
+    // Only the chosen chip prints a name; the others are keyed by it.
+    final memberChip = find.byKey(
+        ValueKey('member-chip:${family.member.fullName.split(' ').first}'));
     await tester.ensureVisible(memberChip.last);
     await tester.pumpAndSettle();
     await tester.tap(memberChip.last);
@@ -266,8 +267,9 @@ void main() {
     await signIn(tester, family.founder.email);
     await openDay(tester, day);
     await expectEditor(tester);
-    final memberChip =
-        find.widgetWithText(ChoiceChip, family.member.fullName.split(' ').first);
+    // Only the chosen chip prints a name; the others are keyed by it.
+    final memberChip = find.byKey(
+        ValueKey('member-chip:${family.member.fullName.split(' ').first}'));
     await tester.ensureVisible(memberChip.last);
     await tester.pumpAndSettle();
     await tester.tap(memberChip.last);

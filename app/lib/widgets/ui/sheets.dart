@@ -571,6 +571,68 @@ class AppInfoTip extends StatelessWidget {
       );
 }
 
+/// The label ON the frame, as a text field carries it: the title, the
+/// "opcional" marker and the ⓘ, for [InputDecoration.label].
+///
+/// The explanation rides the title's semantics as its hint, as in
+/// [AppFieldLabel] (U-48), and the ⓘ stays out of the tree.
+class AppFrameLabel extends StatelessWidget {
+  final String text;
+  final String? info;
+  final String? optionalLabel;
+
+  const AppFrameLabel(this.text, {super.key, this.info, this.optionalLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(child: Semantics(hint: info, child: Text(text))),
+        if (optionalLabel != null) ...[
+          const SizedBox(width: Spacing.xs),
+          Text(optionalLabel!, style: TextStyle(color: tokens.textMuted)),
+        ],
+        if (info != null) ExcludeSemantics(child: AppInfoTip(message: info!)),
+      ],
+    );
+  }
+}
+
+/// A group of controls in the frame of a text field — the title on the
+/// border, like "E-mail" on the sign-in form.
+///
+/// Owner's validation, 25/09/2026: the day sheet spent a card per question —
+/// a padded box, then a title line, then the chips — and pushed the agenda
+/// below the fold. The frame is the input's own [InputDecorator], so its
+/// border, radius, fill and label follow the theme with the fields around it;
+/// nothing here is a second style.
+class AppFieldGroup extends StatelessWidget {
+  final String label;
+  final String? info;
+  final String? optionalLabel;
+  final Widget child;
+
+  const AppFieldGroup({
+    super.key,
+    required this.label,
+    required this.child,
+    this.info,
+    this.optionalLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) => InputDecorator(
+        decoration: InputDecoration(
+          label: AppFrameLabel(label, info: info, optionalLabel: optionalLabel),
+          contentPadding: const EdgeInsets.fromLTRB(
+              Spacing.sm, Spacing.sm + Spacing.xs, Spacing.sm, Spacing.sm),
+        ),
+        child: child,
+      );
+}
+
 /// The label above a control that is not an [AppTextField] — a dropdown, a pair
 /// of time pickers, a row of chips.
 ///

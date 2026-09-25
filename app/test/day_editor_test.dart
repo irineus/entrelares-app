@@ -39,7 +39,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await openDay(tester, future);
-    await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno').first);
+    await tapSheet(tester, memberChip('Bruno').first);
     await tester.enterText(find.byType(TextField), 'Consulta médica');
     await pickHour(tester, 1);
     await tapSheet(tester, find.text(pt[K.commonSave]));
@@ -62,7 +62,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await openDay(tester, future);
-    await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Ana').first);
+    await tapSheet(tester, memberChip('Ana').first);
     await pickHour(tester, 1);
     expect(find.text(pt[K.editorNoTransitionHint]), findsOneWidget);
 
@@ -119,7 +119,7 @@ void main() {
 
     await openDayEditor(tester, future);
     expect(find.text(pt[K.editorLockedHint]), findsNothing);
-    await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno').first);
+    await tapSheet(tester, memberChip('Bruno').first);
     await tapSheet(tester, find.text(pt[K.commonSave]));
 
     // Asked first — nothing written yet.
@@ -176,7 +176,7 @@ void main() {
 
     // F-28 scenario A (the user is the day's planned parent): Bruno offered.
     // The ACTUAL section renders after the scheduled one — .last targets it.
-    await tapSheet(tester, find.widgetWithText(ChoiceChip, 'Bruno').last);
+    await tapSheet(tester, memberChip('Bruno').last);
     await tapSheet(tester, find.text(pt[K.commonSave]));
     expect(ds.updated.single.actualParentId, 2);
     await settleSnack(tester);
@@ -258,7 +258,7 @@ void main() {
             pt.format(KApp.sheetSwapUnavailablePending, ['Eva Pendente'])),
         findsOneWidget);
     expect(find.text(pt[K.editorActualParent]), findsNothing);
-    expect(find.text(pt[K.editorSameAsPlanned]), findsNothing);
+    expect(find.text(pt[KApp.editorNoSwap]), findsNothing);
     // Not the departed ghost: the pill carries the pending mark, not "(saiu)"
     // (U-56: the planned field left for a non-admin; the pill names her).
     expect(

@@ -479,6 +479,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   onOpenFamily: () => _router.go('/family'),
                   onOpenNotifications: () => _router.go('/notifications'),
                   onOpenPlan: () => _router.go('/family/plan'),
+                  onOpenChildren: () => _router.go('/family/children'),
                   handoffNudgePrefs: _handoffNudgePrefs,
                   planRequest: _planRequest,
                   dayRequest: _dayRequest),
