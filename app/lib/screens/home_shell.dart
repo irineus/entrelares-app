@@ -297,9 +297,7 @@ class HomeShell extends StatelessWidget {
               // F-34: five tabs show every label only while they all fit at
               // the SDK's own ceiling (1.3×) with the real font; otherwise
               // only the selected one speaks, the others keep their icon.
-              labelBehavior: five && !navLabelsFitAtCeiling(context, labels)
-                  ? NavigationDestinationLabelBehavior.onlyShowSelected
-                  : null,
+              labelBehavior: five ? navFiveTabBehavior(context, labels) : null,
               onDestinationSelected: (index) {
                 final branch = branches[index];
                 shell.goBranch(branch,
@@ -586,10 +584,8 @@ class _NavLabelFit extends StatelessWidget {
   /// Air kept on each side of the widest label, so two neighbours never touch.
   static const double _sideGap = 2;
 
-  /// F-34: the five-tab floor — [AppShrinkToFit]'s 0.85 at first; F-35
-  /// (provisional, pending the owner): 0.8, the smallest factor at which
-  /// "Comunicação" (85.6 dp at 1.0×) fits a 360 dp phone's slot.
-  static const double fiveTabFloor = 0.8;
+  /// F-34: the five-tab floor — [AppShrinkToFit]'s.
+  static const double fiveTabFloor = 0.85;
 
   /// The SDK already stops the bar's labels here (`navigation_bar.dart`).
   static const double _sdkCeiling = 1.3;
@@ -624,6 +620,48 @@ class _NavLabelFit extends StatelessWidget {
     return MediaQuery.withClampedTextScaling(
         maxScaleFactor: ceiling, child: child);
   }
+}
+
+/// F-34 + F-35 (owner, 24/09/2026) — the five-tab bar in three steps, by the
+/// labels' real width:
+///
+/// 1. every label fits its slot at the SDK's ceiling (1.3×) → all labels;
+/// 2. every label ALONE fits at the five-tab floor (0.85×) → the selected
+///    label only;
+/// 3. otherwise → icons only. "Comunicação" is 85.6 dp at 1.0× and a 360 dp
+///    phone's slot is 70 dp, so on such a phone the bar is icons — the name
+///    stays in the tooltip and in what the screen reader says.
+NavigationDestinationLabelBehavior? navFiveTabBehavior(
+    BuildContext context, List<String> labels) {
+  if (navLabelsFitAtCeiling(context, labels)) return null;
+  if (navLabelsFitAtScale(context, labels, _NavLabelFit.fiveTabFloor,
+      sideGap: 1)) {
+    return NavigationDestinationLabelBehavior.onlyShowSelected;
+  }
+  return NavigationDestinationLabelBehavior.alwaysHide;
+}
+
+/// Whether every label fits its slot at [scale] (less [sideGap] a side).
+bool navLabelsFitAtScale(BuildContext context, List<String> labels,
+    double scale,
+    {double sideGap = 2}) {
+  final style = NavigationBarTheme.of(context)
+      .labelTextStyle
+      ?.resolve(const {WidgetState.selected});
+  if (style?.fontSize == null || labels.isEmpty) return true;
+  final slot = MediaQuery.sizeOf(context).width / labels.length - 2 * sideGap;
+  for (final label in labels) {
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: TextScaler.linear(scale),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    if (width > slot) return false;
+  }
+  return true;
 }
 
 /// F-34 — whether every label of the bar fits its slot at the SDK's ceiling

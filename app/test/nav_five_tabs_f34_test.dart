@@ -153,24 +153,56 @@ void main() {
     });
   }
 
-  // F-35: the final bar — Calendário · Família · Comunicação · Despesas ·
-  // Relatórios. "Comunicação" is the widest label the bar has had.
-  for (final language in AppLanguage.values) {
-    final l = Localization(language);
-    for (final scale in [1.0, 1.3]) {
-      testWidgets('$language @$scale, the final bar: Comunicação selected '
-          'fits its slot on one line', (tester) async {
-        await useSize(tester, _phone, scale);
-        await tester.pumpWidget(_shellApp(l,
-            selected: 2,
-            expensesTab: ValueNotifier(true),
-            chatTab: ValueNotifier(true)));
-        await tester.pumpAndSettle();
-        expectOneLineIn(tester, l[KApp.chatNav], _phone.width / 5);
-        expect(tester.takeException(), isNull);
-      });
-    }
+  // F-35 (owner, 24/09/2026): the final bar — Calendário · Família ·
+  // Comunicação · Despesas · Relatórios. "Comunicação" (85.6 dp) does not fit
+  // a 360 dp slot even alone at 0.85×, so that phone gets ICONS; where it
+  // fits, the labels stay. In English the tab is "Inbox", which fits.
+  for (final scale in [1.0, 1.3]) {
+    testWidgets('PT @$scale, the final bar on 360 dp: icons only, the name '
+        'still spoken', (tester) async {
+      final l = Localization(AppLanguage.ptBr);
+      await useSize(tester, _phone, scale);
+      await tester.pumpWidget(_shellApp(l,
+          selected: 2,
+          expensesTab: ValueNotifier(true),
+          chatTab: ValueNotifier(true)));
+      await tester.pumpAndSettle();
+      final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+      expect(bar.labelBehavior, NavigationDestinationLabelBehavior.alwaysHide);
+      expect(find.bySemanticsLabel(RegExp(l[KApp.chatNav])), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('EN @$scale, the final bar on 360 dp: Inbox selected fits',
+        (tester) async {
+      final l = Localization(AppLanguage.en);
+      await useSize(tester, _phone, scale);
+      await tester.pumpWidget(_shellApp(l,
+          selected: 2,
+          expensesTab: ValueNotifier(true),
+          chatTab: ValueNotifier(true)));
+      await tester.pumpAndSettle();
+      final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+      expect(bar.labelBehavior,
+          NavigationDestinationLabelBehavior.onlyShowSelected);
+      expectOneLineIn(tester, l[KApp.chatNav], _phone.width / 5);
+    });
   }
+
+  testWidgets('PT on a 412 dp phone: Comunicação fits alone — the selected '
+      'label shows', (tester) async {
+    final l = Localization(AppLanguage.ptBr);
+    await useSize(tester, const Size(412, 900), 1.0);
+    await tester.pumpWidget(_shellApp(l,
+        selected: 2,
+        expensesTab: ValueNotifier(true),
+        chatTab: ValueNotifier(true)));
+    await tester.pumpAndSettle();
+    final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    expect(bar.labelBehavior,
+        NavigationDestinationLabelBehavior.onlyShowSelected);
+    expectOneLineIn(tester, l[KApp.chatNav], 412 / 5);
+  });
 
   testWidgets('off: four tabs, and Relatórios still opens its own branch',
       (tester) async {
