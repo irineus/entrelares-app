@@ -809,6 +809,9 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
               ),
           ] else if (widget.children.length > 1)
             DropdownButtonFormField<int>(
+              // A name or label never pushes the field past the screen
+              // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
+              isExpanded: true,
               key: const ValueKey('agenda-child'),
               initialValue: _childId,
               decoration:

@@ -1068,6 +1068,9 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
+                  // A name or label never pushes the field past the screen
+                  // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
+                  isExpanded: true,
                   key: const ValueKey('viewer-role'),
                   initialValue: _viewerRoleId == 0 ? null : _viewerRoleId,
                   decoration: InputDecoration(labelText: l[K.famRoleInFamily]),
@@ -1272,6 +1275,9 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         Text(l[KApp.famInviteEmailOptional], style: theme.textTheme.bodySmall),
         const SizedBox(height: 12),
         DropdownButtonFormField<int>(
+          // A name or label never pushes the field past the screen
+          // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
+          isExpanded: true,
           initialValue: _inviteRoleId == 0 ? null : _inviteRoleId,
           decoration: InputDecoration(labelText: l[K.famRoleInFamily]),
           items: [

@@ -167,6 +167,9 @@ class _ProfileDataSheetState extends State<_ProfileDataSheet> {
         if (widget.canEditRole) ...[
           const SizedBox(height: Spacing.sm),
           DropdownButtonFormField<int>(
+            // A name or label never pushes the field past the screen
+            // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
+            isExpanded: true,
             initialValue: _roleId,
             decoration: InputDecoration(labelText: l[K.famRoleInFamily]),
             items: [

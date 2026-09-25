@@ -223,8 +223,12 @@ class AppSheetFrame extends StatelessWidget {
           Flexible(
             child: SingleChildScrollView(
               key: bodyKey,
+              // The top inset is the first field's floating label: it sits
+              // half above the field's border, and at 0 the scroll view clipped
+              // it — "Descrição" on Lançar despesa read "Descriçao" cut in
+              // half, and no scroll could reveal it (owner, 25/09/2026).
               padding: const EdgeInsets.fromLTRB(
-                  Spacing.md, 0, Spacing.md, Spacing.md),
+                  Spacing.md, Spacing.sm, Spacing.md, Spacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: children,
