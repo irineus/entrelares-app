@@ -99,6 +99,8 @@ class PublicSettings {
   bool get viewersEnabled => parseBoolSetting(values, 'feature.viewers', false);
   bool get reportAttestationEnabled =>
       parseBoolSetting(values, 'feature.report_attestation', false);
+  bool get reportAttestationPremiumOnly =>
+      parseBoolSetting(values, 'report_attestation.premium_only', true);
   bool get childAgendaEnabled =>
       parseBoolSetting(values, 'feature.child_agenda', false);
 

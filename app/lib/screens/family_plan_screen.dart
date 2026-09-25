@@ -572,15 +572,22 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                     l[K.premFeaturePdf],
                     l[K.premFeatureAdminMode],
                     l[K.premFeatureRoles],
+                    // S-22: each phase-6 module lists itself while its flag
+                    // is on AND it is Premium-only (a gate the operator lifted
+                    // is not a benefit any more). The viewer cap is the live
+                    // `max_viewers` (U-57).
+                    for (final b in _phase6Benefits(l)) b.text,
                   ],
-                  leadingIcons: const [
-                    Icon(Icons.group_outlined, size: TypeScale.subtitle),
-                    Icon(Icons.event_available_outlined,
+                  leadingIcons: [
+                    const Icon(Icons.group_outlined, size: TypeScale.subtitle),
+                    const Icon(Icons.event_available_outlined,
                         size: TypeScale.subtitle),
-                    Icon(Icons.picture_as_pdf_outlined,
+                    const Icon(Icons.picture_as_pdf_outlined,
                         size: TypeScale.subtitle),
-                    Icon(Icons.shield_outlined, size: TypeScale.subtitle),
-                    Icon(Icons.sell_outlined, size: TypeScale.subtitle),
+                    const Icon(Icons.shield_outlined, size: TypeScale.subtitle),
+                    const Icon(Icons.sell_outlined, size: TypeScale.subtitle),
+                    for (final b in _phase6Benefits(l))
+                      Icon(b.icon, size: TypeScale.subtitle),
                   ],
                 ),
                 const SizedBox(height: Spacing.md),
@@ -593,6 +600,29 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       ],
     );
   }
+
+  /// S-22 — the phase-6 Premium benefits, each behind its module's flag and
+  /// its own `*.premium_only` gate (viewers: the Premium cap is the benefit).
+  List<({String text, IconData icon})> _phase6Benefits(Localization l) => [
+        if (_settings.childAgendaEnabled && _settings.agendaPremiumOnly)
+          (text: l[KApp.agendaPremiumBenefit], icon: Icons.event_note_outlined),
+        if (_settings.reportAttestationEnabled &&
+            _settings.reportAttestationPremiumOnly)
+          (text: l[KApp.attestPremiumBenefit], icon: Icons.qr_code_2_outlined),
+        if (_settings.expensesEnabled && _settings.expensesPremiumOnly)
+          (
+            text: l[KApp.expensePremiumBenefit],
+            icon: Icons.receipt_long_outlined
+          ),
+        if (_settings.chatEnabled && _settings.chatPremiumOnly)
+          (text: l[KApp.chatPremiumBenefit], icon: Icons.forum_outlined),
+        if (_settings.viewersEnabled &&
+            _settings.maxViewers > _settings.freeViewers)
+          (
+            text: l.format(KApp.viewerPremiumBenefit, [_settings.maxViewers]),
+            icon: Icons.visibility_outlined
+          ),
+      ];
 
   /// The block that follows [computeBillingUi] — the same state machine the
   /// web's Premium section runs, one branch per situation.

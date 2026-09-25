@@ -28,7 +28,7 @@ import 'e2e_proof.dart';
 /// S-15: the consent version the sign-up trigger stamps. Kept as a define so
 /// a policy bump does not need a code change in the lane.
 const policyVersion =
-    String.fromEnvironment('E2E_POLICY_VERSION', defaultValue: '2026-07-30');
+    String.fromEnvironment('E2E_POLICY_VERSION', defaultValue: '2026-09-25');
 
 const pack = String.fromEnvironment('E2E_PACK', defaultValue: 'full');
 

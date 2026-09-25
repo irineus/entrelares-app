@@ -41,7 +41,7 @@ enum ConsentGateState {
 
 abstract final class PolicyVersions {
   /// The version the shipped policy/terms text corresponds to.
-  static const String current = '2026-07-30';
+  static const String current = '2026-09-25';
 
   /// Date from which a missing accept of [current] blocks the app. Always the
   /// date the text becomes VISIBLE to users, plus 15 days — the window exists
@@ -50,8 +50,9 @@ abstract final class PolicyVersions {
   ///
   /// Do NOT shorten it afterwards: an already-published notice period is a
   /// promise. The migration `20260801200000_s15_enforce_from_promotion` carries
-  /// the other half.
-  static const String enforceFrom = '2026-08-16';
+  /// the other half — S-22 moves it again for the phase-6 version, in
+  /// `20260925100000_s22_phase6_live`.
+  static const String enforceFrom = '2026-10-10';
 
   /// [enforceFrom] parsed once. Invalid content would be an authoring mistake,
   /// and `DateTime.parse` throws rather than defaulting to "never block" — a
@@ -62,20 +63,24 @@ abstract final class PolicyVersions {
   /// the acceptance screen so nobody is asked to accept a diff they cannot see
   /// (LGPD art. 9 — clear and adequate information).
   static const List<String> changeSummary = [
-    'Passamos a pedir uma declaração específica para cada forma de entrar numa família: quem cria a família declara ciência de que o aplicativo não possui campos próprios para dados da criança e se compromete a inserir apenas o necessário à rotina nos campos de texto livre; quem entra por convite declara manter estrita confidencialidade sobre as informações e a rotina da criança ou adolescente.',
-    'Os Termos de Uso passaram a prever a suspensão preventiva e imediata do acesso do usuário restrito quando formos notificados formalmente, com cópia integral, de decisão judicial válida que restrinja o contato ou o acesso às informações da criança ou do outro responsável.',
-    'A Política de Privacidade foi alinhada ao que o aplicativo realmente faz: não há coleta estruturada de dados de crianças em campos específicos — esses dados só são tratados de forma incidental, se os responsáveis optarem por inseri-los nos campos de texto livre da rotina.',
-    'Passamos a informar que o nome digitado no cabeçalho do relatório em PDF é tratado de forma efêmera, apenas em memória durante a exportação, e não é armazenado em nenhum banco de dados do Serviço.',
+    'Agenda da criança: a pessoa administradora pode cadastrar a criança pelo primeiro nome, e os responsáveis registram compromissos por dia (Escola, Saúde, Remédio, Atividade, Livre, Nota ou Outro), com rotinas, avisos e lembretes. As observações dos dias passam a ser Notas da agenda. A política explica como tratamos esses dados, inclusive as informações de saúde que a família registrar.',
+    'Visualizador: um novo tipo de membro, convidado para acompanhar o planejamento sem editá-lo. Ele vê o calendário, a agenda e a conversa da família, mas não vê as despesas nem as mensagens das trocas, e recebe só notificações informativas, nunca por e-mail.',
+    'Despesas compartilhadas: os responsáveis podem registrar despesas da criança e pagamentos entre si, que só contam depois que quem recebeu confirma. O aplicativo não movimenta dinheiro; cada alteração ou exclusão fica guardada numa trilha que não se altera.',
+    'Conversa da família: o que é enviado não pode ser editado nem apagado, todos veem quem leu cada texto e quando, e o início de cada texto vai nas notificações. A operação da plataforma não lê a conversa.',
+    'Relatório verificável: o PDF pode trazer um QR code que abre uma página pública com um resumo sem nomes e a impressão digital do arquivo; guardamos só esse resumo e a impressão digital, pelo prazo de validade do relatório.',
+    'A declaração de quem cria a família foi atualizada: o aplicativo passou a ter um campo para o primeiro nome da criança, e quem cria a família se compromete a inserir apenas os dados da criança necessários à rotina.',
   ];
 
   /// U-13 — COURTESY translation of [changeSummary], so an English reader is
   /// not asked to accept a diff in a language they cannot read. NOT a second
   /// normative text. **Entries must stay index-aligned with [changeSummary].**
   static const List<String> changeSummaryEn = [
-    "We now ask for a specific declaration for each way of joining a family: whoever creates the family acknowledges that the app has no dedicated fields for the child's data and undertakes to enter only what the routine requires in the free-text fields; whoever joins through an invitation declares that they will keep strict confidentiality about the information and the routine of the child or adolescent.",
-    "The Terms of Use now provide for the immediate, preventive suspension of a restricted user's access when we are formally notified, with a full copy, of a valid judicial decision restricting contact with — or access to the information of — the child or the other caregiver.",
-    'The Privacy Policy was aligned with what the app actually does: there is no structured collection of children\'s data in dedicated fields — such data is only processed incidentally, if the caregivers choose to enter it into the routine\'s free-text fields.',
-    "We now disclose that the name typed into the PDF report's header is handled ephemerally, in memory only during the export, and is not stored in any database of the Service.",
+    "The child's agenda: the family's administrator may register the child by first name, and the caregivers record appointments per day (School, Health, Medicine, Activity, Free, Note or Other), with routines, notices and reminders. The days' notes become agenda Notes. The policy explains how we handle this data, including the health information the family may record.",
+    'Viewer: a new kind of member, invited to follow the plan without editing it. A viewer sees the calendar, the agenda and the family chat, but not the expenses nor the swap messages, and receives only informative notifications, never by e-mail.',
+    "Shared expenses: caregivers may record the child's expenses and payments between them, which count only after the receiver confirms. The app moves no money; every change or deletion is kept in a trail that cannot be altered.",
+    'Family chat: what is sent can never be edited or deleted, everyone sees who read each text and when, and the start of each text goes into the notifications. The platform operator does not read the chat.',
+    'Verifiable report: the PDF may carry a QR code that opens a public page with a summary without names and the file\'s fingerprint; we keep only that summary and the fingerprint, for the report\'s validity period.',
+    "The declaration of whoever creates the family was updated: the app now has a field for the child's first name, and whoever creates the family undertakes to enter only the child's data the routine needs.",
   ];
 
   /// The change summary in the reader's language.

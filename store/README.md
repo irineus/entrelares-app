@@ -208,7 +208,8 @@ say which one is blocking: sweep the whole list.
   Instructions: *"Log in with the credentials provided; the custody calendar is the home screen.
   All features are reachable from the bottom navigation."* Keep the account alive — Google
   re-reviews on later releases too.
-- **Data Safety** — declare. **Re-verified against the CODE on 12/09/2026 (S-18)**, the way the
+- **Data Safety** — declare. **Re-verified against the CODE on 12/09/2026 (S-18) and again on
+  24/09/2026 for phase 6 (S-22: F-55, F-50, F-64, F-34, F-35)**, the way the
   listing was in T-57: every row names the function or table that makes it true, so the next
   sweep compares the row with the code and not with the previous sweep. The Console form is
   answered by the owner from this table; **step 5 of the wizard (*Preview*) must match it line
@@ -216,18 +217,21 @@ say which one is blocking: sweep the whole list.
   does left out.
   | Data type | Collected? | Shared? | Purpose | Notes — what in the code makes it true |
   |---|---|---|---|---|
-  | Personal info → Name | Yes — required, linked | No | App functionality | `profiles.name`, shown to the family |
+  | Personal info → Name | Yes — required, linked | No | App functionality | `profiles.name`, shown to the family; since **F-55** also `children.first_name` — the child's first name, typed by the family's admin (`add_child`), the ONLY dedicated child field |
   | Personal info → Email address | Yes — required, linked | No | App functionality | GoTrue login + the transactional e-mails (`send-*-email`); since F-68 also the reply address of a support request (`support_requests.reply_email`, typed by a signed-out person) |
   | Personal info → User IDs | Yes — required, linked | No | App functionality | the account id (`auth.uid()` / `profiles.id`); Play's own example of a User ID is *"an account ID"* |
-  | Financial info → Purchase history | Yes — required, linked | No | App functionality | `billing-store-verify` writes `subscriptions.store_purchase_token` and the `billing_events` ledger; the RTDN webhook writes the lifecycle. **Marked 25/08/2026** — the store rail is LIVE since 23/08 |
-  | Messages → Other in-app messages | Yes — optional, linked | No | App functionality | F-44 `request_message` / `approval_note` / `rejection_reason`: free text one caregiver writes, the server stores, the OTHER caregiver reads — inside the app, the e-mail and the push. Since **F-68** also the *Ajuda e contato* message (`send-support-request` → `support_requests.message`, 12-month retention), read by the team |
+  | Financial info → Other financial info | Yes — optional, linked | No | App functionality | **F-34** `expenses` (amount in cents, category, description, date, who paid) + `expense_shares` + `expense_settlements` (payments between caregivers, confirmed by the receiver) + the append-only `expense_history`. Typed by the caregivers; no payment instrument, no money moved; never shown to a viewer |
+| Financial info → Purchase history | Yes — required, linked | No | App functionality | `billing-store-verify` writes `subscriptions.store_purchase_token` and the `billing_events` ledger; the RTDN webhook writes the lifecycle. **Marked 25/08/2026** — the store rail is LIVE since 23/08 |
+  | Messages → Other in-app messages | Yes — optional, linked | No | App functionality | F-44 `request_message` / `approval_note` / `rejection_reason`: free text one caregiver writes, the server stores, the OTHER caregiver reads — inside the app, the e-mail and the push. Since **F-68** also the *Ajuda e contato* message (`send-support-request` → `support_requests.message`, 12-month retention), read by the team. Since **F-35** the family chat: `chat_messages.body` (`send_chat_message`), permanent, read by the whole family (viewers included), its first 140 characters in the `chat_message` push |
   | App info and performance → Other app performance data | Yes — optional, linked | No | App functionality | F-68: only when *Incluir informações técnicas* stays ticked — app version, channel, OS/browser family, language, the route with no query (`support_requests.diagnostics`, the function keeps five keys and drops the rest) |
-  | App activity → Other user-generated content | Yes — optional, linked | No | App functionality | `care_schedules.notes` (the day note), `families.name` and, since **F-67** (21/09/2026), `day_accounts.body` — the *relato do dia*, free text a member appends to a past day, read by the family and printed in the F-33 PDF (same category, same operator, so the Console answer does not change) — Play's own example of this row is *"notes"* |
-  | App activity → App interactions | Yes — required, **linked** (since T-78) | No | Analytics | Two sources, one row — Play asks per data TYPE, so the stricter answer wins. (1) Umami (`analytics_service.dart`): cookieless, no device id, paths sanitized by `sanitizeAnalyticsPath`; dev flavour sends nothing — not linked on its own. (2) **T-78 (23/09/2026)**: `member_activity_days` — one row per member × day (America/Sao_Paulo) × channel (`android`/`web`/`web-installed`) the app was used on, written by `touch_activity`; no hour, no IP, no user agent; service role only (no family member reads it); purged after 400 days and when the account is removed. That row IS linked to the account, so the whole type is. Policy §3/§11 name it |
+  | App activity → Other user-generated content | Yes — optional, linked | No | App functionality | Since **F-55** the agenda: `child_events` (kind, times, `body`, child; the day notes are converted into agenda Notes at S-22) and `child_routines`; before it `care_schedules.notes` (the day note), `families.name` and, since **F-67** (21/09/2026), `day_accounts.body` — the *relato do dia*, free text a member appends to a past day, read by the family and printed in the F-33 PDF (same category, same operator, so the Console answer does not change) — Play's own example of this row is *"notes"* |
+  | App activity → Other actions | Yes — optional, linked | No | App functionality | **F-35** `chat_reads` — who read which chat text and when, shown to the family; `chat_prefs.push_muted`. **F-64** `report_attestations` — that a verifiable PDF was issued: period, a summary of counts with caregivers as INITIALS, the SHA-256 of the file (no document body), public by an unguessable id, purged after `report_attestation.valid_months` |
+| App activity → App interactions | Yes — required, **linked** (since T-78) | No | Analytics | Two sources, one row — Play asks per data TYPE, so the stricter answer wins. (1) Umami (`analytics_service.dart`): cookieless, no device id, paths sanitized by `sanitizeAnalyticsPath`; dev flavour sends nothing — not linked on its own. (2) **T-78 (23/09/2026)**: `member_activity_days` — one row per member × day (America/Sao_Paulo) × channel (`android`/`web`/`web-installed`) the app was used on, written by `touch_activity`; no hour, no IP, no user agent; service role only (no family member reads it); purged after 400 days and when the account is removed. That row IS linked to the account, so the whole type is. Policy §3/§11 name it |
   | App info and performance → Crash logs | Yes — not linked | No | Analytics | T-66 crash sink (Sentry): exception type, scrubbed message, stack, release/environment/channel — no user, no breadcrumbs, no route args (`crash_rules.dart`) |
   | Location → Approximate location | Yes — not linked | No | Analytics | NOT requested from the device: Sentry derives country + city from the IP of the crash report at ingest and KEEPS it after discarding the address (measured, T-66). The policy §7 says so since L-24, so the form has to |
   | Device or other IDs | Yes — optional, linked | No | App functionality | the FCM registration token (`push_subscriptions.token`), written only after the user turns push on (F-09); Play's own example of this row is *"Firebase installation ID"* |
-  | Contacts, photos, files, health, calendar (device), precise location | No | — | — | never requested; the "calendar" is ours, not the device's |
+  | Health and fitness → Health info | Yes — optional, linked | No | App functionality | **F-55** agenda items of kind `health` / `medicine` (`child_events.kind`): the family may record a child's appointment or medicine time, and whatever it types there. Nothing is requested beyond the kind; declared conservatively because the category exists in the product (owner's call at S-22) |
+| Contacts, photos, files, calendar (device), precise location | No | — | — | never requested; the "calendar" is ours, not the device's |
   **"Shared" is No on every row on purpose.** Play's definition of sharing excludes transfers to a
   *service provider* processing on the developer's behalf, and that is what every operator in
   the policy's §7 is (Supabase, Resend, Cloudflare, Google — Fonts, FCM, Play, Gmail —, Umami, Sentry,
@@ -294,9 +298,14 @@ say which one is blocking: sweep the whole list.
     §9-bis).
 - **Content rating questionnaire**: category *Utility/Productivity*; no violence, no user-to-user
   public content (messages are private within a family), no gambling → expected rating L/3+.
+  **Since F-35 (S-22) users DO communicate with each other** — the family chat, private to the
+  family, with no moderation. Re-answer the questionnaire's user-interaction question **Yes**
+  (private messaging between known users) in the same sitting as the Data safety table.
 - **Target audience**: 18+ (parents/guardians). The app is **not** child-directed — the child is
-  the *subject* of the calendar; no child accounts exist and no child data is collected (the only
-  child-related datum is the day assignment itself).
+  the *subject* of the calendar; no child accounts exist. Since **F-55** the family records the
+  child's **first name** and an agenda about the child (including Saúde/Remédio items) — data
+  ABOUT a child typed by the parents, declared above, never an account or an interface for a
+  child.
 - **Ads**: No ads.
 
 ## 5 · Closed test → production
