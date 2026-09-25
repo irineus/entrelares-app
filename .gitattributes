@@ -1,2 +1,11 @@
 # Shell scripts must stay LF — cloud sessions run them on Linux.
 *.sh text eol=lf
+
+# Fulcrum 01.11 (25/09/2026): EVERY text file is LF in the working tree too,
+# on every OS. The index was already LF; with core.autocrlf=true a Windows
+# checkout wrote CRLF to disk (659 files measured), so a tool reading the disk
+# saw a different file from CI (Linux). No symptom was measured here — the
+# Dart toolchain and every test pass either way — so this is preventive, the
+# same defect the Fulcrum repo fixed in card 01.9. Binaries are detected by
+# text=auto and left alone.
+* text=auto eol=lf
