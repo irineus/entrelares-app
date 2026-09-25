@@ -178,9 +178,10 @@ void main() {
       // WebAssembly and blob workers: the engine does not run without them.
       expect(csp, contains("'wasm-unsafe-eval'"));
       expect(csp, contains('worker-src'));
-      // What the app talks to — Supabase (REST + Realtime) and the collector.
-      expect(csp, contains('https://*.supabase.co'));
-      expect(csp, contains('wss://*.supabase.co'));
+      // What the app talks to — the Fulcrum gateway (REST, Auth, Functions,
+      // Realtime; Fulcrum 03.4) and the collector.
+      expect(csp, contains('https://api.entrelares.app'));
+      expect(csp, contains('wss://api.entrelares.app'));
       expect(csp, contains('https://cloud.umami.is'));
       expect(csp, contains("frame-ancestors 'none'"));
 
@@ -208,21 +209,35 @@ void main() {
     // projects; the moment prod answers on `auth.entrelares.app` (T-61, so the
     // Google consent screen names Entrelares instead of the project ref) that
     // wildcard stops covering it, and this test is what turns that into a red
-    // gate instead of a silent outage. Asserted against `Env.prod` because
-    // that is the build `deploy-web` publishes.
-    test('connect-src covers the Supabase host the prod build names', () {
-      final host = Uri.parse(Env.prod.supabaseUrl).host;
+    // gate instead of a silent outage. Fulcrum 03.4 moved the host for real
+    // (`api.entrelares.app`), and since the QA build `qa-web` publishes ships
+    // this SAME file, BOTH flavours are asserted — `deploy-web` publishes prod.
+    test('connect-src covers the API host each flavour names', () {
       final sources = _sources(_csp(headers)!, 'connect-src');
 
-      for (final scheme in const ['https', 'wss']) {
-        expect(
-          sources.any((s) => _covers(s, scheme, host)),
-          isTrue,
-          reason: 'the CSP must allow $scheme://$host — `Env.prod.supabaseUrl` '
-              'names it, so a build that cannot reach it is a dead app. '
-              'Move the host and `_headers` moves with it.',
-        );
+      for (final env in const [Env.prod, Env.dev]) {
+        final host = Uri.parse(env.supabaseUrl).host;
+        for (final scheme in const ['https', 'wss']) {
+          expect(
+            sources.any((s) => _covers(s, scheme, host)),
+            isTrue,
+            reason: 'the CSP must allow $scheme://$host — `${env.name}` '
+                'names it, so a build that cannot reach it is a dead app. '
+                'Move the host and `_headers` moves with it.',
+          );
+        }
       }
+    });
+
+    // Fulcrum 03.4 — the other half: with the app behind the gateway nothing
+    // of it may reach a Supabase project directly, and the browser is the one
+    // place that can refuse it at runtime. A `*.supabase.co` left in
+    // connect-src would let a stray project URL work on the web while the
+    // gateway was meant to be the only door.
+    test('connect-src admits no Supabase project host', () {
+      final sources = _sources(_csp(headers)!, 'connect-src');
+      expect(sources.where((s) => s.contains('supabase.co')), isEmpty,
+          reason: 'the web app talks to the Fulcrum gateway only');
     });
 
     // T-66 — the same mirror, for the crash sink. It is worth its own test for

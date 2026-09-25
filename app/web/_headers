@@ -49,6 +49,15 @@
 #     REPLACES the `child-src` fallback for frames (the PDF print iframe is a
 #     blob). The script only loads on a page that shows the button — the app
 #     initializes the plugin lazily. `web_channel_test` pins each path.
+#   * Fulcrum 03.4 — the API is the Fulcrum GATEWAY, not Supabase. Both
+#     flavours name their gateway host (`api.entrelares.app` for the build
+#     `deploy-web` publishes, `api-dev.entrelares.app` for the QA build that
+#     ships this same file), each over https and wss (REST, Auth, Functions,
+#     Realtime all ride the same host). `*.supabase.co` LEFT this list on
+#     purpose: no request of the app goes there any more, and a CSP that still
+#     admitted it would let a stray project URL work in the browser while the
+#     gateway was meant to be the only door. `web_channel_test` pins both
+#     halves — each flavour's host covered, and no supabase.co at all.
 #   * L-29 — `X-Robots-Tag: noindex`, on EVERY path. `_redirects` answers 200
 #     with the same `index.html` for any address, so to a crawler this host is
 #     an endless set of identical pages titled "Entrelares" with no text (the
@@ -67,7 +76,7 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'self' blob: https://accounts.google.com/gsi/; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cloud.umami.is https://fonts.gstatic.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://o4511910022217728.ingest.us.sentry.io https://accounts.google.com/gsi/; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'self' blob: https://accounts.google.com/gsi/; connect-src 'self' https://api.entrelares.app wss://api.entrelares.app https://api-dev.entrelares.app wss://api-dev.entrelares.app https://cloud.umami.is https://fonts.gstatic.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://o4511910022217728.ingest.us.sentry.io https://accounts.google.com/gsi/; frame-ancestors 'none'
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Cache control

@@ -15,6 +15,7 @@ class Env {
     required this.isProduction,
     required this.supabaseUrl,
     required this.supabaseKey,
+    required this.sessionStorageKey,
     this.umamiWebsiteId = '',
     required this.analyticsHostname,
     required this.webHostname,
@@ -27,8 +28,28 @@ class Env {
 
   final String name;
   final bool isProduction;
+
+  /// Fulcrum 03.4 — the host the Supabase client talks to is the Fulcrum
+  /// GATEWAY (`api.entrelares.app`, `api-dev.entrelares.app` on dev), never
+  /// the project's own `*.supabase.co`: switching the backend behind it is then
+  /// a gateway variable, not an app release. REST, Auth, Functions, Storage
+  /// and Realtime all ride this one host, path for path (Fulcrum contract
+  /// §1.1). `gateway_url_test` fails the build if prod names supabase.co.
   final String supabaseUrl;
+
+  /// The gateway's `TENANT_PUBLIC_KEY` for this flavour — public by design,
+  /// generated rather than borrowed from any Supabase key, and one per ENV so
+  /// a dev build cannot open the production gateway. The gateway swaps it for
+  /// the project's publishable key on the way in; the app never holds that one.
   final String supabaseKey;
+
+  /// Where the signed-in session is saved on the device. supabase_flutter
+  /// derives it from the URL's first label (`sb-<label>-auth-token`), so the
+  /// move to `api.…` would have renamed it to `sb-api-auth-token` and signed
+  /// EVERY family out on the update — the session they already have lives
+  /// under the project ref. It is pinned to that old name, per flavour, and
+  /// passed to `Supabase.initialize` explicitly (`gateway_url_test` holds it).
+  final String sessionStorageKey;
 
   /// T-37: the Umami website id is PUBLIC (it identifies a site, not a person)
   /// but environment-specific. **Empty on dev on purpose** — the service turns
@@ -117,14 +138,17 @@ class Env {
   /// and says nothing about why.
   final String googleWebClientId;
 
-  /// Dev/QA — the spike's original target. Still runs the legacy anon JWT
-  /// until S-17 (app repo) retires it.
+  /// Dev/QA — the spike's original target, behind the gateway's dev deploy
+  /// (`entrelares-dev`, project `buroanotfjcgvbfmacuh`). The legacy anon JWT
+  /// it used to carry left the app with Fulcrum 03.4: the gateway holds the
+  /// project's key now.
   static const dev = Env._(
     name: 'Dev/QA',
     isProduction: false,
-    supabaseUrl: 'https://buroanotfjcgvbfmacuh.supabase.co',
+    supabaseUrl: 'https://api-dev.entrelares.app',
     supabaseKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1cm9hbm90ZmpjZ3ZiZm1hY3VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMTIwNDcsImV4cCI6MjA5NjU4ODA0N30.hRU5jhn1pJQeUVpvnAp4IGBJ5Is_pCwlIfR5hdK9Mi0',
+        '6a6abea8f2bb37df2412172620f5d9ab2742e7715c2efd8d42f10e59fc32772a',
+    sessionStorageKey: 'sb-buroanotfjcgvbfmacuh-auth-token',
     // No website id: analytics is OFF on dev, by decision.
     analyticsHostname: 'dev.app.entrelares.app',
     // Synthetic, like its sibling above — see the field's doc.
@@ -159,13 +183,16 @@ class Env {
         '51960618124-vfauicf9qbt4hhvv3ct49abiivllq3p7.apps.googleusercontent.com',
   );
 
-  /// Production — the exact public values `web.entrelares.app` serves every
-  /// browser in `appsettings.json` (S-16 publishable key).
+  /// Production — behind the gateway's `entrelares` deploy (project
+  /// `jptqbwfziyzlhlmoekzu`). The S-16 publishable key is the gateway's to
+  /// hold since Fulcrum 03.4; the app ships only the tenant key.
   static const prod = Env._(
     name: 'Produção',
     isProduction: true,
-    supabaseUrl: 'https://jptqbwfziyzlhlmoekzu.supabase.co',
-    supabaseKey: 'sb_publishable_uKr0ES-10F3gpcd0j0osYw_HxqP_RMZ',
+    supabaseUrl: 'https://api.entrelares.app',
+    supabaseKey:
+        '6cc0c37647edce18502b231522b60f861e753a92da1929df6386c7b7a444127e',
+    sessionStorageKey: 'sb-jptqbwfziyzlhlmoekzu-auth-token',
     // T-37: the PRODUCT's Umami site — the same one the web app reports to, so
     // the two clients share a dashboard and the `channel` prop separates them.
     umamiWebsiteId: '6fdd6c5a-4bce-449f-8188-3b7399a859d8',
@@ -216,7 +243,7 @@ class Env {
   /// Mirrors `pubspec.yaml`'s `version:` — the web's `AppVersion.Display`.
   /// Only the F-17 export reads it, and a stale value there would misdate an
   /// LGPD record, so `env_version_test.dart` fails the build if the two drift.
-  static const String appVersion = '2.8.24+156';
+  static const String appVersion = '2.8.25+157';
 }
 
 /// T-62 — the PUBLIC Firebase Web config of one environment, plus its VAPID

@@ -81,7 +81,16 @@ class E2eFamily {
     required this._userIds,
   });
 
-  static String get _url => Env.dev.supabaseUrl;
+  /// Fulcrum 03.4 — the fixture has TWO doors, on purpose. What a signed-in
+  /// person does (password grant, `_rpcAs`) goes through the dev GATEWAY with
+  /// the app's own tenant key, like the app. What the SERVICE ROLE does
+  /// (admin create/delete, seeding, the purge) goes straight to the dev
+  /// project: the gateway accepts only its tenant key as `apikey` and answers
+  /// 401 to anything else (contract §3.3), and a privileged key has no reason
+  /// to cross it. Test code only — `lib/` names no project host
+  /// (`gateway_url_test`).
+  static const _adminUrl = 'https://buroanotfjcgvbfmacuh.supabase.co';
+  static String get _gatewayUrl => Env.dev.supabaseUrl;
 
   static Map<String, String> get _headers => {
         'apikey': _serviceRoleKey,
@@ -126,7 +135,7 @@ class E2eFamily {
       {bool idempotent = false}) async {
     final res = await _bounded(
         'POST $path',
-        () => http.post(Uri.parse('$_url$path'),
+        () => http.post(Uri.parse('$_adminUrl$path'),
             headers: _headers, body: jsonEncode(body)),
         idempotent: idempotent);
     if (res.statusCode >= 300) {
@@ -138,7 +147,7 @@ class E2eFamily {
 
   static Future<List<dynamic>> _get(String path) async {
     final res = await _bounded(
-        'GET $path', () => http.get(Uri.parse('$_url$path'), headers: _headers),
+        'GET $path', () => http.get(Uri.parse('$_adminUrl$path'), headers: _headers),
         idempotent: true);
     if (res.statusCode >= 300) {
       throw StateError('GET $path → ${res.statusCode}: ${res.body}');
@@ -165,7 +174,7 @@ class E2eFamily {
     try {
       await _bounded(
           'DELETE admin user',
-          () => http.delete(Uri.parse('$_url/auth/v1/admin/users/$userId'),
+          () => http.delete(Uri.parse('$_adminUrl/auth/v1/admin/users/$userId'),
               headers: _headers),
           idempotent: true);
     } catch (_) {/* best effort */}
@@ -179,7 +188,7 @@ class E2eFamily {
       final res = await _bounded(
           'POST /auth/v1/token',
           () => http.post(
-                Uri.parse('$_url/auth/v1/token?grant_type=password'),
+                Uri.parse('$_gatewayUrl/auth/v1/token?grant_type=password'),
                 headers: {
                   'apikey': Env.dev.supabaseKey,
                   'Content-Type': 'application/json',
@@ -204,7 +213,7 @@ class E2eFamily {
     final res = await _bounded(
         'RPC $name',
         () => http.post(
-              Uri.parse('$_url/rest/v1/rpc/$name'),
+              Uri.parse('$_gatewayUrl/rest/v1/rpc/$name'),
               headers: {
                 'apikey': Env.dev.supabaseKey,
                 'Authorization': 'Bearer $accessToken',
@@ -317,7 +326,7 @@ class E2eFamily {
       await _bounded(
           'PATCH profiles (onboarded)',
           () => http.patch(
-                Uri.parse('$_url/rest/v1/profiles?id=eq.$id'),
+                Uri.parse('$_adminUrl/rest/v1/profiles?id=eq.$id'),
                 headers: _headers,
                 body: jsonEncode({
                   'onboarding_tour_seen_at': seenAt,
@@ -407,7 +416,7 @@ class E2eFamily {
     await _bounded(
         'PATCH families (plan)',
         () => http.patch(
-              Uri.parse('$_url/rest/v1/families?id=eq.$familyId'),
+              Uri.parse('$_adminUrl/rest/v1/families?id=eq.$familyId'),
               headers: {..._headers, 'Content-Type': 'application/json'},
               body: jsonEncode({'plan': plan}),
             ),
