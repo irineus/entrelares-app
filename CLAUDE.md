@@ -262,7 +262,9 @@ cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm 
 # MAIS deep_link_test — o único web por construção (T-64: uma entrada fria numa
 # URL interna só se comporta mal onde o navegador entrega o endereço ao app).
 # Exige chromedriver no PATH (`chromedriver --port=4444 &` antes).
-cd app && fvm flutter drive --driver=test_driver/integration_test.dart   --target=integration_test/swap_workflow_test.dart -d web-server --browser-name=chrome --headless   --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev>
+cd app && fvm flutter drive --driver=test_driver/integration_test.dart   --target=integration_test/swap_workflow_test.dart -d web-server --browser-name=chrome --headless --web-port=8080   --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev>
+# Fulcrum 03.4: o app fala com api-dev.entrelares.app, cujo CORS só admite loopback na
+# porta 8080 — sem o --web-port todo preflight leva 403 e a suíte nem entra.
 # T-58 (12/09/2026): esse gate tem de PROVAR que rodou. Na web o `flutter drive`
 # imprime "All tests passed." e sai 0 também com ZERO testes (um setUpAll que
 # estoura — foi assim por cinco dias, e reproduz-se aqui rodando sem a chave), então

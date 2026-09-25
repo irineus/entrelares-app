@@ -125,17 +125,25 @@ Future<void> main() async {
     usePathUrlStrategy();
     _urlStrategyApplied = true;
   }
-  // publishableKey is just the `apikey` header value — it accepts the legacy
-  // anon JWT dev still uses (until S-17) as well as the new sb_publishable_…
-  // key prod already has, so the S-16 shape ports for free (stage 0).
+  // publishableKey is just the `apikey` header value (and the pre-login
+  // `Bearer`) — since Fulcrum 03.4 it carries the gateway's tenant key, which
+  // the gateway swaps for the project's own key on the way in.
   // Incoming App Links with auth tokens (recovery) are consumed here too:
   // supabase_flutter parses them and emits `passwordRecovery`.
   // T-18: every exchange with Supabase reports to [appConnectivity] — the one
   // place the app learns whether it can reach the server at all.
+  // Fulcrum 03.4: the URL is the gateway and the key its tenant key. The
+  // session's storage name is passed EXPLICITLY — left to the default it would
+  // follow the new host and sign every family out on the update (see
+  // `Env.sessionStorageKey`).
   await Supabase.initialize(
     url: Env.current.supabaseUrl,
     publishableKey: Env.current.supabaseKey,
     httpClient: ConnectivityHttpClient(appConnectivity),
+    authOptions: FlutterAuthClientOptions(
+      localStorage: SharedPreferencesLocalStorage(
+          persistSessionKey: Env.current.sessionStorageKey),
+    ),
   );
   // U-13: the language is resolved BEFORE the first frame — override beats
   // profile beats device, PT-BR fallback. The profile half is null here (no
