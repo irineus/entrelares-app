@@ -18,26 +18,22 @@ import '../widgets/ui/ui.dart';
 /// The register screen's two branches, minus what the OAuth session already
 /// settled: the e-mail belongs to the provider account and there is no
 /// password. The branch is decided the same way — by an invitation — except
-/// the token arrives through [SharedPreferences] instead of the URL: it was
-/// stashed by the register screen right before the OAuth redirect, because a
-/// browser round-trip keeps no widget state.
+/// the token arrives from `main.dart` in memory ([initialInviteToken]) instead
+/// of the URL: the native Google door (F-71) never leaves the app, so there is
+/// nothing to survive and no prefs stash.
 ///
 /// S-13 moved here for this path: the consent the register form collects at
 /// sign-up is collected on this screen instead, and the server stamps it only
 /// after validating the policy version (S-15 posture) — so the deferred
 /// account cannot slip past the declaration the form path signs.
 class OauthOnboardingScreen extends StatefulWidget {
-  /// Where the register screen parks the invite token across the OAuth
-  /// redirect, and the only reader of it.
-  static const String pendingInviteTokenKey = 'pending_invite_token';
-
   final CustodyDataSource dataSource;
   final AnalyticsService? analytics;
   final SharedPreferences prefs;
 
-  /// F-71 — the invitation a NATIVE Google sign-in started from. That door
-  /// never leaves the app, so the token arrives in memory; only the redirect
-  /// (still production's until F-71 PR 2) parks it in [prefs].
+  /// F-71 — the invitation the Google sign-in started from. The native door
+  /// never leaves the app, so the token arrives in MEMORY — there is no prefs
+  /// stash any more (the redirect that needed one is gone).
   final String? initialInviteToken;
 
   /// "Entrar com outra conta" — this session is confined here, so signing out
@@ -97,8 +93,7 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
     super.initState();
     _sessionEmail = widget.dataSource.sessionEmail();
     _fullName.text = widget.dataSource.sessionDisplayName() ?? '';
-    final token = widget.initialInviteToken ??
-        widget.prefs.getString(OauthOnboardingScreen.pendingInviteTokenKey);
+    final token = widget.initialInviteToken;
     if (token != null && token.trim().isNotEmpty) {
       _inviteToken = token.trim();
       _loadingInvite = true;
@@ -135,12 +130,16 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
     });
   }
 
+  /// The stash the redirect door left in prefs (F-57). Nothing writes it since
+  /// F-71 and nothing reads it; a build that stashed a token before updating
+  /// gets it dropped on the first completion, so no dead invitation lingers.
+  static const String _legacyStashKey = 'pending_invite_token';
+
   Future<void> _clearPendingToken() async {
     try {
-      await widget.prefs
-          .remove(OauthOnboardingScreen.pendingInviteTokenKey);
+      await widget.prefs.remove(_legacyStashKey);
     } catch (_) {
-      // Best-effort: a stale token resolves to the invalid state next boot.
+      // Best-effort: nothing reads the key any more.
     }
   }
 

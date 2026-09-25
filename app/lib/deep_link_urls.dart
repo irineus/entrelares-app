@@ -30,26 +30,6 @@ abstract final class DeepLinkUrls {
   /// often on another device.
   static String get login => '$webOrigin/login';
 
-  /// F-57 — where GoTrue sends the OAuth redirect back on ANDROID. A custom
-  /// scheme, not an App Link, and per FLAVOR on purpose:
-  ///
-  /// * custom scheme, because the OAuth round-trip happens inside a browser
-  ///   custom tab, and an `https` App Link on a server-side redirect is the
-  ///   handoff Android is historically flaky about — when it fails, the tab
-  ///   consumes the PKCE code against a verifier only the APP holds and the
-  ///   user strands on the web login. A scheme intent filter has no
-  ///   verification step to lose.
-  /// * per flavor (the scheme IS the `applicationId`), because both flavors
-  ///   coexist on the owner's device — one shared scheme would open a chooser
-  ///   and could hand dev's code to prod. The manifest registers it via the
-  ///   `${applicationId}` placeholder, so the two cannot drift.
-  ///
-  /// Each Supabase project's Redirect URLs allowlist must carry ITS flavor's
-  /// value (runbook §9-ter). On web this is unused: the page redirects to its
-  /// own origin.
-  static String get oauthCallback =>
-      '${Env.current.androidPackage}://login-callback';
-
   /// The LANDING's origin. Legal pages live there, and that is not a detail of
   /// taste: `webOrigin` is the address changing hands in the cutover, and this
   /// app has no `/privacy` route of its own (lote 4: one copy of the legal

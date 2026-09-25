@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart'
     show GoogleSignInException;
 
-import '../env.dart';
 import '../services/google_identity.dart';
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
@@ -32,11 +31,10 @@ import 'google_web_button.dart';
 /// Google's published guideline for this button, and it is the surface a
 /// person meets one screen before handing over their identity.
 ///
-/// **F-71 — on the web with the native flow, the button is Google's.** GIS
-/// hands an ID token only to its own `renderButton`, so there the widget below
-/// is replaced by it and [onIdToken] receives each token the button produces.
-/// Everywhere else (Android, and every build still on the redirect) it is the
-/// U-45 button calling [onPressed].
+/// **F-71 — on the web the button is Google's.** GIS hands an ID token only to
+/// its own `renderButton`, so there the widget below is replaced by it and
+/// [onIdToken] receives each token the button produces. On Android it is the
+/// U-45 button calling [onPressed], which asks Credential Manager.
 class GoogleSignInButton extends StatefulWidget {
   final Future<bool> enabled;
   final Future<void> Function() onPressed;
@@ -58,10 +56,8 @@ class GoogleSignInButton extends StatefulWidget {
 class _GoogleSignInButtonState extends State<GoogleSignInButton> {
   StreamSubscription<String>? _tokens;
 
-  /// The web's GIS button replaces ours only when the environment is on the
-  /// native flow AND the caller can take a token.
-  bool get _gis =>
-      kIsWeb && Env.current.nativeGoogleSignIn && widget.onIdToken != null;
+  /// The web's GIS button replaces ours whenever the caller can take a token.
+  bool get _gis => kIsWeb && widget.onIdToken != null;
 
   @override
   void initState() {

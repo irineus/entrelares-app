@@ -299,13 +299,15 @@ void main() {
     );
     const token = '11111111-2222-3333-4444-555555555555';
 
-    testWidgets('claims through the stashed token', (tester) async {
+    testWidgets('claims through the token handed over in memory',
+        (tester) async {
       var completed = false;
       final ds = FakeCustodyDataSource(members: const [], days: const [])
         ..inviteInfo = invite;
-      final prefs = await prefsWith(
-          {OauthOnboardingScreen.pendingInviteTokenKey: token});
+      // A build from before F-71 may have left the redirect's stash behind.
+      final prefs = await prefsWith({'pending_invite_token': 'stale'});
       await pumpOnboarding(tester, ds, prefs,
+          initialInviteToken: token,
           onCompleted: () async => completed = true);
 
       expect(find.text(pt[K.registerInvitedTitle]), findsOneWidget);
@@ -324,9 +326,8 @@ void main() {
       expect(ds.claims.single['token'], token);
       expect(ds.claims.single['confirmMigration'], false);
       expect(completed, isTrue);
-      // Used up: the stash must not survive the claim.
-      expect(prefs.getString(OauthOnboardingScreen.pendingInviteTokenKey),
-          isNull);
+      // The legacy stash is dropped on completion — nothing reads it.
+      expect(prefs.getString('pending_invite_token'), isNull);
     });
 
     testWidgets('F-71: the native door claims from MEMORY, no stash',
@@ -347,8 +348,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(ds.claims.single['token'], token);
-      expect(prefs.getString(OauthOnboardingScreen.pendingInviteTokenKey),
-          isNull,
+      expect(prefs.getString('pending_invite_token'), isNull,
           reason: 'the native door writes no stash at any point');
     });
 
@@ -357,9 +357,8 @@ void main() {
       final ds = FakeCustodyDataSource(members: const [], days: const [])
         ..inviteInfo = invite
         ..claimResult = const InviteeNeedsMigration('Família Antiga');
-      final prefs = await prefsWith(
-          {OauthOnboardingScreen.pendingInviteTokenKey: token});
-      await pumpOnboarding(tester, ds, prefs);
+      final prefs = await prefsWith(const {});
+      await pumpOnboarding(tester, ds, prefs, initialInviteToken: token);
 
       await tester.enterText(
           find.widgetWithText(TextField, pt[K.registerFullName]), 'Ana');
@@ -384,9 +383,8 @@ void main() {
         (tester) async {
       final ds = FakeCustodyDataSource(members: const [], days: const []);
       // No inviteInfo → every token resolves invalid.
-      final prefs = await prefsWith(
-          {OauthOnboardingScreen.pendingInviteTokenKey: token});
-      await pumpOnboarding(tester, ds, prefs);
+      final prefs = await prefsWith(const {});
+      await pumpOnboarding(tester, ds, prefs, initialInviteToken: token);
 
       expect(find.text(pt[KApp.onbFounderTitle]), findsOneWidget);
       expect(find.text(pt[K.registerInviteInvalidBody]), findsOneWidget);

@@ -62,34 +62,15 @@
                       android:host="web.entrelares.app"
                       android:path="/register"/>
             </intent-filter>
-            <!-- F-57: the OAuth redirect's way back. A custom scheme, per
-                 FLAVOR — the scheme IS the applicationId, via the built-in
-                 placeholder, so a device carrying both flavors never opens a
-                 chooser (and never hands dev's PKCE code to prod). An https
-                 App Link would depend on the custom tab's redirect handoff,
-                 which is the flaky half of Android deep linking; a scheme
-                 filter has no verification step to lose. The matching
-                 DeepLinkUrls.oauthCallback builds the same value from
-                 Env.androidPackage, and each Supabase project's Redirect URLs
-                 allowlist carries its flavor's (runbook §9-ter). -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="${applicationId}"
-                      android:host="login-callback"/>
-            </intent-filter>
             <!-- T-65: the way ACROSS from the web channel. A reader on
                  web.entrelares.app in Chrome who also has this app had no way
                  back into it; the banner there links to
                  `${applicationId}://open/<location>` and this filter is what
                  answers.
 
-                 A SEPARATE filter from the F-57 one above, though the scheme is
-                 the same and Android would match either way: the two hosts
-                 answer to different callers (GoTrue's redirect, our own page)
-                 and reading one comment must never require untangling the
-                 other.
+                 F-57's `login-callback` host (GoTrue's OAuth redirect) used the
+                 same scheme; F-71 retired the redirect and its filter, so this
+                 host is the scheme's only one.
 
                  It is deliberately NOT an https App Link. Covering `/` would
                  end the web channel — every visit to the site would open the

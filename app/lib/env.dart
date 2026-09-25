@@ -23,7 +23,6 @@ class Env {
     this.webPush = WebPushConfig.none,
     this.sentryDsn = '',
     required this.googleWebClientId,
-    required this.nativeGoogleSignIn,
   });
 
   final String name;
@@ -118,15 +117,6 @@ class Env {
   /// and says nothing about why.
   final String googleWebClientId;
 
-  /// F-71 — whether the Google door exchanges an ID token obtained on the
-  /// device (`signInWithIdToken`) instead of the browser redirect
-  /// (`signInWithOAuth`). The redirect's `GET /auth/v1/authorize` is answered
-  /// **410** behind the Fulcrum gateway, so the app cannot move there with it.
-  /// Rolled out per flavour on purpose (owner, 24/09/2026): dev first — the
-  /// PR's APK and `qa.entrelares.app` — and production in a one-line PR once
-  /// dev has been exercised; PR 3 then removes the redirect altogether.
-  final bool nativeGoogleSignIn;
-
   /// Dev/QA — the spike's original target. Still runs the legacy anon JWT
   /// until S-17 (app repo) retires it.
   static const dev = Env._(
@@ -167,7 +157,6 @@ class Env {
     // so a per-PR preview never renders the GIS button.
     googleWebClientId:
         '51960618124-vfauicf9qbt4hhvv3ct49abiivllq3p7.apps.googleusercontent.com',
-    nativeGoogleSignIn: true,
   );
 
   /// Production — the exact public values `web.entrelares.app` serves every
@@ -207,9 +196,6 @@ class Env {
     // `web.entrelares.app`.
     googleWebClientId:
         '575356979434-8fnls1hls3kb9nj1afcvf1cdu4m9hrhi.apps.googleusercontent.com',
-    // F-71 PR 2: production joins the native door — the redirect cannot
-    // survive the move behind the Fulcrum gateway (410 on /authorize).
-    nativeGoogleSignIn: true,
   );
 
   /// How the WEB build says "production". `flutter build web` accepts no
@@ -230,7 +216,7 @@ class Env {
   /// Mirrors `pubspec.yaml`'s `version:` — the web's `AppVersion.Display`.
   /// Only the F-17 export reads it, and a stale value there would misdate an
   /// LGPD record, so `env_version_test.dart` fails the build if the two drift.
-  static const String appVersion = '2.8.23+155';
+  static const String appVersion = '2.8.24+156';
 }
 
 /// T-62 — the PUBLIC Firebase Web config of one environment, plus its VAPID
