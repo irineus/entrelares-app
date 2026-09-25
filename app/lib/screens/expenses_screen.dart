@@ -1088,6 +1088,9 @@ class _ExpenseEditorSheetState extends State<ExpenseEditorSheet> {
         ),
         const SizedBox(height: Spacing.sm),
         DropdownButtonFormField<ExpenseCategory>(
+          // A name or label never pushes the field past the screen
+          // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
+          isExpanded: true,
           key: const ValueKey('expense-category'),
           initialValue: _category,
           decoration: InputDecoration(labelText: l[KApp.expenseCategory]),
@@ -1114,6 +1117,9 @@ class _ExpenseEditorSheetState extends State<ExpenseEditorSheet> {
         ),
         const SizedBox(height: Spacing.sm),
         DropdownButtonFormField<int>(
+          // A name or label never pushes the field past the screen
+          // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
+          isExpanded: true,
           key: const ValueKey('expense-paid-by'),
           initialValue: widget.eligible.any((m) => m.id == _paidBy)
               ? _paidBy
@@ -1121,7 +1127,10 @@ class _ExpenseEditorSheetState extends State<ExpenseEditorSheet> {
           decoration: InputDecoration(labelText: l[KApp.expensePaidBy]),
           items: [
             for (final m in widget.eligible)
-              DropdownMenuItem(value: m.id, child: Text(m.fullName)),
+              DropdownMenuItem(
+                  value: m.id,
+                  child: Text(m.fullName,
+                      maxLines: 1, overflow: TextOverflow.ellipsis)),
           ],
           onChanged: (id) => setState(() => _paidBy = id ?? _paidBy),
         ),
