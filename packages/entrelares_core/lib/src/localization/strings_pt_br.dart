@@ -811,6 +811,8 @@ abstract final class StringsPtBr {
     K.notifRenderTitleSettlementRejected: 'Acerto não confirmado',
     K.notifRenderSettlementConfirmed: '{0} confirmou que recebeu {1} ({2}).',
     K.notifRenderSettlementRejected: '{0} não confirmou que recebeu {1} ({2}).',
+    K.notifRenderTitleSettlementReminder: 'Lembrete de acerto',
+    K.notifRenderSettlementReminder: '{0} lembrou do acerto pendente entre vocês. Veja o saldo em Despesas.',
     K.notifRenderExpenseCategorySchool: 'Escola',
     K.notifRenderExpenseCategoryHealth: 'Saúde',
     K.notifRenderExpenseCategoryClothes: 'Roupas',

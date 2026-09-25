@@ -154,6 +154,7 @@ abstract final class AnalyticsCatalog {
     'expense_changed',
     'settlement_requested',
     'settlement_answered',
+    'settlement_reminder',
     'chat_message',
     'auto_reminder',
     'auto_approved',

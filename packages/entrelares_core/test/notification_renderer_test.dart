@@ -441,6 +441,9 @@ void main() {
     ('settlement_answered',
         '{"kind":"rejected","date":"2026-09-24","amount":"5000","name":"Ana"}',
         'Ana não confirmou que recebeu R\$ 50,00 (24/09/2026).'),
+    // remind_settlement(), word for word — no amount, on purpose.
+    ('settlement_reminder', '{"date":"2026-09-25","name":"Ana"}',
+        'Ana lembrou do acerto pendente entre vocês. Veja o saldo em Despesas.'),
   ];
 
   group('PT-BR renders EXACTLY what the writer stored', () {
@@ -506,6 +509,7 @@ void main() {
           '{"kind":"updated","date":"2026-09-24","amount":"123456","category":"health","name":"Ana","msg":"x"}'),
       ('settlement_answered',
           '{"kind":"confirmed","date":"2026-09-24","amount":"5000","name":"Ana"}'),
+      ('settlement_reminder', '{"date":"2026-09-25","name":"Ana"}'),
     ];
     for (final (type, json) in enTable) {
       test('$type $json', () {

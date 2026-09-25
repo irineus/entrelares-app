@@ -1355,6 +1355,24 @@ class FakeCustodyDataSource implements CustodyDataSource {
     return id;
   }
 
+  Object? throwOnRemind;
+
+  @override
+  Future<void> remindSettlement({int? childId, required int toProfileId}) async {
+    if (throwOnRemind != null) throw throwOnRemind!;
+    expenseWrites.add('remind:$toProfileId');
+  }
+
+  /// The expense channel's listener, so a test can deliver a change.
+  void Function()? expenseListener;
+
+  @override
+  Future<void Function()> watchExpenseChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus}) async {
+    expenseListener = onChange;
+    return () => expenseListener = null;
+  }
+
   ExpenseSettlement _withStatus(ExpenseSettlement s, String status) =>
       ExpenseSettlement(
           id: s.id,
