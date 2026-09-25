@@ -17,15 +17,15 @@ name: Keep-alive do projeto DEV
 # (`gh workflow disable keepalive-dev.yml -R irineus/entrelares-app`); dois pings
 # no mesmo projeto não fazem mal, só ruído.
 #
-# NÃO altera comportamento do app — é infraestrutura/ops (como backup.yml),
-# então não exige bump de versão.
+# NÃO altera comportamento do app — é infraestrutura/ops, então não exige bump
+# de versão.
 
 on:
   schedule:
     # Segundas e quintas às 08:37 UTC. Gap máximo entre pings ~4 dias, folga
     # confortável sobre o limite de 7 dias do auto-pause. Minuto :37 (fora do
     # topo da hora) porque no repo privado/Free o GitHub descarta crons em :00
-    # (mesma razão do backup semanal em `37 4`).
+    # (o backup semanal, aposentado em 24/09/2026, perdeu assim o 1º run agendado).
     - cron: '37 8 * * 1,4'
   workflow_dispatch:
 

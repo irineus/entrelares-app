@@ -139,14 +139,16 @@ Move-Item snapshot_YYYY-MM.sql database\snapshots\
 > the `*.dump.sql` name is already gitignored. Verify the committed snapshot has
 > no `COPY`/`INSERT` lines before pushing.
 
-> **Full backup & disaster-recovery reference (T-19):** the cadence, the
-> encryption/retention rules for PII dumps (row data **and** `auth.users`), and
-> the step-by-step **restore procedure** live in the README's
-> [Backup & Recovery](../README.md#backup--recovery) section. An optional
-> ready-to-enable weekly encrypted backup workflow sits at
-> [`.github/workflows/backup.yml`](../.github/workflows/backup.yml) (disabled by
-> default). The Free plan has no PITR — upgrading to Pro is the recommended
-> durability step before public availability.
+> **Backup & disaster recovery is Fulcrum's since 24/09/2026.** The PRODUCTION
+> database is dumped **every day** by [`irineus/fulcrum`](https://github.com/irineus/fulcrum)
+> (`.github/workflows/pg_dump_r2.yml`, 05:17 UTC, card 04.2): roles + schema +
+> data, the `auth` DDL included, GPG AES-256 before it leaves the runner, into
+> `r2://fulcrum-backups/entrelares/`, which expires objects after **30 days**. A
+> **monthly** restore check (`restore_check.yml`, card 04.4) restores a copy into
+> a throwaway database; the restore procedure is
+> [`backup/README.md`](https://github.com/irineus/fulcrum/blob/main/backup/README.md)
+> there. This repo's weekly dump (`backup.yml`, T-19 — row data + `auth` data
+> only, no schema) was retired the same week. The Free plan has no PITR.
 
 ---
 
@@ -798,13 +800,10 @@ besides the sections above. Consolidated July 2026 (desktop-session handoff):
    `purge-deleted-daily` come with the migrations since Fulcrum 04.2.1 — what
    the project needs is pg_cron + pg_net and the Vault secrets
    (`functions_base_url`, `secret_key`) BEFORE the `db push`.
-8. **Backup (T-19) goes live only on `master`**: create the private R2 bucket
-   `guarda-backups` + a bucket-scoped token, add the 4 secrets
-   (`BACKUP_PASSPHRASE` — keep an offline copy, it is the GPG decryption
-   key —, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`), then
-   smoke-test via Actions → "Weekly encrypted backup" → Run workflow and
-   confirm the object lands in R2. Scheduled workflows only fire from the
-   default branch.
+8. **Backup**: nothing to set up in this repo — the daily dump is Fulcrum's
+   (the backup note in section 1). A NEW prod project means updating
+   `FULCRUM_BACKUP_ENTRELARES_DB_URL` in the Fulcrum repo, or the dump keeps
+   reading the old one.
 9. Standard runbook pass: sections 0–6 (CI covers 1–3; Dashboard steps are
    manual) + human verification (section 6).
 10. **Update the documented production version — in the same pass.** Nothing
@@ -869,7 +868,7 @@ exposed backup, or a Supabase/Cloudflare/Resend upstream breach affecting us.
 **1. Contain (immediately).**
 - Rotate the compromised credential first: Supabase Dashboard → Settings → API
   (service_role/anon), R2 token in Cloudflare, Resend key, GitHub secrets that
-  mirror them (`deploy.yml` / `backup.yml`).
+  mirror them (`verify.yml` here; the backup's `FULCRUM_BACKUP_*` in Fulcrum).
 - If an account is compromised: Authentication → Users → sign-out/ban the user;
   if the app itself is the vector, pause the Cloudflare Pages deployment.
 - Preserve evidence: export the relevant Dashboard logs (Auth, Edge Functions,
