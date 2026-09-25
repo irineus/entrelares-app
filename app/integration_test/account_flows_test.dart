@@ -170,6 +170,13 @@ void main() {
     // menu is found by the invitation's id, because the placeholder's member
     // card carries a ⋮ of its own on the same screen.
     final invitationId = created.single['id'] as int;
+    // `find.text(invitee)` above also matches the e-mail FIELD while the send
+    // is in flight, so it can return before the card exists; the card's own
+    // menu is the proof (web-e2e, 25/09/2026: "Bad state: No element" here,
+    // twice in three runs, once the gateway added latency).
+    await pumpUntilFound(
+        tester, find.byKey(FamilyScreen.invitationMenuKey(invitationId)),
+        reason: 'the invitation card, with its menu, must be on the page');
     await tapVisible(
         tester, find.byKey(FamilyScreen.invitationMenuKey(invitationId)));
     await tester.tap(find.text(l[K.famRevoke]));

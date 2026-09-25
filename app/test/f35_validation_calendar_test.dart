@@ -57,6 +57,21 @@ class _SettingsFailOnce extends FakeCustodyDataSource {
   }
 }
 
+/// The settings read keeps failing for a while — a cold start whose session
+/// is still being refreshed — and nothing else happens on screen.
+class _SettingsLate extends FakeCustodyDataSource {
+  _SettingsLate(this.failures) : super(members: [ana, bruno], days: []);
+  final int failures;
+  int settingsReads = 0;
+
+  @override
+  Future<Map<String, String>> fetchPublicSettings() async {
+    settingsReads++;
+    if (settingsReads <= failures) return const {};
+    return const {'feature.child_agenda': 'true'};
+  }
+}
+
 void main() {
   testWidgets(
       'a cited day with a request that arrived after the month was read opens '
@@ -103,13 +118,34 @@ void main() {
     final ds = _SettingsFailOnce();
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
-    expect(ds.settingsReads, 1);
+    expect(ds.settingsReads, greaterThanOrEqualTo(1));
 
     // Any load retries: here, the app coming back to the foreground.
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
     expect(ds.settingsReads, greaterThan(1));
+
+    await openDay(tester, day);
+    expect(find.byType(DayAgendaSection), findsOneWidget);
+  });
+
+  testWidgets('a settings read that keeps failing retries on its own clock, '
+      'with no load and no resume to trigger it', (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    final ds = _SettingsLate(3);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    final first = ds.settingsReads;
+
+    // 2 s, 5 s, 10 s: the fourth read lands.
+    for (final s in [2, 5, 10]) {
+      await tester.pump(Duration(seconds: s));
+      await tester.pumpAndSettle();
+    }
+    expect(ds.settingsReads, greaterThan(first));
+    expect(ds.settingsReads, greaterThanOrEqualTo(4));
 
     await openDay(tester, day);
     expect(find.byType(DayAgendaSection), findsOneWidget);

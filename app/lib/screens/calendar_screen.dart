@@ -499,12 +499,40 @@ class _CalendarScreenState extends State<CalendarScreen>
   bool _settingsRead = false;
   bool _horizonInFlight = false;
 
+  /// A read asked for while one was in flight — it runs when that one ends.
+  bool _horizonAgain = false;
+
+  /// The retry of a failed settings read, on its own clock. Owner's second
+  /// validation round, 25/09/2026: retrying only from [_load] was not enough —
+  /// with a healthy socket and the healthy poll off (T-83) the next load may
+  /// never come, and a retry asked for while the first read still hung was
+  /// dropped. The agenda stayed off until the app restarted, again.
+  Timer? _settingsRetry;
+  int _settingsAttempt = 0;
+  static const List<int> _settingsBackoffSeconds = [2, 5, 10, 30, 60];
+
+  void _scheduleSettingsRetry() {
+    if (_settingsRead || _settingsRetry != null || !mounted) return;
+    final i = _settingsAttempt < _settingsBackoffSeconds.length
+        ? _settingsAttempt
+        : _settingsBackoffSeconds.length - 1;
+    _settingsAttempt++;
+    _settingsRetry = Timer(Duration(seconds: _settingsBackoffSeconds[i]), () {
+      _settingsRetry = null;
+      if (mounted && !_settingsRead) _loadHorizonInputs();
+    });
+  }
+
   /// Defensive like the web: neither read may break the calendar — entitlement
   /// falls to premium, settings to the seeded fallbacks (no wrongful block).
-  /// Retried by every [_load] until the settings arrive, and on every resume
-  /// (an operator's kill switch reaches an open app).
+  /// A failed settings read retries by itself (2, 5, 10, 30 s, then every
+  /// minute) until it lands; every [_load] and every resume read again too (an
+  /// operator's kill switch reaches an open app).
   Future<void> _loadHorizonInputs() async {
-    if (_horizonInFlight) return;
+    if (_horizonInFlight) {
+      _horizonAgain = true;
+      return;
+    }
     _horizonInFlight = true;
     try {
       Family? family;
@@ -540,6 +568,19 @@ class _CalendarScreenState extends State<CalendarScreen>
       if (agendaTurnedOn && _loadedMonth != null) _load(silent: true);
     } finally {
       _horizonInFlight = false;
+      if (mounted) {
+        if (_settingsRead) {
+          _settingsAttempt = 0;
+          _settingsRetry?.cancel();
+          _settingsRetry = null;
+        }
+        if (_horizonAgain) {
+          _horizonAgain = false;
+          unawaited(_loadHorizonInputs());
+        } else {
+          _scheduleSettingsRetry();
+        }
+      }
     }
   }
 
@@ -624,6 +665,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     _unwatchAgenda?.call();
     _pollTimer?.cancel();
     _changeDebounce?.cancel();
+    _settingsRetry?.cancel();
     _pageController.dispose();
     super.dispose();
   }
