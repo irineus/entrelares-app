@@ -705,6 +705,12 @@ abstract final class KApp {
   static const String chatPdfLead = 'app.chat.pdfLead';
   static const String chatPdfEmpty = 'app.chat.pdfEmpty';
   static const String chatPdfReply = 'app.chat.pdfReply';
+  // ── S-22: the phase-6 Premium benefits on /family/plan ──
+  static const String agendaPremiumBenefit = 'app.agenda.premiumBenefit';
+  static const String attestPremiumBenefit = 'app.attest.premiumBenefit';
+  static const String expensePremiumBenefit = 'app.expense.premiumBenefit';
+  static const String chatPremiumBenefit = 'app.chat.premiumBenefit';
+  static const String viewerPremiumBenefit = 'app.viewer.premiumBenefit';
 
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -1224,6 +1230,11 @@ abstract final class KApp {
     chatPdfLead,
     chatPdfEmpty,
     chatPdfReply,
+    agendaPremiumBenefit,
+    attestPremiumBenefit,
+    expensePremiumBenefit,
+    chatPremiumBenefit,
+    viewerPremiumBenefit,
   ];
 }
 
@@ -1895,6 +1906,11 @@ abstract final class StringsAppPtBr {
     KApp.chatPdfLead: 'O que a família escreveu na Conversa no período, na ordem, como foi escrito. Nada na Conversa se edita ou se apaga.',
     KApp.chatPdfEmpty: 'Nada foi escrito na Conversa no período.',
     KApp.chatPdfReply: 'em resposta a {0}',
+    KApp.agendaPremiumBenefit: 'Agenda completa da criança: escola, saúde, remédios e atividades, com rotinas e lembretes',
+    KApp.attestPremiumBenefit: 'Relatório em PDF verificável por QR code',
+    KApp.expensePremiumBenefit: 'Despesas compartilhadas, com o acerto confirmado por quem recebe',
+    KApp.chatPremiumBenefit: 'Conversa da família, permanente e com leitura confirmada',
+    KApp.viewerPremiumBenefit: 'Até {0} visualizadores, que acompanham o plano sem editar',
   };
 }
 
@@ -2561,5 +2577,10 @@ abstract final class StringsAppEn {
     KApp.chatPdfLead: 'What the family wrote in the chat during the period, in order, as written. Nothing in the chat is edited or deleted.',
     KApp.chatPdfEmpty: 'Nothing was written in the chat in the period.',
     KApp.chatPdfReply: 'in reply to {0}',
+    KApp.agendaPremiumBenefit: 'The child\'s full agenda: school, health, medicine and activities, with routines and reminders',
+    KApp.attestPremiumBenefit: 'A PDF report verifiable by QR code',
+    KApp.expensePremiumBenefit: 'Shared expenses, with settle-ups confirmed by whoever receives them',
+    KApp.chatPremiumBenefit: 'A family chat that is permanent, with read receipts',
+    KApp.viewerPremiumBenefit: 'Up to {0} viewers, who follow the plan without editing it',
   };
 }

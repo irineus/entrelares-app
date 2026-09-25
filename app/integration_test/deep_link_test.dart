@@ -35,7 +35,7 @@ import 'e2e_family.dart';
 import 'e2e_proof.dart';
 
 const policyVersion =
-    String.fromEnvironment('E2E_POLICY_VERSION', defaultValue: '2026-07-30');
+    String.fromEnvironment('E2E_POLICY_VERSION', defaultValue: '2026-09-25');
 
 final l = Localization(AppLanguage.ptBr);
 

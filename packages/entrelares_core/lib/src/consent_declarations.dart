@@ -27,10 +27,16 @@ library;
 
 abstract final class ConsentDeclarations {
   /// A-1.1 — accepted by whoever creates the family.
+  ///
+  /// S-22 (phase 6): the app gained ONE dedicated child field — the first
+  /// name (F-55's `children`) — and an agenda with Saúde/Remédio kinds, so
+  /// "the system has no dedicated fields" stopped being true. The duty stays
+  /// the same: only what the routine needs.
   static const String creator =
-      'Ao criar a família, declaro estar ciente de que o sistema não possui campos próprios '
-      'para dados da criança. Comprometo-me, no uso da minha autoridade parental, a inserir '
-      'apenas informações estritamente necessárias à rotina nos campos de texto livre.';
+      'Ao criar a família, declaro estar ciente de que o único campo próprio para dados da '
+      'criança é o seu primeiro nome. Comprometo-me, no uso da minha autoridade parental, a '
+      'inserir apenas as informações da criança estritamente necessárias à rotina — no '
+      'cadastro, na agenda e nos campos de texto livre.';
 
   /// A-1.2 — accepted by whoever joins through an invitation.
   static const String invitee =
@@ -43,9 +49,10 @@ abstract final class ConsentDeclarations {
   /// the binding text is the PT-BR one, and the screen says so
   /// (`K.registerConsentBindingNotice`).
   static const String creatorEn =
-      "By creating the family, I acknowledge that the system has no dedicated fields "
-      "for the child's data. In exercising my parental authority, I undertake to enter "
-      'only information strictly necessary to the routine in the free-text fields.';
+      "By creating the family, I acknowledge that the only dedicated field for the child's "
+      'data is their first name. In exercising my parental authority, I undertake to enter '
+      "only the child's information strictly necessary to the routine — in the registration, "
+      'the agenda and the free-text fields.';
 
   /// U-13 — courtesy translation of [invitee]. See [creatorEn].
   static const String inviteeEn =

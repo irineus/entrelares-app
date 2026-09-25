@@ -24,13 +24,18 @@ void main() {
     expect(ConsentDeclarations.creatorEn, isNot(ConsentDeclarations.inviteeEn));
   });
 
+  // S-22 (phase 6): the wording moved ON PURPOSE — the app gained a first-name
+  // field for the child (F-55), so "no dedicated fields" stopped being true.
+  // The new text went through the owner's review of the phase-6 material
+  // version, like the one it replaces went through the legal review.
   test('the founder declaration matches the approved wording', () {
     expect(
       ConsentDeclarations.creator,
-      'Ao criar a família, declaro estar ciente de que o sistema não possui '
-      'campos próprios para dados da criança. Comprometo-me, no uso da minha '
-      'autoridade parental, a inserir apenas informações estritamente '
-      'necessárias à rotina nos campos de texto livre.',
+      'Ao criar a família, declaro estar ciente de que o único campo próprio '
+      'para dados da criança é o seu primeiro nome. Comprometo-me, no uso da '
+      'minha autoridade parental, a inserir apenas as informações da criança '
+      'estritamente necessárias à rotina — no cadastro, na agenda e nos campos '
+      'de texto livre.',
     );
   });
 
