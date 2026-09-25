@@ -207,8 +207,9 @@ class Env {
     // `web.entrelares.app`.
     googleWebClientId:
         '575356979434-8fnls1hls3kb9nj1afcvf1cdu4m9hrhi.apps.googleusercontent.com',
-    // Still the redirect until dev has been exercised (F-71 PR 2 flips it).
-    nativeGoogleSignIn: false,
+    // F-71 PR 2: production joins the native door — the redirect cannot
+    // survive the move behind the Fulcrum gateway (410 on /authorize).
+    nativeGoogleSignIn: true,
   );
 
   /// How the WEB build says "production". `flutter build web` accepts no
@@ -229,7 +230,7 @@ class Env {
   /// Mirrors `pubspec.yaml`'s `version:` — the web's `AppVersion.Display`.
   /// Only the F-17 export reads it, and a stale value there would misdate an
   /// LGPD record, so `env_version_test.dart` fails the build if the two drift.
-  static const String appVersion = '2.8.22+154';
+  static const String appVersion = '2.8.23+155';
 }
 
 /// T-62 — the PUBLIC Firebase Web config of one environment, plus its VAPID

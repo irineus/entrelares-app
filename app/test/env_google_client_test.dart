@@ -19,10 +19,10 @@ void main() {
     expect(Env.dev.googleWebClientId, isNot(Env.prod.googleWebClientId));
   });
 
-  test('the native door rolls out per flavour: dev first', () {
-    // F-71 PR 1 — dev builds (the PR's APK, qa.entrelares.app) exchange an ID
-    // token; production keeps the redirect until PR 2 flips this one line.
+  test('both flavours exchange an ID token (F-71 PR 2)', () {
+    // PR 1 turned dev on; PR 2 turned production on. PR 3 removes the switch
+    // together with the redirect it guarded.
     expect(Env.dev.nativeGoogleSignIn, isTrue);
-    expect(Env.prod.nativeGoogleSignIn, isFalse);
+    expect(Env.prod.nativeGoogleSignIn, isTrue);
   });
 }
