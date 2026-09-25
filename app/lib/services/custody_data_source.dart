@@ -673,6 +673,13 @@ abstract class CustodyDataSource {
   /// (capped at 100 — the badge prints "99+" past that).
   Future<int> fetchChatUnreadCount(int profileId);
 
+  /// Listens for chat_messages inserts and chat_reads changes — a text or a
+  /// read mark written on another device reaches an open Conversa and the
+  /// counters without a pull (owner's validation, 25/09/2026). [onStatus] as
+  /// in [watchChanges]. Returns a dispose callback.
+  Future<void Function()> watchChatChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus});
+
   // ── F-34: shared expenses ────────────────────────────────────────────────
 
   /// The family's expenses with their shares, newest first. A viewer reads

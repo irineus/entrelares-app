@@ -1784,6 +1784,27 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
           params: {'p_up_to': upToId}) as int;
 
   @override
+  Future<void Function()> watchChatChanges(void Function() onChange,
+      {void Function(bool connected)? onStatus}) async {
+    final channel = _client
+        .channel('chat_changes_${_channelSeq++}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'chat_messages',
+          callback: (_) => onChange(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'chat_reads',
+          callback: (_) => onChange(),
+        )
+        .subscribe(_statusCallback(onStatus));
+    return () => _client.removeChannel(channel);
+  }
+
+  @override
   Future<bool> fetchChatPushMuted() async {
     final rows = await _client.from('chat_prefs').select('push_muted').limit(1);
     return rows.isNotEmpty && rows.first['push_muted'] == true;

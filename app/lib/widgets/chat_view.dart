@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:entrelares_db_contracts/models/chat_message.dart';
@@ -20,6 +21,12 @@ import 'ui/ui.dart';
 /// "lida por" under every text, citing a calendar day (a tap opens that day),
 /// search, and each member's own push silencing. No moderation and no tone
 /// meter, on purpose.
+///
+/// Live (owner's validation, 25/09/2026): a text or a read mark written on
+/// another device arrives through the chat Realtime channel — with the
+/// T-83 poll as the net while the socket is down — and what arrives while the
+/// Conversa is ON SCREEN is marked read at once. On screen = the shell branch
+/// is active (go_router's `TickerMode`) and the app is in the foreground.
 class ChatView extends StatefulWidget {
   final CustodyDataSource dataSource;
 
@@ -47,7 +54,7 @@ class ChatView extends StatefulWidget {
   State<ChatView> createState() => _ChatViewState();
 }
 
-class _ChatViewState extends State<ChatView> {
+class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
   bool _loading = true;
   bool _loadFailed = false;
   PublicSettings _settings = PublicSettings.unloaded;
@@ -67,18 +74,128 @@ class _ChatViewState extends State<ChatView> {
   bool _sending = false;
   String? _sendError;
 
+  void Function()? _unwatch;
+  bool _socketConnected = false;
+  Timer? _changeDebounce;
+  Timer? _pollTimer;
+  ValueListenable<TickerModeData>? _activeBranch;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+    _watch();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = TickerMode.getValuesNotifier(context);
+    if (!identical(active, _activeBranch)) {
+      _activeBranch?.removeListener(_onVisibilityChanged);
+      _activeBranch = active..addListener(_onVisibilityChanged);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _onVisibilityChanged();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _activeBranch?.removeListener(_onVisibilityChanged);
+    _unwatch?.call();
+    _changeDebounce?.cancel();
+    _pollTimer?.cancel();
     _search.dispose();
     _composer.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// Whether a text arriving now is a text the reader sees.
+  bool get _onScreen {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    return (_activeBranch?.value.enabled ?? true) &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed);
+  }
+
+  void _onVisibilityChanged() {
+    if (!mounted) return;
+    // Back on the Conversa: what arrived meanwhile, then mark it read.
+    if (_onScreen) unawaited(_refresh());
+    _schedulePoll();
+  }
+
+  Future<void> _watch() async {
+    try {
+      final unwatch = await widget.dataSource.watchChatChanges(
+        () {
+          // A mark_chat_read writes one row per text — a burst on the channel.
+          _changeDebounce?.cancel();
+          _changeDebounce = Timer(const Duration(milliseconds: 300), () {
+            if (mounted) unawaited(_refresh());
+          });
+        },
+        onStatus: (connected) {
+          if (!mounted || connected == _socketConnected) return;
+          _socketConnected = connected;
+          // The socket coming back may have missed texts while it was down.
+          if (connected) unawaited(_refresh());
+          _schedulePoll();
+        },
+      );
+      if (!mounted) {
+        unwatch();
+        return;
+      }
+      _unwatch = unwatch;
+    } catch (_) {/* the poll below is the net */}
+    _schedulePoll();
+  }
+
+  /// T-83's cadence, only while the Conversa is on screen.
+  void _schedulePoll() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (!mounted || !_onScreen || !_settings.chatEnabled) return;
+    final ms = pollIntervalMs(
+        socketConnected: _socketConnected, settings: _settings);
+    if (ms == null) return;
+    _pollTimer = Timer(Duration(milliseconds: ms), () async {
+      if (!mounted) return;
+      await _refresh();
+      _schedulePoll();
+    });
+  }
+
+  bool get _atEnd =>
+      !_scroll.hasClients || _scroll.position.extentAfter < 96;
+
+  /// The texts and the marks again — the cheap half of [_load], for a change
+  /// on the channel, a poll or a send. Keeps the reader's place unless they
+  /// were already at the end (or [toEnd], after their own send).
+  Future<void> _refresh({bool toEnd = false}) async {
+    if (_loading || _loadFailed || _me == null || !_settings.chatEnabled) {
+      return;
+    }
+    try {
+      final got = await Future.wait<Object?>([
+        widget.dataSource.fetchChatMessages(),
+        widget.dataSource.fetchChatReads(),
+      ]);
+      if (!mounted) return;
+      final follow = toEnd || _atEnd;
+      setState(() {
+        _messages = got[0] as List<ChatMessage>;
+        _reads = got[1] as List<ChatRead>;
+      });
+      if (follow) _scrollToEnd();
+      if (_onScreen) await _markRead();
+    } catch (_) {/* what is on screen stays; the next change or poll retries */}
   }
 
   Future<void> _load() async {
@@ -122,8 +239,9 @@ class _ChatViewState extends State<ChatView> {
         _muted = rest[4] as bool;
         _loading = false;
       });
-      unawaited(_markRead());
+      if (_onScreen) unawaited(_markRead());
       _scrollToEnd();
+      _schedulePoll();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -145,17 +263,24 @@ class _ChatViewState extends State<ChatView> {
 
   /// Marks what is on screen as read — only when something is actually new
   /// for me, so opening the tab does not write for nothing.
+  bool _marking = false;
+
   Future<void> _markRead() async {
     final me = _me;
     final newest = ChatRules.newestId(_lines);
-    if (me == null || newest == null) return;
+    if (me == null || newest == null || _marking) return;
     if (ChatRules.unreadFor(me.id, _lines, _marks) == 0) return;
+    _marking = true;
     try {
       await widget.dataSource.markChatRead(newest);
       final reads = await widget.dataSource.fetchChatReads();
       if (mounted) setState(() => _reads = reads);
       widget.onRead?.call();
-    } catch (_) {/* the marks are a courtesy; the texts are already here */}
+    } catch (_) {
+      /* the marks are a courtesy; the texts are already here */
+    } finally {
+      _marking = false;
+    }
   }
 
   void _scrollToEnd() {
@@ -207,7 +332,7 @@ class _ChatViewState extends State<ChatView> {
         _day = null;
         _sending = false;
       });
-      await _load();
+      await _refresh(toEnd: true);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -277,17 +402,20 @@ class _ChatViewState extends State<ChatView> {
       for (final m in _messages)
         if (ChatRules.matches(m.body, query)) m
     ];
+    // The notice opens the conversation and scrolls away with it: pinned
+    // above the list, it took most of what the keyboard leaves on a phone and
+    // the column overflowed (owner's validation, 25/09/2026).
+    final notice = Padding(
+      padding: const EdgeInsets.only(top: Spacing.xs, bottom: Spacing.sm),
+      child: AppBanner(
+        key: const ValueKey('chat-notice'),
+        tone: tokens.warning,
+        icon: Icons.lock_clock_outlined,
+        message: l[KApp.chatNotice],
+      ),
+    );
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-          child: AppBanner(
-            key: const ValueKey('chat-notice'),
-            tone: tokens.warning,
-            icon: Icons.lock_clock_outlined,
-            message: l[KApp.chatNotice],
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Row(
@@ -332,7 +460,10 @@ class _ChatViewState extends State<ChatView> {
           child: RefreshIndicator(
             onRefresh: _load,
             child: shown.isEmpty
-                ? ListView(children: [
+                ? ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    children: [
+                    notice,
                     AppEmptyState(
                       key: const ValueKey('chat-empty'),
                       icon: Icons.forum_outlined,
@@ -344,8 +475,9 @@ class _ChatViewState extends State<ChatView> {
                 : ListView.builder(
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                    itemCount: shown.length,
-                    itemBuilder: (context, i) => _bubble(shown[i], l),
+                    itemCount: shown.length + 1,
+                    itemBuilder: (context, i) =>
+                        i == 0 ? notice : _bubble(shown[i - 1], l),
                   ),
           ),
         ),
@@ -536,6 +668,10 @@ class _ChatViewState extends State<ChatView> {
                     key: const ValueKey('chat-composer'),
                     label: l[KApp.chatHint],
                     controller: _composer,
+                    // One line that grows to five as the text wraps: fixed at
+                    // five, the field alone filled a phone's space above the
+                    // keyboard.
+                    minLines: 1,
                     maxLines: 5,
                     maxLength: _settings.chatMessageMaxChars,
                     textCapitalization: TextCapitalization.sentences,
