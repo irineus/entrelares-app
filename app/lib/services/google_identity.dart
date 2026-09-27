@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../env.dart';
@@ -16,14 +19,36 @@ import '../env.dart';
 /// credential to its OWN button, so the button is Google's (`renderButton`,
 /// owner's decision) and its tokens arrive on [webIdTokens].
 ///
-/// **No nonce, on purpose.** `google_sign_in` 7 does not expose one, and GoTrue
-/// accepts a token when neither side carries it (Fulcrum 01.8). A nonce on one
-/// side only fails with "Passed nonce and nonce in id_token should either both
-/// exist or not", and nothing in the app could fix that.
+/// **A nonce on BOTH sides.** GoTrue refuses a token when only one side
+/// carries a nonce ("Passed nonce and nonce in id_token should either both
+/// exist or not"), and the web's GIS button, in FedCM mode, mints tokens WITH
+/// one even when the app asks for none — that is how every Google sign-in on
+/// web.entrelares.app failed from 25/09 to 27/09/2026 (the "no nonce" of
+/// Fulcrum 01.8 held only on paper). So the app makes one per process: Google
+/// stamps [_hashedNonce] into the token (`initialize(nonce:)`, which
+/// `google_sign_in` 7.2 does expose), and [rawNonce] goes to
+/// `signInWithIdToken`, where GoTrue hashes it and compares.
 class GoogleIdentity {
   GoogleIdentity._();
 
   static Future<void>? _initialized;
+
+  /// The value GoTrue receives. Per process, like [_initialized]: the plugin
+  /// takes the nonce once, at initialization, so every token this process
+  /// mints carries the same one.
+  static final String rawNonce = _newRawNonce();
+
+  /// What Google writes into the token's `nonce` claim: SHA-256 of [rawNonce],
+  /// lowercase hex — the exact form GoTrue computes before comparing.
+  @visibleForTesting
+  static String get hashedNonce =>
+      sha256.convert(utf8.encode(rawNonce)).toString();
+
+  static String _newRawNonce() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+    return base64UrlEncode(bytes).replaceAll('=', '');
+  }
 
   /// Initializes the plugin once per process. Lazy on purpose: on the web it
   /// loads Google's GIS script, which a page that never shows the button has
@@ -34,6 +59,7 @@ class GoogleIdentity {
       // the AUDIENCE the device mints the token for — `serverClientId`.
       clientId: kIsWeb ? Env.current.googleWebClientId : null,
       serverClientId: kIsWeb ? null : Env.current.googleWebClientId,
+      nonce: hashedNonce,
     );
   }
 

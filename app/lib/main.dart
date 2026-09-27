@@ -1301,8 +1301,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// minted on the device (Credential Manager / the GIS button) for this
   /// environment's Web client, exchanged by GoTrue. Nothing leaves the app, so
   /// the invitation stays in memory ([_pendingInviteToken]) until the
-  /// onboarding screen claims it — no prefs stash. No nonce (see
-  /// `GoogleIdentity`). Errors are the button's to show.
+  /// onboarding screen claims it — no prefs stash. The raw nonce goes with the
+  /// token (see `GoogleIdentity`). Errors are the button's to show.
   Future<void> _signInWithGoogleIdToken(String idToken,
       {String? inviteToken}) async {
     final token = inviteToken?.trim() ?? '';
@@ -1312,7 +1312,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _signInMethod = 'google';
     try {
       await _client.auth
-          .signInWithIdToken(provider: OAuthProvider.google, idToken: idToken);
+          .signInWithIdToken(
+              provider: OAuthProvider.google,
+              idToken: idToken,
+              nonce: GoogleIdentity.rawNonce);
     } catch (_) {
       _signInMethod = null;
       rethrow;
