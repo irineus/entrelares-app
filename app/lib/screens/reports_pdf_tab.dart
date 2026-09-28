@@ -96,6 +96,10 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   /// Null keeps today's free field — flag off, or no child yet.
   String? _registeredChildNames;
 
+  /// F-07: how many children [_registeredChildNames] names — above one, the
+  /// header and this tab say *Crianças*.
+  int _registeredChildCount = 1;
+
   /// F-55: the agenda is on for this build — the PDF prints section 5.
   bool _agendaOn = false;
 
@@ -168,6 +172,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       if (!settings.childAgendaEnabled) return null;
       final children = await widget.dataSource.fetchChildren();
       if (!mounted) return null;
+      _registeredChildCount = children.isEmpty ? 1 : children.length;
       return ChildRules.joinNames([for (final c in children) c.firstName],
           and: AppL10n.of(context).l[KApp.childAnd]);
     } catch (_) {
@@ -418,6 +423,8 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       final report = buildCustodyReport(
         familyName: family?.name ?? l[K.pdfDocFallbackFamily],
         childName: _registeredChildNames ?? _childName.text,
+        childCount:
+            _registeredChildNames == null ? 1 : _registeredChildCount,
         start: start,
         end: end,
         today: widget.now(),
@@ -748,7 +755,9 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               else
                 AppListRow(
                   key: const ValueKey('pdf-registered-child'),
-                  label: l[K.pdfChildName],
+                  label: _registeredChildCount > 1
+                      ? l[K.pdfDocChildren]
+                      : l[K.pdfChildName],
                   value: _registeredChildNames,
                 ),
               // U-20: the same option as the on-screen Resumo — the numbers of

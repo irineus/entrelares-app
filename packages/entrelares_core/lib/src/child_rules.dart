@@ -7,6 +7,9 @@
 /// convention — so a rule that trips on either side reads identically.
 library;
 
+/// F-07 — why a new child would be refused, or [none].
+enum ChildAddBlock { none, freeCap, maxCap }
+
 abstract final class ChildRules {
   /// The column CHECK and `child_normalize_name` both say 40.
   static const int maxNameLength = 40;
@@ -34,5 +37,21 @@ abstract final class ChildRules {
     if (clean.isEmpty) return null;
     if (clean.length == 1) return clean.single;
     return '${clean.sublist(0, clean.length - 1).join(', ')} $and ${clean.last}';
+  }
+
+  /// F-07 — what the *Crianças* page OFFERS, mirroring `add_child`: the
+  /// ceiling (`children.max_per_family`) for every plan, and from
+  /// `children.free_max` on, Premium. The server is the rule; this only keeps
+  /// the page from offering a door it would refuse. A downgraded family keeps
+  /// every child it has — it only meets [ChildAddBlock.freeCap] on the next.
+  static ChildAddBlock addBlock({
+    required int childrenTaken,
+    required bool isPremium,
+    required int freeMax,
+    required int maxPerFamily,
+  }) {
+    if (childrenTaken >= maxPerFamily) return ChildAddBlock.maxCap;
+    if (!isPremium && childrenTaken >= freeMax) return ChildAddBlock.freeCap;
+    return ChildAddBlock.none;
   }
 }

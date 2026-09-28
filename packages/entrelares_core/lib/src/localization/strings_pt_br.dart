@@ -640,6 +640,7 @@ abstract final class StringsPtBr {
     K.pdfDocSubtitle: 'Histórico consolidado do período',
     K.pdfDocFamily: 'Família',
     K.pdfDocChild: 'Criança',
+    K.pdfDocChildren: 'Crianças',
     K.pdfDocPeriod: 'Período',
     K.pdfDocPeriodValue: '{0} a {1} ({2} dias)',
     K.pdfDocCriterion: 'Critério',

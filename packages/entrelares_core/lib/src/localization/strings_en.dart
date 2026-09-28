@@ -638,6 +638,7 @@ abstract final class StringsEn {
     K.pdfDocSubtitle: 'Consolidated history for the period',
     K.pdfDocFamily: 'Family',
     K.pdfDocChild: 'Child',
+    K.pdfDocChildren: 'Children',
     K.pdfDocPeriod: 'Period',
     K.pdfDocPeriodValue: '{0} to {1} ({2} days)',
     K.pdfDocCriterion: 'Criterion',

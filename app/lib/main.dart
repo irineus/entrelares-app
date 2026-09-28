@@ -551,8 +551,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                 ),
                 GoRoute(
                   path: 'children',
-                  builder: (_, _) =>
-                      FamilyChildrenScreen(dataSource: _dataSource),
+                  builder: (_, _) => FamilyChildrenScreen(
+                    dataSource: _dataSource,
+                    analytics: _analytics,
+                    onOpenPlan: () => _router.go('/family/plan'),
+                  ),
                 ),
                 GoRoute(
                   path: 'delete',
