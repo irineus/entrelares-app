@@ -139,7 +139,7 @@ void main() {
     expect(reported(tester), '/family',
         reason: 'and the address bar agrees — without that a reload replays '
             'the whole defect');
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  }, timeout: e2eTestTimeout);
 
   testWidgets('p0 — a tapped web push opens the notice it names, not the '
       'calendar', (tester) async {
@@ -149,7 +149,7 @@ void main() {
         reason: 'the tab and the notice id are what make the TAPPED notice the '
             'one that opens; losing them is what T-62 found');
     expect(reported(tester), '/notifications?tab=incoming&n=7');
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  }, timeout: e2eTestTimeout);
 
   testWidgets('p0 — a URL this app does not serve says so', (tester) async {
     await bootAt(tester, '/relatorios', signedOut: false);
@@ -157,7 +157,7 @@ void main() {
     expect(find.text(l[K.notFoundTitle]), findsOneWidget,
         reason: 'an unknown path is an answer, not a silent detour to the '
             'calendar');
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  }, timeout: e2eTestTimeout);
 
   testWidgets('p0 — S-02 is not relaxed: an anonymous visitor gets login',
       (tester) async {
@@ -166,5 +166,5 @@ void main() {
     expect(find.text(l[K.loginSubmit]), findsOneWidget,
         reason: 'restoring a guarded screen for a visitor without a session '
             'would hand over exactly what S-02 refuses');
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  }, timeout: e2eTestTimeout);
 }

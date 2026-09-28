@@ -2721,6 +2721,18 @@ not the sum (~19). The users each run creates on dev are unchanged: one throwawa
 target (§16). `web_channel_test` reads the matrix rows as the counts T-58 demands and pins
 `fail-fast: false`, the per-target group and the 13–20 min timeout band.
 
+**The per-test ceiling moved with it.** Every `testWidgets` carried a literal
+`Timeout(Duration(minutes: 5))`, and the bodies had grown into it. Measured from the end of the
+setUpAll to the verdict over the same 20 runs: the p0 swap test took 4.55–4.86 min, the p0
+invitation test up to 3.55, and deep_link's four tests 7.6 together. On main run 36374786205 the
+swap test ran 5m01s and died on its ceiling. The driver can only report that as *"ZERO testes
+executados"*, because a test killed by its timeout never reaches the tearDown that records it. The
+ceiling is now ONE constant, `e2eTestTimeout` (8 min) in `integration_test/e2e_proof.dart`, on every
+test. `web_channel_test` refuses a literal `Timeout(` in a suite and requires the ceiling + 3 min
+to fit inside the leg's `timeout-minutes`, so a stuck test ends red with its suite named instead
+of a cancelled leg. **A "ZERO testes" whose setUpAll window is green is this ceiling**, not an
+empty suite: read the gap between the setUpAll's end and the verdict.
+
 **Reading it:** a red or timed-out leg names its suite in the job name (`web-e2e
 (deep_link_test)`). The other legs still report, so a lone slow leg is the dev project; all three
 slow at once is the dev project or the runner image, not the change.

@@ -53,6 +53,19 @@ const failedKey = 'failed';
 /// `elapsedMs`, and — only when it threw — `error` and `stack`.
 const setUpAllKey = 'setUpAll';
 
+/// The ceiling of EVERY flow test, in one place (T-95, 28/09/2026). It was a
+/// literal 5 min in each `testWidgets`, and the test bodies had grown into it:
+/// over the last 20 green web runs the p0 swap test took 4.55–4.86 min, the p0
+/// invitation test up to 3.55, and deep_link's four tests 7.6 together. On
+/// main run 36374786205 the swap test ran 5m01s and died on the ceiling,
+/// which the driver can only read as "ZERO testes executados". 8 min covers
+/// the +51% a slow shared dev project cost on PR #301, and it stays under the
+/// `web-e2e` leg's `timeout-minutes` with room for setup and compile, so a
+/// stuck test ends RED with its suite named instead of a `cancelled` leg.
+/// `web_channel_test` refuses a literal `Timeout(` in a suite and pins this
+/// value against the leg's timeout.
+const e2eTestTimeout = Timeout(Duration(minutes: 8));
+
 /// Call once in `main()`, right after `ensureInitialized()`, before any test
 /// is declared. `web_channel_test` fails if a suite under `integration_test/`
 /// forgets it.

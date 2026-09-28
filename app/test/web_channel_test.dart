@@ -1277,6 +1277,39 @@ void main() {
       // leg holds the publish longer than the old whole job did.
       expect(timeout, inInclusiveRange(13, 20));
     });
+
+    test('every flow test shares one ceiling, and it fits inside the leg', () {
+      // T-95: a literal 5 min per test had become 97% of the swap test's green
+      // time, and a test that dies on its ceiling reads "ZERO testes" — so the
+      // ceiling is ONE constant, on every test, below the leg's own clock.
+      for (final suite in suites) {
+        final body = code(suite);
+        expect(body, isNot(contains('Timeout(')),
+            reason: '${suite.path}: a flow test takes `e2eTestTimeout`, never '
+                'a ceiling of its own');
+        expect('timeout: e2eTestTimeout'.allMatches(body).length,
+            'testWidgets('.allMatches(body).length,
+            reason: '${suite.path}: without a timeout a test inherits the '
+                'package default, which no measurement chose');
+      }
+      final proofSide =
+          File('integration_test/e2e_proof.dart').readAsStringSync();
+      final ceiling = int.parse(RegExp(
+              r'const e2eTestTimeout = Timeout\(Duration\(minutes: (\d+)\)\);')
+          .firstMatch(proofSide)!
+          .group(1)!);
+      final leg = int.parse(RegExp(r'timeout-minutes: (\d+)')
+          .firstMatch(_webE2eJob(workflow))!
+          .group(1)!);
+      // ~0.6 min of runner setup, ~1 min of compile and connect, the setUpAll:
+      // a test stuck on its ceiling must still end before the leg does, or
+      // the leg reads `cancelled` again.
+      expect(ceiling + 3, lessThanOrEqualTo(leg),
+          reason: 'a $ceiling-min test ceiling does not fit a $leg-min leg');
+      // The p0 swap test measured up to 4.86 min green; below 7 the +51% of a
+      // slow dev project (PR #301) no longer fits.
+      expect(ceiling, greaterThanOrEqualTo(7));
+    });
   });
 
   // ── T-68 — a red `main` reaching a human ──────────────────────────────────
