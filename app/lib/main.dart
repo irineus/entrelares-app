@@ -61,6 +61,7 @@ import 'services/offline_cache.dart';
 import 'services/offline_cache_store.dart';
 import 'services/onboarding_service.dart';
 import 'services/push_service.dart';
+import 'services/refresh_guard_client.dart';
 import 'services/session_gate.dart';
 import 'services/store_billing.dart';
 import 'services/sudo_service.dart';
@@ -140,7 +141,9 @@ Future<void> main() async {
   await Supabase.initialize(
     url: Env.current.supabaseUrl,
     publishableKey: Env.current.supabaseKey,
-    httpClient: ConnectivityHttpClient(appConnectivity),
+    // T-93: the refresh guard wraps the connectivity client, so an answer it
+    // gives from memory never counts as having reached the server.
+    httpClient: RefreshGuardHttpClient(ConnectivityHttpClient(appConnectivity)),
     authOptions: FlutterAuthClientOptions(
       localStorage: SharedPreferencesLocalStorage(
           persistSessionKey: Env.current.sessionStorageKey),
