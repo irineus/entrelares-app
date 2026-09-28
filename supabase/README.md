@@ -2654,7 +2654,7 @@ guard, and it is free.
 |---|---|---|
 | **The suite reports** | `app/integration_test/e2e_proof.dart` — `proveExecution(binding)` | A per-test `tearDown` copies `binding.results` into `binding.reportData` (`executed`, `failed`). Zero tests → zero tearDowns → no report. It is deliberately NOT a `tearDownAll`: that would run after a broken `setUpAll` and share its slot with `family.purge()`, which throws on an uninitialised `late` in exactly that case |
 | **The driver judges** | `app/test_driver/integration_test.dart` + `e2e_proof.dart` (pure Dart) | Same sequence as the stock driver (connect → request → close), then `judge()`: red on a failure, on no report, on a report without the list, on an empty list, on a count ≠ `E2E_EXPECTED_TESTS`. Writes `app/build/e2e_proof.json` in every outcome and exits 1 on red |
-| **The workflow demands** | `verify.yml`, job `web-e2e` | `for spec in swap_workflow_test:1:2 account_flows_test:1:3 deep_link_test:4:4` — `<target>:<p0>:<full>`. Removes the proof BEFORE each drive (a stale one must never stand in for a missing one), passes the count, and prints the executed names in the run summary |
+| **The workflow demands** | `verify.yml`, job `web-e2e` | One matrix leg per suite since T-95 (28/09/2026): `{ target: swap_workflow_test, p0: 1, full: 2 }`, `{ target: account_flows_test, p0: 1, full: 3 }`, `{ target: deep_link_test, p0: 4, full: 4 }`. Each leg removes the proof BEFORE its drive (a stale one must never stand in for a missing one), passes its own count, and prints the executed names in the run summary |
 
 Full-pack tests are skipped with **`skip: pack == 'p0'`**, never with an early `return`: a body
 that returns on its first line reaches `runTest` and counts as executed — the vacuous green in
@@ -2695,6 +2695,47 @@ The driver's last line says which of the five it was, in PT-BR, with the names i
 | `não traz a lista "executed"` | driver and suite stopped sharing the key | `test_driver/e2e_proof.dart` vs `integration_test/e2e_proof.dart` |
 | `ZERO testes executados` | the suite reported, but nothing ran | a suite whose every test is skipped |
 | `esperava N … executou M` | the count moved | a test added/removed without the `verify.yml` bump (the app lane should have caught it first) |
+
+### 15.4.1 One leg per suite, and why the job cannot time out on a green run (T-95)
+
+Until 28/09/2026 the three suites ran back to back in ONE job under `timeout-minutes: 20`. Over the
+last 20 green runs before the change (36176048613 … 36372110532) that job took **median 18.9, p95
+19.5, max 19.6 min**, up from ~15.2 on 24/09. On PR #301 the shared dev project was slow
+(`account_flows_test` 5.9 min instead of 3.9), and the job hit its own ceiling 7 min into
+`deep_link_test` with no assertion failed. The run read **`cancelled`**, which is also what a
+`db-gate` eviction looks like (§5), and `ops-alert` ignores `cancelled` on purpose.
+
+| Per leg, same 20 runs (min) | median | p95 | max |
+|---|---|---|---|
+| setup before the drive | 0.5 | 0.6 | 0.9 |
+| `swap_workflow_test` (compile + run) | 5.6 | 5.9 | 6.0 |
+| `account_flows_test` | 3.9 | 4.3 | 4.4 |
+| `deep_link_test` | 8.5 | 8.6 | 8.6 |
+
+Now `web-e2e` is a matrix with `fail-fast: false`. Each leg has its own runner, its own
+`timeout-minutes: 15` (the longest leg is ~9.2 min at p95, and 15 leaves room for the +51% the slow
+dev project cost on #301), its own concurrency group (`web-e2e-<ref>-<target>`; one group shared by
+the three legs would make a run cancel its own legs) and its own verdict. `needs: web-e2e` waits for
+every leg, so the publish gate is unchanged, and the job's wall time is the longest leg (~10 min),
+not the sum (~19). The users each run creates on dev are unchanged: one throwaway family of 2 per
+target (§16). `web_channel_test` reads the matrix rows as the counts T-58 demands and pins
+`fail-fast: false`, the per-target group and the 13–20 min timeout band.
+
+**The per-test ceiling moved with it.** Every `testWidgets` carried a literal
+`Timeout(Duration(minutes: 5))`, and the bodies had grown into it. Measured from the end of the
+setUpAll to the verdict over the same 20 runs: the p0 swap test took 4.55–4.86 min, the p0
+invitation test up to 3.55, and deep_link's four tests 7.6 together. On main run 36374786205 the
+swap test ran 5m01s and died on its ceiling. The driver can only report that as *"ZERO testes
+executados"*, because a test killed by its timeout never reaches the tearDown that records it. The
+ceiling is now ONE constant, `e2eTestTimeout` (8 min) in `integration_test/e2e_proof.dart`, on every
+test. `web_channel_test` refuses a literal `Timeout(` in a suite and requires the ceiling + 3 min
+to fit inside the leg's `timeout-minutes`, so a stuck test ends red with its suite named instead
+of a cancelled leg. **A "ZERO testes" whose setUpAll window is green is this ceiling**, not an
+empty suite: read the gap between the setUpAll's end and the verdict.
+
+**Reading it:** a red or timed-out leg names its suite in the job name (`web-e2e
+(deep_link_test)`). The other legs still report, so a lone slow leg is the dev project; all three
+slow at once is the dev project or the runner image, not the change.
 
 ### 15.5 The lane's oscillation — what T-58 measured and what it left
 

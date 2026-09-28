@@ -248,7 +248,7 @@ void main() {
     expect(await family.openRequests(), isEmpty);
     final afterApproval = await family.dayOf(targetDay);
     expect(afterApproval?['actual_parent_id'], family.member.profileId);
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  }, timeout: e2eTestTimeout);
 
   // Full pack only — `skip:`, never an early `return`: a body that returns on
   // its first line counts as an executed test in the T-58 proof.
@@ -320,5 +320,5 @@ void main() {
     expect(requests.where((r) => r['schedule_date'].toString().endsWith(
         '-${day.day.toString().padLeft(2, '0')}')), isEmpty,
         reason: 'the rejection closed the request');
-  }, skip: pack == 'p0', timeout: const Timeout(Duration(minutes: 5)));
+  }, skip: pack == 'p0', timeout: e2eTestTimeout);
 }

@@ -201,7 +201,7 @@ void main() {
     final all = await family.allInvitations();
     expect(all.where((i) => i['email'] == invitee).single['revoked_at'],
         isNotNull);
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  }, timeout: e2eTestTimeout);
 
   // Full pack only — `skip:`, never an early `return`: a body that returns on
   // its first line counts as an executed test in the T-58 proof.
@@ -245,7 +245,7 @@ void main() {
         reason: 'a live elevation window is reused for 5 minutes');
     expect((await family.profileOf(family.member.profileId))?['is_admin'],
         isFalse);
-  }, skip: pack == 'p0', timeout: const Timeout(Duration(minutes: 5)));
+  }, skip: pack == 'p0', timeout: e2eTestTimeout);
 
   // Full pack only, same reasoning as above.
   testWidgets('a wrong password is refused by the real Edge Function',
@@ -265,5 +265,5 @@ void main() {
     expect(find.text(l[K.sudoTitle]), findsOneWidget);
     expect((await family.profileOf(family.member.profileId))?['is_admin'],
         isFalse);
-  }, skip: pack == 'p0', timeout: const Timeout(Duration(minutes: 5)));
+  }, skip: pack == 'p0', timeout: e2eTestTimeout);
 }

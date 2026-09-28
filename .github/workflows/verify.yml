@@ -482,15 +482,50 @@ jobs:
   # report: a broken flow now stops the channel instead of reaching users. The
   # cost is accepted with it — a flaky run here holds a deploy, and the answer to
   # a red is to read it, never to re-run until it passes.
+  #
+  # T-95 (28/09/2026): ONE LEG PER SUITE. The three suites used to run back to
+  # back under a single `timeout-minutes: 20`, and a GREEN run already took
+  # 18.9 min (median of the last 20; p95 19.5, max 19.6), up from 15.2 on
+  # 24/09. On PR #301 the shared dev project was slow, `account_flows_test`
+  # took 5.9 min instead of 3.9, and the job hit its own ceiling 7 min into
+  # `deep_link_test` with no assertion failed. It read `cancelled`, the shape
+  # of a `db-gate` eviction, which `ops-alert` deliberately ignores. As a matrix
+  # each suite has its own runner, clock and verdict, and the job ends when the
+  # longest leg does (~10 min, not ~19). `needs: web-e2e` still waits for ALL
+  # legs, and a failing leg makes the whole job `failure`.
   web-e2e:
+    name: web-e2e (${{ matrix.target }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Per LEG. Measured over those 20 green runs: setup before the drive p95
+    # 0.6 min; compile + run p95 5.9 (swap_workflow), 4.3 (account_flows) and
+    # 8.6 (deep_link). The longest leg is ~9.2 min at p95. 15 min leaves 60% on
+    # top, more than the +51% the slow dev project cost account_flows on #301.
+    timeout-minutes: 15
+    strategy:
+      # A red leg must not cancel its siblings. A cancelled sibling is exactly
+      # the misleading `cancelled` this split exists to remove, and the other
+      # suites' verdicts are evidence for whoever reads the red one.
+      fail-fast: false
+      matrix:
+        # T-58: `p0` / `full` are the number of tests each pack must PROVE it
+        # ran, handed to the driver as E2E_EXPECTED_TESTS. `web_channel_test`
+        # mirrors these against the suites' `testWidgets(` declarations, so a
+        # new test bumps them in the cheap lane first. One line per suite, in
+        # this exact shape: the mirror reads it.
+        include:
+          - { target: swap_workflow_test, p0: 1, full: 2 }
+          - { target: account_flows_test, p0: 1, full: 3 }
+          - { target: deep_link_test, p0: 4, full: 4 }
     concurrency:
       # Its OWN group, not `db-gate`'s: both drive the dev project, but they do
       # not collide — each invents its own `E2E-<runId>` family and both orphan
       # sweeps spare anything younger than 2h. Sharing a group would only
-      # serialize them and lengthen every PR's critical path.
-      group: web-e2e-${{ github.ref }}
+      # serialize them and lengthen every PR's critical path. The target is in
+      # the key because every leg evaluates this block: without it the three
+      # legs of ONE run would share a group and cancel one another. The same
+      # `E2E-<runId>` naming (UTC timestamp + a microsecond suffix, drawn by
+      # each suite) keeps three legs running at once apart on the dev project.
+      group: web-e2e-${{ github.ref }}-${{ matrix.target }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
@@ -516,56 +551,56 @@ jobs:
         env:
           E2E_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
           E2E_PACK: ${{ inputs.e2e-pack || 'p0' }}
+          # The matrix reaches the script through the environment, never
+          # interpolated into it.
+          TARGET: ${{ matrix.target }}
+          P0: ${{ matrix.p0 }}
+          FULL: ${{ matrix.full }}
         run: |
           set -euo pipefail
           flutter pub get
           chromedriver --port=4444 &
           for i in $(seq 1 20); do curl -sf http://localhost:4444/status >/dev/null && break; sleep 1; done
-          echo "### Gate de fluxo (web) — pack $E2E_PACK" >> "$GITHUB_STEP_SUMMARY"
-          # One invocation per target: `flutter drive` takes a single target and
-          # each one pays its own ~40 s compile. The first two files are the SAME
+          echo "### Gate de fluxo (web) — $TARGET, pack $E2E_PACK" >> "$GITHUB_STEP_SUMMARY"
+          # One leg per target: `flutter drive` takes a single target and each
+          # one pays its own ~40 s compile. The first two files are the SAME
           # ones the emulator lane runs; `deep_link_test` is the exception T-64
           # bought — a cold entry into an inner URL only misbehaves where the
           # browser hands the app its own address, so that one is web-only by
           # construction and the emulator lane does not run it.
           #
-          # T-58: `<target>:<p0 count>:<full count>` — the number of tests each
-          # pack must PROVE it ran, handed to the driver as E2E_EXPECTED_TESTS.
-          # `web_channel_test` mirrors these against the suites' `testWidgets(`
-          # declarations, so a new test bumps them in the cheap lane first. The
-          # proof file is removed BEFORE each drive: a stale one from the previous
-          # target must never stand in for a missing one.
+          # T-58: the count this pack must PROVE it ran comes from the matrix.
+          # The proof file is removed BEFORE the drive: a stale one (a cache, a
+          # re-run on a warm workspace) must never stand in for a missing one.
           #
           # Fulcrum 03.4: `--web-port=8080` is NOT cosmetic. The dev build talks
           # to `api-dev.entrelares.app`, whose CORS list admits loopback on 8080
           # only (`ALLOWED_ORIGINS` of the gateway's `entrelares-dev` env) - on
           # the random port `web-server` picks by default every preflight is a
-          # 403 and the suite never signs in.
-          for spec in swap_workflow_test:1:2 account_flows_test:1:3 deep_link_test:4:4; do
-            IFS=: read -r target p0 full <<< "$spec"
-            expected="$p0"
-            if [ "$E2E_PACK" = full ]; then expected="$full"; fi
-            rm -f build/e2e_proof.json
-            start=$(date +%s)
-            E2E_EXPECTED_TESTS="$expected" flutter drive \
-              --driver=test_driver/integration_test.dart \
-              --target="integration_test/$target.dart" \
-              -d web-server --browser-name=chrome --headless \
-              --web-port=8080 \
-              --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY="$E2E_KEY" \
-              --dart-define=E2E_PACK="$E2E_PACK"
-            # The driver exits 1 without a proof; this is the belt to that brace,
-            # for a driver that died before writing one.
-            [ -f build/e2e_proof.json ] || { echo "::error title=T-58::$target terminou sem build/e2e_proof.json — nada prova que a suíte rodou"; exit 1; }
-            ran=$(jq -r ".executed | length" build/e2e_proof.json)
-            names=$(jq -r '.executed | join("; ")' build/e2e_proof.json)
-            # T-71: the setUpAll's window, green or red — it is what a later
-            # red is crossed against the db-gate's window on the shared dev
-            # project (H1). Printed from the proof, so a run whose setUpAll
-            # never reported shows "-" instead of a guessed time.
-            window=$(jq -r '.setUpAll | if . then "\(.startedAt)→\(.finishedAt) (\(.elapsedMs / 1000 | floor)s)" else "-" end' build/e2e_proof.json)
-            echo "- $target: $(( $(date +%s) - start ))s — $ran/$expected teste(s) provado(s): $names · setUpAll $window" >> "$GITHUB_STEP_SUMMARY"
-          done
+          # 403 and the suite never signs in. Each leg has its own runner, so the
+          # three legs never compete for the port.
+          expected="$P0"
+          if [ "$E2E_PACK" = full ]; then expected="$FULL"; fi
+          rm -f build/e2e_proof.json
+          start=$(date +%s)
+          E2E_EXPECTED_TESTS="$expected" flutter drive \
+            --driver=test_driver/integration_test.dart \
+            --target="integration_test/$TARGET.dart" \
+            -d web-server --browser-name=chrome --headless \
+            --web-port=8080 \
+            --dart-define=E2E_SUPABASE_SERVICE_ROLE_KEY="$E2E_KEY" \
+            --dart-define=E2E_PACK="$E2E_PACK"
+          # The driver exits 1 without a proof; this is the belt to that brace,
+          # for a driver that died before writing one.
+          [ -f build/e2e_proof.json ] || { echo "::error title=T-58::$TARGET terminou sem build/e2e_proof.json — nada prova que a suíte rodou"; exit 1; }
+          ran=$(jq -r ".executed | length" build/e2e_proof.json)
+          names=$(jq -r '.executed | join("; ")' build/e2e_proof.json)
+          # T-71: the setUpAll's window, green or red — it is what a later
+          # red is crossed against the db-gate's window on the shared dev
+          # project (H1). Printed from the proof, so a run whose setUpAll
+          # never reported shows "-" instead of a guessed time.
+          window=$(jq -r '.setUpAll | if . then "\(.startedAt)→\(.finishedAt) (\(.elapsedMs / 1000 | floor)s)" else "-" end' build/e2e_proof.json)
+          echo "- $TARGET: $(( $(date +%s) - start ))s — $ran/$expected teste(s) provado(s): $names · setUpAll $window" >> "$GITHUB_STEP_SUMMARY"
 
   # ── Production database ──────────────────────────────────────────────────
   # T-29's order, preserved across the move: migrations → functions → app. This
