@@ -39,6 +39,7 @@ abstract final class AnalyticsEvents {
   static const dayNoticeSent = 'day-notice-sent'; // T-78 (F-52 enums)
   static const dayNoticeAnswered = 'day-notice-answered'; // T-78
   static const dayAccountSaved = 'day-account-saved'; // T-78 (F-67)
+  static const dayAccountReplySaved = 'day-account-reply-saved'; // F-75, 28/09/2026
   static const adminModeOffer = 'admin-mode-offer'; // F-67, 21/09/2026
   static const adminModeToggle = 'admin-mode-toggle'; // T-78
   static const pdfExport = 'pdf-export'; // T-78
@@ -96,6 +97,7 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.dayNoticeSent: {'reason', 'request', 'eta'},
     AnalyticsEvents.dayNoticeAnswered: {'outcome'},
     AnalyticsEvents.dayAccountSaved: {'correction'},
+    AnalyticsEvents.dayAccountReplySaved: {'correction'},
     AnalyticsEvents.adminModeOffer: {'action', 'result'},
     AnalyticsEvents.adminModeToggle: {'state'},
     // U-59 (28/09/2026): `source` tells the Conversa's door (`chat`) from

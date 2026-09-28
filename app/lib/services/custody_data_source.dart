@@ -22,6 +22,7 @@ import 'package:entrelares_db_contracts/models/chat_message.dart';
 import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
+import 'package:entrelares_db_contracts/models/day_account_reply.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_deletion.dart';
@@ -278,6 +279,22 @@ abstract class CustodyDataSource {
   /// the day the RPC's daily cap counts — so the sheet can say how many are
   /// left before the database says no.
   Future<int> countDayAccountsWrittenToday(int authorId);
+
+  // ── F-75 the reply to a relato ──
+
+  /// The replies to the relatos [accountIds], in the order they were
+  /// written. Empty ids read nothing.
+  Future<List<DayAccountReply>> fetchDayAccountReplies(List<int> accountIds);
+
+  /// Records a reply to the relato [accountId] (or a correction of
+  /// [correctsId]) and returns its id. Every rule — the flag, who, the
+  /// window, the length, one reply per member per relato and one correction —
+  /// is the database's; the sheet mirrors them only to offer the button.
+  Future<int> addDayAccountReply({
+    required int accountId,
+    required String body,
+    int? correctsId,
+  });
 
   // ── F-52 aviso de imprevisto ──
 

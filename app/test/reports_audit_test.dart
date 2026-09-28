@@ -20,6 +20,7 @@ import 'package:entrelares_app/widgets/app_l10n.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource;
 import 'package:entrelares_db_contracts/models/day_account.dart';
+import 'package:entrelares_db_contracts/models/day_account_reply.dart';
 
 const roleMother = Role(id: 1, roleName: 'mother');
 const roleFather = Role(id: 2, roleName: 'father');
@@ -398,6 +399,37 @@ void main() {
       expect(find.textContaining('Corrigido em'), findsOne);
       // A month with relatos and no calendar change is not "empty".
       expect(find.text(l[K.auditEmptyTitle]), findsNothing);
+    });
+
+    // F-75: a reply is an entry of its own, on the day its relato is about.
+    testWidgets('Por Mês lists the replies to the month\'s relatos',
+        (tester) async {
+      final ds = source()
+        ..dayAccounts = [
+          DayAccount(
+              id: 1,
+              familyId: 7,
+              accountDate: DateTime(2026, 8, 10),
+              authorProfileId: 1,
+              body: 'buscou as 17h',
+              createdAt: DateTime.utc(2026, 8, 11, 12)),
+        ]
+        ..dayAccountReplies = [
+          DayAccountReply(
+              id: 9,
+              familyId: 7,
+              accountId: 1,
+              authorProfileId: 2,
+              body: 'foi as 18h',
+              createdAt: DateTime.utc(2026, 8, 11, 14)),
+        ];
+      await pumpAudit(tester, ds);
+      await tester.tap(find.text(l[K.repByMonth]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l.format(KApp.dayAccountReplyAuditNew, ['Bruno Lima'])),
+          findsOne);
+      expect(find.text('foi as 18h'), findsOne);
     });
 
     testWidgets('Por Mês reads the month, Por Ano the year', (tester) async {

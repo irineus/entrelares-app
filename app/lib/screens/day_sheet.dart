@@ -8,6 +8,7 @@ import '../theme/tokens.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
+import 'package:entrelares_db_contracts/models/day_account_reply.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import '../services/admin_mode.dart';
 import '../services/custody_data_source.dart';
@@ -35,6 +36,12 @@ const daySheetCorrectPlanKey = Key('day-sheet-correct-plan');
 /// (suffixed with its id).
 const daySheetReportFieldKey = Key('day-sheet-report-field');
 String daySheetCorrectAccountKey(int id) => 'day-sheet-correct-account-$id';
+
+/// F-75: the reply's text field, "Responder" under one relato and the
+/// "Corrigir" of one reply (both suffixed with their ids).
+const daySheetReplyFieldKey = Key('day-sheet-reply-field');
+String daySheetReplyKey(int accountId) => 'day-sheet-reply-$accountId';
+String daySheetCorrectReplyKey(int id) => 'day-sheet-correct-reply-$id';
 
 /// The day sheet — a native modal bottom sheet (owner directive: use the
 /// platform where it improves on the web's inline panel). Since lote 2 this is
@@ -217,6 +224,18 @@ class _DaySheetState extends State<_DaySheet> {
   /// until read; a failed read just skips the "N left" line.
   int? _writtenToday;
 
+  // ── F-75: the replies to the day's relatos ──
+  List<DayAccountReply> _replies = const [];
+
+  /// The relato being answered — the reply editor is on screen, a fourth
+  /// mode, never at the same time as the others.
+  DayAccount? _replyingTo;
+
+  /// The reply being corrected, or null for the reply itself.
+  DayAccountReply? _correctingReply;
+  late final TextEditingController _replyBody;
+  bool _savingReply = false;
+
   /// U-56: how the day tap opened this sheet — decides the first mode and is
   /// the `mode` of `day-sheet-closed`.
   late final DaySheetOpening _opening;
@@ -373,6 +392,7 @@ class _DaySheetState extends State<_DaySheet> {
     _notes = TextEditingController();
     _swapMessage = TextEditingController();
     _accountBody = TextEditingController();
+    _replyBody = TextEditingController();
     _resetDraft();
     _notes.addListener(_onNotesChanged);
     if (_isPast) _loadAccounts();
@@ -525,9 +545,17 @@ class _DaySheetState extends State<_DaySheet> {
     try {
       final rows =
           await widget.dataSource.fetchDayAccounts(widget.date, widget.date);
+      // F-75: the replies ride along, best-effort — a relato without its
+      // replies is still the relato.
+      var replies = const <DayAccountReply>[];
+      try {
+        replies = await widget.dataSource
+            .fetchDayAccountReplies([for (final a in rows) a.id]);
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _accounts = rows;
+        _replies = replies;
         _accountsFailed = false;
       });
     } catch (_) {
@@ -605,6 +633,110 @@ class _DaySheetState extends State<_DaySheet> {
     }
   }
 
+  // ── F-75 ──
+
+  List<DayAccountReplyEntry> get _replyEntries => [
+        for (final r in _replies)
+          (
+            id: r.id,
+            accountId: r.accountId,
+            authorId: r.authorProfileId,
+            correctsId: r.correctsId,
+            createdAt: r.createdAt,
+          ),
+      ];
+
+  bool _canReplyTo(DayAccount a) {
+    final me = widget.myProfile;
+    if (me == null || widget.offline) return false;
+    return canReplyToDayAccount(
+      enabled: widget.settings.dayAccountRepliesEnabled,
+      isViewer: me.isViewer,
+      hasAccount: (me.userId ?? '').isNotEmpty,
+      hasLeft: me.hasLeft,
+      myProfileId: me.id,
+      accountId: a.id,
+      accountAuthorId: a.authorProfileId,
+      accountCreatedAt: a.createdAt,
+      now: DateTime.now().toUtc(),
+      windowDays: widget.settings.dayAccountReplyWindowDays,
+      replies: _replyEntries,
+    );
+  }
+
+  /// The reader could still write under [a] — the flag, the seat, the
+  /// window — which is what a correction of their reply also needs.
+  bool _replyWindowOpen(DayAccount a) {
+    final me = widget.myProfile;
+    return me != null &&
+        !widget.offline &&
+        !me.isViewer &&
+        !me.hasLeft &&
+        (me.userId ?? '').isNotEmpty &&
+        widget.settings.dayAccountRepliesEnabled &&
+        isInDayAccountReplyWindow(
+            accountCreatedAt: a.createdAt,
+            now: DateTime.now().toUtc(),
+            windowDays: widget.settings.dayAccountReplyWindowDays);
+  }
+
+  void _startReply(DayAccount a, {DayAccountReply? correcting}) =>
+      setState(() {
+        _error = null;
+        _replyingTo = a;
+        _correctingReply = correcting;
+        _replyBody.text = correcting?.body ?? '';
+      });
+
+  void _cancelReply() => setState(() {
+        _replyingTo = null;
+        _correctingReply = null;
+        _error = null;
+        _replyBody.clear();
+      });
+
+  Future<void> _saveReply() async {
+    final account = _replyingTo;
+    if (_savingReply || account == null) return;
+    final l = AppL10n.of(context).l;
+    final maxChars = widget.settings.dayAccountReplyMaxChars;
+    final errorKey = dayAccountReplyBodyErrorKey(_replyBody.text, maxChars);
+    if (errorKey != null) {
+      setState(() => _error = l.format(errorKey, [maxChars]));
+      return;
+    }
+    setState(() {
+      _savingReply = true;
+      _error = null;
+    });
+    try {
+      await widget.dataSource.addDayAccountReply(
+        accountId: account.id,
+        body: _replyBody.text.trim(),
+        correctsId: _correctingReply?.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _savingReply = false;
+        _replyingTo = null;
+        _correctingReply = null;
+        _replyBody.clear();
+        _result = DaySheetResult.report;
+      });
+      showAppSnack(context, l[KApp.dayAccountReplySaved]);
+      await _loadAccounts();
+    } catch (e) {
+      if (!mounted) return;
+      final raw = e.toString();
+      setState(() {
+        _savingReply = false;
+        _error = isSessionExpired(raw)
+            ? sessionExpiredMessage(l)
+            : translateSaveError(raw, l[KApp.dayAccountReplyErrSave], l);
+      });
+    }
+  }
+
   void _cancelEdit() {
     if (!_startedInSummary) {
       Navigator.of(context).pop();
@@ -628,6 +760,7 @@ class _DaySheetState extends State<_DaySheet> {
     _notes.dispose();
     _swapMessage.dispose();
     _accountBody.dispose();
+    _replyBody.dispose();
     super.dispose();
   }
 
@@ -934,19 +1067,22 @@ class _DaySheetState extends State<_DaySheet> {
 
     // F-67: the guards are about the PLAN; while a relato is being written
     // "Dia passado — apenas visualização" would contradict the field under it.
-    final banners =
-        _reporting ? const <Widget>[] : _guardBanners(l, assignment);
+    final replying = _replyingTo != null;
+    final banners = _reporting || replying
+        ? const <Widget>[]
+        : _guardBanners(l, assignment);
     // U-28 QA: the day is READ-ONLY here, and the owner's review said the
     // stripped-down version of this sheet was the best thing on the screen.
     // U-25 made that version the DEFAULT: every assigned day opens as it, and
     // the form is one pencil away wherever a save is possible.
     final readOnly = _readOnly;
-    final editing = _editing && !readOnly && !_reporting;
+    final editing = _editing && !readOnly && !_reporting && !replying;
     final reporting = _reporting;
     // F-67: on a past day inside the window the summary's primary is the
     // relato — the one door every active member has; "Corrigir o
     // planejamento" (Part B) stays the secondary, admin-only one.
-    final offerReport = !editing && !reporting && _isPast && _canWriteAccount;
+    final offerReport =
+        !editing && !reporting && !replying && _isPast && _canWriteAccount;
     final draftChanged = _paintedDraftChanged = _draftChanged;
     return AppSheetFrame(
       title: _capitalize('${formatHandoffDate(widget.date, l)} · '
@@ -955,7 +1091,7 @@ class _DaySheetState extends State<_DaySheet> {
       onClose: () => Navigator.of(context).pop(),
       closeLabel: l[K.commonClose],
       headerActions: [
-        if (!readOnly && !editing && !reporting)
+        if (!readOnly && !editing && !reporting && !replying)
           IconButton(
             key: daySheetEditKey,
             icon: const Icon(Icons.edit_outlined),
@@ -990,14 +1126,18 @@ class _DaySheetState extends State<_DaySheet> {
           : editing
               ? _confirmation(l)
               : null,
-      primaryLabel: reporting
+      primaryLabel: replying
+          ? l[KApp.dayAccountReplySave]
+          : reporting
           ? l[KApp.dayAccountSave]
           : offerReport
               ? l[KApp.dayAccountAction]
               : !editing
                   ? null
                   : l[K.commonSave],
-      onPrimary: reporting
+      onPrimary: replying
+          ? _saveReply
+          : reporting
           ? (_writtenToday != null && _capLeft <= 0 ? null : _saveAccount)
           : offerReport
               ? () => _startReport()
@@ -1007,18 +1147,20 @@ class _DaySheetState extends State<_DaySheet> {
                       _beyondRetroReach
                   ? null
                   : _save,
-      secondaryLabel: reporting
+      secondaryLabel: reporting || replying
           ? l[K.commonCancel]
           : !editing
               ? null
               : l[K.commonCancel],
-      onSecondary: reporting
+      onSecondary: replying
+          ? (_savingReply ? null : _cancelReply)
+          : reporting
           ? (_savingAccount ? null : _cancelReport)
           : _deleting
               ? null
               : _cancelEdit,
-      busy: _saving || _savingAccount,
-      extraAction: reporting
+      busy: _saving || _savingAccount || _savingReply,
+      extraAction: reporting || replying
           ? null
           : !editing
           ? _correctPlanAction(l)
@@ -1036,7 +1178,9 @@ class _DaySheetState extends State<_DaySheet> {
                           : _clearDay,
                 ),
       children: [
-        if (reporting)
+        if (replying)
+          ..._replyForm(l)
+        else if (reporting)
           ..._reportForm(l)
         else if (!editing) ...[
           _summary(l, day, assignment),
@@ -1157,10 +1301,121 @@ class _DaySheetState extends State<_DaySheet> {
                   child: Text(l[KApp.dayAccountCorrect]),
                 ),
               ),
+            // F-75: the second voice, under the relato it answers.
+            ..._repliesOf(l, a),
+            if (_canReplyTo(a))
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: Key(daySheetReplyKey(a.id)),
+                  onPressed: () => _startReply(a),
+                  child: Text(l[KApp.dayAccountReplyAction]),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  /// F-75: the replies to [a], in the order they were written — a corrected
+  /// one stays, struck, with the instant of its correction, like a relato.
+  List<Widget> _repliesOf(Localization l, DayAccount a) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    final entries = _replyEntries;
+    final mine = repliesToDayAccount(a.id, entries);
+    if (mine.isEmpty) return const [];
+    final byId = {for (final r in _replies) r.id: r};
+    final canWrite = _replyWindowOpen(a);
+    return [
+      for (final e in mine)
+        Padding(
+          padding: const EdgeInsets.only(top: Spacing.sm),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: tokens.outline, width: 3)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(left: Spacing.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(byId[e.id]!.body,
+                      style: correctionOfReply(e.id, entries) != null
+                          ? textTheme.bodyMedium?.copyWith(
+                              color: tokens.textMuted,
+                              decoration: TextDecoration.lineThrough)
+                          : textTheme.bodyMedium),
+                  const SizedBox(height: Spacing.xs),
+                  Text(
+                      dayAccountReplyByline(l,
+                          authorName: _nameOf(e.authorId),
+                          writtenAt: e.createdAt),
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: tokens.textMuted)),
+                  if (correctionOfReply(e.id, entries) case final fix?)
+                    Text(dayAccountCorrectedLine(l, correctedAt: fix.createdAt),
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: tokens.textMuted)),
+                  if (canCorrectDayAccountReply(
+                      entry: e,
+                      replies: entries,
+                      myProfileId: widget.myProfile?.id ?? -1,
+                      canWrite: canWrite))
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        key: Key(daySheetCorrectReplyKey(e.id)),
+                        onPressed: () => _startReply(a, correcting: byId[e.id]),
+                        child: Text(l[KApp.dayAccountCorrect]),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  /// F-75: the reply editor — the relato being answered on top, one field,
+  /// and the sentence that says what cannot be undone BEFORE the tap.
+  List<Widget> _replyForm(Localization l) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    final account = _replyingTo!;
+    final correcting = _correctingReply;
+    return [
+      Text(
+          dayAccountByline(l,
+              authorName: _nameOf(account.authorProfileId),
+              writtenAt: account.createdAt),
+          style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
+      const SizedBox(height: Spacing.xs),
+      Text(account.body, style: textTheme.bodyMedium),
+      const SizedBox(height: Spacing.md),
+      if (correcting != null) ...[
+        Text(
+            l.format(KApp.dayAccountReplyCorrecting,
+                [l.formatDateTime(correcting.createdAt.toLocal())]),
+            style: textTheme.labelMedium?.copyWith(color: tokens.textMuted)),
+        const SizedBox(height: Spacing.sm),
+      ],
+      AppTextField(
+        key: daySheetReplyFieldKey,
+        label: l[KApp.dayAccountReplyFieldLabel],
+        hint: l[KApp.dayAccountReplyFieldHint],
+        controller: _replyBody,
+        maxLines: 6,
+        maxLength: widget.settings.dayAccountReplyMaxChars,
+        keyboardType: TextInputType.multiline,
+        autofocus: true,
+      ),
+      const SizedBox(height: Spacing.sm),
+      Text(l[KApp.dayAccountReplyAppendOnly],
+          style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+    ];
   }
 
   /// F-67: the relato editor — one field, and the sentence that says what

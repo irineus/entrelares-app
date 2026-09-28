@@ -307,4 +307,25 @@ void main() {
     expect(pt[K.notifRenderTitleExpenseAdded], 'Despesa lançada');
     expect(catalogs['en']![K.notifRenderTitleExpenseAdded], 'Expense added');
   });
+
+  // F-75 (28/09/2026): the second voice under a relato is a *resposta* /
+  // *reply* (owner). The word is already free elsewhere ("aguardando
+  // resposta", the help form's reply-to), so an exclusive address is not
+  // possible; what is pinned is the half that rots silently — the F-75
+  // surface keeps calling itself a resposta.
+  test('the F-75 surface calls the answer to a relato a resposta', () {
+    final pt = Localization(AppLanguage.ptBr);
+    final en = Localization(AppLanguage.en);
+    final ptWord = RegExp(r'\bresp(ost|ond)', caseSensitive: false);
+    final enWord = RegExp(r'\breply', caseSensitive: false);
+    for (final key in [
+      KApp.dayAccountReplyAction,
+      KApp.dayAccountReplySave,
+      KApp.dayAccountReplyFieldLabel,
+      K.notifRenderTitleDayAccountReply,
+    ]) {
+      expect(ptWord.hasMatch(pt[key]), isTrue, reason: '$key (pt): ${pt[key]}');
+      expect(enWord.hasMatch(en[key]), isTrue, reason: '$key (en): ${en[key]}');
+    }
+  });
 }

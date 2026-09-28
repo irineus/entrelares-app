@@ -876,6 +876,10 @@ abstract final class K {
   static const String notifRenderTitleDayAccount = 'notifRender.title.dayAccount';
   static const String notifRenderDayAccountNew = 'notifRender.dayAccount.new';
   static const String notifRenderDayAccountCorrection = 'notifRender.dayAccount.correction';
+  // F-75: the reply to a relato (in-app only, to the relato's author).
+  static const String notifRenderTitleDayAccountReply = 'notifRender.title.dayAccountReply';
+  static const String notifRenderDayAccountReplyNew = 'notifRender.dayAccount.replyNew';
+  static const String notifRenderDayAccountReplyCorrection = 'notifRender.dayAccount.replyCorrection';
 
   // ── E-mail quota (F-38) + billing grace (S-15) ──
   static const String notifRenderTitleEmailCapPremium = 'notifRender.title.emailCapPremium';
@@ -2021,6 +2025,9 @@ abstract final class K {
     notifRenderTitleDayAccount,
     notifRenderDayAccountNew,
     notifRenderDayAccountCorrection,
+    notifRenderTitleDayAccountReply,
+    notifRenderDayAccountReplyNew,
+    notifRenderDayAccountReplyCorrection,
     notifRenderTitleEmailCapPremium,
     notifRenderTitleEmailCapFree,
     notifRenderTitleEmailCapLast,

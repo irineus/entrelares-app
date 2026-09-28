@@ -8,6 +8,7 @@ import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
+import 'package:entrelares_db_contracts/models/day_account_reply.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
@@ -67,6 +68,9 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   /// "by affected date" reading those tabs give the calendar changes.
   List<DayAccount> _dayAccounts = const [];
 
+  /// F-75: the replies to those relatos, printed under each one.
+  List<DayAccountReply> _dayAccountReplies = const [];
+
   /// F-55: the agenda events whose DAY falls in the period, deleted ones
   /// included — the record says who added and who removed. Empty with the
   /// agenda off.
@@ -99,6 +103,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
       _activity = const [];
       _account = const [];
       _dayAccounts = const [];
+      _dayAccountReplies = const [];
       _agendaEvents = const [];
       _origins = const {};
       _expandedBatches.clear();
@@ -109,6 +114,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
       var activity = const <ActivityLog>[];
       var account = const <AccountLog>[];
       var dayAccounts = const <DayAccount>[];
+      var dayAccountReplies = const <DayAccountReply>[];
       var agendaEvents = const <ChildEvent>[];
       var children = _children;
       var hasMore = false;
@@ -130,6 +136,11 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
           activity =
               await widget.dataSource.fetchActivityLogsForPeriod(start, end);
           dayAccounts = await widget.dataSource.fetchDayAccounts(start, end);
+          // F-75: best-effort — a failure costs the replies, never the relatos.
+          try {
+            dayAccountReplies = await widget.dataSource
+                .fetchDayAccountReplies([for (final a in dayAccounts) a.id]);
+          } catch (_) {}
           // F-55: best-effort — a failure costs the agenda lines, never the
           // calendar trail.
           try {
@@ -153,6 +164,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
         _activity = activity;
         _account = account;
         _dayAccounts = dayAccounts;
+        _dayAccountReplies = dayAccountReplies;
         _agendaEvents = agendaEvents;
         _children = children;
         _family = family;
@@ -524,6 +536,55 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
           ],
           timestamp: l.formatDateTime(a.createdAt.toLocal()),
         ),
+      // F-75: the replies, each its own dated entry — "who answered which
+      // relato" is a fact of the trail like the relato itself.
+      ..._dayAccountReplyTimeline(l),
+    ];
+  }
+
+  List<Widget> _dayAccountReplyTimeline(Localization l) {
+    if (_dayAccountReplies.isEmpty) return const [];
+    final byAccount = {for (final a in _dayAccounts) a.id: a};
+    final entries = [
+      for (final r in _dayAccountReplies)
+        (
+          id: r.id,
+          accountId: r.accountId,
+          authorId: r.authorProfileId,
+          correctsId: r.correctsId,
+          createdAt: r.createdAt,
+        ),
+    ];
+    final ordered = [..._dayAccountReplies]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final textTheme = Theme.of(context).textTheme;
+    return [
+      for (final r in ordered)
+        if (byAccount[r.accountId] case final a?)
+          _item(
+            badge: AuditBadge.created,
+            icon: Icons.reply,
+            children: [
+              Text(l.format(K.auditDayLabel, [l.formatDate(a.accountDate)]),
+                  style: textTheme.labelSmall),
+              Text(l.format(
+                  r.correctsId == null
+                      ? KApp.dayAccountReplyAuditNew
+                      : KApp.dayAccountReplyAuditCorrection,
+                  [_nameOf(r.authorProfileId, l[K.auditSystemTrigger])])),
+              Text(r.body,
+                  style: correctionOfReply(r.id, entries) != null
+                      ? textTheme.bodySmall?.copyWith(
+                          decoration: TextDecoration.lineThrough,
+                          color: context.tokens.textMuted)
+                      : textTheme.bodySmall),
+              if (correctionOfReply(r.id, entries) case final fix?)
+                Text(dayAccountCorrectedLine(l, correctedAt: fix.createdAt),
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: context.tokens.textMuted)),
+            ],
+            timestamp: l.formatDateTime(r.createdAt.toLocal()),
+          ),
     ];
   }
 

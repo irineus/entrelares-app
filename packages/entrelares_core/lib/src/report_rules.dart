@@ -423,8 +423,31 @@ class ReportDayAccount {
   final bool isCorrection;
   final DateTime? correctedAtLocal;
 
+  /// F-75: the replies to this relato, in the order they were written.
+  final List<ReportDayAccountReply> replies;
+
   const ReportDayAccount({
     required this.accountDate,
+    required this.writtenAtLocal,
+    required this.authorName,
+    required this.body,
+    this.isCorrection = false,
+    this.correctedAtLocal,
+    this.replies = const [],
+  });
+}
+
+/// F-75: one reply to a relato as section 4 prints it, under the relato it
+/// answers — the author, when it was WRITTEN, the text, and on a reply some
+/// later one corrects, when. Both texts stay, like a relato's.
+class ReportDayAccountReply {
+  final DateTime writtenAtLocal;
+  final String authorName;
+  final String body;
+  final bool isCorrection;
+  final DateTime? correctedAtLocal;
+
+  const ReportDayAccountReply({
     required this.writtenAtLocal,
     required this.authorName,
     required this.body,

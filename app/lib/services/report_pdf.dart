@@ -435,9 +435,42 @@ List<pw.Widget> _dayAccountsSection(CustodyReport report, Localization l) => [
                         style: const pw.TextStyle(
                             fontSize: 8.5, color: PdfColors.grey800)),
                   ),
+                // F-75: the replies, under the relato they answer — the
+                // second voice, with its own author and instant.
+                for (final r in a.replies) ..._replyLines(r, l),
               ],
             ),
           ),
+    ];
+
+List<pw.Widget> _replyLines(ReportDayAccountReply r, Localization l) => [
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(left: 10, top: 4),
+        child: pw.Text(
+          l.format(
+              r.isCorrection
+                  ? KApp.pdfDayAccountReplyCorrectionLine
+                  : KApp.pdfDayAccountReplyLine,
+              [r.authorName, l.formatDateTime(r.writtenAtLocal)]),
+          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+        ),
+      ),
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(left: 20, top: 2),
+        child: pw.Text(r.body,
+            style: pw.TextStyle(
+                fontSize: 8.5,
+                color: r.correctedAtLocal == null
+                    ? PdfColors.black
+                    : PdfColors.grey700)),
+      ),
+      if (r.correctedAtLocal != null)
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(left: 20, top: 1),
+          child: pw.Text(
+              dayAccountCorrectedLine(l, correctedAt: r.correctedAtLocal!),
+              style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800)),
+        ),
     ];
 
 /// F-55: section 5 — the agenda of the period, day by day. It replaces the

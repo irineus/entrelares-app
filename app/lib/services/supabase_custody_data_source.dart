@@ -15,6 +15,7 @@ import 'package:entrelares_db_contracts/models/chat_message.dart';
 import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
+import 'package:entrelares_db_contracts/models/day_account_reply.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_deletion.dart';
@@ -963,6 +964,37 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       'p_corrects_id': correctsId,
     });
     unawaited(analytics?.trackEvent(AnalyticsEvents.dayAccountSaved,
+            props: {'correction': correctsId != null ? 'yes' : 'no'}) ??
+        Future<void>.value());
+    return id as int;
+  }
+
+  // ── F-75 the reply to a relato ──
+
+  @override
+  Future<List<DayAccountReply>> fetchDayAccountReplies(
+      List<int> accountIds) async {
+    if (accountIds.isEmpty) return const [];
+    final rows = await _client
+        .from('day_account_replies')
+        .select()
+        .inFilter('account_id', accountIds)
+        .order('created_at', ascending: true);
+    return rows.map(DayAccountReply.fromJson).toList();
+  }
+
+  @override
+  Future<int> addDayAccountReply({
+    required int accountId,
+    required String body,
+    int? correctsId,
+  }) async {
+    final id = await _client.rpc<dynamic>('add_day_account_reply', params: {
+      'p_account_id': accountId,
+      'p_body': body,
+      'p_corrects_id': correctsId,
+    });
+    unawaited(analytics?.trackEvent(AnalyticsEvents.dayAccountReplySaved,
             props: {'correction': correctsId != null ? 'yes' : 'no'}) ??
         Future<void>.value());
     return id as int;
