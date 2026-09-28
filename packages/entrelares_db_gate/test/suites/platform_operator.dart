@@ -57,6 +57,9 @@ const _usageReportKeys = {
   'expenses', 'deleted', 'settlements_pending', 'settlements_confirmed',
   // F-35: the Conversa — counts only
   'chat', 'messages', 'messages_30d', 'authors', 'chat_push_muted',
+  // F-75: the replies to a relato — counts only (weeks gain
+  // `day_account_replies`)
+  'day_account_replies', 'replies', 'reply_corrections',
 };
 
 Set<String> _keysOf(Object? node) => switch (node) {
@@ -845,11 +848,22 @@ void platformOperatorTests(GateFixture fx) {
         'body': '$marker-agenda',
       });
 
-      await fx.service.from('day_accounts').insert({
+      final relato = (await fx.service
+              .from('day_accounts')
+              .insert({
+                'family_id': fam.familyId,
+                'account_date': isoDate(addDays(today, -1)),
+                'author_profile_id': fam.adminProfile.id,
+                'body': '$marker-relato',
+              })
+              .select('id'))
+          .single['id'] as int;
+      // F-75: a reply's text is content too — counted, never shown.
+      await fx.service.from('day_account_replies').insert({
         'family_id': fam.familyId,
-        'account_date': isoDate(addDays(today, -1)),
-        'author_profile_id': fam.adminProfile.id,
-        'body': '$marker-relato',
+        'account_id': relato,
+        'author_profile_id': fam.memberProfile.id,
+        'body': '$marker-resposta',
       });
 
       // A type outside PUSH_TYPES (the F-28 fan-out), so the dispatcher never
@@ -948,6 +962,8 @@ void platformOperatorTests(GateFixture fx) {
           {'outcome': 'cancelled', 'count': 1}
         ]);
         expect((report['day_accounts'] as Map)['total'], 1);
+        expect((report['day_accounts'] as Map)['replies'], 1);
+        expect((report['day_accounts'] as Map)['reply_corrections'], 0);
         final agenda = report['agenda'] as Map<String, dynamic>;
         expect(agenda['children'], 1);
         expect(agenda['events_active'], 1);

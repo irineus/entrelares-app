@@ -442,6 +442,23 @@ abstract final class KApp {
   static const String dayAccountSaved = 'app.dayAccount.saved';
   static const String dayAccountErrSave = 'app.dayAccount.errSave';
   static const String dayAccountErrLoad = 'app.dayAccount.errLoad';
+  // ── F-75: the reply to a relato (the address stays app.dayAccount.* —
+  //    vocabulary_test keeps "relato" inside it) ──
+  static const String dayAccountReplyAction = 'app.dayAccount.replyAction';
+  static const String dayAccountReplyFieldLabel = 'app.dayAccount.replyFieldLabel';
+  static const String dayAccountReplyFieldHint = 'app.dayAccount.replyFieldHint';
+  static const String dayAccountReplyAppendOnly = 'app.dayAccount.replyAppendOnly';
+  static const String dayAccountReplySave = 'app.dayAccount.replySave';
+  static const String dayAccountReplyCorrecting = 'app.dayAccount.replyCorrecting';
+  static const String dayAccountReplyByline = 'app.dayAccount.replyByline';
+  static const String dayAccountReplySaved = 'app.dayAccount.replySaved';
+  static const String dayAccountReplyErrSave = 'app.dayAccount.replyErrSave';
+  static const String dayAccountReplyErrEmpty = 'app.dayAccount.replyErrEmpty';
+  static const String dayAccountReplyErrTooLong = 'app.dayAccount.replyErrTooLong';
+  static const String dayAccountReplyAuditNew = 'app.dayAccount.replyAuditNew';
+  static const String dayAccountReplyAuditCorrection = 'app.dayAccount.replyAuditCorrection';
+  static const String pdfDayAccountReplyLine = 'app.dayAccount.pdfReplyLine';
+  static const String pdfDayAccountReplyCorrectionLine = 'app.dayAccount.pdfReplyCorrectionLine';
   static const String dayAccountAuditNew = 'app.dayAccount.auditNew';
   static const String dayAccountAuditCorrection = 'app.dayAccount.auditCorrection';
   static const String pdfDayAccountsSection = 'app.dayAccount.pdfSection';
@@ -1020,6 +1037,21 @@ abstract final class KApp {
     dayAccountSaved,
     dayAccountErrSave,
     dayAccountErrLoad,
+    dayAccountReplyAction,
+    dayAccountReplyFieldLabel,
+    dayAccountReplyFieldHint,
+    dayAccountReplyAppendOnly,
+    dayAccountReplySave,
+    dayAccountReplyCorrecting,
+    dayAccountReplyByline,
+    dayAccountReplySaved,
+    dayAccountReplyErrSave,
+    dayAccountReplyErrEmpty,
+    dayAccountReplyErrTooLong,
+    dayAccountReplyAuditNew,
+    dayAccountReplyAuditCorrection,
+    pdfDayAccountReplyLine,
+    pdfDayAccountReplyCorrectionLine,
     dayAccountAuditNew,
     dayAccountAuditCorrection,
     pdfDayAccountsSection,
@@ -1720,6 +1752,21 @@ abstract final class StringsAppPtBr {
         'Relato registrado.',
     KApp.dayAccountErrSave:
         'Não foi possível registrar o relato.',
+    KApp.dayAccountReplyAction: 'Responder',
+    KApp.dayAccountReplyFieldLabel: 'Sua resposta',
+    KApp.dayAccountReplyFieldHint: 'O que foi diferente, e quando',
+    KApp.dayAccountReplyAppendOnly: 'Uma resposta não pode ser editada nem apagada depois de registrada. Para corrigir, registre uma correção: o texto anterior continua no registro, marcado como corrigido.',
+    KApp.dayAccountReplySave: 'Registrar resposta',
+    KApp.dayAccountReplyCorrecting: 'Correção da resposta registrada em {0}',
+    KApp.dayAccountReplyByline: 'Resposta de {0} em {1} às {2}',
+    KApp.dayAccountReplySaved: 'Resposta registrada.',
+    KApp.dayAccountReplyErrSave: 'Não foi possível registrar a resposta.',
+    KApp.dayAccountReplyErrEmpty: 'Escreva a sua resposta.',
+    KApp.dayAccountReplyErrTooLong: 'A resposta é limitada a {0} caracteres.',
+    KApp.dayAccountReplyAuditNew: '{0} respondeu a um relato',
+    KApp.dayAccountReplyAuditCorrection: '{0} corrigiu uma resposta a um relato',
+    KApp.pdfDayAccountReplyLine: 'Resposta de {0}, registrada em {1}:',
+    KApp.pdfDayAccountReplyCorrectionLine: 'Correção da resposta de {0}, registrada em {1}:',
     KApp.dayAccountErrLoad:
         'Não foi possível carregar os relatos deste dia.',
     KApp.dayAccountAuditNew:
@@ -2426,6 +2473,21 @@ abstract final class StringsAppEn {
         'Day account recorded.',
     KApp.dayAccountErrSave:
         'The day account could not be recorded.',
+    KApp.dayAccountReplyAction: 'Reply',
+    KApp.dayAccountReplyFieldLabel: 'Your reply',
+    KApp.dayAccountReplyFieldHint: 'What was different, and when',
+    KApp.dayAccountReplyAppendOnly: 'A reply cannot be edited or deleted once recorded. To correct it, record a correction: the earlier text stays on the record, marked as corrected.',
+    KApp.dayAccountReplySave: 'Record reply',
+    KApp.dayAccountReplyCorrecting: 'Correction of the reply recorded on {0}',
+    KApp.dayAccountReplyByline: 'Reply by {0} on {1} at {2}',
+    KApp.dayAccountReplySaved: 'Reply recorded.',
+    KApp.dayAccountReplyErrSave: 'The reply could not be recorded.',
+    KApp.dayAccountReplyErrEmpty: 'Write your reply.',
+    KApp.dayAccountReplyErrTooLong: 'A reply is limited to {0} characters.',
+    KApp.dayAccountReplyAuditNew: '{0} replied to a day account',
+    KApp.dayAccountReplyAuditCorrection: '{0} corrected a reply to a day account',
+    KApp.pdfDayAccountReplyLine: 'Reply by {0}, recorded on {1}:',
+    KApp.pdfDayAccountReplyCorrectionLine: 'Correction of the reply by {0}, recorded on {1}:',
     KApp.dayAccountErrLoad:
         'The day accounts of this day could not be loaded.',
     KApp.dayAccountAuditNew:

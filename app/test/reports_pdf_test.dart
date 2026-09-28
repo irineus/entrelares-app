@@ -272,6 +272,30 @@ void main() {
 
     // F-67: section 4 prints both dates, the author and the text; a corrected
     // relato keeps its text and says when it was corrected.
+    // F-75: the reply prints under the relato it answers, with its author.
+    test('section 4 prints the replies under their relato', () async {
+      final text = await render(
+          report(dayAccounts: [
+            ReportDayAccount(
+              accountDate: DateTime(2026, 8, 10),
+              writtenAtLocal: DateTime(2026, 8, 11, 9, 30),
+              authorName: 'Ana Souza',
+              body: 'buscou no aeroporto',
+              replies: [
+                ReportDayAccountReply(
+                  writtenAtLocal: DateTime(2026, 8, 11, 12, 0),
+                  authorName: 'Bruno Lima',
+                  body: 'chegou tarde, perto das 19h',
+                ),
+              ],
+            ),
+          ]),
+          l);
+      expect(text, contains('Resposta'));
+      expect(text, contains('Bruno'));
+      expect(text, contains('19h'));
+    });
+
     test('section 4 prints the relatos with both dates, corrections kept',
         () async {
       final text = await render(

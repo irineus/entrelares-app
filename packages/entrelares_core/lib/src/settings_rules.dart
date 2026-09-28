@@ -124,6 +124,14 @@ class PublicSettings {
   // F-35 — the family's Conversa (the RPCs read the same keys).
   bool get chatEnabled => parseBoolSetting(values, 'feature.chat', false);
 
+  /// F-75 — the reply to a relato: the module flag, the window (days since
+  /// the relato was WRITTEN) and the text limit.
+  bool get dayAccountRepliesEnabled =>
+      parseBoolSetting(values, 'feature.day_account_replies', false);
+  int get dayAccountReplyWindowDays =>
+      _int('day_account_reply.window_days', 30);
+  int get dayAccountReplyMaxChars => _int('day_account_reply.max_chars', 1000);
+
   /// F-73 — the Play review request (`ReviewPromptRules`): the switch, the
   /// account's minimum age and the interval between requests on one device.
   bool get reviewPromptEnabled =>

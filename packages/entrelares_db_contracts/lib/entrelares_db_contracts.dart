@@ -29,6 +29,7 @@ export 'models/child_event.dart';
 export 'models/child_routine.dart';
 export 'models/report_attestation.dart';
 export 'models/day_account.dart';
+export 'models/day_account_reply.dart';
 export 'models/day_notice.dart';
 export 'models/family.dart';
 export 'models/family_deletion.dart';

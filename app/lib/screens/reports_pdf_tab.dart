@@ -12,6 +12,7 @@ import 'package:crypto/crypto.dart' show sha256;
 import '../env.dart';
 import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
+import 'package:entrelares_db_contracts/models/day_account_reply.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
@@ -344,6 +345,18 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       try {
         dayAccounts = await widget.dataSource.fetchDayAccounts(start, end);
       } catch (_) {/* section 4 prints its empty line */}
+      // F-75: the replies under each relato — a failure costs the replies.
+      var replies = const <DayAccountReply>[];
+      try {
+        replies = await widget.dataSource
+            .fetchDayAccountReplies([for (final a in dayAccounts) a.id]);
+      } catch (_) {/* the relatos print without their replies */}
+      String nameOf(int id) =>
+          [
+            for (final m in members)
+              if (m.id == id) m.fullName
+          ].firstOrNull ??
+          l[K.pdfDocSystem];
 
       // F-55: section 5 — the live events of the period. A failure prints the
       // section's empty line, like the other enrichments.
@@ -467,6 +480,20 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
                 for (final c in dayAccounts)
                   if (c.correctsId == a.id) c.createdAt.toLocal()
               ].firstOrNull,
+              replies: [
+                for (final r in replies)
+                  if (r.accountId == a.id)
+                    ReportDayAccountReply(
+                      writtenAtLocal: r.createdAt.toLocal(),
+                      authorName: nameOf(r.authorProfileId),
+                      body: r.body,
+                      isCorrection: r.correctsId != null,
+                      correctedAtLocal: [
+                        for (final c in replies)
+                          if (c.correctsId == r.id) c.createdAt.toLocal()
+                      ].firstOrNull,
+                    ),
+              ],
             ),
         ],
       );

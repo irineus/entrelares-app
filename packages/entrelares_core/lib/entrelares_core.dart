@@ -30,6 +30,7 @@ export 'src/consent_declarations.dart';
 export 'src/crash_rules.dart';
 export 'src/custom_role_rules.dart';
 export 'src/date_math.dart';
+export 'src/day_account_reply_rules.dart';
 export 'src/day_account_rules.dart';
 export 'src/day_protection_rules.dart';
 export 'src/editor_rules.dart';

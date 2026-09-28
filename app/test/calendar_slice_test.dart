@@ -22,6 +22,7 @@ import 'package:entrelares_db_contracts/models/chat_message.dart';
 import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
+import 'package:entrelares_db_contracts/models/day_account_reply.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_invitation.dart';
@@ -504,6 +505,43 @@ class FakeCustodyDataSource implements CustodyDataSource {
   @override
   Future<int> countDayAccountsWrittenToday(int authorId) async =>
       writtenToday;
+
+  // ── F-75 ──
+  /// Every reply the fake knows about; [addDayAccountReply] appends the way
+  /// the RPC would, authored by the first member (the signed-in one).
+  List<DayAccountReply> dayAccountReplies = [];
+  Object? throwOnDayAccountReply;
+
+  @override
+  Future<List<DayAccountReply>> fetchDayAccountReplies(
+          List<int> accountIds) async =>
+      [
+        for (final r in dayAccountReplies)
+          if (accountIds.contains(r.accountId)) r,
+      ]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+  @override
+  Future<int> addDayAccountReply({
+    required int accountId,
+    required String body,
+    int? correctsId,
+  }) async {
+    if (throwOnDayAccountReply != null) throw throwOnDayAccountReply!;
+    final id = 700 + dayAccountReplies.length;
+    dayAccountReplies = [
+      ...dayAccountReplies,
+      DayAccountReply(
+        id: id,
+        familyId: 1,
+        accountId: accountId,
+        authorProfileId: members.first.id,
+        body: body.trim(),
+        correctsId: correctsId,
+        createdAt: DateTime.now().toUtc(),
+      ),
+    ];
+    return id;
+  }
 
   // ── F-52 ──
   /// Every aviso the fake knows about, newest first — the calendar reads it

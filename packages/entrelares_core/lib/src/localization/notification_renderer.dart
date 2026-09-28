@@ -254,6 +254,13 @@ abstract final class NotificationRenderer {
       case 'day_account' when date != null && kind == 'correction':
         return l.format(K.notifRenderDayAccountCorrection,
             [name ?? l[K.notifRenderFbOtherCap], date]);
+      // F-75: a reply to the reader's relato — in-app only, to its author.
+      case 'day_account_reply' when date != null && kind == 'new':
+        return l.format(K.notifRenderDayAccountReplyNew,
+            [name ?? l[K.notifRenderFbOtherCap], date]);
+      case 'day_account_reply' when date != null && kind == 'correction':
+        return l.format(K.notifRenderDayAccountReplyCorrection,
+            [name ?? l[K.notifRenderFbOtherCap], date]);
 
       // ── E-mail quota (F-38) ──
       case 'email_cap_reached':
@@ -511,6 +518,10 @@ abstract final class NotificationRenderer {
       'day_account' => p['date'] != null &&
               (kind == 'new' || kind == 'correction')
           ? K.notifRenderTitleDayAccount
+          : null,
+      'day_account_reply' => p['date'] != null &&
+              (kind == 'new' || kind == 'correction')
+          ? K.notifRenderTitleDayAccountReply
           : null,
       'billing' =>
         kind == 'grace_warning' ? K.notifRenderTitleBillingGrace : null,
