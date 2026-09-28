@@ -59,8 +59,13 @@ class RegisterScreen extends StatefulWidget {
   final Future<void> Function(String idToken, {String? inviteToken})?
       onGoogleIdToken;
 
+  /// U-58 — the invitation was claimed: `main.dart` raises the welcome the
+  /// calendar shows before the tour. Called before the sign-in that lands.
+  final void Function(InviteInfo invite)? onInviteeJoined;
+
   const RegisterScreen({
     this.analytics,
+    this.onInviteeJoined,
     super.key,
     required this.dataSource,
     required this.onSignIn,
@@ -281,6 +286,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       case InviteeRegistered():
         // T-37: viral loop closed — an invited caregiver joined a family.
         widget.analytics?.trackEvent(AnalyticsEvents.inviteeJoined);
+        final invite = _invite;
+        if (invite != null) widget.onInviteeJoined?.call(invite);
         // U-17: already confirmed — sign in and let the router land them.
         try {
           await widget.onSignIn(_email.text.trim(), _password.text);

@@ -274,6 +274,73 @@ void main() {
     });
   });
 
+  group('U-58 — the invitee welcome', () {
+    const welcome =
+        InviteeWelcome(familyName: 'Souza', inviterName: 'Bruno Lima');
+
+    OnboardingService withWelcome(FakeCustodyDataSource ds) =>
+        OnboardingService(ds)..pendingInviteeWelcome = welcome;
+
+    testWidgets('right after the claim it comes FIRST, and the tour follows',
+        (tester) async {
+      final ds = source();
+      await pumpCalendar(tester, ds,
+          onboarding: withWelcome(ds), tourKeys: TourKeys());
+
+      expect(find.text(l.format(KApp.welcomeTitle, ['Souza'])), findsOne);
+      expect(find.text(l.format(KApp.welcomeLead, ['Bruno Lima'])), findsOne);
+      for (final key in InviteeWelcomeRules.pointKeys(viewer: false)) {
+        expect(find.text(l[key]), findsOne);
+      }
+      // The tour waits for the sheet.
+      expect(find.text(l[K.tourTodayTitle]), findsNothing);
+
+      await tester.tap(find.text(l[KApp.welcomeAction]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l.format(KApp.welcomeTitle, ['Souza'])), findsNothing);
+      expect(find.text(l[K.tourTodayTitle]), findsOne);
+    });
+
+    testWidgets('a Visualizador reads the viewer lines, never the caregiver ones',
+        (tester) async {
+      const viewer = Member(
+          id: 1,
+          fullName: 'Ana Souza',
+          userId: 'u1',
+          membershipType: 'viewer',
+          onboardingTourSeenAt: null);
+      final ds = source(members: const [viewer, bruno]);
+      await pumpCalendar(tester, ds, onboarding: withWelcome(ds));
+
+      for (final key in InviteeWelcomeRules.pointKeys(viewer: true)) {
+        expect(find.text(l[key]), findsOne);
+      }
+      expect(find.text(l[KApp.welcomeSeen]), findsNothing);
+    });
+
+    testWidgets('never without a claim in this session — the founder and every '
+        'member who joined before see nothing', (tester) async {
+      await pumpCalendar(tester, source(members: [seenTour()]));
+
+      expect(find.text(l[KApp.welcomeAction]), findsNothing);
+    });
+
+    testWidgets('shown once: a later refresh of the calendar does not reopen it',
+        (tester) async {
+      final ds = source(members: [seenTour()]);
+      final onboarding = withWelcome(ds);
+      await pumpCalendar(tester, ds, onboarding: onboarding);
+      await tester.tap(find.text(l[KApp.welcomeAction]));
+      await tester.pumpAndSettle();
+
+      expect(onboarding.pendingInviteeWelcome, isNull);
+      // A second calendar in the same session (a reload, the tab again).
+      await pumpCalendar(tester, ds, onboarding: onboarding);
+      expect(find.text(l[KApp.welcomeAction]), findsNothing);
+    });
+  });
+
   group('the service', () {
     test('skips the swap-participation read once the explanation is stamped',
         () async {

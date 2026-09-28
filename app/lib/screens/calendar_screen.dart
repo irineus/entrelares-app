@@ -37,6 +37,7 @@ import 'quick_swap_sheet.dart';
 import 'resolve_sheet.dart';
 import '../services/handoff_nudge_prefs.dart';
 import '../services/onboarding_service.dart';
+import '../widgets/invitee_welcome_sheet.dart';
 import '../widgets/onboarding.dart';
 import 'wizard_sheet.dart';
 
@@ -188,6 +189,9 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// flashing the nudge at somebody who already invited the other caregiver.
   bool _openInvitation = false;
   bool _tourShown = false;
+
+  /// U-58 — the welcome sheet is up; the tour waits for it.
+  bool _welcomeOpen = false;
 
   /// U-55: the strip was sent away in THIS session (the prefs keep it for
   /// good; this covers a host without them and the frame before the write).
@@ -858,10 +862,33 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (!mounted) return;
     setState(() => _onboardingSignals = signals);
 
+    // U-58: the invitee's welcome comes FIRST, only in the session where the
+    // invitation was claimed (taken once), and the tour follows it. While it
+    // is open a poll's refresh must not start the tour over it.
+    final welcome = onboarding.takeInviteeWelcome();
+    if (welcome != null) {
+      _welcomeOpen = true;
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      final analytics = widget.analytics;
+      if (analytics != null) {
+        unawaited(analytics.trackEventOnce(AnalyticsEvents.inviteeWelcomeView,
+            props: {
+              'channel': analytics.channel,
+              'member': InviteeWelcomeRules.memberProp(viewer: me.isViewer),
+            }));
+      }
+      await showInviteeWelcomeSheet(context,
+          welcome: welcome, viewer: me.isViewer);
+      _welcomeOpen = false;
+      if (!mounted) return;
+    }
+
     // The tour runs ONCE, on the first authenticated session, and hands over
     // to the checklist when it ends — the web's FinishTour does the same.
     // (Explicit replays arrive through [_onTourReplayRequested] now.)
     if (!_tourShown &&
+        !_welcomeOpen &&
         widget.tourKeys != null &&
         me.onboardingTourSeenAt == null) {
       _tourShown = true;

@@ -51,6 +51,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:entrelares_app/screens/calendar_screen.dart';
+import 'package:entrelares_app/services/onboarding_service.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_app/screens/custom_roles_screen.dart';
@@ -922,6 +923,32 @@ void main() {
       await tester.pumpAndSettle();
       await _measure(tester, 'plan');
     });
+
+    for (final viewer in [false, true]) {
+      _scene('invitee welcome (${viewer ? 'viewer' : 'caregiver'})',
+          (tester, dark) async {
+        final ds = viewer
+            ? cal.FakeCustodyDataSource(members: const [
+                Member(
+                    id: 1,
+                    fullName: 'Ana Souza',
+                    userId: 'u1',
+                    membershipType: 'viewer'),
+                cal.bruno,
+              ], days: [])
+            : _calendarSource();
+        final onboarding = OnboardingService(ds)
+          ..pendingInviteeWelcome = const InviteeWelcome(
+              familyName: 'Souza', inviterName: 'Bruno Lima');
+        await tester.pumpWidget(_host(
+            CalendarScreen(
+                dataSource: ds, adminMode: AdminMode(), onboarding: onboarding),
+            dark: dark));
+        await tester.pumpAndSettle();
+        expect(find.text(pt[KApp.welcomeAction]), findsOne);
+        await _measure(tester, 'invitee welcome');
+      });
+    }
 
     _scene('custom roles', (tester, dark) async {
       await tester.pumpWidget(

@@ -45,6 +45,7 @@ Future<void> pumpRegister(
   List<String>? signIns,
   VoidCallback? onBackToLogin,
   AnalyticsService? analytics,
+  void Function(InviteInfo invite)? onInviteeJoined,
 }) async {
   // The founder form (21 role chips + consent block) is far taller than the
   // 800px default surface. Giving the test a tall viewport keeps every control
@@ -61,6 +62,7 @@ Future<void> pumpRegister(
         analytics: analytics,
         inviteToken: inviteToken,
         onSignIn: (email, password) async => signIns?.add(email),
+        onInviteeJoined: onInviteeJoined,
         onBackToLogin: onBackToLogin ?? () {},
       ),
     ),
@@ -417,8 +419,12 @@ void main() {
         (tester) async {
       final ds = source()..inviteInfo = invite;
       final signIns = <String>[];
+      final joined = <InviteInfo>[];
       await pumpRegister(tester,
-          dataSource: ds, inviteToken: validToken, signIns: signIns);
+          dataSource: ds,
+          inviteToken: validToken,
+          signIns: signIns,
+          onInviteeJoined: joined.add);
       await fillCommonFields(tester);
       await acceptTerms(tester);
 
@@ -428,6 +434,8 @@ void main() {
       expect(ds.inviteeRegistrations, hasLength(1));
       expect(ds.inviteeRegistrations.single['confirmMigration'], isFalse);
       expect(signIns, ['bruno@example.com']);
+      // U-58: the claim raises the welcome, with the invitation it came from.
+      expect(joined.single.familyName, invite.familyName);
     });
 
     testWidgets('a dead token shows the invalid-invitation dead end',
