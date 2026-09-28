@@ -95,7 +95,9 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.dayAccountSaved: {'correction'},
     AnalyticsEvents.adminModeOffer: {'action', 'result'},
     AnalyticsEvents.adminModeToggle: {'state'},
-    AnalyticsEvents.pdfExport: {'period'},
+    // U-59 (28/09/2026): `source` tells the Conversa's door (`chat`) from
+    // the Relatórios tab (`reports`); before it, every export was `reports`.
+    AnalyticsEvents.pdfExport: {'period', 'source'},
     AnalyticsEvents.appOpen: {'channel', 'display'},
     AnalyticsEvents.signIn: {'method'},
     AnalyticsEvents.notificationOpen: {'source', 'type'},
