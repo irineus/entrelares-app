@@ -29,10 +29,15 @@
 /// shell not repainting on the late answer was (see `HomeShell.appHandoff`).
 ///
 /// Everywhere else — every non-web build, and on the web every browser that
-/// does not expose the API (Firefox, Samsung Internet, iOS, desktop) — the
-/// answer is `false`. Fail-closed is the T-38 shape: a service that cannot
-/// answer never becomes a broken offer. The accepted price is that some
+/// does not expose the API (Firefox, Samsung Internet, iOS) — the answer is
+/// [StoreAppPresence.unknown]. Fail-closed is the T-38 shape: a service that
+/// cannot answer never becomes a broken offer. The accepted price is that some
 /// Android readers who DO have the app will not be shown the shortcut.
+///
+/// F-72 (27/09/2026) split the old `false` in two: "the browser could not
+/// answer" and "the browser answered, and the app is not here". Only the
+/// second may become an invitation to install — and even that one is weighed
+/// by `PlayInstallRules`, because a broken source answers it too.
 ///
 /// The choice is made at COMPILE time by the conditional export below, so
 /// neither implementation's imports ever reach the other platform — the same

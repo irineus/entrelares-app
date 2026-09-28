@@ -53,6 +53,9 @@ abstract final class AnalyticsEvents {
   static const installHintView = 'install-hint-view'; // U-51, 15/09/2026
   static const installHintOpen = 'install-hint-open'; // U-51, 15/09/2026
   static const installHintDismiss = 'install-hint-dismiss'; // U-51, 15/09/2026
+  static const playInviteView = 'play-invite-view'; // F-72, 27/09/2026
+  static const playInviteOpen = 'play-invite-open'; // F-72, 27/09/2026
+  static const playInviteDismiss = 'play-invite-dismiss'; // F-72, 27/09/2026
   static const preferenceChanged = 'preference-changed'; // T-78
   static const supportContactSent = 'support-contact-sent'; // T-78 (F-68)
 
@@ -101,6 +104,9 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.installHintView: {},
     AnalyticsEvents.installHintOpen: {},
     AnalyticsEvents.installHintDismiss: {},
+    AnalyticsEvents.playInviteView: {},
+    AnalyticsEvents.playInviteOpen: {},
+    AnalyticsEvents.playInviteDismiss: {},
     AnalyticsEvents.preferenceChanged: {'pref', 'value'},
     AnalyticsEvents.supportContactSent: {'category', 'signed_in'},
     AnalyticsEvents.premiumGateClick: {'gate'},

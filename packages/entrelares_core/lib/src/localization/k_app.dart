@@ -240,6 +240,13 @@ abstract final class KApp {
   static const String handoffOpen = 'app.handoff.open';
   static const String handoffDismiss = 'app.handoff.dismiss';
 
+  // ── F-72 install invitation — the other half of T-65: shown ONLY on the web
+  //    channel, on Android, when the browser answered and did NOT list the
+  //    Play app. Never beside the handoff above (installed vs not installed). ──
+  static const String playInviteBanner = 'app.playInvite.banner';
+  static const String playInviteOpen = 'app.playInvite.open';
+  static const String playInviteDismiss = 'app.playInvite.dismiss';
+
   // ── U-51 iPhone install hint. Shown ONLY on the web channel, in Safari on
   //    an iPhone or iPad that has not added the app to the Home Screen. The
   //    two steps mirror the landing's L-19 guide, which was checked against
@@ -860,6 +867,9 @@ abstract final class KApp {
     handoffBanner,
     handoffOpen,
     handoffDismiss,
+    playInviteBanner,
+    playInviteOpen,
+    playInviteDismiss,
     installHintBanner,
     installHintHow,
     installHintDismiss,
@@ -1477,6 +1487,9 @@ abstract final class StringsAppPtBr {
     KApp.handoffBanner: 'Você já tem o app neste aparelho.',
     KApp.handoffOpen: 'Abrir no app',
     KApp.handoffDismiss: 'Agora não',
+    KApp.playInviteBanner: 'O Entrelares também tem app Android, na Google Play.',
+    KApp.playInviteOpen: 'Instalar',
+    KApp.playInviteDismiss: 'Agora não',
     KApp.installHintBanner: 'Coloque o Entrelares na sua Tela de Início.',
     KApp.installHintHow: 'Como fazer',
     KApp.installHintDismiss: 'Agora não',
@@ -2166,6 +2179,9 @@ abstract final class StringsAppEn {
     KApp.handoffBanner: 'You already have the app on this device.',
     KApp.handoffOpen: 'Open in the app',
     KApp.handoffDismiss: 'Not now',
+    KApp.playInviteBanner: 'Entrelares also has an Android app on Google Play.',
+    KApp.playInviteOpen: 'Install',
+    KApp.playInviteDismiss: 'Not now',
     KApp.installHintBanner: 'Put Entrelares on your Home Screen.',
     KApp.installHintHow: 'Show me how',
     KApp.installHintDismiss: 'Not now',
