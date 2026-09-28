@@ -37,6 +37,28 @@ points at them; this directory is about the *presence*, not the pipeline.
   place the bullet list gained the web channel, which does exist. **A listing is a claim about
   the system (the S-15 rule): re-read it against the code before every republish, and never
   paste a sentence a test could not defend.**
+- **Re-verified again on 27/09/2026, after T-59 made the listing public** — a month of features
+  had shipped past the 28/08 text. What moved, with the code that makes each sentence true:
+  - **"aprovada automaticamente após 48 horas" was FALSE** since F-60: the window is anchored
+    on the DAY's deadline (`schedule_date` + handoff time, `auto_approve_expired`), not on the
+    request, and `auto_approval_copy_mirror_test` bans quoting the hours in any product
+    sentence. The listing now says the reminder carries the exact day and time.
+  - **"cada solicitação… chega por e-mail" was STALE**: push (F-09) is live on Android and the
+    web (`_shared/push.ts` `PUSH_TYPES`); e-mail still carries the swaps, but a free family has
+    a monthly e-mail cap and a Visualizador gets none — so no sentence says "every".
+  - **"não pode ser editado nem apagado — por ninguém"** narrowed to *no family member*: a
+    unanimous family deletion (S-11) erases the history.
+  - **The caregivers paragraph** now says that caregivers beyond the free limit are Premium
+    (`free_caregivers`), and names the **Visualizador** (F-50).
+  - **Added, each live in production since S-22 (25/09/2026,
+    `20260925100000_s22_phase6_live.sql`)**: the verifiable PDF (F-64), the child agenda
+    (F-55 — notes free, the rest Premium), expenses and the Conversa (F-34/F-35, Premium);
+    plus avisos (F-52), relatos do dia (F-67), Google sign-in (F-57/F-71), the dark theme
+    (U-12), the Android offline month (T-18 — read-only, current month, Android only) and the
+    Premium trial for new families. No number an operator can change is typed (U-57), no
+    price (the store price is Play's), and the vocabulary is `vocabulary_test`'s.
+  - en-US also stopped saying "after a divorce" (pt says *pais separados*) and "approved
+    swaps" (read as if only approved swaps were free).
 - **English translation** (the app is bilingual since U-13): at the top of the Main store
   listing page → **Manage translations** → **Add your own translation** → **English (United
   States) – en-US** → paste from `listing-en-US.txt`. The default language stays pt-BR.

@@ -11,25 +11,37 @@ QUEM ESTÁ COM A CRIANÇA HOJE
 Abra o app e a resposta está na primeira tela. O calendário do mês mostra os dias de cada responsável por cor, com o horário de entrega quando a criança troca de casa.
 
 TROCAS COM APROVAÇÃO DOS DOIS LADOS
-Precisou trocar um dia? Proponha a troca com uma mensagem curta ("consulta médica às 14h") — nada muda no calendário sem o outro responsável concordar. Quem responde também pode comentar, e tudo fica registrado. Sem resposta, a solicitação é aprovada automaticamente após 48 horas, com lembrete antes.
+Precisou trocar um dia? Proponha a troca com uma mensagem curta ("consulta médica às 14h") — nada muda no calendário sem o outro responsável concordar. Quem responde também pode comentar, e tudo fica registrado. Sem resposta dentro do prazo, a solicitação é aprovada automaticamente — e antes disso chega um lembrete com o dia e a hora exatos.
 
-HISTÓRICO QUE NINGUÉM PODE ALTERAR
-Cada mudança no calendário fica registrada: quem pediu, quem aprovou e as mensagens trocadas. O histórico não pode ser editado nem apagado — por ninguém. No plano Premium, gere um relatório em PDF do período com a linha do tempo completa.
+AVISOS E RELATOS DO DIA
+Imprevisto no dia? Mande um aviso ao outro responsável ("vou atrasar 15 minutos"). Depois que o dia passou, registre um relato do dia: o que aconteceu fica anexado àquele dia e nunca é editado — uma correção vira um novo relato, e os dois ficam.
+
+HISTÓRICO QUE NINGUÉM DA FAMÍLIA PODE ALTERAR
+Cada mudança no calendário fica registrada: quem pediu, quem aprovou e as mensagens trocadas. Nenhum membro da família pode editar ou apagar o histórico. No plano Premium, gere um relatório em PDF do período com a linha do tempo completa, verificável por QR code.
 
 RESUMO DO PERÍODO
 Veja quantos dias cada responsável teve — o planejado e o realizado —, quantas trocas cada um cedeu e recebeu, e o saldo previsto considerando as trocas futuras já combinadas.
 
-MAIS CUIDADORES NA ROTINA
-Avós, babá ou outro responsável podem participar da família com papel próprio, convidados por e-mail pelos administradores.
+AGENDA DA CRIANÇA
+Deixe notas no dia para a outra casa. No Premium, a agenda completa da criança: escola, saúde, remédio e atividades, com rotinas e lembretes.
+
+DESPESAS E CONVERSA
+No Premium, despesas compartilhadas, com o acerto confirmado por quem recebe, e a Conversa da família: permanente e com leitura confirmada.
+
+MAIS GENTE NA ROTINA
+Avós, babá ou outro responsável podem participar da família com papel próprio, convidados por e-mail pelos administradores; responsáveis além do limite do plano gratuito entram com o Premium. E o Visualizador acompanha sem participar: vê o calendário, a agenda e os relatórios, e não altera nada.
 
 SEMPRE ATUALIZADO
-Com o app aberto, o calendário se atualiza em tempo real: solicitações, aprovações e mudanças aparecem sem precisar recarregar. Com o app fechado, cada solicitação, aprovação e lembrete de prazo chega por e-mail.
+Com o app aberto, o calendário se atualiza em tempo real: solicitações, aprovações e mudanças aparecem sem precisar recarregar. Com o app fechado, solicitações, aprovações, avisos e lembretes chegam como notificação no celular — e as trocas também por e-mail.
 
 FEITO PARA O SEU DIA A DIA
 • Em português e em inglês — cada pessoa da família lê no seu idioma, inclusive as notificações e os e-mails
-• Feito para o celular
+• Entre com e-mail e senha ou com a sua conta Google
+• Tema claro ou escuro
+• No Android, o mês atual continua visível mesmo sem conexão
 • O mesmo calendário no navegador, em https://web.entrelares.app
 • O essencial é gratuito: calendário, trocas com aprovação, notificações e histórico
+• Famílias novas começam com um período de teste do Premium
 
 PRIVACIDADE
 Seus dados pertencem à sua família: acesso controlado por perfil, sem anúncios e sem venda de dados. Política de privacidade: https://entrelares.app/privacidade
