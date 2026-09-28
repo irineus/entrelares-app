@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, kReleaseMode, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 // T-53 stage 4: real paths instead of `/#/…` on the web. The library resolves
@@ -61,6 +62,7 @@ import 'services/notification_badge.dart';
 import 'services/offline_cache.dart';
 import 'services/offline_cache_store.dart';
 import 'services/onboarding_service.dart';
+import 'services/review_prompt_service.dart';
 import 'services/push_service.dart';
 import 'services/refresh_guard_client.dart';
 import 'services/session_gate.dart';
@@ -632,6 +634,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                           _router.go('/');
                         },
                         onOpenExpenses: () => _router.go('/expenses'),
+                        onApprovalSeen: () =>
+                            unawaited(_reviewPrompt.approvalSeen()),
                         embedded: embedded,
                         landing: landing,
                         landingNonce: nonce);
@@ -827,6 +831,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// U-23 — the checklist/tour state and the shared registry of tour targets
   /// (they live in two different subtrees: the tab bar and the calendar).
   late final OnboardingService _onboarding;
+
+  /// F-73 — the Play review request, fired when a requester sees an approval.
+  late final ReviewPromptService _reviewPrompt;
   final _tourKeys = TourKeys();
 
   /// T-18 — the device's copy of the current month, Android only (see
@@ -899,6 +906,22 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     };
     _sudo = SudoService(_dataSource);
     _onboarding = OnboardingService(_dataSource, push: _push);
+    // F-73 — only the Android production store build ever asks Play; the
+    // account's age is the LOGIN's, which only this file may read.
+    _reviewPrompt = ReviewPromptService(
+      _dataSource,
+      reviewer: PlayInAppReviewer(),
+      prefs: SharedReviewPromptPrefs(widget.prefs),
+      connectivity: appConnectivity,
+      isStoreBuild: ReviewPromptRules.isStoreBuild(
+        isWeb: kIsWeb,
+        isAndroid: defaultTargetPlatform == TargetPlatform.android,
+        isProduction: Env.current.isProduction,
+        isRelease: kReleaseMode,
+      ),
+      accountCreatedAt: () =>
+          DateTime.tryParse(_client.auth.currentUser?.createdAt ?? ''),
+    );
     _l = Localization(widget.initialLanguage);
     appConnectivity.addListener(_onConnectivityChanged);
     // U-12: the picker sits inside a route go_router caches, so the root only

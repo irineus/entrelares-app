@@ -123,6 +123,14 @@ class PublicSettings {
 
   // F-35 — the family's Conversa (the RPCs read the same keys).
   bool get chatEnabled => parseBoolSetting(values, 'feature.chat', false);
+
+  /// F-73 — the Play review request (`ReviewPromptRules`): the switch, the
+  /// account's minimum age and the interval between requests on one device.
+  bool get reviewPromptEnabled =>
+      parseBoolSetting(values, 'review_prompt.enabled', true);
+  int get reviewPromptMinAccountDays =>
+      _int('review_prompt.min_account_days', 14);
+  int get reviewPromptIntervalDays => _int('review_prompt.interval_days', 120);
   bool get chatPremiumOnly =>
       parseBoolSetting(values, 'chat.premium_only', true);
   int get chatMessageMaxChars => _int('chat.message_max_chars', 2000);
