@@ -739,6 +739,12 @@ abstract final class KApp {
   static const String chatFormerMember = 'app.chat.formerMember';
   static const String chatSendFailed = 'app.chat.sendFailed';
   static const String chatPdfInclude = 'app.chat.pdfInclude';
+  // ── U-59: the Conversa's door to the PDF ──
+  static const String chatExport = 'app.chat.export';
+  static const String chatExportTitle = 'app.chat.exportTitle';
+  static const String chatExportLead = 'app.chat.exportLead';
+  static const String chatExportQr = 'app.chat.exportQr';
+  static const String chatExportPremium = 'app.chat.exportPremium';
   static const String chatPdfSection = 'app.chat.pdfSection';
   static const String chatPdfLead = 'app.chat.pdfLead';
   static const String chatPdfEmpty = 'app.chat.pdfEmpty';
@@ -1294,6 +1300,11 @@ abstract final class KApp {
     chatFormerMember,
     chatSendFailed,
     chatPdfInclude,
+    chatExport,
+    chatExportTitle,
+    chatExportLead,
+    chatExportQr,
+    chatExportPremium,
     chatPdfSection,
     chatPdfLead,
     chatPdfEmpty,
@@ -2000,6 +2011,11 @@ abstract final class StringsAppPtBr {
     KApp.chatFormerMember: 'Ex-membro',
     KApp.chatSendFailed: 'Não foi possível enviar. Tente de novo.',
     KApp.chatPdfInclude: 'Incluir a Conversa do período',
+    KApp.chatExport: 'Exportar conversa',
+    KApp.chatExportTitle: 'Exportar a Conversa em PDF',
+    KApp.chatExportLead: 'O relatório começa nos últimos {0} dias, com a Conversa incluída. Dá para mudar o período e as opções antes de gerar.',
+    KApp.chatExportQr: 'O PDF sai verificável por QR code: quem recebe confere que o arquivo não foi alterado.',
+    KApp.chatExportPremium: 'Exportar a Conversa em PDF faz parte do Premium.',
     KApp.chatPdfSection: '{0}. Conversa da família',
     KApp.chatPdfLead: 'O que a família escreveu na Conversa no período, na ordem, como foi escrito. Nada na Conversa se edita ou se apaga.',
     KApp.chatPdfEmpty: 'Nada foi escrito na Conversa no período.',
@@ -2701,6 +2717,11 @@ abstract final class StringsAppEn {
     KApp.chatFormerMember: 'Former member',
     KApp.chatSendFailed: 'Could not send. Try again.',
     KApp.chatPdfInclude: 'Include the period\'s chat',
+    KApp.chatExport: 'Export the chat',
+    KApp.chatExportTitle: 'Export the chat as a PDF',
+    KApp.chatExportLead: 'The report starts on the last {0} days, with the chat included. You can change the period and the options before generating it.',
+    KApp.chatExportQr: 'The PDF comes out verifiable by QR code: whoever receives it checks that the file was not altered.',
+    KApp.chatExportPremium: 'Exporting the chat as a PDF is part of Premium.',
     KApp.chatPdfSection: '{0}. Family chat',
     KApp.chatPdfLead: 'What the family wrote in the chat during the period, in order, as written. Nothing in the chat is edited or deleted.',
     KApp.chatPdfEmpty: 'Nothing was written in the chat in the period.',

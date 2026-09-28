@@ -79,6 +79,7 @@ import 'package:entrelares_app/theme/app_theme.dart';
 import 'package:entrelares_app/theme/tokens.dart';
 import 'package:entrelares_app/widgets/account_button.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
+import 'package:entrelares_app/widgets/chat_view.dart';
 import 'package:entrelares_app/widgets/google_sign_in_button.dart';
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
@@ -89,6 +90,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'agenda_validation_test.dart' as agv;
+import 'chat_f35_test.dart' as chat;
 import 'calendar_slice_test.dart' as cal;
 import 'custom_roles_test.dart' as roles;
 import 'family_page_test.dart' as fam;
@@ -947,6 +949,24 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text(pt[KApp.welcomeAction]), findsOne);
         await _measure(tester, 'invitee welcome');
+      });
+    }
+
+    for (final plan in ['premium', 'free']) {
+      _scene('chat export sheet ($plan)', (tester, dark) async {
+        final ds = chat.source(plan: plan, settings: const {
+          'feature.chat': 'true',
+          'feature.report_attestation': 'true',
+        });
+        await tester.pumpWidget(_host(
+            Scaffold(
+                body: ChatView(
+                    dataSource: ds, onOpenPlan: () {}, now: () => chat.today)),
+            dark: dark));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('chat-export')));
+        await tester.pumpAndSettle();
+        await _measure(tester, 'chat export sheet');
       });
     }
 

@@ -40,12 +40,28 @@ class ReportsPdfTab extends StatefulWidget {
   final Future<void> Function(Uint8List bytes, String fileName)? onShare;
   final Future<void> Function(Uint8List bytes, String fileName)? onPrint;
 
+  /// U-59 — the Conversa's door opens this same tab pre-filled: a custom
+  /// period and the Conversa's switch on. Everything stays editable; null
+  /// and false keep the Relatórios tab exactly as it was.
+  final (DateTime, DateTime)? initialPeriod;
+  final bool initialIncludeChat;
+
+  /// The `source` of `pdf-export` (`reports` / `chat`) — a closed token.
+  final String analyticsSource;
+
+  /// Hosted inside a sheet's own scroll view (U-59): no scroll of its own.
+  final bool embedded;
+
   const ReportsPdfTab({
     super.key,
     required this.dataSource,
     this.now = DateTime.now,
     this.onShare,
     this.onPrint,
+    this.initialPeriod,
+    this.initialIncludeChat = false,
+    this.analyticsSource = 'reports',
+    this.embedded = false,
   });
 
   @override
@@ -63,13 +79,14 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   String? _loadErrorRaw;
   String? _errorText;
 
-  _PeriodKind _kind = _PeriodKind.month;
+  late _PeriodKind _kind =
+      widget.initialPeriod == null ? _PeriodKind.month : _PeriodKind.custom;
   late int _month = widget.now().month;
   late int _year = widget.now().year;
-  late DateTime _customStart =
+  late DateTime _customStart = widget.initialPeriod?.$1 ??
       DateTime(widget.now().year, widget.now().month, 1);
-  late DateTime _customEnd = DateTime(
-      widget.now().year, widget.now().month, widget.now().day);
+  late DateTime _customEnd = widget.initialPeriod?.$2 ??
+      DateTime(widget.now().year, widget.now().month, widget.now().day);
 
   final _childName = TextEditingController();
 
@@ -88,7 +105,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   /// F-35: the Conversa is on; the reader may add its section (off by
   /// default — it is the one section a reader chooses to hand over).
   bool _chatOn = false;
-  bool _includeChat = false;
+  late bool _includeChat = widget.initialIncludeChat;
 
   /// F-64: `feature.report_attestation` — the PDF goes out with its QR.
   bool _attestOn = false;
@@ -488,7 +505,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       // T-78: the period KIND only — never the dates or the header name.
       unawaited(widget.dataSource.analytics?.trackEvent(
               AnalyticsEvents.pdfExport,
-              props: {'period': _kind.name}) ??
+              props: {'period': _kind.name, 'source': widget.analyticsSource}) ??
           Future<void>.value());
       if (!mounted) return;
       setState(() {
@@ -529,7 +546,11 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
     final l = AppL10n.of(context).l;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      shrinkWrap: widget.embedded,
+      physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
+      padding: widget.embedded
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: [
         Text(l[K.pdfHeading],
             style: Theme.of(context).textTheme.titleMedium),

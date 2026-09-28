@@ -11,6 +11,7 @@ import '../services/custody_data_source.dart';
 import '../theme/tokens.dart';
 import 'app_l10n.dart';
 import 'app_snack.dart';
+import 'chat_export_sheet.dart';
 import 'ui/ui.dart';
 
 /// F-35 — the family's Conversa: one conversation per family, permanent.
@@ -453,6 +454,25 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
                 tooltip: l[_muted ? KApp.chatUnmuted : KApp.chatMute],
                 onPressed: () => _toggleMute(l),
               ),
+              // U-59: the door to the EXISTING PDF, pre-filled with the
+              // Conversa. A viewer exports too (F-50); the sheet gates a
+              // family without Premium.
+              if (_me != null)
+                IconButton(
+                  key: const ValueKey('chat-export'),
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  tooltip: l[KApp.chatExport],
+                  onPressed: () => showChatExportSheet(
+                    context,
+                    dataSource: widget.dataSource,
+                    premium: Family.isPremiumFamily(
+                        _family, widget.now().toUtc()),
+                    viewer: _me!.isViewer,
+                    attestationEnabled: _settings.reportAttestationEnabled,
+                    now: widget.now,
+                    onOpenPlan: widget.onOpenPlan,
+                  ),
+                ),
             ],
           ),
         ),
