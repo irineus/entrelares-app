@@ -170,31 +170,40 @@ jobs:
           # day someone complains.
 
   # ── The DB gate ──────────────────────────────────────────────────────────
-  # 225 tests over RLS, the SECURITY DEFINER RPCs, the triggers and the billing
-  # ledger, run against the REAL dev project with a throwaway family. It is the
-  # test layer that proves the invariant this product is built on — the client
-  # MIRRORS, the database ENFORCES — and it moved here from `entrelares-app`,
-  # which is being archived (`docs/arquivamento-app.md`).
+  # The tests over RLS, the SECURITY DEFINER RPCs, the triggers, the Edge
+  # Functions' refusals and the billing ledger (479 on 27/09/2026 — `dart
+  # test`'s own report is the count). It is the test layer that proves the
+  # invariant this product is built on — the client MIRRORS, the database
+  # ENFORCES — and it moved here from `entrelares-app` (`docs/arquivamento-app.md`).
   #
   # It arrived in C# and was PORTED to Dart suite by suite (T-56, PRs 6-16,
-  # closed 24/08/2026). Each PR of that crossing translated a group and deleted
-  # the C# classes it replaced IN THE SAME COMMIT, so the gate was never
-  # uncovered, and `C# + Dart` stayed at 225 on every one of them — which is the
-  # arithmetic that said nothing was lost on the way. The C# half, the .NET
-  # toolchain step and the sum that watched them are gone with PR 16; the 225
-  # are now all Dart, and `dart test`'s own report is the count.
+  # closed 24/08/2026); the C# half is gone with PR 16.
+  #
+  # Since Fulcrum 04.3.1 / T-94 (28/09/2026) the SUITE runs on an EPHEMERAL
+  # LOCAL stack on this runner (`tool/db_gate_local.sh`: `supabase start` with
+  # every migration from zero, `supabase/seed.sql`, the local edge runtime
+  # serving `supabase/functions/`), never on the hosted dev project. Each run
+  # creates ~344 auth users, and the Free plan counts every one that signed in
+  # during the cycle as a MAU, deleted at teardown or not: 375 runs in the
+  # 09/09–09/10/2026 cycle put the org "Entrelares Dev" at 91,988 / 50,000,
+  # with every request to dev answering 402 once the grace period ends (24/10).
+  # Same 479 tests before and after; ~3 min on the local stack against ~7 on dev.
+  #
+  # What still reaches the dev project from this job is the PR's SCHEMA (the
+  # T-29 step below) — `qa-preview` builds against dev and needs it there.
   #
   # Runs on the same events as `verify` (and blocks `deploy-web` alongside it),
-  # but in its own job: it carries its own Supabase serialization, so it costs
-  # nothing to run beside the Flutter lane.
+  # but in its own job, so it costs nothing to run beside the Flutter lane.
   db-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Serialized across the whole repo, unlike the per-ref group of the workflow.
-    # The suite is safe to run twice at once for FAMILIES (each run invents its own
-    # `E2E-<runId>` and the orphan sweep spares anything younger than 2h), but the
-    # T-39 billing seeds use FIXED external ids (`sub_e2e_*`) — two runs overlapping
-    # there delete and recreate each other's rows. Queue instead of racing.
+    # It was born for the SUITE — the T-39 billing seeds use FIXED external ids
+    # (`sub_e2e_*`), and two runs overlapping on the shared dev project deleted
+    # and recreated each other's rows. With the suite on a per-runner stack
+    # (T-94) that reason is gone; the group stays because the PR's `db push` +
+    # function deploy to dev still happen here, and two of those interleaved on
+    # one project is the same race one level up.
     #
     # What `false` does NOT do is protect the job that is WAITING: GitHub keeps
     # exactly one pending entry per group, so a third claimant drops the queued
@@ -224,8 +233,8 @@ jobs:
       # PULL REQUESTS ONLY: the PR is this repo's staging stage (there is no `dev`
       # branch — a merge to `main` publishes production). By the time a change is
       # on `main`, its PR already put the schema on dev.
+      # Every event now: the local stack of the gate needs the CLI too (T-94).
       - name: Instalar Supabase CLI
-        if: github.event_name == 'pull_request' && env.SUPABASE_ACCESS_TOKEN != ''
         uses: supabase/setup-cli@v3
         with:
           # PINNED, like the app repo: resolving "latest" spends GitHub API quota
@@ -244,7 +253,7 @@ jobs:
       - name: Dizer por que o schema não foi aplicado
         if: github.event_name == 'pull_request' && env.SUPABASE_ACCESS_TOKEN == ''
         run: |
-          echo "### Schema NÃO aplicado no dev — o gate rodou contra o schema antigo" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Schema NÃO aplicado no dev — o QA (qa-preview) roda contra o schema antigo" >> "$GITHUB_STEP_SUMMARY"
           echo "Faltam \`SUPABASE_ACCESS_TOKEN_DEV\`, \`SUPABASE_DB_PASSWORD_DEV\` e \`SUPABASE_PROJECT_REF_DEV\` neste repo. Enquanto isso, quem aplica migrations é o \`entrelares-app\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Read Flutter version from .fvmrc
@@ -257,19 +266,13 @@ jobs:
           channel: stable
           cache: true
 
-      - name: DB gate (Dart) — regras de banco contra o projeto dev
-        working-directory: packages/entrelares_db_gate
-        env:
-          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_DEV }}
-          # OPTIONAL: arms the positive billing-webhook tests. A missing secret
-          # arrives empty, which the suite reads as absent and disarms those
-          # cases — the same shape `deploy-web` gives the Cloudflare credentials.
-          # Set `ASAAS_WEBHOOK_TOKEN_DEV` here to run them.
-          E2E_ASAAS_WEBHOOK_TOKEN: ${{ secrets.ASAAS_WEBHOOK_TOKEN_DEV }}
-        run: |
-          dart pub get
-          dart analyze --fatal-infos
-          dart test --reporter expanded
+      # T-94: the suite on an ephemeral LOCAL stack, never the hosted dev. No
+      # secret reaches this step — the keys are the local CLI's own, read from
+      # `supabase status` by the script, and the webhook token is minted per run
+      # (so the positive billing-webhook cases are always armed; on dev they
+      # hung on the optional `ASAAS_WEBHOOK_TOKEN_DEV`).
+      - name: DB gate (Dart) — regras de banco numa stack LOCAL efêmera
+        run: bash tool/db_gate_local.sh
 
   # T-54's E2E lane (opened by lote 3, the first two-user flow). It drives the
   # REAL app on an emulator against the DEV project, with the throwaway-family

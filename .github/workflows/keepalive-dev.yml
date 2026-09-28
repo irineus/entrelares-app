@@ -7,9 +7,11 @@ name: Keep-alive do projeto DEV
 # faz um ping leve no PostgREST do DEV duas vezes por semana para zerar o
 # contador de inatividade e manter o projeto sempre ativo.
 #
-# MOVIDO para cá em 24/08/2026 junto com o banco (`docs/arquivamento-app.md`):
-# ele protege o projeto de QA contra o qual o gate de banco roda, então precisa
-# viver no repo que roda o gate. Arquivar um repo desliga seus agendamentos.
+# MOVIDO para cá em 24/08/2026 junto com o banco (`docs/arquivamento-app.md`).
+# Desde o T-94 (28/09/2026) o gate de banco NÃO roda mais no dev (stack local no
+# runner), e isso torna este ping MAIS necessário, não menos: o dev ainda serve o
+# QA, os previews por PR, o web-e2e e a suíte de contrato do Fulcrum, e com menos
+# tráfego de CI a pausa de 7 dias do Free volta a ser um risco real.
 #
 # O gatilho `schedule` só dispara a partir do DEFAULT branch — aqui é `main`, então
 # ele entra no automático assim que este arquivo é mesclado, sem promoção. A cópia
