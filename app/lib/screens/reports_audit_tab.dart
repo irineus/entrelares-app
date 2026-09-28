@@ -9,6 +9,7 @@ import 'package:entrelares_db_contracts/models/account_log.dart';
 import 'package:entrelares_db_contracts/models/activity_log.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_account_reply.dart';
+import 'package:entrelares_db_contracts/models/history_search_hit.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
@@ -32,10 +33,14 @@ class ReportsAuditTab extends StatefulWidget {
   /// Injected by the tests; production reads the clock.
   final DateTime Function() now;
 
+  /// F-76: a search result opens its day in the calendar's month view.
+  final ValueChanged<DateTime>? onOpenDay;
+
   const ReportsAuditTab({
     super.key,
     required this.dataSource,
     this.now = DateTime.now,
+    this.onOpenDay,
   });
 
   @override
@@ -70,6 +75,15 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
 
   /// F-75: the replies to those relatos, printed under each one.
   List<DayAccountReply> _dayAccountReplies = const [];
+
+  // ── F-76: the word search over the whole trail (server, as the reader) ──
+  final _searchText = TextEditingController();
+
+  /// The query whose results are on screen; null shows the timeline.
+  String? _searchQuery;
+  bool _searching = false;
+  bool _searchFailed = false;
+  List<HistorySearchHit> _hits = const [];
 
   /// F-55: the agenda events whose DAY falls in the period, deleted ones
   /// included — the record says who added and who removed. Empty with the
@@ -246,6 +260,137 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   }
 
   @override
+  void dispose() {
+    _searchText.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search() async {
+    final query = _searchText.text.trim();
+    if (query.isEmpty) {
+      _clearSearch();
+      return;
+    }
+    setState(() {
+      _searchQuery = query;
+      _searching = true;
+      _searchFailed = false;
+    });
+    try {
+      final hits = await widget.dataSource.searchHistory(query);
+      if (!mounted || _searchQuery != query) return;
+      setState(() {
+        _hits = hits;
+        _searching = false;
+      });
+    } catch (_) {
+      if (!mounted || _searchQuery != query) return;
+      setState(() {
+        _hits = const [];
+        _searching = false;
+        _searchFailed = true;
+      });
+    }
+  }
+
+  void _clearSearch() => setState(() {
+        _searchText.clear();
+        _searchQuery = null;
+        _hits = const [];
+        _searching = false;
+        _searchFailed = false;
+      });
+
+  Widget _searchField(Localization l) => AppTextField(
+        key: const ValueKey('history-search-field'),
+        label: l[KApp.historySearchLabel],
+        hint: l[KApp.historySearchHint],
+        controller: _searchText,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => _search(),
+        suffixIcon: _searchQuery == null
+            ? IconButton(
+                key: const ValueKey('history-search'),
+                icon: const Icon(Icons.search),
+                tooltip: l[KApp.historySearchAction],
+                onPressed: _search,
+              )
+            : IconButton(
+                key: const ValueKey('history-search-clear'),
+                icon: const Icon(Icons.close),
+                tooltip: l[KApp.historySearchClear],
+                onPressed: _clearSearch,
+              ),
+      );
+
+  String _kindLabel(Localization l, String kind) => switch (kind) {
+        'relato' => l[KApp.dayAccountSearchKind],
+        'reply' => l[KApp.dayAccountSearchKindReply],
+        'swap_message' => l[KApp.historySearchKindSwapMessage],
+        'swap_note' => l[KApp.historySearchKindSwapNote],
+        'day_note' => l[K.auditFieldDayNote],
+        'agenda' => l[KApp.agendaSearchKind],
+        'notice' => l[KApp.noticeSearchKind],
+        _ => l[K.auditHeading],
+      };
+
+  /// F-76: a flat list, newest day first; a tap opens the day in the month.
+  List<Widget> _searchResults(Localization l) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    if (_searching) {
+      return [AppSkeletonList(rows: 3, semanticsLabel: l[K.famLoading])];
+    }
+    if (_searchFailed) {
+      return [_banner(l[K.repErrorTitle], l[KApp.historySearchError])];
+    }
+    if (_hits.isEmpty) {
+      return [
+        Text(l.format(KApp.historySearchEmpty, [_searchQuery ?? '']),
+            style: textTheme.bodyMedium?.copyWith(color: tokens.textMuted)),
+      ];
+    }
+    return [
+      Text(
+          _hits.length == 1
+              ? l[KApp.historySearchCountOne]
+              : l.format(KApp.historySearchCountMany, [_hits.length]),
+          style: textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+      const SizedBox(height: Spacing.sm),
+      for (final (i, h) in _hits.indexed)
+        Semantics(
+          button: widget.onOpenDay != null,
+          child: InkWell(
+            key: ValueKey('history-hit-$i'),
+            onTap: widget.onOpenDay == null
+                ? null
+                : () => widget.onOpenDay!(
+                    DateTime(h.day.year, h.day.month, h.day.day)),
+            child: _item(
+              badge: AuditBadge.updated,
+              icon: Icons.search,
+              isLast: i == _hits.length - 1,
+              children: [
+                Text(l.format(K.auditDayLabel, [l.formatDate(h.day)]),
+                    style: textTheme.labelSmall),
+                Text(_kindLabel(l, h.kind), style: textTheme.labelMedium),
+                Text(ChatRules.snippet(h.body, max: 160),
+                    style: textTheme.bodySmall),
+                Text(
+                    l.format(KApp.historySearchByline, [
+                      _nameOf(h.authorProfileId, l[K.auditSystemTrigger]),
+                      l.formatDate(h.writtenAt.toLocal()),
+                    ]),
+                    style:
+                        textTheme.bodySmall?.copyWith(color: tokens.textMuted)),
+              ],
+            ),
+          ),
+        ),
+    ];
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
 
@@ -264,6 +409,11 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
           Text(l[K.auditSubtitle],
               style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 12),
+          _searchField(l),
+          const SizedBox(height: 12),
+          if (_searchQuery != null)
+            ..._searchResults(l)
+          else ...[
           _filterCard(l),
           const SizedBox(height: 12),
           if (_errorRaw != null)
@@ -287,6 +437,7 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
                 ),
               ),
             ],
+          ],
           ],
         ],
       ),

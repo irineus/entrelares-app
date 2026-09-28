@@ -34,6 +34,7 @@ import 'suites/children.dart';
 import 'suites/custom_role.dart';
 import 'suites/day_account.dart';
 import 'suites/day_account_reply.dart';
+import 'suites/history_search.dart';
 import 'suites/day_notice.dart';
 import 'suites/day_protection.dart';
 import 'suites/e2e_date_allocator.dart';
@@ -136,6 +137,7 @@ void main() {
   dayNoticeTests(fx);
   dayAccountTests(fx);
   dayAccountReplyTests(fx);
+  historySearchTests(fx);
   resolutionLogLinkTests(fx);
   accountDeletionTests(fx);
   familyDeletionTests(fx);

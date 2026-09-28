@@ -17,7 +17,7 @@ void main() {
         'wizard-started', 'wizard_completed', 'swap_requested', 'swap-answered',
         'day-note-saved', 'day-sheet-closed', 'day-notice-sent',
         'day-notice-answered',
-        'day-account-saved', 'day-account-reply-saved', 'admin-mode-offer', 'admin-mode-toggle',
+        'day-account-saved', 'day-account-reply-saved', 'history-search', 'admin-mode-offer', 'admin-mode-toggle',
         'pdf-export', 'app-open', 'sign-in', 'notification-open',
         'push-nudge-view', 'push-nudge-click', 'push-enable-result',
         'install-hint-view', 'install-hint-open', 'install-hint-dismiss',

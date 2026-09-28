@@ -119,7 +119,7 @@ chores that are not backlog items.
 ## Build & test
 ```
 cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
-# Nesse lane moram os dez ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21 + F-60 + F-68 + T-78): rótulos
+# Nesse lane moram os onze ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21 + F-60 + F-68 + T-78 + F-76): rótulos
 # de papel em inglês, formato de data dos e-mails, a chave `lang` do redirect de reset,
 # a cobertura de `params` de todo writer de notificação, o catálogo de push
 # (F-09: o texto do push é montado no servidor, então `_shared/push.ts` duplica de
@@ -146,11 +146,13 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # retenção da atividade por membro (T-78: `member_activity_days` aceita android/web/
 # web-installed no CHECK e na guarda de `touch_activity`, e o purge guarda 400 dias — o prazo
 # da §11 da política; o app chama fire-and-forget, então um canal recusado sumiria dos dados
-# sem sintoma). Cinco leem
+# sem sintoma), e o mapa de acentos da busca do Histórico (F-76: `history_fold`, o translate()
+# da migração, tem de dobrar exatamente o que `ChatRules.foldMap` dobra, nas duas caixas —
+# senão "ônibus" acha o relato na Conversa e não no Histórico). Cinco leem
 # supabase/functions/_shared/i18n.ts e supabase/migrations — as duplicações que
 # existem de propósito porque Deno não chama Dart; o sexto lê um service worker, o
 # sétimo uma Edge Function, o oitavo um catálogo de e-mail ao lado de uma migração e o
-# nono uma Edge Function ao lado de uma migração e o décimo uma migração só,
+# nono uma Edge Function ao lado de uma migração e o décimo e o décimo primeiro uma migração só,
 # pela mesma razão em outras linguagens. Um espelho que
 # ninguém confere apodrece calado, e é o lane mais barato do run.
 # Também no lane core, desde o T-78 (23/09/2026), analytics_catalog_test: todo evento que o

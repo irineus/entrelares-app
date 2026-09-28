@@ -38,7 +38,9 @@ abstract final class ChatRules {
           if (m.messageId == messageId && m.profileId != author) m
       ]..sort((a, b) => a.readAt.compareTo(b.readAt));
 
-  static const Map<String, String> _fold = {
+  /// The accents folded — public since F-76, whose SQL mirror (`history_fold`)
+  /// `history_fold_mirror_test` pins to this map.
+  static const Map<String, String> foldMap = {
     'á': 'a', 'à': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a',
     'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
     'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
@@ -53,7 +55,7 @@ abstract final class ChatRules {
     final out = StringBuffer();
     for (final rune in lower.runes) {
       final ch = String.fromCharCode(rune);
-      out.write(_fold[ch] ?? ch);
+      out.write(foldMap[ch] ?? ch);
     }
     return out.toString();
   }

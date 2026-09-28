@@ -16,6 +16,7 @@ import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_account_reply.dart';
+import 'package:entrelares_db_contracts/models/history_search_hit.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_deletion.dart';
@@ -998,6 +999,23 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
             props: {'correction': correctsId != null ? 'yes' : 'no'}) ??
         Future<void>.value());
     return id as int;
+  }
+
+  // ── F-76 search the Histórico ──
+
+  @override
+  Future<List<HistorySearchHit>> searchHistory(String query) async {
+    final rows = await _client
+        .rpc<dynamic>('search_history', params: {'p_query': query});
+    final hits = [
+      for (final r in (rows as List? ?? const []))
+        HistorySearchHit.fromJson(r as Map<String, dynamic>),
+    ];
+    // T-37/F-76: the count only — the words never leave the device.
+    unawaited(analytics?.trackEvent(AnalyticsEvents.historySearch,
+            props: {'results': hits.length}) ??
+        Future<void>.value());
+    return hits;
   }
 
   @override

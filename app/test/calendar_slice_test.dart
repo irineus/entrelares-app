@@ -23,6 +23,7 @@ import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_account_reply.dart';
+import 'package:entrelares_db_contracts/models/history_search_hit.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_invitation.dart';
@@ -505,6 +506,19 @@ class FakeCustodyDataSource implements CustodyDataSource {
   @override
   Future<int> countDayAccountsWrittenToday(int authorId) async =>
       writtenToday;
+
+  // ── F-76 ──
+  /// What [searchHistory] answers, and every query it was asked.
+  List<HistorySearchHit> historyHits = [];
+  final List<String> historyQueries = [];
+  Object? throwOnHistorySearch;
+
+  @override
+  Future<List<HistorySearchHit>> searchHistory(String query) async {
+    historyQueries.add(query);
+    if (throwOnHistorySearch != null) throw throwOnHistorySearch!;
+    return historyHits;
+  }
 
   // ── F-75 ──
   /// Every reply the fake knows about; [addDayAccountReply] appends the way

@@ -24,8 +24,14 @@ class ReportsScreen extends StatelessWidget {
   /// screen never names a route and the tests need no router.
   final VoidCallback? onOpenCalendar;
 
+  /// F-76: a Histórico search result opens its day in the month view.
+  final ValueChanged<DateTime>? onOpenDay;
+
   const ReportsScreen(
-      {super.key, required this.dataSource, this.onOpenCalendar});
+      {super.key,
+      required this.dataSource,
+      this.onOpenCalendar,
+      this.onOpenDay});
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +65,7 @@ class ReportsScreen extends StatelessWidget {
           children: [
             ReportsSummaryTab(
                 dataSource: dataSource, onOpenCalendar: onOpenCalendar),
-            ReportsAuditTab(dataSource: dataSource),
+            ReportsAuditTab(dataSource: dataSource, onOpenDay: onOpenDay),
             ReportsPdfTab(dataSource: dataSource),
           ],
         ),

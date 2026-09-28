@@ -677,7 +677,13 @@ class _EntrelaresAppState extends State<EntrelaresApp>
               path: '/reports',
               builder: (_, _) => ReportsScreen(
                   dataSource: _dataSource,
-                  onOpenCalendar: () => _router.go('/')),
+                  onOpenCalendar: () => _router.go('/'),
+                  // F-76: a search result opens its day in the month view,
+                  // the door the Conversa's cited day already uses.
+                  onOpenDay: (day) {
+                    _dayRequest.value = day;
+                    _router.go('/');
+                  }),
             ),
           ]),
         ],

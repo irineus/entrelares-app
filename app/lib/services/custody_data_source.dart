@@ -23,6 +23,7 @@ import 'package:entrelares_db_contracts/models/expense.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_account_reply.dart';
+import 'package:entrelares_db_contracts/models/history_search_hit.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_deletion.dart';
@@ -295,6 +296,14 @@ abstract class CustodyDataSource {
     required String body,
     int? correctsId,
   });
+
+  // ── F-76 search the Histórico ──
+
+  /// The texts the Histórico shows that match every word of [query]
+  /// (accents and case forgiven — the Conversa's rule), newest day first.
+  /// Read as the caller: the server returns only what the reader can see.
+  /// Counts the search in Umami — the number of results, never the words.
+  Future<List<HistorySearchHit>> searchHistory(String query);
 
   // ── F-52 aviso de imprevisto ──
 
