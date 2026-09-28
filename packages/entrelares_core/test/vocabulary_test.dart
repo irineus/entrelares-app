@@ -260,11 +260,18 @@ void main() {
       'app.expense.',
     ];
     final pt = catalogs['pt-BR']!;
-    final word = RegExp(r'despesas?', caseSensitive: false);
+    final word = RegExp(r'\bdespesas?\b', caseSensitive: false);
+    var inside = 0;
     for (final key in [...K.allKeys, ...KApp.allKeys]) {
-      if (prefixes.any(key.startsWith)) continue;
+      if (prefixes.any(key.startsWith)) {
+        if (word.hasMatch(pt[key])) inside++;
+        continue;
+      }
       expect(word.hasMatch(pt[key]), isFalse, reason: '$key says "${pt[key]}"');
     }
+    // The regex has to see the word where it IS allowed, or the loop above is
+    // green over nothing — it was, for weeks, with two 0x08 bytes for `\b`.
+    expect(inside, greaterThan(0));
   });
 
   // F-35: "conversa" names the family chat, and nothing else. The address:
@@ -277,11 +284,16 @@ void main() {
       'app.chat.',
     ];
     final pt = catalogs['pt-BR']!;
-    final word = RegExp(r'conversas?', caseSensitive: false);
+    final word = RegExp(r'\bconversas?\b', caseSensitive: false);
+    var inside = 0;
     for (final key in [...K.allKeys, ...KApp.allKeys]) {
-      if (prefixes.any(key.startsWith)) continue;
+      if (prefixes.any(key.startsWith)) {
+        if (word.hasMatch(pt[key])) inside++;
+        continue;
+      }
       expect(word.hasMatch(pt[key]), isFalse, reason: '$key says "${pt[key]}"');
     }
+    expect(inside, greaterThan(0));
   });
 
   test('F-35: the tab that holds the Conversa is Comunicação', () {

@@ -179,7 +179,10 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # num dia que já passou, anexado e nunca editado), endereço `app.dayAccount.*` e
 # `notifRender.*dayAccount*`, e a superfície tem de continuar dizendo-o; "relatório" (o PDF)
 # é outra palavra e segue livre. No mesmo item a regex do "agendado" deixou de ter dois
-# bytes de backspace no lugar do \b — por meses ela não casava com nada.
+# bytes de backspace no lugar do \b — por meses ela não casava com nada. As de "despesa" (F-34)
+# e "conversa" (F-35) tinham o mesmo defeito até 28/09/2026; desde então cada uma exige casar ao
+# menos uma chave DENTRO do próprio endereço, e no_control_bytes_test recusa byte de controle
+# (fora tab/LF/CR) em todo .dart/.ts/.sql de app/, packages/ e supabase/.
 # String nova com uma dessas palavras derruba o lane core; as exceções são presas pelo nome
 # da chave. O glossário do produto mora na subpágina Design system and UX.
 # Desde o U-57 (23/09/2026), settings_copy_guard_test: toda frase que AFIRMA o valor de uma
