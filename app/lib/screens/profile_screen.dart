@@ -295,9 +295,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// U-21 — the Senha pencil. Two doors in one sheet: the change, gated by
-  /// S-10 (the CURRENT password is always demanded first — otherwise a
-  /// borrowed unlocked phone could take the account over), and the reset by
-  /// e-mail for whoever cannot answer that prompt.
+  /// S-10 (a proof is always demanded first — the current password or, since
+  /// S-21, a code mailed to the account — otherwise a borrowed unlocked phone
+  /// could take the account over), and the reset by e-mail for whoever cannot
+  /// answer that prompt.
   Future<void> _editPassword(Localization l, Member target) async {
     setState(() => _passwordLinkSent = false);
     final outcome = await showProfilePasswordSheet(
@@ -312,6 +313,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (outcome != ProfilePasswordOutcome.changed || !mounted) return;
     await widget.dataSource.logAccountAction('password_changed');
     if (mounted) showAppSnack(context, l[K.profPasswordChanged]);
+  }
+
+  /// F-66 — "Definir uma senha" on the Google row of an account the server
+  /// says has NO password: the same editor in its "set" mode, behind the same
+  /// S-10 gate (the e-mailed code is the proof such an account can give,
+  /// S-21 — nothing about the gate changes). Then the page asks the server
+  /// again, so the password door and the Senha card appear without a reload.
+  Future<void> _setPassword(Localization l) async {
+    final outcome = await showProfilePasswordSheet(
+      context: context,
+      onChange: (newPassword) => runWithSudo(
+        context: context,
+        sudo: widget.sudo,
+        action: () => widget.dataSource.updateOwnPassword(newPassword),
+      ),
+    );
+    if (outcome != ProfilePasswordOutcome.changed || !mounted) return;
+    await widget.dataSource.logAccountAction('password_changed');
+    final hasPassword = await widget.dataSource.sessionHasPassword();
+    if (!mounted) return;
+    setState(() => _hasPassword = hasPassword);
+    showAppSnack(context, l[KApp.profSetPasswordDone]);
   }
 
   Future<void> _export(Localization l) async {
@@ -777,6 +800,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (method.email != null)
                   Text(method.email!, style: theme.bodyMedium),
                 Text(note, style: theme.bodySmall),
+                // F-66: only once the SERVER said there is no password —
+                // never on an unanswered question, never beside one.
+                if (method.kind == SignInMethodKind.google &&
+                    _hasPassword == false)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: const ValueKey('profile-set-password'),
+                      onPressed: () => _setPassword(l),
+                      icon: const Icon(Icons.key_outlined),
+                      label: Text(l[KApp.profSetPasswordAction]),
+                    ),
+                  ),
               ],
             ),
           ),

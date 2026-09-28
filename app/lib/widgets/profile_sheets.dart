@@ -74,10 +74,16 @@ enum ProfilePasswordOutcome {
 /// Opens the password editor. [onChange] receives the validated new password;
 /// [onReset] is the "esqueci a senha atual" door, which needs no elevation
 /// (the mailbox is the proof) and lives here so the page keeps one line.
+///
+/// F-66: with [onReset] null the sheet SETS a first password on an account
+/// that has none (a Google-only door): its own title, lead and action, and
+/// no reset door and no "forgot the current one" line — there is no current
+/// one. The gate is unchanged: [onChange] still runs behind the S-10 sudo,
+/// whose e-mailed code (S-21) is the proof such an account can give.
 Future<ProfilePasswordOutcome?> showProfilePasswordSheet({
   required BuildContext context,
   required Future<bool> Function(String newPassword) onChange,
-  required Future<void> Function() onReset,
+  Future<void> Function()? onReset,
 }) =>
     showAppSheet<ProfilePasswordOutcome>(
       context: context,
@@ -278,11 +284,11 @@ class _ProfileEmailSheetState extends State<_ProfileEmailSheet> {
 
 class _ProfilePasswordSheet extends StatefulWidget {
   final Future<bool> Function(String newPassword) onChange;
-  final Future<void> Function() onReset;
+  final Future<void> Function()? onReset;
 
   const _ProfilePasswordSheet({
     required this.onChange,
-    required this.onReset,
+    this.onReset,
   });
 
   @override
@@ -337,9 +343,10 @@ class _ProfilePasswordSheetState extends State<_ProfilePasswordSheet> {
   }
 
   Future<void> _reset() async {
-    if (_busy) return;
+    final onReset = widget.onReset;
+    if (_busy || onReset == null) return;
     setState(() => _busy = true);
-    await widget.onReset();
+    await onReset();
     if (!mounted) return;
     Navigator.of(context).pop(ProfilePasswordOutcome.resetSent);
   }
@@ -348,20 +355,24 @@ class _ProfilePasswordSheetState extends State<_ProfilePasswordSheet> {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
     final theme = Theme.of(context).textTheme;
+    final setting = widget.onReset == null;
     return AppSheetFrame(
-      title: l[K.profSectionPassword],
+      title: l[setting ? KApp.profSetPasswordTitle : K.profSectionPassword],
+      subtitle: setting ? l[KApp.profSetPasswordLead] : null,
       busy: _busy,
-      primaryLabel: l[K.profChangePassword],
+      primaryLabel: l[setting ? KApp.profSetPasswordAction : K.profChangePassword],
       onPrimary: () => _change(l),
       secondaryLabel: l[K.commonCancel],
       onSecondary: () => Navigator.of(context).pop(),
       // The way out for a forgotten password rides WITH the actions, not in
       // the scroll: a reader who cannot answer the sudo prompt must see it.
-      extraAction: OutlinedButton.icon(
-        onPressed: _busy ? null : _reset,
-        icon: const Icon(Icons.mail_outline),
-        label: Text(l[K.profResetByEmail]),
-      ),
+      extraAction: setting
+          ? null
+          : OutlinedButton.icon(
+              onPressed: _busy ? null : _reset,
+              icon: const Icon(Icons.mail_outline),
+              label: Text(l[K.profResetByEmail]),
+            ),
       children: [
         AppTextField(
           label: l[K.updatePwdNewPassword],
@@ -387,8 +398,10 @@ class _ProfilePasswordSheetState extends State<_ProfilePasswordSheet> {
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _change(l),
         ),
-        const SizedBox(height: Spacing.md),
-        Text(l[K.profForgotCurrent], style: theme.bodySmall),
+        if (!setting) ...[
+          const SizedBox(height: Spacing.md),
+          Text(l[K.profForgotCurrent], style: theme.bodySmall),
+        ],
       ],
     );
   }

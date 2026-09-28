@@ -168,6 +168,11 @@ abstract final class KApp {
   //    needs one line to stand in for the form it no longer shows ──
   static const String profEditData = 'app.prof.editData';
   static const String profPasswordSummary = 'app.prof.passwordSummary';
+  // ── F-66: a first password on a Google-only account ──
+  static const String profSetPasswordAction = 'app.prof.setPasswordAction';
+  static const String profSetPasswordTitle = 'app.prof.setPasswordTitle';
+  static const String profSetPasswordLead = 'app.prof.setPasswordLead';
+  static const String profSetPasswordDone = 'app.prof.setPasswordDone';
 
   // ── F-09 push (the Notificações control) ──
   static const String pushTitle = 'app.push.title';
@@ -867,6 +872,10 @@ abstract final class KApp {
     profLoginMethodOtherNote,
     profEditData,
     profPasswordSummary,
+    profSetPasswordAction,
+    profSetPasswordTitle,
+    profSetPasswordLead,
+    profSetPasswordDone,
     pushTitle,
     pushHintOff,
     pushHintOn,
@@ -1472,7 +1481,7 @@ abstract final class StringsAppPtBr {
     KApp.profLoginMethod: 'Como você entra',
     KApp.profLoginMethodGoogle: 'Conta Google',
     KApp.profLoginMethodNote:
-        'Você entra com sua conta Google — não há senha para alterar aqui.',
+        'Você entra com sua conta Google e ainda não tem uma senha.',
     KApp.profLoginMethodsIntro:
         'Esta conta tem mais de uma porta de entrada. Qualquer uma delas abre '
             'o login sozinha.',
@@ -1486,6 +1495,10 @@ abstract final class StringsAppPtBr {
     KApp.profLoginMethodOther: 'Outro provedor: {0}',
     KApp.profLoginMethodOtherNote: 'Abre este login sozinho.',
     KApp.profEditData: 'Editar dados',
+    KApp.profSetPasswordAction: 'Definir uma senha',
+    KApp.profSetPasswordTitle: 'Definir uma senha',
+    KApp.profSetPasswordLead: 'Uma segunda porta de entrada: o seu e-mail e esta senha. A conta Google continua abrindo o login. Para confirmar que é você, peça o código que enviamos ao seu e-mail.',
+    KApp.profSetPasswordDone: 'Senha definida. Agora você também entra com o seu e-mail e esta senha.',
     KApp.profPasswordSummary:
         'Senha definida. Altere aqui ou redefina por e-mail.',
     KApp.pushTitle: 'Notificações no celular',
@@ -2209,8 +2222,7 @@ abstract final class StringsAppEn {
     KApp.profLoginMethod: 'How you sign in',
     KApp.profLoginMethodGoogle: 'Google account',
     KApp.profLoginMethodNote:
-        'You sign in with your Google account — there is no password to '
-            'change here.',
+        'You sign in with your Google account and have no password yet.',
     KApp.profLoginMethodsIntro:
         'This account has more than one way in. Any one of them opens it on '
             'its own.',
@@ -2224,6 +2236,10 @@ abstract final class StringsAppEn {
     KApp.profLoginMethodOther: 'Another provider: {0}',
     KApp.profLoginMethodOtherNote: 'Opens this login on its own.',
     KApp.profEditData: 'Edit details',
+    KApp.profSetPasswordAction: 'Set a password',
+    KApp.profSetPasswordTitle: 'Set a password',
+    KApp.profSetPasswordLead: 'A second way in: your e-mail and this password. The Google account keeps opening your login. To confirm it is you, ask for the code we send to your e-mail.',
+    KApp.profSetPasswordDone: 'Password set. You can now also sign in with your e-mail and this password.',
     KApp.profPasswordSummary:
         'Password set. Change it here or reset it by e-mail.',
     KApp.pushTitle: 'Phone notifications',

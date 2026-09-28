@@ -98,6 +98,7 @@ import 'custom_roles_test.dart' as roles;
 import 'family_page_test.dart' as fam;
 import 'frozen_day_test.dart' as frz;
 import 'profile_test.dart' as prof;
+import 'set_password_f66_test.dart' as setpw;
 import 'push_service_test.dart' as psh;
 import 'register_test.dart' as reg;
 import 'reports_audit_test.dart' as audit;
@@ -852,6 +853,25 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(pt[KApp.pushHintReallowIos]), findsOneWidget);
       await _measure(tester, 'notifications, iPhone re-allow line');
+    });
+
+    _scene('profile, Google-only: set a password', (tester, dark) async {
+      final ds = setpw.googleOnly();
+      await tester.pumpWidget(
+        _host(
+          ProfileScreen(
+            dataSource: ds,
+            sudo: SudoService(ds),
+            deliverExport: (_, _) async {},
+          ),
+          dark: dark,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _measure(tester, 'profile, Google-only');
+      await tester.tap(find.byKey(const ValueKey('profile-set-password')));
+      await tester.pumpAndSettle();
+      await _measure(tester, 'set password sheet');
     });
 
     _scene('profile', (tester, dark) async {
