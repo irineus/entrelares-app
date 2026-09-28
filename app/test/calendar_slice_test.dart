@@ -1600,6 +1600,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Future<void> updateOwnPassword(String password) async {
     if (throwOnProfileWrite != null) throw throwOnProfileWrite!;
     passwordUpdates.add(password);
+    // F-66: a set password is one the server now reports.
+    hasPassword = true;
   }
 
   @override
