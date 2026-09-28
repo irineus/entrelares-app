@@ -2707,3 +2707,40 @@ Realtime, and `pumpAndSettle` waits for frames, not for a request in flight — 
 naming what was on screen when it hits). **H1 vs H3** (two concurrent runs on the dev project vs an
 ordinary render race) got the experiment the card asked for — two `workflow_dispatch` on the same
 tree, one second apart (runs 361 and 362, 12/09/2026) — and its result is on the T-58 card.
+
+## 16. T-94 — where each CI lane runs, and what it costs the dev project in MAU
+
+**Fulcrum 04.3.1 / T-94, 28/09/2026.** The dev org (`Entrelares Dev`) is on the **Free** plan, and
+Free counts as a MAU **every user that authenticated in the billing cycle — deleted afterwards or
+not**. Its cap is 50,000; over it, the provider restricts the org at the end of a grace period and
+**every request to the dev project answers 402** (QA web, per-PR previews, E2E, `api-dev`, Fulcrum's
+contract matrix). The 09/09–09/10/2026 cycle reached **91,988** because the DB gate ran on dev.
+
+| Lane | Where it runs | Auth users per run (measured 28/09/2026) |
+|---|---|---|
+| `db-gate` (`packages/entrelares_db_gate`) | **LOCAL, ephemeral** — `bash tool/db_gate_local.sh` on the runner: `supabase start`, every migration from zero, `seed.sql`, the local edge runtime serving `supabase/functions/` | ~344 created, 333 sign in — **0 on dev** since T-94. Before it: 375 runs in the cycle, the suite growing from 268 tests (10/09) to 479 (27/09) |
+| `db-gate`, T-29 step | dev (PR only) | 0 — `db push` + function deploy, so `qa-preview` builds against the PR's schema |
+| `web-e2e` (every PR + every merge) | dev, through `api-dev.entrelares.app` | 6 — one throwaway family of 2 per target, 3 targets (~390 runs/cycle ≈ 2,300) |
+| `e2e` (emulator; daily + dispatch) | dev | 4 — two targets × 2 (~25 runs/cycle ≈ 100) |
+| `qa-preview` / `qa-web` | dev (the built app points at it) | 0 — builds and deploys only; a human signing in is a real MAU |
+| Fulcrum contract suite (`irineus/fulcrum`) | dev, through `api-dev` | its fixed fixture users — a handful per cycle, not per run |
+| `keepalive-dev.yml` (T-44) | dev | 0 — one PostgREST read twice a week; still needed, and more so: with the gate gone, dev can sit idle long enough to hit the Free 7-day pause |
+
+**Projection for a cycle after T-94:** ~2,400 MAU from CI at today's PR rate (`web-e2e` + `e2e`), plus
+the humans on QA — under 5 % of the cap. Doubling the PR rate still leaves it under 10 %.
+
+**The rule this leaves (and Fulcrum's Decisões §4 states for every product):** on the Free plan, a CI
+lane that CREATES users does not run against a hosted project; it runs on a local stack. A new suite
+that needs users goes into the DB gate (local), or states its per-run count in this table.
+
+**Running it on a workstation.** `bash tool/db_gate_local.sh` with Docker running (`DART="fvm dart"`,
+`SUPABASE="npx --yes supabase@2.105.0"`, `KEEP_STACK=1` to leave the stack up). On Windows the
+default ports `54321-54329` can fall inside a Hyper-V excluded range (`netsh interface ipv4 show
+excludedportrange protocol=tcp`) — run from a copy of `supabase/` with other ports in its
+`config.toml`, never committed.
+
+**The one thing the local stack does not have.** The reference rows the hosted projects carry as DATA
+rather than migration — today only the `father`/`mother` pair of `public.roles` (the V001 rows the
+2026-07-13 baseline dump replaced; the F-27 catalog migration renamed them and seeded the other 19
+around them). `supabase/seed.sql` adds them, idempotently and by slug; `db push` never runs it. A
+gate that fails locally on a missing reference row gets the row in `seed.sql`, never a hosted target.

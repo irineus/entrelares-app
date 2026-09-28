@@ -3,17 +3,24 @@ import 'dart:io';
 /// Where the gate points and how it authorizes — the Dart twin of the C#
 /// suite's `TestEnv` (T-30).
 ///
-/// The suite runs against the REAL dev Supabase project, never a local stack:
-/// the invariant it exists to prove is "the client MIRRORS, the database
-/// ENFORCES", and a local stack proves it about a database no user talks to.
-/// URL and anon key default to the committed dev config (both PUBLIC — the same
-/// pair `env.dart` ships); the service-role key is a SECRET and is REQUIRED —
-/// without it the fixture aborts with instructions rather than running half a
-/// suite and reporting green.
+/// Since Fulcrum 04.3.1 / T-94 (28/09/2026) the suite runs against an
+/// EPHEMERAL LOCAL stack built from the checkout — `bash tool/db_gate_local.sh`,
+/// in CI and on a workstation alike — and never against a hosted project. It
+/// used to run against the dev project on the grounds that a local stack proves
+/// the rules "about a database no user talks to"; what that cost was ~344 real
+/// auth users per run, which the Free plan counts as MAU whether or not the
+/// teardown deletes them, and 375 runs put the dev org at 91,988 / 50,000. The
+/// migrations are the same files `db push` applies to both hosted projects, so
+/// the local database IS the schema users talk to, applied from zero.
 ///
-/// Sources, in order: environment variable (CI: the `SUPABASE_SERVICE_ROLE_DEV`
-/// secret) → the git-ignored `e2e.local.env` file, searched upward from the
-/// working directory, for local runs.
+/// So all three values are REQUIRED and have no default: a missing URL can no
+/// longer fall back to a hosted project and spend its MAU in silence. The
+/// fixture aborts with instructions rather than running half a suite and
+/// reporting green.
+///
+/// Sources, in order: environment variable (what the script exports from
+/// `supabase status`) → the git-ignored `e2e.local.env` file, searched upward
+/// from the working directory.
 abstract final class TestEnv {
   /// The signature the DB-side purge guard recognises. `purge_e2e_family`
   /// re-validates it server-side, which is what makes a fixture bug unable to
@@ -23,25 +30,26 @@ abstract final class TestEnv {
   /// Resend's test domain: accepted, delivered nowhere, never bounces.
   static const String e2eEmailDomain = '@resend.dev';
 
-  static String get supabaseUrl =>
-      _get('E2E_SUPABASE_URL') ?? 'https://buroanotfjcgvbfmacuh.supabase.co';
+  static String get supabaseUrl => _required('E2E_SUPABASE_URL');
 
-  static String get anonKey =>
-      _get('E2E_SUPABASE_ANON_KEY') ??
-      'sb_publishable_Eniwxftri8Std4uXaWhD8w_tzKO9u-g';
+  static String get anonKey => _required('E2E_SUPABASE_ANON_KEY');
 
-  static String get serviceRoleKey {
-    final key = _get('E2E_SUPABASE_SERVICE_ROLE_KEY');
-    if (key == null || key.trim().isEmpty) {
+  static String get serviceRoleKey =>
+      _required('E2E_SUPABASE_SERVICE_ROLE_KEY');
+
+  static String _required(String name) {
+    final value = _get(name);
+    if (value == null || value.trim().isEmpty) {
       throw StateError(
-        'E2E_SUPABASE_SERVICE_ROLE_KEY is not set. The gate needs the DEV '
-        "project's service_role key (Dashboard → Settings → API) to create and "
-        'purge its throwaway family. Set the environment variable, or put '
-        "'E2E_SUPABASE_SERVICE_ROLE_KEY=<key>' in the git-ignored e2e.local.env "
-        'file at the repository root. Never use the PROD key here.',
+        '$name is not set. The gate runs against a LOCAL Supabase stack: from '
+        'the repository root, `bash tool/db_gate_local.sh` starts one from the '
+        'migrations, exports E2E_SUPABASE_URL, E2E_SUPABASE_ANON_KEY and '
+        'E2E_SUPABASE_SERVICE_ROLE_KEY from `supabase status`, and runs the '
+        'suite. Never point it at a hosted project — every run creates ~344 '
+        'auth users, and the Free plan counts each one as a MAU (T-94).',
       );
     }
-    return key.trim();
+    return value.trim();
   }
 
   /// S-16: a key is either LEGACY (a JWT signed with the project's JWT secret)

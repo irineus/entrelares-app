@@ -50,3 +50,6 @@ e2e.local.env
 /fastlane/test_output/
 /vendor/bundle/
 /.bundle/
+# T-94: written by tool/db_gate_local.sh for the local stack's functions (dummy
+# Resend key, per-run webhook token) and removed on exit.
+supabase/functions/.env
