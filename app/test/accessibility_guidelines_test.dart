@@ -55,6 +55,7 @@ import 'package:entrelares_app/services/onboarding_service.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_account_reply.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
+import 'package:entrelares_db_contracts/models/history_search_hit.dart';
 import 'package:entrelares_app/screens/custom_roles_screen.dart';
 import 'package:entrelares_app/screens/day_sheet.dart';
 import 'package:entrelares_app/screens/family_plan_screen.dart';
@@ -955,6 +956,40 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ReportsPdfTab), findsOneWidget);
       await _measure(tester, 'reports pdf');
+    });
+
+    _scene('history search results', (tester, dark) async {
+      final ds = audit.source()
+        ..historyHits = [
+          HistorySearchHit(
+            kind: 'relato',
+            day: DateTime(2026, 8, 14),
+            writtenAt: DateTime.utc(2026, 8, 15, 10),
+            authorProfileId: 2,
+            body: 'Febre de 38 graus à noite; levei ao pronto-socorro e voltamos às 2h.',
+          ),
+          HistorySearchHit(
+            kind: 'swap_message',
+            day: DateTime(2026, 8, 12),
+            writtenAt: DateTime.utc(2026, 8, 10, 9),
+            authorProfileId: 1,
+            body: 'Posso ficar com ela? Ela está com febre.',
+          ),
+        ];
+      await tester.pumpWidget(_host(
+          Scaffold(
+              body: ReportsAuditTab(
+                  dataSource: ds, now: () => audit.today, onOpenDay: (_) {})),
+          dark: dark));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.descendant(
+              of: find.byKey(const ValueKey('history-search-field')),
+              matching: find.byType(TextField)),
+          'febre');
+      await tester.tap(find.byKey(const ValueKey('history-search')));
+      await tester.pumpAndSettle();
+      await _measure(tester, 'history search results');
     });
 
     _scene('plan', (tester, dark) async {

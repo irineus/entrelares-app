@@ -442,6 +442,23 @@ abstract final class KApp {
   static const String dayAccountSaved = 'app.dayAccount.saved';
   static const String dayAccountErrSave = 'app.dayAccount.errSave';
   static const String dayAccountErrLoad = 'app.dayAccount.errLoad';
+  // ── F-76: search the Histórico (the kind labels keep their words'
+  //    addresses — relato, aviso, agenda — per vocabulary_test) ──
+  static const String historySearchLabel = 'app.history.searchLabel';
+  static const String historySearchHint = 'app.history.searchHint';
+  static const String historySearchAction = 'app.history.searchAction';
+  static const String historySearchClear = 'app.history.searchClear';
+  static const String historySearchEmpty = 'app.history.searchEmpty';
+  static const String historySearchCountOne = 'app.history.searchCountOne';
+  static const String historySearchCountMany = 'app.history.searchCountMany';
+  static const String historySearchError = 'app.history.searchError';
+  static const String historySearchKindSwapMessage = 'app.history.searchKindSwapMessage';
+  static const String historySearchKindSwapNote = 'app.history.searchKindSwapNote';
+  static const String historySearchByline = 'app.history.searchByline';
+  static const String dayAccountSearchKind = 'app.dayAccount.searchKind';
+  static const String dayAccountSearchKindReply = 'app.dayAccount.searchKindReply';
+  static const String noticeSearchKind = 'app.notice.searchKind';
+  static const String agendaSearchKind = 'app.agenda.searchKind';
   // ── F-75: the reply to a relato (the address stays app.dayAccount.* —
   //    vocabulary_test keeps "relato" inside it) ──
   static const String dayAccountReplyAction = 'app.dayAccount.replyAction';
@@ -1037,6 +1054,21 @@ abstract final class KApp {
     dayAccountSaved,
     dayAccountErrSave,
     dayAccountErrLoad,
+    historySearchLabel,
+    historySearchHint,
+    historySearchAction,
+    historySearchClear,
+    historySearchEmpty,
+    historySearchCountOne,
+    historySearchCountMany,
+    historySearchError,
+    historySearchKindSwapMessage,
+    historySearchKindSwapNote,
+    historySearchByline,
+    dayAccountSearchKind,
+    dayAccountSearchKindReply,
+    noticeSearchKind,
+    agendaSearchKind,
     dayAccountReplyAction,
     dayAccountReplyFieldLabel,
     dayAccountReplyFieldHint,
@@ -1767,6 +1799,21 @@ abstract final class StringsAppPtBr {
     KApp.dayAccountReplyAuditCorrection: '{0} corrigiu uma resposta a um relato',
     KApp.pdfDayAccountReplyLine: 'Resposta de {0}, registrada em {1}:',
     KApp.pdfDayAccountReplyCorrectionLine: 'Correção da resposta de {0}, registrada em {1}:',
+    KApp.historySearchLabel: 'Buscar no Histórico',
+    KApp.historySearchHint: 'Uma ou mais palavras, com ou sem acento',
+    KApp.historySearchAction: 'Buscar',
+    KApp.historySearchClear: 'Limpar a busca',
+    KApp.historySearchEmpty: 'Nada encontrado para "{0}".',
+    KApp.historySearchCountOne: '1 resultado. Toque para abrir o dia no calendário.',
+    KApp.historySearchCountMany: '{0} resultados. Toque num deles para abrir o dia no calendário.',
+    KApp.historySearchError: 'Não foi possível buscar agora. Tente de novo.',
+    KApp.historySearchKindSwapMessage: 'Mensagem de quem pediu a troca',
+    KApp.historySearchKindSwapNote: 'Mensagem de quem aprovou a troca',
+    KApp.historySearchByline: '{0} · escrito em {1}',
+    KApp.dayAccountSearchKind: 'Relato do dia',
+    KApp.dayAccountSearchKindReply: 'Resposta a um relato',
+    KApp.noticeSearchKind: 'Aviso',
+    KApp.agendaSearchKind: 'Agenda',
     KApp.dayAccountErrLoad:
         'Não foi possível carregar os relatos deste dia.',
     KApp.dayAccountAuditNew:
@@ -2488,6 +2535,21 @@ abstract final class StringsAppEn {
     KApp.dayAccountReplyAuditCorrection: '{0} corrected a reply to a day account',
     KApp.pdfDayAccountReplyLine: 'Reply by {0}, recorded on {1}:',
     KApp.pdfDayAccountReplyCorrectionLine: 'Correction of the reply by {0}, recorded on {1}:',
+    KApp.historySearchLabel: 'Search the History',
+    KApp.historySearchHint: 'One or more words, accents optional',
+    KApp.historySearchAction: 'Search',
+    KApp.historySearchClear: 'Clear the search',
+    KApp.historySearchEmpty: 'Nothing found for "{0}".',
+    KApp.historySearchCountOne: '1 result. Tap to open the day in the calendar.',
+    KApp.historySearchCountMany: '{0} results. Tap one to open the day in the calendar.',
+    KApp.historySearchError: 'The search could not run now. Try again.',
+    KApp.historySearchKindSwapMessage: 'Message from whoever asked for the swap',
+    KApp.historySearchKindSwapNote: 'Note from whoever approved the swap',
+    KApp.historySearchByline: '{0} · written on {1}',
+    KApp.dayAccountSearchKind: 'Day account',
+    KApp.dayAccountSearchKindReply: 'Reply to a day account',
+    KApp.noticeSearchKind: 'Notice',
+    KApp.agendaSearchKind: 'Agenda',
     KApp.dayAccountErrLoad:
         'The day accounts of this day could not be loaded.',
     KApp.dayAccountAuditNew:
