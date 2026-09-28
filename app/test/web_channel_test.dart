@@ -24,6 +24,17 @@ File _androidManifest() =>
     File('android/app/src/main/AndroidManifest.xml');
 File _androidStrings() => File('android/app/src/main/res/values/strings.xml');
 
+/// The `web-e2e` job alone — from its key to the next job's — with comment
+/// lines dropped, so the prose explaining a value is never what gets matched.
+String _webE2eJob(String workflow) {
+  final start = workflow.indexOf('\n  web-e2e:\n');
+  expect(start, greaterThan(-1), reason: 'verify.yml has no web-e2e job');
+  final next = RegExp(r'\n  [a-z][\w-]*:\n').firstMatch(
+      workflow.substring(start + 1));
+  final end = next == null ? workflow.length : start + 1 + next.start;
+  return _withoutComments(workflow.substring(start, end));
+}
+
 /// Every `autoVerify` filter in the manifest, as raw blocks. These are the
 /// filters that claim an https ADDRESS — the ones with the power to take a URL
 /// away from the web channel.
@@ -1179,18 +1190,22 @@ void main() {
 
     test('the workflow demands, per pack, exactly what each suite declares',
         () {
-      // The spec line: `<target>:<p0>:<full>` for every suite. Read from the
-      // code so the comment explaining it is not what gets matched.
-      final job = workflow.substring(workflow.indexOf('  web-e2e:'));
-      final specLine =
-          RegExp(r'for spec in ([^;]+); do').firstMatch(job)?.group(1);
-      expect(specLine, isNotNull,
-          reason: 'the web-e2e step must loop over target:p0:full specs');
+      // T-95: one matrix leg per suite, `{ target: <name>, p0: <n>, full: <n> }`.
+      // Read from the job's own lines, not from the comment explaining them.
+      final job = _webE2eJob(workflow);
+      final legs = RegExp(
+              r'^\s+- \{ target: (\w+), p0: (\d+), full: (\d+) \}$',
+              multiLine: true)
+          .allMatches(job)
+          .toList();
+      expect(legs, isNotEmpty,
+          reason: 'the web-e2e matrix must name its legs as '
+              '{ target, p0, full } — the counts T-58 makes each one prove');
       final specs = <String, (int, int)>{};
-      for (final spec in specLine!.trim().split(RegExp(r'\s+'))) {
-        final parts = spec.split(':');
-        expect(parts, hasLength(3), reason: 'malformed spec: $spec');
-        specs[parts[0]] = (int.parse(parts[1]), int.parse(parts[2]));
+      for (final leg in legs) {
+        expect(specs.containsKey(leg.group(1)), isFalse,
+            reason: '${leg.group(1)} is driven by two legs');
+        specs[leg.group(1)!] = (int.parse(leg.group(2)!), int.parse(leg.group(3)!));
       }
 
       final declared = <String, (int, int)>{};
@@ -1217,12 +1232,20 @@ void main() {
     });
 
     test('the expectation reaches the driver, and the proof is fresh', () {
-      final job = workflow.substring(workflow.indexOf('  web-e2e:'));
+      final job = _webE2eJob(workflow);
       final drive = job.indexOf('flutter drive');
       expect(drive, greaterThan(-1));
       expect(job, contains('$expectedTestsVariable="\$expected" flutter drive'),
           reason: 'a drive without the variable accepts any positive count, '
               'which is fine at a keyboard and not in the gate');
+      // T-95: the leg drives the target its own matrix row names, and the
+      // count comes from that same row — never a list typed in the script,
+      // which would drift from the rows the test above reads.
+      expect(job, contains(r'--target="integration_test/$TARGET.dart"'));
+      for (final key in ['target', 'p0', 'full']) {
+        expect(job, contains('\${{ matrix.$key }}'),
+            reason: 'the leg must read `$key` from its matrix row');
+      }
       final removal = job.indexOf('rm -f $proofFile');
       expect(removal, greaterThan(-1),
           reason: 'a stale proof from the previous target must never stand in '
@@ -1231,6 +1254,28 @@ void main() {
       expect(job.indexOf(proofFile, drive), greaterThan(drive),
           reason: 'the workflow reads the proof AFTER the drive, for the '
               'summary — the names that ran are the evidence a human reads');
+    });
+
+    test('each suite has its own leg and clock, and no leg cancels another',
+        () {
+      // T-95 (28/09/2026): three suites back to back under one 20-min ceiling
+      // used 97% of it on a GREEN run; a slow dev project on PR #301 pushed
+      // the job over, and it read `cancelled` — the db-gate eviction's shape.
+      final job = _webE2eJob(workflow);
+      expect(job, contains('fail-fast: false'),
+          reason: 'a red leg must not turn its siblings into `cancelled`');
+      final group = RegExp(r'^\s+group: (.+)$', multiLine: true)
+          .firstMatch(job)
+          ?.group(1);
+      expect(group, contains(r'${{ matrix.target }}'),
+          reason: 'a concurrency group the three legs share makes one run '
+              'cancel its own legs');
+      final timeout = int.parse(
+          RegExp(r'timeout-minutes: (\d+)').firstMatch(job)!.group(1)!);
+      // The longest leg (deep_link_test) measured 9.2 min at p95. Below 13 the
+      // +51% a slow dev project cost on #301 no longer fits; above 20 a hung
+      // leg holds the publish longer than the old whole job did.
+      expect(timeout, inInclusiveRange(13, 20));
     });
   });
 

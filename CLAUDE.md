@@ -281,9 +281,14 @@ cd app && fvm flutter drive --driver=test_driver/integration_test.dart   --targe
 # `proveExecution(binding)` antes do primeiro testWidgets), o driver é NOSSO
 # (test_driver/integration_test.dart, veredito em test_driver/e2e_proof.dart) e
 # recusa run sem relatório, com zero testes ou com contagem diferente de
-# E2E_EXPECTED_TESTS — que o verify.yml fixa por alvo e por pack (`alvo:p0:full`) e o
+# E2E_EXPECTED_TESTS — que o verify.yml fixa por alvo e por pack (uma perna da matriz
+# por suíte, `{ target, p0, full }`, desde o T-95) e o
 # web_channel_test espelha contra as declarações `testWidgets(` de cada arquivo:
 # teste novo = bump no verify.yml na MESMA entrega, ou o lane barato fica vermelho.
+# T-95 (28/09/2026): o web-e2e é uma MATRIZ, uma perna por suíte, fail-fast desligado e
+# timeout de 15 min por perna — em série, sob 20 min, um run VERDE já gastava 19,5 no
+# p95 e o dev lento do PR #301 fez o job ler `cancelled` sem asserção nenhuma quebrar.
+# Suíte nova = perna nova na matriz (runbook §15.4.1).
 # Sem a variável (rodada à mão, como acima) vale "pelo menos um". A prova fica em
 # app/build/e2e_proof.json e o sumário do run lista os testes pelo nome. Teste "só
 # full" usa `skip: pack == 'p0'`, nunca `return` na primeira linha — um corpo que
