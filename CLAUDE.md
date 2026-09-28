@@ -54,7 +54,7 @@ URL with the ids already in it, never `https://<console>` with a placeholder.
 | Console | Direct URL | Note |
 |---|---|---|
 | Supabase **prod** | https://supabase.com/dashboard/project/jptqbwfziyzlhlmoekzu | ref `jptqbwfziyzlhlmoekzu`. **A merge reaches real users from here** |
-| Supabase **dev/QA** | https://supabase.com/dashboard/project/buroanotfjcgvbfmacuh | ref `buroanotfjcgvbfmacuh`. The DB gate and the E2E lane run against THIS one |
+| Supabase **dev/QA** | https://supabase.com/dashboard/project/buroanotfjcgvbfmacuh | ref `buroanotfjcgvbfmacuh`. QA web, per-PR previews, `web-e2e`, the E2E lane and Fulcrum's contract suite run against THIS one — the DB gate does NOT since T-94 (local stack; Free org, 50k MAU cap — `supabase/README.md` §16) |
 | GitHub secrets (app) | https://github.com/irineus/entrelares-app/settings/secrets/actions | `SUPABASE_SERVICE_ROLE_DEV`, `CLOUDFLARE_API_TOKEN`, … |
 | GitHub Environments (app) | https://github.com/irineus/entrelares-app/settings/environments | T-79: `play-internal` (deploy from `main` only; `PLAY_RELEASE_SERVICE_ACCOUNT` + the four `ANDROID_UPLOAD_*` secrets) and `play-production` (deploy from `main` only, required reviewer = owner; `PLAY_RELEASE_SERVICE_ACCOUNT`). The branch rule is what keeps a same-repo PR branch of this PUBLIC repo from reading the upload key |
 | GitHub variables (app) | https://github.com/irineus/entrelares-app/settings/variables/actions | public config (`UMAMI_APP_WEBSITE_ID` and friends) |
@@ -258,11 +258,15 @@ cd app && fvm flutter build web --release --no-web-resources-cdn --dart-define=A
 # `entrelares-app@<versão do pubspec>` — a mesma string que o cliente manda, senão
 # mapas e eventos nunca se encontram — e APAGA todo .map antes de publicar, porque
 # um mapa servido da nossa origem entrega o fonte Dart inteiro a quem pedir.
-# Gate de banco (392 testes de RLS/RPC/trigger contra o projeto dev, 24/09/2026), Dart puro
-# desde o PR 16 do T-56. Exige a service_role do DEV — nunca a de produção. Sem
-# ela a suíte aborta com instruções em vez de rodar pela metade.
-cd packages/entrelares_db_gate && fvm dart analyze --fatal-infos
-cd packages/entrelares_db_gate && E2E_SUPABASE_SERVICE_ROLE_KEY=<chave dev> fvm dart test
+# Gate de banco (479 testes de RLS/RPC/trigger/Edge Function, 27/09/2026), Dart puro desde o
+# PR 16 do T-56. Desde o T-94 / Fulcrum 04.3.1 (28/09/2026) roda numa stack LOCAL e efêmera —
+# no CI e aqui —, NUNCA no projeto dev: cada run cria ~344 usuários de auth, o Free conta cada
+# um como MAU mesmo apagado, e 375 runs levaram a org dev a 91.988/50.000. O script sobe a stack
+# (migrations do zero + supabase/seed.sql + as functions do checkout), exporta as chaves locais
+# do `supabase status` e roda a suíte; sem E2E_SUPABASE_URL o gate aborta — não há mais default
+# hospedado. Docker ligado. No Windows as portas 5432x podem cair numa faixa reservada do
+# Hyper-V: rodar de uma cópia de supabase/ com outras portas (supabase/README.md §16).
+DART="fvm dart" SUPABASE="npx --yes supabase@2.105.0" bash tool/db_gate_local.sh
 # Gate de fluxo na web: os mesmos arquivos integration_test/ num Chrome headless,
 # MAIS deep_link_test — o único web por construção (T-64: uma entrada fria numa
 # URL interna só se comporta mal onde o navegador entrega o endereço ao app).

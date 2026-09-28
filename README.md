@@ -289,10 +289,14 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
   `assetlinks.json` (site→app), `related_applications` (em `web/manifest.json`) e o
   `<link rel="manifest">` do `index.html`, sem o qual o navegador nem lê o manifest: faltando
   qualquer uma a API devolve lista VAZIA, igualzinho a "não instalado". Fora do Chrome
-  Android não aparece nada (fail-closed, forma do T-38), e o convite para INSTALAR fica de
-  fora de propósito enquanto a Play não era pública; ela é pública desde 25/09/2026 (T-59) e o
-  convite é o card F-72 — até ele, o web continua só oferecendo o app JÁ instalado. Regra pura em
-  `ChannelHandoffRules`; as quatro fontes e a ausência de App Link em `/` são presas no
+  Android não aparece nada (fail-closed, forma do T-38). **O convite para INSTALAR (F-72,
+  27/09/2026)** é a outra resposta da mesma pergunta: Chrome Android que RESPONDEU sem listar o
+  app ganha uma faixa `info` que abre a ficha pública da Play (`PlayInstallRules.listingUri`, com
+  `referrer=utm_*` que o relatório de aquisição da Play Console lê). Como lista vazia também é o
+  que uma fonte quebrada devolve, o convite nunca aparece num navegador que JÁ confirmou o app
+  uma vez (`app.storeApp.confirmed`), nem num build dev, nem na web instalada na Tela de Início;
+  dispensar adia 14 dias, até três vezes (o ritmo do U-54). Regras puras em
+  `ChannelHandoffRules` e `PlayInstallRules`; as quatro fontes e a ausência de App Link em `/` são presas no
   `web_channel_test`. **A resposta do navegador chega DEPOIS do shell montar, e o shell é
   construído por um `builder` de rota do go_router, que guarda as páginas em cache e só roda
   de novo numa navegação** — medido no aparelho em 13/09/2026: a API confirmava o app, o

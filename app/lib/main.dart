@@ -463,6 +463,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                 from: _router.routeInformationProvider.value.uri.path),
             deletionBanner: _deletionBanner,
             appHandoff: _appHandoff,
+            playInvite: _playInvite,
             installHint: _installHint,
             connectivity: appConnectivity,
             tourKeys: _tourKeys,
@@ -733,6 +734,26 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// test.
   static const String _handoffDismissedKey = 'app.handoff.dismissed';
 
+  /// F-72: this browser has confirmed the Play app at least once. Written on
+  /// every "installed" answer and never cleared: after it, an empty list is
+  /// read as a broken source rather than an uninstall, and the invitation to
+  /// install stays away for good (`PlayInstallRules`).
+  static const String _storeAppConfirmedKey = 'app.storeApp.confirmed';
+
+  /// F-72: the install invitation, or null — the answer on every native
+  /// build, in a dev build, on every browser that could not answer, on every
+  /// device that is not Android, in a web app on the Home Screen, and
+  /// whenever the handoff above is the answer instead. A notifier for the
+  /// reason [_deletionBanner] gives.
+  final _playInvite = ValueNotifier<PlayInviteBanner?>(null);
+
+  /// F-72: the invitation's dismissals, per browser — U-54's two keys, under
+  /// the invitation's own prefix.
+  static const String _playInviteDismissCountKey =
+      'app.playInvite.dismissCount';
+  static const String _playInviteLastDismissedKey =
+      'app.playInvite.lastDismissedAt';
+
   /// U-51: the iPhone install hint, or null — the answer on every native
   /// build, on Android, on desktop, in every browser but Safari, and in an app
   /// already on the Home Screen. A notifier for the reason [_deletionBanner]
@@ -947,6 +968,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _chatTab.dispose();
     _dayRequest.dispose();
     _appHandoff.dispose();
+    _playInvite.dispose();
     _installHint.dispose();
     _planRequest.dispose();
     super.dispose();
@@ -1065,15 +1087,20 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     );
   }
 
-  /// T-65 — whether to offer the crossing into the installed app.
+  /// T-65 — whether to offer the crossing into the installed app; F-72 —
+  /// and, when the browser answered that the app is NOT here, whether to
+  /// invite the reader to install it. One question to the browser, two
+  /// mutually exclusive offers.
   ///
-  /// Asked once per authenticated session and never again after a dismissal:
-  /// the offer is a convenience, and a convenience that keeps coming back is
-  /// an interruption. The dismissal is per BROWSER (`prefs` is `localStorage`
-  /// on this channel), which is the right grain — it is that browser that has
-  /// the app beside it.
+  /// The crossing is asked once per authenticated session and never again
+  /// after a dismissal: the offer is a convenience, and a convenience that
+  /// keeps coming back is an interruption. The dismissal is per BROWSER
+  /// (`prefs` is `localStorage` on this channel), which is the right grain —
+  /// it is that browser that has the app beside it. The browser is asked even
+  /// after that dismissal, because an "installed" answer is also what
+  /// [_storeAppConfirmedKey] remembers for the invitation.
   ///
-  /// Every failure inside [isStoreAppInstalled] answers "no", so the whole
+  /// Every failure inside [storeAppPresence] answers "unknown", so the whole
   /// path is silent by construction: nothing here may cost the reader a
   /// screen.
   ///
@@ -1081,14 +1108,69 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// the shell is built by a go_router route builder, which does not run again
   /// for a rebuild of this widget (see [_deletionBanner]).
   Future<void> _resolveAppHandoff() async {
-    if (!kIsWeb || _appHandoff.value != null) return;
-    if (widget.prefs.getBool(_handoffDismissedKey) ?? false) return;
-    if (!await isStoreAppInstalled(Env.current.androidPackage)) return;
+    if (!kIsWeb || _appHandoff.value != null || _playInvite.value != null) {
+      return;
+    }
+    final presence = await storeAppPresence(Env.current.androidPackage);
     if (!mounted || _phase != _AuthPhase.authed) return;
-    _appHandoff.value = AppHandoffBanner(
-      onOpen: _openInApp,
-      onDismiss: _dismissAppHandoff,
+    if (presence == StoreAppPresence.installed) {
+      unawaited(widget.prefs.setBool(_storeAppConfirmedKey, true));
+      if (widget.prefs.getBool(_handoffDismissedKey) ?? false) return;
+      _appHandoff.value = AppHandoffBanner(
+        onOpen: _openInApp,
+        onDismiss: _dismissAppHandoff,
+      );
+      return;
+    }
+    _resolvePlayInvite(presence);
+  }
+
+  /// F-72 — the decision is `PlayInstallRules`; this reads the facts it wants
+  /// and counts the impression, once per authenticated session like U-51's.
+  void _resolvePlayInvite(StoreAppPresence presence) {
+    final facts = _browserFacts;
+    if (facts == null) return;
+    if (!PlayInstallRules.shouldInvite(
+      isProduction: Env.current.isProduction,
+      facts: facts,
+      presence: presence,
+      appConfirmedBefore: widget.prefs.getBool(_storeAppConfirmedKey) ?? false,
+      dismissals: _playInviteDismissals(),
+      now: DateTime.now(),
+    )) {
+      return;
+    }
+    _playInvite.value = PlayInviteBanner(
+      onOpen: _openPlayListing,
+      onDismiss: _dismissPlayInvite,
     );
+    unawaited(_analytics.trackEvent(AnalyticsEvents.playInviteView));
+  }
+
+  /// A new tab on purpose, unlike the handoff's `_self`: Chrome on Android
+  /// hands a `play.google.com/store/apps/details` address to the Play Store
+  /// app, and the reader's place in the web app stays where it was.
+  void _openPlayListing() {
+    unawaited(_analytics.trackEvent(AnalyticsEvents.playInviteOpen));
+    unawaited(launchUrl(PlayInstallRules.listingUri(Env.current.androidPackage)));
+  }
+
+  InstallHintDismissals _playInviteDismissals() {
+    final prefs = widget.prefs;
+    final lastMs = prefs.getInt(_playInviteLastDismissedKey);
+    return InstallHintDismissals(
+      count: prefs.getInt(_playInviteDismissCountKey) ?? 0,
+      last: lastMs == null ? null : DateTime.fromMillisecondsSinceEpoch(lastMs),
+    );
+  }
+
+  void _dismissPlayInvite() {
+    _playInvite.value = null;
+    final next = _playInviteDismissals().next(DateTime.now());
+    unawaited(widget.prefs.setInt(_playInviteDismissCountKey, next.count));
+    unawaited(widget.prefs.setInt(
+        _playInviteLastDismissedKey, next.last!.millisecondsSinceEpoch));
+    unawaited(_analytics.trackEvent(AnalyticsEvents.playInviteDismiss));
   }
 
   /// T-65 — hands the reader's CURRENT location to the app.

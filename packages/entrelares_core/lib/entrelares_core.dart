@@ -11,6 +11,7 @@ export 'src/admin_mode_offer.dart';
 export 'src/agenda_rules.dart';
 export 'src/chat_rules.dart';
 export 'src/expense_rules.dart';
+export 'src/play_install_rules.dart';
 export 'src/viewer_rules.dart';
 export 'src/attestation_rules.dart';
 export 'src/analytics_catalog.dart';
