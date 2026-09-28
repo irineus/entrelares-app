@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'deep_link_urls.dart';
 import 'env.dart';
+import 'package:entrelares_db_contracts/models/invite_info.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'screens/help_screen.dart';
 import 'screens/calendar_screen.dart';
@@ -321,6 +322,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           analytics: _analytics,
           inviteToken: InviteFormRules.inviteTokenFrom(state.uri),
           onSignIn: _signIn,
+          onInviteeJoined: _welcomeInvitee,
           onBackToLogin: () => _router.go('/login'),
           googleEnabled: AuthProviders.googleEnabled(),
           // F-57: the invite branch hands its token over, and the stash has
@@ -343,6 +345,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           // F-71: the native door never leaves the app, so the invitation
           // stays in memory instead of in the prefs stash.
           initialInviteToken: _pendingInviteToken,
+          onInviteeJoined: _welcomeInvitee,
           onSignOut: _signOut,
           onCompleted: () async {
             _pendingInviteToken = null;
@@ -1497,11 +1500,18 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     await _applyProfileGates(me);
   }
 
+  /// U-58 — the claim happened in THIS session: the calendar shows the
+  /// welcome once, before the tour.
+  void _welcomeInvitee(InviteInfo invite) =>
+      _onboarding.pendingInviteeWelcome = InviteeWelcome(
+          familyName: invite.familyName, inviterName: invite.inviterName);
+
   Future<void> _signOut() async {
     // Set BEFORE the call: the auth event may arrive before or after the
     // await returns, and only this flag makes that order irrelevant.
     _userSignOut = true;
     _pendingInviteToken = null;
+    _onboarding.pendingInviteeWelcome = null;
     await _gate.signOutSafely();
     _identity.clear();
     // Lesson 1.3: navigate ALWAYS (the auth listener also fires on success).

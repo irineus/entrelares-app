@@ -43,8 +43,13 @@ class OauthOnboardingScreen extends StatefulWidget {
   /// The profile now exists — `main.dart` re-resolves the phase and routes.
   final Future<void> Function() onCompleted;
 
+  /// U-58 — the invitation was claimed: `main.dart` raises the welcome the
+  /// calendar shows before the tour. Called before the sign-in that lands.
+  final void Function(InviteInfo invite)? onInviteeJoined;
+
   const OauthOnboardingScreen({
     super.key,
+    this.onInviteeJoined,
     required this.dataSource,
     this.analytics,
     required this.prefs,
@@ -209,6 +214,8 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
       case InviteeRegistered():
         // T-37: viral loop closed — an invited caregiver joined a family.
         widget.analytics?.trackEvent(AnalyticsEvents.inviteeJoined);
+        final invite = _invite;
+        if (invite != null) widget.onInviteeJoined?.call(invite);
         await _clearPendingToken();
         await widget.onCompleted();
       case InviteeNeedsMigration(:final previousFamilyName):

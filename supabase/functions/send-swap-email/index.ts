@@ -785,6 +785,7 @@ function templateInvitation(lang: Lang, inviterName: string, familyName: string,
      ${paragraph(t.invitationExpiry(validDays, expiresBr), "last")}
      ${button(inviteLink, t.invitationButton)}
      ${small(`${t.invitationLinkFallback}<br/>${rawUrl(inviteLink)}`)}
+     ${small(t.invitationSafety(inviterName), true)}
      ${small(`${privacy} ${smallLink("https://entrelares.app/privacidade", t.invitationPrivacyLink)}.`, true)}`
   );
 }

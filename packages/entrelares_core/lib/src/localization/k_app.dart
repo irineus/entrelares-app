@@ -537,6 +537,16 @@ abstract final class KApp {
   static const String viewerLeaveBody = 'app.viewer.leaveBody';
   static const String viewerLeaveButton = 'app.viewer.leaveButton';
   static const String viewerInvitedBody = 'app.viewer.invitedBody';
+  // ── U-58: the invitee's welcome, right after the claim ──
+  static const String welcomeTitle = 'app.welcome.title';
+  static const String welcomeLead = 'app.welcome.lead';
+  static const String welcomeSees = 'app.welcome.sees';
+  static const String welcomeSeen = 'app.welcome.seen';
+  static const String welcomeRecord = 'app.welcome.record';
+  static const String welcomeAction = 'app.welcome.action';
+  static const String viewerWelcomeSees = 'app.viewer.welcomeSees';
+  static const String viewerWelcomeLimits = 'app.viewer.welcomeLimits';
+  static const String viewerWelcomeSeen = 'app.viewer.welcomeSeen';
   // ── F-64: the verifiable report ──
   static const String attestPageTitle = 'app.attest.pageTitle';
   static const String attestValid = 'app.attest.valid';
@@ -1087,6 +1097,15 @@ abstract final class KApp {
     viewerLeaveBody,
     viewerLeaveButton,
     viewerInvitedBody,
+    welcomeTitle,
+    welcomeLead,
+    welcomeSees,
+    welcomeSeen,
+    welcomeRecord,
+    welcomeAction,
+    viewerWelcomeSees,
+    viewerWelcomeLimits,
+    viewerWelcomeSeen,
     attestPageTitle,
     attestValid,
     attestPending,
@@ -1769,6 +1788,15 @@ abstract final class StringsAppPtBr {
     KApp.viewerSection: 'Visualizadores',
     KApp.viewerInviteButton: 'Convidar visualizador',
     KApp.viewerReadOnly: 'Você é visualizador: acompanha o plano da família sem alterar nada.',
+    KApp.welcomeTitle: 'Bem-vindo(a) à família {0}',
+    KApp.welcomeLead: '{0} convidou você. A partir de agora, todos da família veem o mesmo calendário.',
+    KApp.welcomeSees: 'O que você vê: de quem é cada dia, os pedidos de troca e o Histórico, com tudo o que foi feito e por quem.',
+    KApp.welcomeSeen: 'O que os outros veem: seu nome e sua cor no calendário, e o que você fizer no app — pedir ou responder uma troca, alterar um dia.',
+    KApp.welcomeRecord: 'O que já está no Histórico foi feito antes de você entrar, e cada linha diz quem fez. A partir de agora, o que você fizer entra nele também.',
+    KApp.welcomeAction: 'Ver o calendário',
+    KApp.viewerWelcomeSees: 'Você acompanha o plano como visualizador: vê o calendário, a agenda e os relatórios, e recebe as notificações informativas.',
+    KApp.viewerWelcomeLimits: 'Você não altera nada, não entra em trocas e não vê as mensagens das trocas.',
+    KApp.viewerWelcomeSeen: 'Os outros veem seu nome na lista da família, como quem acompanha o plano.',
     KApp.viewerInviteLead: 'O visualizador vê o calendário, a agenda e os relatórios, e recebe no app e no celular as notificações informativas. Não altera nada, não entra em trocas, não vê as mensagens das trocas e não recebe e-mail.',
     KApp.viewerInviteNeedsEmail: 'Para convidar um visualizador, informe o e-mail.',
     KApp.viewerFreeCapOne: 'No plano gratuito, a família inclui {0} visualizador. Para convidar mais, ative o Premium.',
@@ -2461,6 +2489,15 @@ abstract final class StringsAppEn {
     KApp.viewerSection: 'Viewers',
     KApp.viewerInviteButton: 'Invite viewer',
     KApp.viewerReadOnly: 'You are a viewer: you follow the family\'s plan without changing anything.',
+    KApp.welcomeTitle: 'Welcome to the {0} family',
+    KApp.welcomeLead: '{0} invited you. From now on, everyone in the family sees the same calendar.',
+    KApp.welcomeSees: 'What you see: whose day each day is, the swap requests and the History, with everything that was done and by whom.',
+    KApp.welcomeSeen: 'What the others see: your name and your colour on the calendar, and what you do in the app — asking for or answering a swap, changing a day.',
+    KApp.welcomeRecord: 'What is already in the History was done before you joined, and each line says who did it. From now on, what you do goes into it too.',
+    KApp.welcomeAction: 'See the calendar',
+    KApp.viewerWelcomeSees: 'You follow the plan as a viewer: you see the calendar, the agenda and the reports, and you get the informative notifications.',
+    KApp.viewerWelcomeLimits: 'You change nothing, take no part in swaps and do not see the swap messages.',
+    KApp.viewerWelcomeSeen: 'The others see your name in the family list, as someone who follows the plan.',
     KApp.viewerInviteLead: 'A viewer sees the calendar, the agenda and the reports, and gets the informative notifications in the app and on the phone. They change nothing, take no part in swaps, do not see the swap messages and get no e-mail.',
     KApp.viewerInviteNeedsEmail: 'To invite a viewer, enter their e-mail.',
     KApp.viewerFreeCapOne: 'On the free plan, the family includes {0} viewer. To invite more, activate Premium.',

@@ -27,6 +27,20 @@ class OnboardingService extends ChangeNotifier {
   /// for THIS session, not a new stored preference.
   bool checklistReopened = false;
 
+  /// U-58 — raised at the claim's own call site (the sign-up with a token,
+  /// the social-login claim) and CONSUMED by the calendar, which shows the
+  /// welcome before the tour. In memory on purpose: no stored fact tells a
+  /// claim that just happened from one months old, and the welcome is never
+  /// retroactive.
+  InviteeWelcome? pendingInviteeWelcome;
+
+  /// Hands the welcome over exactly once.
+  InviteeWelcome? takeInviteeWelcome() {
+    final welcome = pendingInviteeWelcome;
+    pendingInviteeWelcome = null;
+    return welcome;
+  }
+
   /// U-29: a NOTIFYING flag, because the calendar's State stays alive in the
   /// tab stack — before, the profile's "Ver o tour de novo" set a flag nobody
   /// was watching, and the tour only fired when a background reload happened

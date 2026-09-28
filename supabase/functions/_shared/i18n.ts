@@ -248,6 +248,8 @@ export interface SwapStrings {
   invitationBody: (inviter: string, family: string) => string;
   /** F-50: the same invitation, to someone invited as a VIEWER. */
   invitationBodyViewer: (inviter: string, family: string) => string;
+  /** U-58: the reader who does not know the inviter is told what to do — nothing is created until they act. */
+  invitationSafety: (inviter: string) => string;
   invitationRole: (role: string) => string;
   /** T-82: the days THIS invitation is valid for (`invitation.valid_days` when it was created). */
   invitationExpiry: (days: number, date: string) => string;
@@ -361,6 +363,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     invitationHeading: "Você foi convidado(a)!",
     invitationBody: (i, f) => `<strong>${i}</strong> convidou você para gerenciar juntos o calendário de guarda compartilhada da <strong>${f}</strong>.`,
     invitationBodyViewer: (i, f) => `<strong>${i}</strong> convidou você para acompanhar o calendário de guarda compartilhada da <strong>${f}</strong> como visualizador: você vê o plano, a agenda e as notificações informativas no aplicativo, sem alterar nada.`,
+    invitationSafety: (i) => `Se você não reconhece <strong>${i}</strong>, ignore este e-mail — nenhuma conta é criada até você agir.`,
     invitationRole: (r) => `Você entrará como <strong>${r}</strong>.`,
     invitationExpiry: (n, d) => `Toque no botão abaixo para criar a sua conta. Este convite é válido por <strong>${n} ${n === 1 ? "dia" : "dias"}</strong>, até <strong>${d}</strong>.`,
     invitationButton: "Criar minha conta",
@@ -469,6 +472,7 @@ const SWAP: Record<Lang, SwapStrings> = {
     invitationHeading: "You have been invited!",
     invitationBody: (i, f) => `<strong>${i}</strong> invited you to manage the shared custody calendar of <strong>${f}</strong> together.`,
     invitationBodyViewer: (i, f) => `<strong>${i}</strong> invited you to follow the shared custody calendar of <strong>${f}</strong> as a viewer: you see the plan, the agenda and the informative notifications in the app, without changing anything.`,
+    invitationSafety: (i) => `If you do not recognise <strong>${i}</strong>, ignore this e-mail — no account is created until you act.`,
     invitationRole: (r) => `You will join as <strong>${r}</strong>.`,
     invitationExpiry: (n, d) => `Tap the button below to create your account. This invitation is valid for <strong>${n} ${n === 1 ? "day" : "days"}</strong>, until <strong>${d}</strong>.`,
     invitationButton: "Create my account",

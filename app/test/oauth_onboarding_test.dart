@@ -43,6 +43,7 @@ Future<void> pumpOnboarding(
   Future<void> Function()? onCompleted,
   Future<void> Function()? onSignOut,
   String? initialInviteToken,
+  void Function(InviteInfo invite)? onInviteeJoined,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 1600));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -50,6 +51,7 @@ Future<void> pumpOnboarding(
     dataSource: ds,
     prefs: prefs,
     initialInviteToken: initialInviteToken,
+    onInviteeJoined: onInviteeJoined,
     onSignOut: onSignOut ?? () async {},
     onCompleted: onCompleted ?? () async {},
   )));
@@ -306,8 +308,10 @@ void main() {
         ..inviteInfo = invite;
       // A build from before F-71 may have left the redirect's stash behind.
       final prefs = await prefsWith({'pending_invite_token': 'stale'});
+      final joined = <InviteInfo>[];
       await pumpOnboarding(tester, ds, prefs,
           initialInviteToken: token,
+          onInviteeJoined: joined.add,
           onCompleted: () async => completed = true);
 
       expect(find.text(pt[K.registerInvitedTitle]), findsOneWidget);
@@ -326,6 +330,8 @@ void main() {
       expect(ds.claims.single['token'], token);
       expect(ds.claims.single['confirmMigration'], false);
       expect(completed, isTrue);
+      // U-58: the claim raises the welcome before the phase moves on.
+      expect(joined.single.inviterName, 'Bruno');
       // The legacy stash is dropped on completion — nothing reads it.
       expect(prefs.getString('pending_invite_token'), isNull);
     });

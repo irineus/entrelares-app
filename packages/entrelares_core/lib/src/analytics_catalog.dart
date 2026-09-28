@@ -56,6 +56,7 @@ abstract final class AnalyticsEvents {
   static const playInviteView = 'play-invite-view'; // F-72, 27/09/2026
   static const playInviteOpen = 'play-invite-open'; // F-72, 27/09/2026
   static const playInviteDismiss = 'play-invite-dismiss'; // F-72, 27/09/2026
+  static const inviteeWelcomeView = 'invitee-welcome-view'; // once — U-58, 28/09/2026
   static const preferenceChanged = 'preference-changed'; // T-78
   static const supportContactSent = 'support-contact-sent'; // T-78 (F-68)
 
@@ -107,6 +108,7 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.playInviteView: {},
     AnalyticsEvents.playInviteOpen: {},
     AnalyticsEvents.playInviteDismiss: {},
+    AnalyticsEvents.inviteeWelcomeView: {'channel', 'member'},
     AnalyticsEvents.preferenceChanged: {'pref', 'value'},
     AnalyticsEvents.supportContactSent: {'category', 'signed_in'},
     AnalyticsEvents.premiumGateClick: {'gate'},
