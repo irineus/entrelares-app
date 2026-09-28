@@ -50,7 +50,10 @@ EOF
 # Only what the gate talks to: Postgres, GoTrue, PostgREST, Kong, the edge
 # runtime, Realtime and Storage (the start health-checks them). Studio,
 # analytics, image proxy, pooler and pg-meta are dead weight on a runner.
-$SUPABASE start -x studio,logflare,vector,imgproxy,supavisor,postgres-meta
+# Its banner prints the local keys; they are the CLI's public defaults, identical on every
+# machine, and still kept out of a public log (pipefail carries a failed start through).
+$SUPABASE start -x studio,logflare,vector,imgproxy,supavisor,postgres-meta |
+  sed -E 's/sb_(secret|publishable)_[A-Za-z0-9_-]+/sb_\1_<local default>/g'
 
 # The suite runs from the package directory, so the trap goes back to the root
 # first — a relative path here left the .env behind on the first rehearsal.
@@ -61,8 +64,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# `status -o env` prints KEY="value" lines. The keys are the CLI's own local
-# defaults — public by construction — but they are still never echoed.
+# `status -o env` prints KEY="value" lines, captured here and never echoed.
 status=$($SUPABASE status -o env)
 value() { printf '%s\n' "$status" | sed -n "s/^$1=\"\{0,1\}\([^\"]*\)\"\{0,1\}$/\1/p"; }
 E2E_SUPABASE_URL=$(value API_URL)
