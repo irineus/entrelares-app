@@ -84,6 +84,9 @@ void main() {
       expect(s.priceMonthlyCents, 549);
       expect(s.priceAnnualCents, 5490);
       expect(s.graceDays, 7);
+      expect(s.reviewPromptEnabled, isTrue);
+      expect(s.reviewPromptMinAccountDays, 14);
+      expect(s.reviewPromptIntervalDays, 120);
     });
 
     test('loaded rows override their defaults, the rest keep theirs', () {

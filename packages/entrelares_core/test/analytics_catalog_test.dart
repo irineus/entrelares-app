@@ -22,7 +22,7 @@ void main() {
         'push-nudge-view', 'push-nudge-click', 'push-enable-result',
         'install-hint-view', 'install-hint-open', 'install-hint-dismiss',
         'play-invite-view', 'play-invite-open', 'play-invite-dismiss',
-        'invitee-welcome-view',
+        'invitee-welcome-view', 'review-prompt-requested',
         'preference-changed', 'support-contact-sent', 'premium-gate-click',
         'premium-paywall-view', 'premium-interest', 'premium-checkout-start',
         'premium-checkout-return', 'premium-checkout-outcome',

@@ -90,6 +90,11 @@ class NotificationsScreen extends StatefulWidget {
   /// tabs). Off, the screen is exactly what it was.
   final bool embedded;
 
+  /// F-73 — the list shows, for the first time, an approval the other side
+  /// gave to one of MY swap requests (`ReviewPromptRules.isTrigger`). `main`
+  /// hands it to the review prompt, which owns every floor.
+  final VoidCallback? onApprovalSeen;
+
   const NotificationsScreen(
       {super.key,
       required this.dataSource,
@@ -101,6 +106,7 @@ class NotificationsScreen extends StatefulWidget {
       this.onPlanFrom,
       this.onOpenExpenses,
       this.embedded = false,
+      this.onApprovalSeen,
       this.landing,
       this.landingNonce});
 
@@ -253,6 +259,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _init() async {
     await _loadAll();
+    // F-73: read BEFORE the marks below — "the first time" is an unread row.
+    final me = _ownProfile;
+    if (me != null &&
+        widget.onApprovalSeen != null &&
+        _history.any((n) => ReviewPromptRules.isTrigger(
+            type: n.type,
+            addressedToMe: n.recipientProfileId == me.id,
+            isRead: n.isRead))) {
+      widget.onApprovalSeen!();
+    }
     // Web parity (OnInitializedAsync): refresh the badge, then mark
     // everything read — best-effort, never blocks the page.
     await widget.badge.refresh();
