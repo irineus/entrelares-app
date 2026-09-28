@@ -42,6 +42,49 @@ void main() {
     });
   });
 
+  // F-07: what the Crianças page offers, mirroring add_child.
+  group('ChildRules.addBlock', () {
+    ChildAddBlock block(int taken, {bool premium = false}) =>
+        ChildRules.addBlock(
+          childrenTaken: taken,
+          isPremium: premium,
+          freeMax: 1,
+          maxPerFamily: 6,
+        );
+
+    test('free: the first child is included, the second is Premium', () {
+      expect(block(0), ChildAddBlock.none);
+      expect(block(1), ChildAddBlock.freeCap);
+    });
+
+    test('Premium: up to the ceiling, then the ceiling says so', () {
+      expect(block(5, premium: true), ChildAddBlock.none);
+      expect(block(6, premium: true), ChildAddBlock.maxCap);
+    });
+
+    test('a downgraded family above the free cap keeps its children and '
+        'only meets the gate on the next one', () {
+      expect(block(3), ChildAddBlock.freeCap);
+    });
+
+    test('the ceiling wins over the free cap when both are hit', () {
+      expect(
+          ChildRules.addBlock(
+              childrenTaken: 2, isPremium: false, freeMax: 2, maxPerFamily: 2),
+          ChildAddBlock.maxCap);
+    });
+
+    test('the seeds are the migration seeds: 1 free, 6 in all', () {
+      expect(PublicSettings.unloaded.childrenFreeMax, 1);
+      expect(PublicSettings.unloaded.childrenMaxPerFamily, 6);
+      expect(
+          const PublicSettings(
+                  {'children.free_max': '2', 'children.max_per_family': '8'})
+              .childrenMaxPerFamily,
+          8);
+    });
+  });
+
   test('the flag reads false until the server says true', () {
     expect(PublicSettings.unloaded.childAgendaEnabled, isFalse);
     expect(const PublicSettings({'feature.child_agenda': 'true'})

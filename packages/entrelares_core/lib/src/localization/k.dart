@@ -723,6 +723,8 @@ abstract final class K {
   static const String pdfDocSubtitle = 'pdf.doc.subtitle';
   static const String pdfDocFamily = 'pdf.doc.family';
   static const String pdfDocChild = 'pdf.doc.child';
+  // F-07: the header label when the family has more than one child.
+  static const String pdfDocChildren = 'pdf.doc.children';
   static const String pdfDocPeriod = 'pdf.doc.period';
   static const String pdfDocPeriodValue = 'pdf.doc.periodValue';
   static const String pdfDocCriterion = 'pdf.doc.criterion';
@@ -1895,6 +1897,7 @@ abstract final class K {
     pdfDocSubtitle,
     pdfDocFamily,
     pdfDocChild,
+    pdfDocChildren,
     pdfDocPeriod,
     pdfDocPeriodValue,
     pdfDocCriterion,

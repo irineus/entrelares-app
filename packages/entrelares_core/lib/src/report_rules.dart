@@ -608,9 +608,14 @@ class ReportChatLine {
 class CustodyReport {
   final String familyName;
 
-  /// Optional free-text child name typed at generation (not stored — there is
-  /// no child entity yet; multi-child is F-07). Omitted when blank.
+  /// The child line of the header: the registered names already joined
+  /// (F-55/F-07), or the free text typed at generation when the agenda is
+  /// off. Omitted when blank.
   final String? childName;
+
+  /// F-07: how many children [childName] names — the header says *Crianças*
+  /// above one. The free text counts as one.
+  final int childCount;
 
   final DateTime periodStart;
   final DateTime periodEnd;
@@ -653,6 +658,7 @@ class CustodyReport {
   const CustodyReport({
     required this.familyName,
     required this.childName,
+    this.childCount = 1,
     required this.periodStart,
     required this.periodEnd,
     required this.generatedAtLocal,
@@ -678,6 +684,7 @@ class CustodyReport {
 CustodyReport buildCustodyReport({
   required String familyName,
   required String? childName,
+  int childCount = 1,
   required DateTime start,
   required DateTime end,
   required DateTime today,
@@ -729,6 +736,7 @@ CustodyReport buildCustodyReport({
     childName: (childName == null || childName.trim().isEmpty)
         ? null
         : childName.trim(),
+    childCount: childCount,
     periodStart: dateOnly(start),
     periodEnd: dateOnly(end),
     generatedAtLocal: generatedAtLocal,

@@ -49,6 +49,11 @@ void childrenTests(GateFixture fx) {
       flagBefore = await getFlag();
       await setFlag('true');
       fam = await fx.createFamily('f55kids');
+      // F-07: the second child onwards is Premium — this group is about the
+      // entity, so its family is Premium explicitly (not by a trial's clock).
+      await fx.service.from('families').update({
+        'comp_premium_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', fam.familyId);
     });
 
     // Back to what the run found (OFF — the entrypoint's choice for the run).
@@ -175,6 +180,86 @@ void childrenTests(GateFixture fx) {
           () => fam.admin
               .rpc<dynamic>('remove_child', params: {'p_child_id': id}),
           contains: 'não encontrada');
+    });
+  });
+
+  // F-07 (PR 1): the second child onwards is Premium, the ceiling holds for
+  // every plan, and a downgrade takes nothing away — only a NEW child is
+  // refused (the F-50 viewer caps' shape).
+  group('F-07 · children caps', () {
+    late ThrowawayFamily fam;
+    late String flagBefore;
+
+    Future<void> setPremium(bool on) => fx.service.from('families').update({
+          'plan': 'free',
+          'trial_ends_at': null,
+          'comp_premium_at':
+              on ? DateTime.now().toUtc().toIso8601String() : null,
+        }).eq('id', fam.familyId);
+
+    setUpAll(() async {
+      flagBefore = await getFlag();
+      await setFlag('true');
+      fam = await fx.createFamily('f07cap');
+      await setPremium(false);
+    });
+
+    tearDownAll(() async => setFlag(flagBefore));
+
+    test('a free family registers ONE child; the second asks for Premium',
+        () async {
+      await add(fam.admin, 'Lia');
+      await expectRejected(() => add(fam.admin, 'Theo'),
+          contains: 'O plano gratuito inclui 1 criança(s)');
+      expect(await childrenOf(fam.familyId), hasLength(1));
+    });
+
+    test('a repeated name still reads as a repeat, not as the cap', () async {
+      await expectRejected(() => add(fam.admin, 'LIA'),
+          contains: 'Já existe uma criança com esse nome');
+    });
+
+    test('Premium registers the second and the third', () async {
+      await setPremium(true);
+      await add(fam.admin, 'Theo');
+      await add(fam.admin, 'Nina');
+      expect([for (final r in await childrenOf(fam.familyId)) r['first_name']],
+          ['Lia', 'Theo', 'Nina']);
+    });
+
+    test('a downgrade keeps every child and refuses only a new one', () async {
+      await setPremium(false);
+      final before = await childrenOf(fam.familyId);
+      expect(before, hasLength(3));
+      await expectRejected(() => add(fam.admin, 'Davi'),
+          contains: 'O plano gratuito inclui');
+      // The ones already there still rename (nothing is locked).
+      final theo = before.firstWhere((r) => r['first_name'] == 'Theo');
+      await fam.admin.rpc<dynamic>('rename_child',
+          params: {'p_child_id': theo['id'], 'p_first_name': 'Téo'});
+      expect(await childrenOf(fam.familyId), hasLength(3));
+    });
+
+    test('the ceiling holds for Premium too (children.max_per_family)',
+        () async {
+      const key = 'children.max_per_family';
+      final before = await readFlag(fx, key);
+      await setPremium(true);
+      await writeFlag(fx, key, '3');
+      try {
+        await expectRejected(() => add(fam.admin, 'Davi'),
+            contains: 'limite de 3 crianças');
+      } finally {
+        await writeFlag(fx, key, before);
+      }
+      expect(await childrenOf(fam.familyId), hasLength(3));
+    });
+
+    test('free_max above the ceiling is refused at commit', () async {
+      await expectRejected(
+          () => writeFlag(fx, 'children.free_max', '7'),
+          contains: 'children.free_max');
+      expect(await readFlag(fx, 'children.free_max'), '1');
     });
   });
 }

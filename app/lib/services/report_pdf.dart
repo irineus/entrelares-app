@@ -218,7 +218,9 @@ List<pw.Widget> _header(CustodyReport report, Localization l) => [
         children: [
           _metaRow(l[K.pdfDocFamily], report.familyName),
           if (report.childName != null)
-            _metaRow(l[K.pdfDocChild], report.childName!),
+            _metaRow(
+                l[report.childCount > 1 ? K.pdfDocChildren : K.pdfDocChild],
+                report.childName!),
           _metaRow(
             l[K.pdfDocPeriod],
             l.format(K.pdfDocPeriodValue, [

@@ -67,6 +67,9 @@ class PublicSettings {
   // F-50: the viewer caps, outside the caregiver seats.
   int get freeViewers => _int('free_viewers', 1);
   int get maxViewers => _int('max_viewers', 4);
+  // F-07: the children caps — the free plan's, and the ceiling for all.
+  int get childrenFreeMax => _int('children.free_max', 1);
+  int get childrenMaxPerFamily => _int('children.max_per_family', 6);
   int get overrideFreeDays => _int('override_free_days', 7);
   int get overridePremiumMonths => _int('override_premium_months', 6);
 

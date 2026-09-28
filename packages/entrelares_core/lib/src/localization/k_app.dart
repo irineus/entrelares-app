@@ -514,6 +514,11 @@ abstract final class KApp {
   static const String childRenamed = 'app.child.renamed';
   static const String childRemoved = 'app.child.removed';
   static const String childErrLoad = 'app.child.errLoad';
+  // F-07: more than one child; from `children.free_max` on, Premium.
+  static const String childAddAnother = 'app.child.addAnother';
+  static const String childFreeCapOne = 'app.child.freeCapOne';
+  static const String childFreeCapMany = 'app.child.freeCapMany';
+  static const String childMaxCap = 'app.child.maxCap';
 
   // ── F-55 the day agenda (PR 2). Every key lives under `app.agenda.` — the
   //    ADDRESS vocabulary_test pins the words "agenda" and "nota" to. ──
@@ -1119,6 +1124,10 @@ abstract final class KApp {
     childRenamed,
     childRemoved,
     childErrLoad,
+    childAddAnother,
+    childFreeCapOne,
+    childFreeCapMany,
+    childMaxCap,
     agendaSection,
     agendaKindSchool,
     agendaKindHealth,
@@ -1844,13 +1853,13 @@ abstract final class StringsAppPtBr {
     KApp.pdfDayAccountCorrectionLine:
         'Sobre {0} — correção registrada por {1} em {2}.',
     // ── F-55 the child entity ──
-    KApp.famChildRow: 'Criança',
+    KApp.famChildRow: 'Crianças',
     KApp.famChildRowEmpty: 'Nenhuma criança cadastrada',
     KApp.childAnd: 'e',
-    KApp.childTitle: 'Criança',
-    KApp.childLead: 'Só o primeiro nome. O relatório e a agenda do dia usam este nome.',
+    KApp.childTitle: 'Crianças',
+    KApp.childLead: 'Só o primeiro nome de cada criança. O relatório, a agenda do dia e as despesas usam esses nomes.',
     KApp.childEmpty: 'Nenhuma criança cadastrada ainda.',
-    KApp.childAdminOnly: 'Só um administrador da família cadastra ou muda a criança.',
+    KApp.childAdminOnly: 'Só um administrador da família cadastra ou muda as crianças.',
     KApp.childNameLabel: 'Primeiro nome',
     KApp.childAdd: 'Cadastrar a criança',
     KApp.editorNoSwap: 'Sem troca',
@@ -1862,7 +1871,11 @@ abstract final class StringsAppPtBr {
     KApp.childAdded: 'Criança cadastrada.',
     KApp.childRenamed: 'Nome atualizado.',
     KApp.childRemoved: 'Criança removida.',
-    KApp.childErrLoad: 'Não foi possível carregar a criança.',
+    KApp.childErrLoad: 'Não foi possível carregar as crianças.',
+    KApp.childAddAnother: 'Cadastrar outra criança',
+    KApp.childFreeCapOne: 'No plano gratuito, a família cadastra até {0} criança. Para cadastrar mais, ative o Premium.',
+    KApp.childFreeCapMany: 'No plano gratuito, a família cadastra até {0} crianças. Para cadastrar mais, ative o Premium.',
+    KApp.childMaxCap: 'A família já tem {0} crianças, o limite.',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'Escola',
@@ -2583,13 +2596,13 @@ abstract final class StringsAppEn {
     KApp.pdfDayAccountCorrectionLine:
         'About {0} — correction recorded by {1} on {2}.',
     // ── F-55 the child entity ──
-    KApp.famChildRow: 'Child',
+    KApp.famChildRow: 'Children',
     KApp.famChildRowEmpty: 'No child added yet',
     KApp.childAnd: 'and',
-    KApp.childTitle: 'Child',
-    KApp.childLead: 'First name only. The report and the day agenda use this name.',
+    KApp.childTitle: 'Children',
+    KApp.childLead: 'First name only, for each child. The report, the day agenda and the expenses use these names.',
     KApp.childEmpty: 'No child added yet.',
-    KApp.childAdminOnly: 'Only a family administrator adds or changes the child.',
+    KApp.childAdminOnly: 'Only a family administrator adds or changes the children.',
     KApp.childNameLabel: 'First name',
     KApp.childAdd: 'Add the child',
     KApp.editorNoSwap: 'No swap',
@@ -2601,7 +2614,11 @@ abstract final class StringsAppEn {
     KApp.childAdded: 'Child added.',
     KApp.childRenamed: 'Name updated.',
     KApp.childRemoved: 'Child removed.',
-    KApp.childErrLoad: 'The child could not be loaded.',
+    KApp.childErrLoad: 'The children could not be loaded.',
+    KApp.childAddAnother: 'Add another child',
+    KApp.childFreeCapOne: 'On the free plan, the family adds up to {0} child. To add more, activate Premium.',
+    KApp.childFreeCapMany: 'On the free plan, the family adds up to {0} children. To add more, activate Premium.',
+    KApp.childMaxCap: 'The family already has {0} children, the limit.',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'School',

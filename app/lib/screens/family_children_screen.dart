@@ -2,7 +2,9 @@ import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 
 import 'package:entrelares_db_contracts/models/child.dart';
+import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
+import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
@@ -17,13 +19,24 @@ import '../widgets/ui/ui.dart';
 /// server refuses anyone else, and with `feature.child_agenda` off it refuses
 /// everyone, so the row that leads here only exists while the flag is on.
 ///
-/// v1 renders ONE child (owner, 24/09/2026): the add door shows only while the
-/// family has none. The table is multi-child already; a family that somehow
-/// has more sees them all listed, and F-07 brings the selector.
+/// F-07 (28/09/2026): more than one child. The add door stays open up to
+/// `children.max_per_family`; from `children.free_max` on, a free family meets
+/// the Premium gate as a banner that carries its own action (U-49), landing on
+/// `/family/plan` (U-35). A downgrade takes no child away — `add_child` only
+/// refuses the NEXT one, and [ChildRules.addBlock] mirrors exactly that.
 class FamilyChildrenScreen extends StatefulWidget {
   final CustodyDataSource dataSource;
 
-  const FamilyChildrenScreen({super.key, required this.dataSource});
+  /// Where the Premium gate lands (`/family/plan`). Null hides the action.
+  final VoidCallback? onOpenPlan;
+  final AnalyticsService? analytics;
+
+  const FamilyChildrenScreen({
+    super.key,
+    required this.dataSource,
+    this.onOpenPlan,
+    this.analytics,
+  });
 
   @override
   State<FamilyChildrenScreen> createState() => _FamilyChildrenScreenState();
@@ -35,6 +48,8 @@ class _FamilyChildrenScreenState extends State<FamilyChildrenScreen> {
   bool _loading = true;
   bool _loadFailed = false;
   bool _isAdmin = false;
+  bool _isPremium = false;
+  PublicSettings _settings = PublicSettings.unloaded;
   List<Child> _children = const [];
 
   @override
@@ -52,12 +67,18 @@ class _FamilyChildrenScreenState extends State<FamilyChildrenScreen> {
       final results = await Future.wait([
         widget.dataSource.fetchChildren(),
         widget.dataSource.fetchOwnProfile(),
+        widget.dataSource.fetchOwnFamily(),
+        widget.dataSource.fetchPublicSettings(),
       ]);
       if (!mounted) return;
       final me = results[1] as Member?;
       setState(() {
         _children = results[0] as List<Child>;
         _isAdmin = me != null && me.isAdmin && !me.hasLeft;
+        // F-32 mirror, fail-closed: no family row → free.
+        _isPremium = Family.isPremiumFamily(
+            results[2] as Family?, DateTime.now().toUtc());
+        _settings = PublicSettings(results[3] as Map<String, String>);
         _loading = false;
       });
     } catch (_) {
@@ -103,6 +124,50 @@ class _FamilyChildrenScreenState extends State<FamilyChildrenScreen> {
     showAppSnack(context,
         l[outcome == _SheetOutcome.removed ? KApp.childRemoved : savedKey]);
     await _load();
+  }
+
+  void _goToPremium() {
+    widget.analytics?.trackEvent(AnalyticsEvents.premiumGateClick,
+        props: {'gate': 'extra-child'});
+    widget.onOpenPlan?.call();
+  }
+
+  /// The admin's door under the list: the add button, the Premium gate, or
+  /// the ceiling — whichever `add_child` would answer next.
+  Widget _addDoor(BuildContext context, Localization l) {
+    final block = ChildRules.addBlock(
+      childrenTaken: _children.length,
+      isPremium: _isPremium,
+      freeMax: _settings.childrenFreeMax,
+      maxPerFamily: _settings.childrenMaxPerFamily,
+    );
+    final free = _settings.childrenFreeMax;
+    return switch (block) {
+      ChildAddBlock.none => Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: OutlinedButton.icon(
+            key: const ValueKey('child-add-another'),
+            onPressed: () => _openAdd(l),
+            icon: const Icon(Icons.add),
+            label: Text(l[KApp.childAddAnother]),
+          ),
+        ),
+      ChildAddBlock.freeCap => AppBanner(
+          key: const ValueKey('child-free-cap'),
+          tone: context.tokens.info,
+          icon: Icons.lock_outline,
+          // U-57: the number is the live `children.free_max`.
+          message: l.format(
+              free == 1 ? KApp.childFreeCapOne : KApp.childFreeCapMany, [free]),
+          actionLabel: widget.onOpenPlan == null ? null : l[K.famSeePremium],
+          actionIcon: widget.onOpenPlan == null ? null : Icons.auto_awesome,
+          onAction: widget.onOpenPlan == null ? null : _goToPremium,
+        ),
+      ChildAddBlock.maxCap => Text(
+          l.format(KApp.childMaxCap, [_settings.childrenMaxPerFamily]),
+          key: const ValueKey('child-max-cap'),
+          style: Theme.of(context).textTheme.bodySmall),
+    };
   }
 
   @override
@@ -163,7 +228,10 @@ class _FamilyChildrenScreenState extends State<FamilyChildrenScreen> {
                       : null,
                 ),
               ),
-            if (!_isAdmin)
+            if (_isAdmin) ...[
+              const SizedBox(height: Spacing.sm),
+              _addDoor(context, l),
+            ] else
               Text(l[KApp.childAdminOnly], style: textTheme.bodySmall),
           ],
         ],
