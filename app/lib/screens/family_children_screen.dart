@@ -49,6 +49,7 @@ class _FamilyChildrenScreenState extends State<FamilyChildrenScreen> {
   bool _loadFailed = false;
   bool _isAdmin = false;
   bool _isPremium = false;
+  String _mode = ScheduleModeRules.single;
   PublicSettings _settings = PublicSettings.unloaded;
   List<Child> _children = const [];
 
@@ -75,9 +76,10 @@ class _FamilyChildrenScreenState extends State<FamilyChildrenScreen> {
       setState(() {
         _children = results[0] as List<Child>;
         _isAdmin = me != null && me.isAdmin && !me.hasLeft;
+        final family = results[2] as Family?;
         // F-32 mirror, fail-closed: no family row → free.
-        _isPremium = Family.isPremiumFamily(
-            results[2] as Family?, DateTime.now().toUtc());
+        _isPremium = Family.isPremiumFamily(family, DateTime.now().toUtc());
+        _mode = family?.scheduleMode ?? ScheduleModeRules.single;
         _settings = PublicSettings(results[3] as Map<String, String>);
         _loading = false;
       });
@@ -170,6 +172,68 @@ class _FamilyChildrenScreenState extends State<FamilyChildrenScreen> {
     };
   }
 
+  /// F-07 (PR 3) — the plan's mode: one plan for every child, or one per
+  /// child. Everyone reads the state; the switch is the admin's, through a
+  /// sheet that says what moves (today on) and what never does (the past).
+  Widget _planCard(BuildContext context, Localization l) {
+    final offer = ScheduleModeRules.offer(
+      flagOn: _settings.perChildScheduleEnabled,
+      mode: _mode,
+      childCount: _children.length,
+    );
+    if (offer == ScheduleModeOffer.hidden) return const SizedBox.shrink();
+    final textTheme = Theme.of(context).textTheme;
+    final perChild = offer == ScheduleModeOffer.toSingle;
+    return AppCard(
+      key: const ValueKey('child-plan-card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l[KApp.childPlanTitle], style: textTheme.titleSmall),
+          const SizedBox(height: Spacing.xs),
+          Text(
+              l[perChild ? KApp.childPlanPerChild : KApp.childPlanSingle],
+              key: const ValueKey('child-plan-state'),
+              style: textTheme.bodyMedium),
+          if (offer == ScheduleModeOffer.needsTwoChildren) ...[
+            const SizedBox(height: Spacing.xs),
+            Text(l[KApp.childPlanNeedsTwo], style: textTheme.bodySmall),
+          ],
+          if (_isAdmin &&
+              (offer == ScheduleModeOffer.toPerChild || perChild)) ...[
+            const SizedBox(height: Spacing.sm),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: OutlinedButton(
+                key: const ValueKey('child-plan-switch'),
+                onPressed: () => _openModeSheet(l, toPerChild: !perChild),
+                child: Text(l[perChild
+                    ? KApp.childPlanToSingle
+                    : KApp.childPlanToPerChild]),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openModeSheet(Localization l, {required bool toPerChild}) async {
+    final switched = await showAppSheet<bool>(
+      context: context,
+      builder: (_) => _PlanModeSheet(
+        toPerChild: toPerChild,
+        children: _children,
+        onSwitch: (baseChildId) => widget.dataSource.setScheduleMode(
+            toPerChild ? ScheduleModeRules.perChild : ScheduleModeRules.single,
+            baseChildId: baseChildId),
+      ),
+    );
+    if (switched != true || !mounted) return;
+    showAppSnack(context, l[KApp.childPlanSwitched]);
+    await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
@@ -233,6 +297,8 @@ class _FamilyChildrenScreenState extends State<FamilyChildrenScreen> {
               _addDoor(context, l),
             ] else
               Text(l[KApp.childAdminOnly], style: textTheme.bodySmall),
+            const SizedBox(height: Spacing.md),
+            _planCard(context, l),
           ],
         ],
       ),
@@ -348,6 +414,93 @@ class _ChildNameSheetState extends State<_ChildNameSheet> {
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _save(l),
         ),
+      ],
+    );
+  }
+}
+
+/// F-07 (PR 3) — the plan-mode switch. To one plan per child it only
+/// confirms; back to one plan for everyone it asks WHOSE plan becomes the
+/// family's (the server refuses without one). [onSwitch] throws on a refusal
+/// (a pending request, the flag): the sheet shows the sentence and stays open.
+class _PlanModeSheet extends StatefulWidget {
+  final bool toPerChild;
+  final List<Child> children;
+  final Future<void> Function(int? baseChildId) onSwitch;
+
+  const _PlanModeSheet({
+    required this.toPerChild,
+    required this.children,
+    required this.onSwitch,
+  });
+
+  @override
+  State<_PlanModeSheet> createState() => _PlanModeSheetState();
+}
+
+class _PlanModeSheetState extends State<_PlanModeSheet> {
+  int? _base;
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _go(Localization l) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.onSwitch(widget.toPerChild ? null : _base);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = translateSaveError(e.toString(), l[K.errSaveFailed], l);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context).l;
+    final base = widget.children.where((c) => c.id == _base).firstOrNull;
+    final ready = widget.toPerChild || base != null;
+    return AppSheetFrame(
+      title: l[KApp.childPlanTitle],
+      busy: _busy,
+      error: _error,
+      primaryLabel: widget.toPerChild
+          ? l[KApp.childPlanToPerChild]
+          : base == null
+              ? l[KApp.childPlanToSingle]
+              : l.format(KApp.childPlanUseChild, [base.firstName]),
+      onPrimary: ready ? () => _go(l) : null,
+      secondaryLabel: l[K.commonCancel],
+      onSecondary: () => Navigator.of(context).pop(),
+      children: [
+        Text(l[widget.toPerChild
+            ? KApp.childPlanToPerChildConfirm
+            : KApp.childPlanToSingleLead]),
+        if (!widget.toPerChild) ...[
+          const SizedBox(height: Spacing.md),
+          Wrap(
+            key: const ValueKey('child-plan-base'),
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final c in widget.children)
+                ChoiceChip(
+                  key: ValueKey('child-plan-base-${c.id}'),
+                  label: Text(c.firstName),
+                  selected: _base == c.id,
+                  onSelected:
+                      _busy ? null : (_) => setState(() => _base = c.id),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }

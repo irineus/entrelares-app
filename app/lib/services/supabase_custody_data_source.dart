@@ -236,11 +236,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<CareSchedule?> fetchDay(DateTime date) async {
-    final row = await _client
+  Future<CareSchedule?> fetchDay(DateTime date, {int? childId}) async {
+    final query = _client
         .from('care_schedules')
         .select()
-        .eq('schedule_date', CareSchedule.isoDate(date))
+        .eq('schedule_date', CareSchedule.isoDate(date));
+    final row = await (childId == null
+            ? query.isFilter('child_id', null)
+            : query.eq('child_id', childId))
         .maybeSingle();
     return row == null ? null : CareSchedule.fromJson(row);
   }
@@ -264,31 +267,44 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<ScheduleRangeResult> clearScheduleRange(
-      DateTime from, DateTime to) async {
+  Future<ScheduleRangeResult> clearScheduleRange(DateTime from, DateTime to,
+      {int? childId}) async {
     final result = await _client.rpc<dynamic>('clear_schedule_range', params: {
       'p_from': CareSchedule.isoDate(from),
       'p_to': CareSchedule.isoDate(to),
+      'p_child_id': ?childId,
     });
     return ScheduleRangeResult.fromJson(Map<String, dynamic>.from(result as Map));
   }
 
   @override
   Future<HandoffRangeResult> setHandoffTimeRange(
-      DateTime from, DateTime? to, HandoffTime time) async {
+      DateTime from, DateTime? to, HandoffTime time,
+      {int? childId}) async {
     final result =
         await _client.rpc<dynamic>('set_handoff_time_range', params: {
       'p_from': CareSchedule.isoDate(from),
       'p_to': to == null ? null : CareSchedule.isoDate(to),
       'p_time': '${time.hour.toString().padLeft(2, '0')}:'
           '${time.minute.toString().padLeft(2, '0')}:00',
+      'p_child_id': ?childId,
     });
     return HandoffRangeResult.fromJson(Map<String, dynamic>.from(result as Map));
   }
 
   @override
+  Future<int> setScheduleMode(String mode, {int? baseChildId}) async {
+    final result = await _client.rpc<dynamic>('set_schedule_mode', params: {
+      'p_mode': mode,
+      'p_base_child_id': baseChildId,
+    });
+    return (Map<String, dynamic>.from(result as Map)['days'] as int?) ?? 0;
+  }
+
+  @override
   Future<ScheduleRangeResult> replaceScheduleRange(
-      DateTime from, DateTime to, List<CareSchedule> days) async {
+      DateTime from, DateTime to, List<CareSchedule> days,
+      {int? childId}) async {
     final result =
         await _client.rpc<dynamic>('replace_schedule_range', params: {
       'p_from': CareSchedule.isoDate(from),
@@ -296,6 +312,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       // The same wire shape as a plain insert (actual_parent_id travels
       // null: the wizard never plans a swap).
       'p_days': [for (final d in days) d.toInsertJson()],
+      'p_child_id': ?childId,
     });
     return ScheduleRangeResult.fromJson(Map<String, dynamic>.from(result as Map));
   }
@@ -309,12 +326,18 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     final first = dates.first;
     final last = dates.last;
 
+    // F-07: a batch is one lane (the wizard plans one child at a time), and
+    // "already assigned" means assigned IN that lane.
+    final lane = days.first.childId;
     Future<Set<String>> existingDates() async {
-      final rows = await _client
+      final query = _client
           .from('care_schedules')
           .select('schedule_date')
           .gte('schedule_date', CareSchedule.isoDate(first))
           .lte('schedule_date', CareSchedule.isoDate(last));
+      final rows = await (lane == null
+          ? query.isFilter('child_id', null)
+          : query.eq('child_id', lane));
       return {for (final r in rows) r['schedule_date'] as String};
     }
 
@@ -463,12 +486,16 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
 
   /// The revert links back to the swap it undoes: the most recently resolved
   /// approved request on that date.
-  Future<SwapRequest?> _approvedRequestForDate(DateTime date) async {
-    final rows = await _client
+  Future<SwapRequest?> _approvedRequestForDate(DateTime date,
+      {int? childId}) async {
+    final query = _client
         .from('swap_requests')
         .select()
         .eq('schedule_date', CareSchedule.isoDate(date))
-        .eq('status', 'approved')
+        .eq('status', 'approved');
+    final rows = await (childId == null
+            ? query.isFilter('child_id', null)
+            : query.eq('child_id', childId))
         .order('resolved_at', ascending: false, nullsFirst: false)
         .limit(1);
     return rows.isEmpty ? null : SwapRequest.fromJson(rows.first);
@@ -477,11 +504,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   /// The newest activity_logs row for a date is the one just written by the
   /// base-schedule upsert that precedes [createSwapRequest], so its old_data
   /// is the day's pre-edit snapshot (id is a monotonic identity).
-  Future<int?> _latestLogIdForDate(DateTime date) async {
-    final rows = await _client
+  Future<int?> _latestLogIdForDate(DateTime date, {int? childId}) async {
+    final query = _client
         .from('activity_logs')
         .select('id')
-        .eq('affected_date', CareSchedule.isoDate(date))
+        .eq('affected_date', CareSchedule.isoDate(date));
+    final rows = await (childId == null
+            ? query.isFilter('child_id', null)
+            : query.eq('child_id', childId))
         .order('id', ascending: false)
         .limit(1);
     return rows.isEmpty ? null : rows.first['id'] as int?;
@@ -574,7 +604,8 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     // Snapshot reference (F-26): the base schedule was just upserted by the
     // caller, so the newest audit log for this date holds the pre-edit
     // old_data used to fully restore the day if this swap is later reverted.
-    final preEditLogId = await _latestLogIdForDate(schedule.scheduleDate);
+    final preEditLogId = await _latestLogIdForDate(schedule.scheduleDate,
+        childId: schedule.childId);
 
     final now = _nowUtcIso();
     final inserted = await _client
@@ -725,6 +756,8 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     bool restoreNotes = false,
     required Member myProfile,
     required List<Member> allProfiles,
+    int? childId,
+    int? scheduleId,
   }) async {
     final message = normalizeFreeText(requestMessage);
 
@@ -739,9 +772,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
 
     // Find the approved swap for this date to link back (F-26) and read the
     // day's current handoff time for the urgency tag.
-    final approvedRequest = await _approvedRequestForDate(scheduleDate);
+    final approvedRequest =
+        await _approvedRequestForDate(scheduleDate, childId: childId);
     String? currentHandoffTime;
-    final approvedScheduleId = approvedRequest?.scheduleId;
+    // F-07: the approved request's row, or — when a plan-mode switch took it —
+    // the lane's own row, which the server stamps the lane from.
+    final approvedScheduleId = approvedRequest?.scheduleId ?? scheduleId;
     if (approvedScheduleId != null) {
       final row = await _client
           .from('care_schedules')
@@ -759,7 +795,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         .from('swap_requests')
         .insert({
           'schedule_date': CareSchedule.isoDate(scheduleDate),
-          'schedule_id': approvedRequest?.scheduleId,
+          'schedule_id': approvedScheduleId,
           'requesting_profile_id': myProfile.id,
           'target_profile_id': approverId,
           'previous_actual_parent_id': currentActualProfileId,
@@ -927,8 +963,10 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       Future<void>.value());
 
   @override
-  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate) async {
-    final approvedRequest = await _approvedRequestForDate(scheduleDate);
+  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate,
+      {int? childId}) async {
+    final approvedRequest =
+        await _approvedRequestForDate(scheduleDate, childId: childId);
     final preEditLogId = approvedRequest?.preEditLogId;
     if (preEditLogId == null) return null;
     final snapshot = PreEditSnapshot.parse(await _fetchOldData(preEditLogId));

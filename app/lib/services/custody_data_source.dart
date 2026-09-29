@@ -139,7 +139,9 @@ abstract class CustodyDataSource {
   /// One day's row, or null when unassigned — mirror of the web's
   /// `GetScheduleForDateAsync` (the T-27 transition check on the 1st of the
   /// month needs the previous month's last day).
-  Future<CareSchedule?> fetchDay(DateTime date);
+  /// F-07: the day in ONE lane — [childId] null is the family's lane (a
+  /// single-plan family), a child is that child's lane.
+  Future<CareSchedule?> fetchDay(DateTime date, {int? childId});
 
   Future<void> insertDay(CareSchedule day);
 
@@ -162,23 +164,35 @@ abstract class CustodyDataSource {
   /// SECURITY INVOKER). The server floors [from] to today and keeps frozen
   /// and approved-swap days; the counts it answers are the toast. Admin-only
   /// by DB rule — the UI offers it only under the admin bypass.
-  Future<ScheduleRangeResult> clearScheduleRange(DateTime from, DateTime to);
+  /// F-07: [childId] null clears every lane; a child, that child's only.
+  Future<ScheduleRangeResult> clearScheduleRange(DateTime from, DateTime to,
+      {int? childId});
 
   /// F-51 — the wizard's "substituir os dias já planejados": clears
   /// [from, to] and inserts [days] in the SAME transaction
   /// (`replace_schedule_range`). Every day must fall inside the range — the
   /// server refuses otherwise. An insert that fails leaves the old plan
   /// untouched: the whole call rolls back.
+  /// F-07: with [childId], only that child's lane is cleared, and every day
+  /// must carry the same `childId`.
   Future<ScheduleRangeResult> replaceScheduleRange(
-      DateTime from, DateTime to, List<CareSchedule> days);
+      DateTime from, DateTime to, List<CareSchedule> days,
+      {int? childId});
 
   /// U-55 — one handoff time for every TRANSITION day in [from, to] (null =
   /// no upper bound) that has none, in ONE statement as the caller
   /// (`set_handoff_time_range`, SECURITY INVOKER). The server floors [from]
   /// to today, keeps frozen days and never overwrites a time already set;
   /// the counts it answers are the closing line. Admin-only by DB rule.
+  /// F-07: [childId] null times every lane; a child, that child's only.
   Future<HandoffRangeResult> setHandoffTimeRange(
-      DateTime from, DateTime? to, HandoffTime time);
+      DateTime from, DateTime? to, HandoffTime time,
+      {int? childId});
+
+  /// F-07 — `set_schedule_mode`: 'single' or 'per_child', from today on.
+  /// Back to 'single' names the child whose plan becomes the family's
+  /// ([baseChildId]). Returns how many days the switch moved.
+  Future<int> setScheduleMode(String mode, {int? baseChildId});
 
   /// Starts listening for care_schedules changes; [onChange] fires on any
   /// insert/update/delete visible to this session. [onStatus] reports socket
@@ -241,6 +255,11 @@ abstract class CustodyDataSource {
     bool restoreNotes = false,
     required Member myProfile,
     required List<Member> allProfiles,
+    // F-07: the day's lane and row. A swap approved before a plan-mode switch
+    // lost its `schedule_id` with the row it named, so the revert takes the
+    // lane's own row.
+    int? childId,
+    int? scheduleId,
   });
 
   /// Restores the day to its pre-edit snapshot (F-26 plan computed in core),
@@ -257,7 +276,8 @@ abstract class CustodyDataSource {
   /// F-47: the day's observation as the pre-edit snapshot holds it, or null
   /// when there is nothing to restore FROM (no approved swap on the date, no
   /// snapshot reference, or an old_data-less snapshot).
-  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate);
+  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate,
+      {int? childId});
 
   // ── F-67 relato do dia ──
 

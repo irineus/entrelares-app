@@ -107,6 +107,10 @@ class PublicSettings {
   bool get childAgendaEnabled =>
       parseBoolSetting(values, 'feature.child_agenda', false);
 
+  /// F-07 — the plan per child (`set_schedule_mode`).
+  bool get perChildScheduleEnabled =>
+      parseBoolSetting(values, 'feature.per_child_schedule', false);
+
   // F-55 PR 2 — the agenda's operator keys (the RPCs read the same ones).
   bool get agendaPremiumOnly =>
       parseBoolSetting(values, 'agenda.premium_only', true);

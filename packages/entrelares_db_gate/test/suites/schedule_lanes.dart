@@ -3,6 +3,7 @@ import 'package:supabase/supabase.dart';
 import 'package:test/test.dart';
 
 import '_helpers.dart';
+import 'day_notice.dart' show saoPauloToday;
 
 /// F-07 (PR 2) — the plan per child, where it is actually enforced.
 ///
@@ -300,6 +301,198 @@ void scheduleLaneTests(GateFixture fx) {
           () => fam.admin
               .rpc<dynamic>('remove_child', params: {'p_child_id': childA}),
           contains: 'tem dias no plano');
+    });
+  });
+
+  // F-07 (PR 3): the ONLY writer of `families.schedule_mode`.
+  group('F-07 · plan mode switch', () {
+    const flag = 'feature.per_child_schedule';
+    late ThrowawayFamily fam;
+    late String agendaBefore;
+    late String flagBefore;
+    late int childA;
+    late int childB;
+    final today = saoPauloToday();
+    final days = [for (var i = 0; i < 4; i++) addDays(today, i)];
+
+    Future<Map<String, dynamic>> switchTo(SupabaseClient who, String mode,
+            {int? base}) async =>
+        Map<String, dynamic>.from(await who.rpc<dynamic>('set_schedule_mode',
+            params: {'p_mode': mode, 'p_base_child_id': base}) as Map);
+
+    Future<List<Map<String, dynamic>>> rowsOn(DateTime d) async =>
+        (await fx.service
+                .from('care_schedules')
+                .select()
+                .eq('family_id', fam.familyId)
+                .eq('schedule_date', isoDate(d))
+                .order('child_id', ascending: true, nullsFirst: true))
+            .cast<Map<String, dynamic>>();
+
+    Future<String> mode() async => (await fx.service
+            .from('families')
+            .select('schedule_mode')
+            .eq('id', fam.familyId))
+        .single['schedule_mode'] as String;
+
+    setUpAll(() async {
+      agendaBefore = await readFlag(fx, agendaFlag);
+      flagBefore = await readFlag(fx, flag);
+      await writeFlag(fx, agendaFlag, 'true');
+      fam = await fx.createFamily('f07mode');
+      await fx.service.from('families').update({
+        'comp_premium_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', fam.familyId);
+      childA = await fam.admin
+          .rpc<dynamic>('add_child', params: {'p_first_name': 'Lia'}) as int;
+
+      // Yesterday, written by the system: the past the switch must not move.
+      await fx.service.from('care_schedules').insert({
+        'schedule_date': isoDate(addDays(today, -1)),
+        'scheduled_parent_id': fam.adminProfile.id,
+      });
+      // Today on: admin, member, admin, member.
+      for (var i = 0; i < days.length; i++) {
+        await fam.admin.from('care_schedules').insert({
+          'schedule_date': isoDate(days[i]),
+          'scheduled_parent_id':
+              i.isEven ? fam.adminProfile.id : fam.memberProfile.id,
+        });
+      }
+      // An APPROVED swap on days[2]: the member asked, the admin approved.
+      final day2 = (await rowsOn(days[2])).single;
+      final req = (await fam.member
+              .from('swap_requests')
+              .insert({
+                'schedule_date': isoDate(days[2]),
+                'schedule_id': day2['id'],
+                'requesting_profile_id': fam.memberProfile.id,
+                'target_profile_id': fam.adminProfile.id,
+                'previous_actual_parent_id': null,
+                'proposed_actual_parent_id': fam.memberProfile.id,
+                'status': 'pending',
+              })
+              .select())
+          .single;
+      await fam.admin.from('care_schedules').update({
+        'actual_parent_id': fam.memberProfile.id,
+        'submitted_token': day2['revision_token'],
+      }).eq('id', day2['id'] as int);
+      await fam.admin.from('swap_requests').update({
+        'status': 'approved',
+        'resolved_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', req['id'] as int);
+    });
+
+    tearDownAll(() async {
+      await writeFlag(fx, flag, flagBefore);
+      await writeFlag(fx, agendaFlag, agendaBefore);
+    });
+
+    test('with the flag OFF nobody switches', () async {
+      await writeFlag(fx, flag, 'false');
+      await expectRejected(() => switchTo(fam.admin, 'per_child'),
+          contains: 'ainda não está disponível');
+      await writeFlag(fx, flag, 'true');
+    });
+
+    test('only an admin switches', () async {
+      await expectRejected(() => switchTo(fam.member, 'per_child'),
+          contains: 'Somente administradores');
+    });
+
+    test('one child is not enough for a plan per child', () async {
+      await expectRejected(() => switchTo(fam.admin, 'per_child'),
+          contains: 'pelo menos duas crianças');
+      childB = await fam.admin
+          .rpc<dynamic>('add_child', params: {'p_first_name': 'Theo'}) as int;
+    });
+
+    test('a pending request from today on refuses the switch', () async {
+      final day3 = (await rowsOn(days[3])).single;
+      final req = (await fam.admin
+              .from('swap_requests')
+              .insert({
+                'schedule_date': isoDate(days[3]),
+                'schedule_id': day3['id'],
+                'requesting_profile_id': fam.adminProfile.id,
+                'target_profile_id': fam.memberProfile.id,
+                'previous_actual_parent_id': null,
+                'proposed_actual_parent_id': fam.adminProfile.id,
+                'status': 'pending',
+              })
+              .select())
+          .single;
+      await expectRejected(() => switchTo(fam.admin, 'per_child'),
+          contains: 'pedidos de troca pendentes');
+      await fam.admin.from('swap_requests').update({
+        'status': 'cancelled',
+        'resolved_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', req['id'] as int);
+      expect(await mode(), 'single');
+    });
+
+    test('single → per child copies today on into every lane, past untouched',
+        () async {
+      final result = await switchTo(fam.admin, 'per_child');
+      expect(result['changed'], isTrue);
+      expect(result['days'], days.length);
+      expect(result['written'], days.length * 2);
+      expect(await mode(), 'per_child');
+
+      final past = await rowsOn(addDays(today, -1));
+      expect([for (final r in past) r['child_id']], [null]);
+
+      for (var i = 0; i < days.length; i++) {
+        final rows = await rowsOn(days[i]);
+        expect([for (final r in rows) r['child_id']], [childA, childB]);
+        for (final r in rows) {
+          expect(r['scheduled_parent_id'],
+              i.isEven ? fam.adminProfile.id : fam.memberProfile.id);
+        }
+      }
+      // The approved swap is a fact: every lane keeps the real carer.
+      for (final r in await rowsOn(days[2])) {
+        expect(r['actual_parent_id'], fam.memberProfile.id);
+      }
+      // ONE batch, folded by the Histórico.
+      final logs = await fx.service
+          .from('activity_logs')
+          .select('context')
+          .eq('family_id', fam.familyId)
+          .eq('affected_date', isoDate(days[0]))
+          .order('id', ascending: false)
+          .limit(3);
+      expect({for (final l in logs) (l['context'] as Map)['batch_kind']},
+          {'mode_switch'});
+    });
+
+    test('switching to the mode already in place changes nothing', () async {
+      final result = await switchTo(fam.admin, 'per_child');
+      expect(result['changed'], isFalse);
+    });
+
+    test('back to single asks whose plan becomes the family plan', () async {
+      await expectRejected(() => switchTo(fam.admin, 'single'),
+          contains: 'Escolha de qual criança');
+      // The second lane diverges on days[1]: the admin plans it for themself.
+      final second = (await rowsOn(days[1]))
+          .firstWhere((r) => r['child_id'] == childB);
+      await fam.admin.from('care_schedules').update({
+        'scheduled_parent_id': fam.adminProfile.id,
+        'submitted_token': second['revision_token'],
+      }).eq('id', second['id'] as int);
+
+      final result = await switchTo(fam.admin, 'single', base: childB);
+      expect(result['days'], days.length);
+      expect(await mode(), 'single');
+      for (var i = 0; i < days.length; i++) {
+        final rows = await rowsOn(days[i]);
+        expect([for (final r in rows) r['child_id']], [null]);
+      }
+      expect((await rowsOn(days[1])).single['scheduled_parent_id'],
+          fam.adminProfile.id,
+          reason: 'the chosen lane is the family plan now');
     });
   });
 }

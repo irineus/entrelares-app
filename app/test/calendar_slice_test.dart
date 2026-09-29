@@ -207,9 +207,10 @@ class FakeCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<CareSchedule?> fetchDay(DateTime date) async {
+  Future<CareSchedule?> fetchDay(DateTime date, {int? childId}) async {
     for (final d in days) {
-      if (CareSchedule.isoDate(d.scheduleDate) == CareSchedule.isoDate(date)) {
+      if (CareSchedule.isoDate(d.scheduleDate) == CareSchedule.isoDate(date) &&
+          d.childId == childId) {
         return d;
       }
     }
@@ -240,8 +241,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<ScheduleRangeResult> clearScheduleRange(
-      DateTime from, DateTime to) async {
+  Future<ScheduleRangeResult> clearScheduleRange(DateTime from, DateTime to,
+      {int? childId}) async {
     if (throwOnWrite != null) throw throwOnWrite!;
     clearedRanges.add((from: from, to: to));
     final removed = _dropRange(from, to);
@@ -256,7 +257,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
   /// from [from] on (never before today) that have no time get it.
   @override
   Future<HandoffRangeResult> setHandoffTimeRange(
-      DateTime from, DateTime? to, HandoffTime time) async {
+      DateTime from, DateTime? to, HandoffTime time,
+      {int? childId}) async {
     if (throwOnWrite != null) throw throwOnWrite!;
     final wire = '${time.hour.toString().padLeft(2, '0')}:'
         '${time.minute.toString().padLeft(2, '0')}:00';
@@ -294,7 +296,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
 
   @override
   Future<ScheduleRangeResult> replaceScheduleRange(
-      DateTime from, DateTime to, List<CareSchedule> newDays) async {
+      DateTime from, DateTime to, List<CareSchedule> newDays,
+      {int? childId}) async {
     if (throwOnWrite != null) throw throwOnWrite!;
     replacedRanges.add((from: from, to: to, days: newDays));
     final removed = _dropRange(from, to);
@@ -424,6 +427,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
     bool restoreNotes = false,
     required Member myProfile,
     required List<Member> allProfiles,
+    int? childId,
+    int? scheduleId,
   }) async {
     if (throwOnWrite != null) throw throwOnWrite!;
     revertRequests.add({
@@ -458,8 +463,31 @@ class FakeCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate) async =>
+  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate,
+          {int? childId}) async =>
       preEditNotes;
+
+  // ── F-07 ──
+  /// Every `set_schedule_mode` call, as (mode, baseChildId).
+  final List<(String, int?)> scheduleModeCalls = [];
+
+  @override
+  Future<int> setScheduleMode(String mode, {int? baseChildId}) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    scheduleModeCalls.add((mode, baseChildId));
+    final current = family;
+    if (current != null) {
+      family = Family(
+        id: current.id,
+        name: current.name,
+        plan: current.plan,
+        trialEndsAt: current.trialEndsAt,
+        compPremiumAt: current.compPremiumAt,
+        scheduleMode: mode,
+      );
+    }
+    return days.length;
+  }
 
   // ── F-67 ──
   /// Every relato the fake knows about; [addDayAccount] appends to it the way

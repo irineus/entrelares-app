@@ -297,4 +297,94 @@ void main() {
       expect(find.text('Lia e Theo'), findsOne);
     });
   });
+
+  // F-07 (PR 3): the plan's mode, switched only by `set_schedule_mode`.
+  group('the plan mode', () {
+    const theo = Child(id: 6, familyId: 7, firstName: 'Theo', sortOrder: 1);
+    const planOn = {...on, 'feature.per_child_schedule': 'true'};
+    final card = find.byKey(const ValueKey('child-plan-card'));
+    final switchButton = find.byKey(const ValueKey('child-plan-switch'));
+
+    FakeCustodyDataSource perChild(FakeCustodyDataSource ds) => ds
+      ..family = Family(
+          id: 7,
+          name: 'Souza',
+          plan: 'free',
+          compPremiumAt: DateTime.utc(2026, 1, 1),
+          scheduleMode: 'per_child');
+
+    testWidgets('flag OFF: no plan card at all', (tester) async {
+      await pumpPage(tester, source(children: const [lia, theo]));
+      expect(card, findsNothing);
+    });
+
+    testWidgets('one child: the card says two are needed, with no door',
+        (tester) async {
+      await pumpPage(tester, source(children: const [lia], settings: planOn));
+      expect(find.text(l[KApp.childPlanSingle]), findsOne);
+      expect(find.text(l[KApp.childPlanNeedsTwo]), findsOne);
+      expect(switchButton, findsNothing);
+    });
+
+    testWidgets('two children: the admin confirms and every child gets a plan',
+        (tester) async {
+      final ds = source(
+          children: const [lia, theo], premium: true, settings: planOn);
+      await pumpPage(tester, ds);
+      await tester.tap(switchButton);
+      await tester.pumpAndSettle();
+      expect(find.text(l[KApp.childPlanToPerChildConfirm]), findsOne);
+      await tester.tap(find.text(l[KApp.childPlanToPerChild]).last);
+      await tester.pumpAndSettle();
+      expect(ds.scheduleModeCalls, [('per_child', null)]);
+      expect(find.text(l[KApp.childPlanSwitched]), findsOne);
+      expect(find.text(l[KApp.childPlanPerChild]), findsOne);
+    });
+
+    testWidgets('back to one plan asks whose plan it becomes', (tester) async {
+      final ds = perChild(source(
+          children: const [lia, theo], premium: true, settings: planOn));
+      await pumpPage(tester, ds);
+      await tester.tap(switchButton);
+      await tester.pumpAndSettle();
+      // No child chosen yet: the primary names no plan and does nothing.
+      await tester.tap(find.text(l[KApp.childPlanToSingle]).last);
+      await tester.pumpAndSettle();
+      expect(ds.scheduleModeCalls, isEmpty);
+
+      await tester.tap(find.byKey(const ValueKey('child-plan-base-6')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l.format(KApp.childPlanUseChild, ['Theo'])));
+      await tester.pumpAndSettle();
+      expect(ds.scheduleModeCalls, [('single', 6)]);
+      expect(find.text(l[KApp.childPlanSingle]), findsOne);
+    });
+
+    testWidgets('a server refusal keeps the sheet open with its sentence',
+        (tester) async {
+      final ds = source(
+          children: const [lia, theo], premium: true, settings: planOn)
+        ..throwOnWrite = Exception('{"code":"23514","message":'
+            '"Há pedidos de troca pendentes a partir de hoje. Resolva-os '
+            'antes de mudar o modo do plano."}');
+      await pumpPage(tester, ds);
+      await tester.tap(switchButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[KApp.childPlanToPerChild]).last);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('pedidos de troca pendentes'), findsOne);
+      expect(find.text(l[KApp.childPlanToPerChildConfirm]), findsOne);
+    });
+
+    testWidgets('a member reads the state and gets no door', (tester) async {
+      await pumpPage(
+          tester,
+          perChild(source(
+              members: const [plain, admin],
+              children: const [lia, theo],
+              settings: planOn)));
+      expect(find.text(l[KApp.childPlanPerChild]), findsOne);
+      expect(switchButton, findsNothing);
+    });
+  });
 }
