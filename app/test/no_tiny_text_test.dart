@@ -1,13 +1,15 @@
 // U-48 — the type floor. No text a screen paints reads under 11 sp, and the
 // three places that do are EXCEPTIONS the owner kept on 17/09/2026, each with
 // its measured reason, pinned here by name so a fourth cannot join them
-// quietly and none of the three can drift lower.
+// quietly and none of the three can drift lower. A fourth, D, joined by the
+// owner's decision on 29/09/2026 (F-07): the split day's avatars.
 //
 // Cut to the same pattern as `no_color_literal_test`: a source scan over
 // `lib/` for the literal a screen would write, plus a walk over the theme
 // and the two typographic tables that carry sizes by another name.
 import 'dart:io';
 
+import 'package:entrelares_core/entrelares_core.dart' show SplitCellFit, fitSplitCell;
 import 'package:entrelares_app/theme/app_theme.dart';
 import 'package:entrelares_app/theme/tokens.dart';
 import 'package:flutter/material.dart';
@@ -227,5 +229,52 @@ void main() {
       isTrue,
       reason: 'no AppAvatar at r14 any more — exception C can be retired',
     );
+  });
+
+  test("exception D — the split day's avatars (F-07, owner 29/09/2026): "
+      'carer never under 14 dp, child never under 10, letters by ratio', () {
+    // The owner chose the "Colunas" cell: in Todas, a day whose children
+    // are with different carers draws one column per carer — the carer's
+    // avatar on top, the children's below — inside the same cell exception
+    // A already measures. The letters scale with the circle, so the floors
+    // are the circles' and the ratios.
+    expect(SplitCellFit.minCarer, 14);
+    expect(SplitCellFit.minChild, 10);
+    expect(SplitCellFit.carerLetter, 0.55);
+    expect(SplitCellFit.childLetter, 0.6);
+    // However narrow the cell and however many carers, never under.
+    for (final width in [20.0, 34.0, 41.0, 48.0, 90.0]) {
+      for (final columns in [1, 2, 3, 4]) {
+        final fit = fitSplitCell(
+            width: width,
+            avatarDiameter: 18,
+            childrenPerColumn: List.filled(columns, 3));
+        expect(fit.carerDiameter, greaterThanOrEqualTo(SplitCellFit.minCarer));
+        expect(fit.childDiameter, greaterThanOrEqualTo(SplitCellFit.minChild));
+      }
+    }
+    final chip = File('lib/widgets/person_chip.dart').readAsStringSync();
+    expect(chip, contains('fontSize: diameter * letterScale'),
+        reason: 'the formula moved — re-read exception D');
+    // Outside the split cell, a MiniAvatar is a chip's or the day view's:
+    // 20 dp or more, so its letters (≥ 0.55 ×) reach the 11 px floor.
+    final literal = RegExp(
+        r'(?:MiniAvatar\((?:[^()]|\([^()]*\))*?diameter:\s*|_childAvatar\([^,]+,\s*)(\d+(?:\.\d+)?)');
+    final under = <String>[];
+    var seen = 0;
+    for (final file in _appSources()) {
+      for (final m in literal.allMatches(file.readAsStringSync())) {
+        seen++;
+        final d = double.parse(m.group(1)!);
+        if (d * 0.55 < floor - 1e-9) under.add('${file.path}: diameter $d');
+      }
+    }
+    expect(under, isEmpty,
+        reason: 'a MiniAvatar under 20 dp outside the split cell — '
+            'exception D covers the cell, nothing else');
+
+    // The scan reads the call sites it is about (chips, legend, day view).
+    expect(seen, greaterThanOrEqualTo(3),
+        reason: 'the MiniAvatar call sites moved — re-read exception D');
   });
 }

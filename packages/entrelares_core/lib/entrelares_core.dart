@@ -27,6 +27,7 @@ export 'src/channel_handoff_rules.dart';
 export 'src/child_rules.dart';
 export 'src/schedule_mode_rules.dart';
 export 'src/lane_view_rules.dart';
+export 'src/person_chip_rules.dart';
 export 'src/connectivity_rules.dart';
 export 'src/consent_declarations.dart';
 export 'src/crash_rules.dart';

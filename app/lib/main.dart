@@ -490,6 +490,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   onOpenNotifications: () => _router.go('/notifications'),
                   onOpenPlan: () => _router.go('/family/plan'),
                   onOpenChildren: () => _router.go('/family/children'),
+                  // F-07 (owner's QA, 29/09/2026): a carer's legend chip.
+                  onOpenMember: (target, id) => _router.go(switch (target) {
+                    MemberLinkTarget.ownProfile => '/family/profile',
+                    MemberLinkTarget.memberProfile => '/family/profile/$id',
+                    MemberLinkTarget.family => '/family',
+                  }),
                   handoffNudgePrefs: _handoffNudgePrefs,
                   planRequest: _planRequest,
                   dayRequest: _dayRequest),

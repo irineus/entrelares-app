@@ -88,6 +88,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:entrelares_app/widgets/person_chip.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -182,14 +183,24 @@ const _material = Size(48, 48);
 const _wcag = Size(44, 44);
 const _google = Size(40, 40);
 
+/// F-07 (owner, 29/09/2026): the legend and lane chips above the month are
+/// 40 dp to touch — the Google button's floor — so two rows of them do not
+/// take the month grid's height.
+const _personChip = Size(40, 40);
+
 /// Where a smaller floor applies, as rects on the screen right now.
-({List<Rect> grids, List<Rect> google}) _exceptions(WidgetTester tester) => (
+({List<Rect> grids, List<Rect> google, List<Rect> chips}) _exceptions(
+        WidgetTester tester) => (
   grids: [
     for (final e in find.byType(GridView).evaluate())
       tester.getRect(find.byWidget(e.widget)),
   ],
   google: [
     for (final e in find.byType(GoogleSignInButton).evaluate())
+      tester.getRect(find.byWidget(e.widget)),
+  ],
+  chips: [
+    for (final e in find.byType(PersonChip).evaluate())
       tester.getRect(find.byWidget(e.widget)),
   ],
 );
@@ -236,6 +247,8 @@ Future<void> _expectTapTargets(WidgetTester tester, String where) async {
         ? _wcag
         : ex.google.any((g) => g.contains(bounds.center))
         ? _google
+        : ex.chips.any((g) => g.contains(bounds.center))
+        ? _personChip
         : _material;
     if (size.width < floor.width - 1e-10 ||
         size.height < floor.height - 1e-10) {
@@ -256,7 +269,8 @@ Future<void> _expectTapTargets(WidgetTester tester, String where) async {
     reason:
         '[$where] a target under its floor: a thumb misses it and a '
         'switch-access user cannot reach it. Material 48 dp; the month '
-        'grid 44 dp (WCAG 2.5.5, U-28); the Google button 40 dp (U-45).',
+        'grid 44 dp (WCAG 2.5.5, U-28); the Google button 40 dp (U-45); '
+        'the chips above the month 40 dp (F-07).',
   );
 }
 
@@ -382,7 +396,11 @@ cal.FakeCustodyDataSource _calendarSource() {
 }
 
 Widget _calendar(cal.FakeCustodyDataSource ds, {required bool dark}) => _host(
-  CalendarScreen(dataSource: ds, adminMode: AdminMode()),
+  CalendarScreen(
+      dataSource: ds,
+      adminMode: AdminMode(),
+      // F-07: the legend chips are targets in the app — measure them.
+      onOpenMember: (_, _) {}),
   dark: dark,
 );
 
@@ -688,7 +706,11 @@ void main() {
                   GoRoute(
                     path: '/',
                     builder: (_, _) =>
-                        CalendarScreen(dataSource: ds, adminMode: AdminMode()),
+                        CalendarScreen(
+      dataSource: ds,
+      adminMode: AdminMode(),
+      // F-07: the legend chips are targets in the app — measure them.
+      onOpenMember: (_, _) {}),
                   ),
                 ],
               ),

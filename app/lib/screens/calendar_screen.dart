@@ -40,6 +40,7 @@ import '../services/handoff_nudge_prefs.dart';
 import '../services/onboarding_service.dart';
 import '../widgets/invitee_welcome_sheet.dart';
 import '../widgets/onboarding.dart';
+import '../widgets/person_chip.dart';
 import 'wizard_sheet.dart';
 
 /// U-28 — what one day of the grid is tall enough to hold: the day number, the
@@ -124,6 +125,10 @@ class CalendarScreen extends StatefulWidget {
   /// F-55: the agenda's "add the child" door (`/family/children`).
   final VoidCallback? onOpenChildren;
 
+  /// F-07 (owner's QA, 29/09/2026): a carer's legend chip leads to the
+  /// person — my profile, anyone's for an admin, the Família otherwise.
+  final void Function(MemberLinkTarget target, int memberId)? onOpenMember;
+
   /// U-55: where the "Definir horário" strip's dismissal is kept on this
   /// device. Null (tests, hosts without storage) keeps it for the session.
   final HandoffNudgePrefs? handoffNudgePrefs;
@@ -158,6 +163,7 @@ class CalendarScreen extends StatefulWidget {
       this.onOpenNotifications,
       this.onOpenPlan,
       this.onOpenChildren,
+      this.onOpenMember,
       this.handoffNudgePrefs,
       this.planRequest,
       this.dayRequest});
@@ -1668,6 +1674,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         DaySheetLane(
           childId: c.id,
           childName: c.firstName,
+          initials: _childInitials[c.id] ?? '',
           day: _monthRows
               .where((d) =>
                   d.childId == c.id &&
@@ -1775,34 +1782,84 @@ class _CalendarScreenState extends State<CalendarScreen>
     ].join('; ');
   }
 
-  /// F-07 — whose plan is on screen: *Todas as crianças* or one child.
-  Widget _laneChips(Localization l) => Padding(
-        key: CalendarScreen.laneChipsKey,
-        padding: const EdgeInsets.fromLTRB(
-            Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
-        child: SingleChildScrollView(
+  /// F-07 — whose plan is on screen: *Todas* or one child. The same chip as
+  /// the carers' legend above (owner, 29/09/2026), each child with the
+  /// neutral avatar the split day draws — this row is the children's key.
+  Widget _laneChips(Localization l) {
+    final tokens = context.tokens;
+    final scheme = Theme.of(context).colorScheme;
+    final initials = _childInitials;
+    PersonChip chip(
+            {required Key key,
+            required String label,
+            required bool selected,
+            required VoidCallback onTap,
+            required Widget avatar}) =>
+        PersonChip(
+          key: key,
+          label: label,
+          selected: selected,
+          onTap: onTap,
+          background: selected
+              ? scheme.primary.withValues(alpha: 0.12)
+              : scheme.surface,
+          border: selected ? scheme.primary : tokens.outline,
+          ink: tokens.text,
+          avatar: avatar,
+        );
+    return Padding(
+      key: CalendarScreen.laneChipsKey,
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+      child: LayoutBuilder(
+        builder: (context, box) => SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              ChoiceChip(
-                key: const ValueKey('lane-all'),
-                label: Text(l[KApp.calLaneAll]),
-                selected: _lane == null,
-                onSelected: (_) => _selectLane(null),
-              ),
-              for (final c in _children) ...[
-                const SizedBox(width: Spacing.sm),
-                ChoiceChip(
-                  key: ValueKey('lane-${c.id}'),
-                  label: Text(c.firstName),
-                  selected: _lane == c.id,
-                  onSelected: (_) => _selectLane(c.id),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: box.maxWidth),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                chip(
+                  key: const ValueKey('lane-all'),
+                  label: l[KApp.calLaneAllShort],
+                  selected: _lane == null,
+                  onTap: () => _selectLane(null),
+                  avatar: Icon(Icons.groups_outlined,
+                      size: 20, color: tokens.textMuted),
                 ),
+                for (final c in _children) ...[
+                  const SizedBox(width: Spacing.sm),
+                  chip(
+                    key: ValueKey('lane-${c.id}'),
+                    label: c.firstName,
+                    selected: _lane == c.id,
+                    onTap: () => _selectLane(c.id),
+                    avatar: _childAvatar(initials[c.id] ?? '?', 20),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
-      );
+      ),
+    );
+  }
+
+  /// F-07: the children's letters (`childInitials`, core).
+  Map<int, String> get _childInitials =>
+      childInitials({for (final c in _children) c.id: c.firstName});
+
+  /// A child's NEUTRAL avatar — surface, ring, text ink.
+  Widget _childAvatar(String letters, double diameter) {
+    final tokens = context.tokens;
+    return MiniAvatar(
+      diameter: diameter,
+      letters: letters,
+      fill: Theme.of(context).colorScheme.surface,
+      ink: tokens.text,
+      ring: tokens.textMuted,
+      letterScale: SplitCellFit.childLetter,
+    );
+  }
 
   /// Web: GoToToday — no-op when already on the current month (the card is
   /// not tappable then anyway).
@@ -2559,8 +2616,14 @@ class _CalendarScreenState extends State<CalendarScreen>
               child: _Legend(
                 members: _members,
                 views: views,
-                roleOf: (id) => _roleLabelFor(id, l.current),
                 showSwapKey: _visibleMonthHasSwap,
+                onOpen: widget.onOpenMember == null || _ownProfile == null
+                    ? null
+                    : (m) => widget.onOpenMember!(
+                        memberLinkTarget(
+                            isOwn: m.id == _ownProfile!.id,
+                            iAmAdmin: _ownProfile!.isAdmin),
+                        m.id),
               ),
             ),
           const Divider(height: 1),
@@ -2603,6 +2666,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                           laneNames: {
                             for (final c in _children) c.id: c.firstName
                           },
+                          laneInitials: _childInitials,
                           frozenByIso: isVisible ? _frozenByIso : const {},
                           agendaByIso: isVisible ? _agendaByIso : const {},
                           ownProfileId: _ownProfile?.id,
@@ -2779,21 +2843,21 @@ class _Legend extends StatelessWidget {
   final List<Member> members;
   final List<MemberView> views;
 
-  /// Resolves a member's role for the current reader; null keeps the bare name.
-  final String? Function(int memberId) roleOf;
-
   /// U-18 parity: whether the month on screen has any swapped day at all.
   final bool showSwapKey;
+
+  /// F-07 (owner's QA, 29/09/2026): a carer's chip leads to the person.
+  final void Function(Member member)? onOpen;
 
   const _Legend({
     required this.members,
     required this.views,
-    required this.roleOf,
     required this.showSwapKey,
+    this.onOpen,
   });
 
-  /// One row of keys. A four-carer family plus the swap key needs two.
-  static const rowHeight = 22.0;
+  /// One row of keys (the skeleton's height).
+  static const rowHeight = PersonChip.target;
 
   @override
   Widget build(BuildContext context) {
@@ -2811,22 +2875,38 @@ class _Legend extends StatelessWidget {
     // horizontal scroll hides the fourth carer behind a gesture nobody knows is
     // there. Two rows show everyone, and the rows only appear when the family
     // has grown enough to need them — a two-carer family still gets one.
+    // F-07 (owner's QA, 29/09/2026): an avatar and the short name — the role
+    // left the key, the chip leads to the person instead, and the children's
+    // lane chips wear the same shape.
+    final names = legendNames({for (final m in active) m.id: m.fullName});
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.sm, 0, Spacing.sm, Spacing.xs),
+      padding: const EdgeInsets.fromLTRB(Spacing.sm, 0, Spacing.sm, 0),
       child: Wrap(
-        spacing: Spacing.md,
-        runSpacing: Spacing.xs,
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: Spacing.sm,
         children: [
           for (final m in active)
             Builder(builder: (context) {
               final slot = context.tokens.slot(profileSlotIndex(m.id, views));
-              final role = roleOf(m.id);
-              final first = m.fullName.split(' ').first;
-              final base = role == null ? first : '$first ($role)';
+              final base = names[m.id] ?? m.fullName;
               final label = m.isPendingMember
                   ? '$base ${AppL10n.of(context).l[KApp.calMemberPending]}'
                   : base;
-              return _key(context, slot: slot, label: label);
+              return PersonChip(
+                key: ValueKey('legend-member-${m.id}'),
+                label: label,
+                background: slot.tone.container,
+                border: slot.tone.border,
+                ink: slot.tone.onContainer,
+                onTap: onOpen == null ? null : () => onOpen!(m),
+                avatar: MiniAvatar(
+                  diameter: 20,
+                  letters: displayInitials(m.id, views),
+                  fill: slot.tone.solid,
+                  ink: slot.tone.onSolid,
+                ),
+              );
             }),
           if (showSwapKey)
             _key(context,
@@ -2850,7 +2930,7 @@ class _Legend extends StatelessWidget {
           {required SlotColors slot,
           required String label,
           bool dashed = false}) =>
-      SlotPill(slot: slot, label: label, height: rowHeight, dashed: dashed);
+      SlotPill(slot: slot, label: label, height: 22, dashed: dashed);
 }
 
 class _MonthGrid extends StatelessWidget {
@@ -2862,6 +2942,9 @@ class _MonthGrid extends StatelessWidget {
 
   /// F-07: child id → first name, for the split cell's spoken label.
   final Map<int, String> laneNames;
+
+  /// F-07: child id → avatar letters (`childInitials`).
+  final Map<int, String> laneInitials;
   final Map<String, SwapRequest> frozenByIso;
   final Map<String, List<ChildEvent>> agendaByIso;
   final int? ownProfileId;
@@ -2887,6 +2970,7 @@ class _MonthGrid extends StatelessWidget {
     required this.daysByIso,
     this.divergentByIso = const {},
     this.laneNames = const {},
+    this.laneInitials = const {},
     required this.frozenByIso,
     this.agendaByIso = const {},
     required this.ownProfileId,
@@ -3062,6 +3146,7 @@ class _MonthGrid extends StatelessWidget {
                           DateTime(month.year, month.month, day))] ??
                       const [],
                   laneNames: laneNames,
+                  laneInitials: laneInitials,
                   frozenMark: _markFor(
                       frozenByIso[CareSchedule.isoDate(
                           DateTime(month.year, month.month, day))],
@@ -3189,6 +3274,7 @@ class _DayCell extends StatelessWidget {
   /// split between their carers' tones and the cell says who has whom.
   final List<CareSchedule> lanes;
   final Map<int, String> laneNames;
+  final Map<int, String> laneInitials;
   final _FrozenMark? frozenMark;
   final List<MemberView> views;
 
@@ -3208,6 +3294,7 @@ class _DayCell extends StatelessWidget {
     required this.day,
     this.lanes = const [],
     this.laneNames = const {},
+    this.laneInitials = const {},
     required this.frozenMark,
     required this.views,
     this.agenda = const [],
@@ -3295,16 +3382,14 @@ class _DayCell extends StatelessWidget {
     final paint = dayPaint(assignment, views);
     final slot = _slotOf(context, paint);
     final split = lanes.length > 1;
-    // F-07 (owner's QA, 29/09/2026): one BAND per distinct carer, in the
-    // children's order, each in the carer's colour AND texture — the texture
-    // is the grid's non-colour channel (U-29), so no letters are drawn. Who
-    // has whom is said aloud here and shown on tap (the read-only day).
-    final splitSlots = split
-        ? [
-            for (final carer in {for (final r in lanes) r.effectiveParentId})
-              _slotOf(context, DaySlot(profileSlotIndex(carer, views))),
-          ]
-        : const <SlotColors>[];
+    // F-07 (owner's QA, 29/09/2026): one COLUMN per distinct carer, in the
+    // children's order — the carer's avatar on top, the children's (neutral)
+    // below, so who has whom reads without a tap. The ground is neutral: the
+    // colour lives in the avatars. `fitSplitCell` (core) sizes it all.
+    final carers = <int, List<int?>>{};
+    for (final r in lanes) {
+      (carers[r.effectiveParentId] ??= []).add(r.childId);
+    }
     final initial = parentInitial(assignment, views);
     final assigned = paint is! DayUnassigned;
     // The swap wears a dashed border instead of the slot's solid one — the
@@ -3375,26 +3460,6 @@ class _DayCell extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (split && !isSelected)
-            ClipRRect(
-              key: ValueKey('cell-split-${date.day}'),
-              borderRadius: BorderRadius.circular(Radii.md),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final band in splitSlots)
-                    Expanded(
-                      child: ColoredBox(
-                        color: band.tone.container,
-                        child: CustomPaint(
-                          painter: SlotPatternPainter(
-                              band.pattern, band.tone.border),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(Radii.md),
@@ -3457,12 +3522,18 @@ class _DayCell extends StatelessWidget {
                     _numberLine(context, tokens,
                         assigned ? slot.tone.onContainer : null),
                     const SizedBox(height: DayCellType.gap),
-                    // F-07: the split day keeps the avatar's room (the grid
-                    // must not jump) and draws no letter — the bands say it.
+                    // F-07: the split day draws its columns in the avatar's
+                    // place and the rest of the cell's height.
                     if (split)
-                      SizedBox(
-                          height: type.avatarRadius * 2,
-                          width: type.avatarRadius * 2)
+                      Expanded(
+                        child: _SplitColumns(
+                          key: ValueKey('cell-split-${date.day}'),
+                          carers: carers,
+                          views: views,
+                          laneInitials: laneInitials,
+                          avatarDiameter: type.avatarRadius * 2,
+                        ),
+                      )
                     else
                       DayCellAvatar(
                         radius: type.avatarRadius,
@@ -3478,11 +3549,16 @@ class _DayCell extends StatelessWidget {
                     // U-29 round 4 (owner): the same breath the date already
                     // gets above the avatar — without it the time sat glued to
                     // the initial. Gated, so a badge-less cell stays centred.
-                    if (frozenMark != null || day?.handoffTime != null)
+                    if (!split &&
+                        (frozenMark != null || day?.handoffTime != null))
                       const SizedBox(height: DayCellType.gap),
                     // Web parity: the frozen badge REPLACES the handoff badge.
                     // (U-29: its label rides the CELL's semantics node now.)
-                    if (frozenMark != null)
+                    // F-07: the split day has no room for a mark or a time
+                    // (they may differ per child); the tap shows both.
+                    if (split)
+                      const SizedBox.shrink()
+                    else if (frozenMark != null)
                       Container(
                         padding: frozenMark!.overdue
                             ? const EdgeInsets.symmetric(horizontal: 3)
@@ -3555,4 +3631,91 @@ class _DayCell extends StatelessWidget {
 
   /// Material 3's hover state layer: 8 % of the content colour.
   static const double _hoverAlpha = 0.08;
+}
+
+/// F-07 (owner's QA, 29/09/2026) — the split day's columns: one per carer,
+/// the carer's avatar on top and the children's below (a "+N" when they do
+/// not fit). Sized by `fitSplitCell` (core), whose floors are exception D
+/// of `no_tiny_text_test` — the letters here are under the U-48 floor on
+/// purpose, by the owner's decision, and ONLY here.
+class _SplitColumns extends StatelessWidget {
+  final Map<int, List<int?>> carers;
+  final List<MemberView> views;
+  final Map<int, String> laneInitials;
+  final double avatarDiameter;
+
+  const _SplitColumns({
+    super.key,
+    required this.carers,
+    required this.views,
+    required this.laneInitials,
+    required this.avatarDiameter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final surface = Theme.of(context).colorScheme.surface;
+    return LayoutBuilder(builder: (context, box) {
+      final entries = carers.entries.toList();
+      final fit = fitSplitCell(
+        width: box.maxWidth,
+        avatarDiameter: avatarDiameter,
+        childrenPerColumn: [for (final e in entries) e.value.length],
+      );
+      Widget child(String letters) => MiniAvatar(
+            diameter: fit.childDiameter,
+            letters: letters,
+            fill: surface,
+            ink: tokens.text,
+            ring: tokens.textMuted,
+            letterScale: SplitCellFit.childLetter,
+          );
+      final shift = fit.childDiameter * SplitCellFit.overlap;
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (i, e) in entries.indexed)
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                () {
+                  final slot = tokens.slot(profileSlotIndex(e.key, views));
+                  return MiniAvatar(
+                    diameter: fit.carerDiameter,
+                    letters: displayInitials(e.key, views),
+                    fill: slot.tone.solid,
+                    ink: slot.tone.onSolid,
+                    letterScale: SplitCellFit.carerLetter,
+                  );
+                }(),
+                const SizedBox(height: 2),
+                SizedBox(
+                  height: fit.childDiameter,
+                  width: fit.childDiameter +
+                      (fit.shown[i] + (fit.more[i] > 0 ? 1 : 0) - 1)
+                              .clamp(0, 99) *
+                          (fit.childDiameter - shift),
+                  child: Stack(
+                    children: [
+                      for (var k = 0; k < fit.shown[i]; k++)
+                        Positioned(
+                          left: k * (fit.childDiameter - shift),
+                          child: child(laneInitials[e.value[k]] ?? '?'),
+                        ),
+                      if (fit.more[i] > 0)
+                        Positioned(
+                          left: fit.shown[i] * (fit.childDiameter - shift),
+                          child: child('+${fit.more[i]}'),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
+      );
+    });
+  }
 }
