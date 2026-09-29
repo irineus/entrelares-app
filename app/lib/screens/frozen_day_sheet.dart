@@ -41,6 +41,8 @@ Future<FrozenDayOutcome?> showFrozenDaySheet({
   required int? ownProfileId,
   required CustodyDataSource dataSource,
   bool offline = false,
+  String? childName,
+  List<SwapRequest> siblings = const [],
 }) {
   return showAppSheet<FrozenDayOutcome>(
     context: context,
@@ -50,6 +52,8 @@ Future<FrozenDayOutcome?> showFrozenDaySheet({
       ownProfileId: ownProfileId,
       dataSource: dataSource,
       offline: offline,
+      childName: childName,
+      siblings: siblings,
     ),
   );
 }
@@ -67,12 +71,21 @@ class _FrozenDaySheet extends StatefulWidget {
   /// honest "connect first".
   final bool offline;
 
+  /// F-07: whose day this is, in a per-child plan.
+  final String? childName;
+
+  /// F-07 (PR 4b): the same requester's OTHER pending swap requests to me for
+  /// this date, one per child — approved together from here.
+  final List<SwapRequest> siblings;
+
   const _FrozenDaySheet({
     required this.request,
     required this.allProfiles,
     required this.ownProfileId,
     required this.dataSource,
     this.offline = false,
+    this.childName,
+    this.siblings = const [],
   });
 
   @override
@@ -210,6 +223,7 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
       // U-31: the title is words only. The urgency it used to carry as an
       // emoji is the pinned notice below, which says it in a sentence.
       title: l[isRevert ? K.frozenRevertTitle : K.frozenSwapTitle],
+      subtitle: widget.childName,
       // U-25: a tap on a day opens this sheet or the day sheet, and both carry
       // the same visible way out — the reader cannot tell in advance which one
       // a day will open.
@@ -357,8 +371,86 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
       bool destructive,
     }) actionButton,
   }) {
+    if (iAmTarget && !isRevert && widget.siblings.isNotEmpty) {
+      // F-07 (PR 4b): every child's request of this day, approved in one tap
+      // — each one still through its own two-party workflow.
+      final all = [request, ...widget.siblings];
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton(
+            key: const ValueKey('frozen-approve-all'),
+            onPressed: _acting
+                ? null
+                : () => _run('approve-all', K.errApproveFailed, () async {
+                      for (final r in all) {
+                        await widget.dataSource.approveSwap(r.id,
+                            approvalNote: _note,
+                            allProfiles: widget.allProfiles);
+                      }
+                      return FrozenDayOutcome.approved;
+                    }),
+            child: _pendingAction == 'approve-all'
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(l.format(KApp.frozenApproveAll, [all.length])),
+          ),
+          const SizedBox(height: 8),
+          _targetRow(context, l,
+              request: request, isRevert: isRevert, actionButton: actionButton),
+        ],
+      );
+    }
     if (iAmTarget) {
-      return Row(
+      return _targetRow(context, l,
+          request: request, isRevert: isRevert, actionButton: actionButton);
+    }
+    if (iAmRequester) {
+      return actionButton(
+                  actionKey: 'cancel',
+                  labelKey:
+                      isRevert ? K.frozenCancelRevert : K.frozenCancelRequest,
+                  destructive: true,
+                  onPressed: () => _run(
+                      'cancel',
+                      isRevert ? K.errCancelRevertFailed : K.errCancelFailed,
+                      () async {
+                        if (isRevert) {
+                          await widget.dataSource.cancelRevert(request.id,
+                              allProfiles: widget.allProfiles);
+                          return FrozenDayOutcome.revertCancelled;
+                        }
+                        await widget.dataSource.cancelSwap(request.id,
+                            allProfiles: widget.allProfiles);
+                        return FrozenDayOutcome.cancelled;
+                      }),
+      );
+    }
+    return Text(
+      l.format(K.frozenObserver, [targetName ?? l[K.calOtherCaregiver]]),
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.bodySmall,
+    );
+  }
+
+  /// Approve / reject for the request's target.
+  Widget _targetRow(
+    BuildContext context,
+    Localization l, {
+    required SwapRequest request,
+    required bool isRevert,
+    required Widget Function({
+      required String actionKey,
+      required String labelKey,
+      required VoidCallback onPressed,
+      bool filled,
+      bool destructive,
+    }) actionButton,
+  }) {
+    return Row(
                   children: [
                     Expanded(
                       child: isRevert
@@ -420,32 +512,5 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                     ),
                   ],
                 );
-    }
-    if (iAmRequester) {
-      return actionButton(
-                  actionKey: 'cancel',
-                  labelKey:
-                      isRevert ? K.frozenCancelRevert : K.frozenCancelRequest,
-                  destructive: true,
-                  onPressed: () => _run(
-                      'cancel',
-                      isRevert ? K.errCancelRevertFailed : K.errCancelFailed,
-                      () async {
-                        if (isRevert) {
-                          await widget.dataSource.cancelRevert(request.id,
-                              allProfiles: widget.allProfiles);
-                          return FrozenDayOutcome.revertCancelled;
-                        }
-                        await widget.dataSource.cancelSwap(request.id,
-                            allProfiles: widget.allProfiles);
-                        return FrozenDayOutcome.cancelled;
-                      }),
-      );
-    }
-    return Text(
-      l.format(K.frozenObserver, [targetName ?? l[K.calOtherCaregiver]]),
-      textAlign: TextAlign.center,
-      style: Theme.of(context).textTheme.bodySmall,
-    );
   }
 }

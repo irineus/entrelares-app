@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
+import 'package:entrelares_db_contracts/models/swap_request.dart';
 import 'package:entrelares_app/screens/calendar_screen.dart';
 
 import 'calendar_slice_test.dart';
@@ -110,5 +111,98 @@ void main() {
     expect(find.bySemanticsLabel(RegExp('Theo com')), findsNothing);
     expect(find.bySemanticsLabel(RegExp('^$day, .*Bruno Lima')), findsOne);
     semantics.dispose();
+  });
+
+  // ── F-07 (PR 4b): swaps and today, per child ──
+
+  Future<void> selectLane(WidgetTester tester, int childId) async {
+    final chip = find.byKey(ValueKey('lane-$childId'));
+    await tester.ensureVisible(chip);
+    await tester.pumpAndSettle();
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('Hoje, in Todas: who has whom when the children split today',
+      (tester) async {
+    final ds = FakeCustodyDataSource(members: const [ana, bruno], days: [
+      laneRow(1, dayOfMonth(today.day), ana.id, lia.id),
+      laneRow(2, dayOfMonth(today.day), bruno.id, theo.id),
+    ])
+      ..family = const Family(
+          id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+      ..children = [lia, theo];
+    await pump(tester, ds);
+    expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('today-lane-summary')))
+            .data,
+        'Lia com Ana Souza; Theo com Bruno Lima');
+    // In one child's lane, the card is that child's — one name again.
+    await selectLane(tester, theo.id);
+    expect(find.byKey(const ValueKey('today-lane-summary')), findsNothing);
+  });
+
+  testWidgets('a swap asked for one child can be asked for the other too',
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    // Both children with Ana (me) that day: the same state, the same swap.
+    final ds = FakeCustodyDataSource(members: const [ana, bruno], days: [
+      laneRow(1, dayOfMonth(day), ana.id, lia.id),
+      laneRow(2, dayOfMonth(day), ana.id, theo.id),
+    ])
+      ..family = const Family(
+          id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+      ..children = [lia, theo];
+    await pump(tester, ds);
+    await selectLane(tester, lia.id);
+    await openDayEditor(tester, day);
+    await tapVisible(tester, memberChip('Bruno').last);
+    await tapVisible(tester, find.byKey(const ValueKey('day-also-for-11')));
+    await tapVisible(tester, find.widgetWithText(FilledButton, l[K.commonSave]));
+    expect(ds.createdSwapRequests, hasLength(2),
+        reason: "one request per child — Lia's and Theo's");
+    expect({for (final r in ds.createdSwapRequests) r['proposed']}, {bruno.id});
+  });
+
+  testWidgets("the approver approves every child's request of the day at once",
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    SwapRequest pending(int id, int child) => SwapRequest.fromJson({
+          'id': id,
+          'schedule_date': CareSchedule.isoDate(dayOfMonth(day)),
+          'schedule_id': id,
+          'child_id': child,
+          'requesting_profile_id': bruno.id,
+          'target_profile_id': ana.id,
+          'proposed_actual_parent_id': bruno.id,
+          'status': 'pending',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        });
+    final ds = FakeCustodyDataSource(members: const [ana, bruno], days: [
+      laneRow(1, dayOfMonth(day), ana.id, lia.id),
+      laneRow(2, dayOfMonth(day), ana.id, theo.id),
+    ])
+      ..family = const Family(
+          id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+      ..children = [lia, theo]
+      ..frozenRequests = [pending(1, lia.id), pending(2, theo.id)];
+    await pump(tester, ds);
+    await selectLane(tester, lia.id);
+    await openDay(tester, day);
+    final all = find.byKey(const ValueKey('frozen-approve-all'));
+    expect(find.descendant(of: all, matching: find.text(
+        l.format(KApp.frozenApproveAll, [2]))), findsOne);
+    await tapVisible(tester, all);
+    expect({for (final a in ds.approvedSwaps) a.id}, {1, 2});
   });
 }
