@@ -600,6 +600,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                     GoRoute(
                       path: ':id',
                       builder: (_, state) => ProfileScreen(
+                        // F-07 (owner's QA, 29/09/2026): the page's key is
+                        // the ROUTE's, not the id's, so going from one
+                        // member's profile to another's (the calendar's key,
+                        // with the Família branch still on the first) kept
+                        // the old State — and its old member on screen.
+                        key: ValueKey(state.pathParameters['id']),
                         dataSource: _dataSource,
                         sudo: _sudo,
                         profileId:

@@ -273,7 +273,15 @@ void main() {
         reason: 'a MiniAvatar under 20 dp outside the split cell — '
             'exception D covers the cell, nothing else');
 
-    // The scan reads the call sites it is about (chips, legend, day view).
+    // The chips name their size once (PersonChip.avatarSize, pinned at 20);
+    // the scan reads the call sites it is about (chips, legend, day view).
+    expect(chip, contains('static const double avatarSize = 20;'),
+        reason: "the chips' avatar is no longer 20 dp — re-read exception D");
+    for (final file in _appSources()) {
+      seen += 'PersonChip.avatarSize'
+          .allMatches(file.readAsStringSync())
+          .length;
+    }
     expect(seen, greaterThanOrEqualTo(3),
         reason: 'the MiniAvatar call sites moved — re-read exception D');
   });

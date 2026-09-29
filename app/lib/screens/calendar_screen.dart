@@ -1789,15 +1789,18 @@ class _CalendarScreenState extends State<CalendarScreen>
     final tokens = context.tokens;
     final scheme = Theme.of(context).colorScheme;
     final initials = _childInitials;
+    final allLabel = l[KApp.calLaneAllShort];
     PersonChip chip(
             {required Key key,
-            required String label,
+            required String? label,
+            required String spoken,
             required bool selected,
             required VoidCallback onTap,
             required Widget avatar}) =>
         PersonChip(
           key: key,
           label: label,
+          semanticsLabel: spoken,
           selected: selected,
           onTap: onTap,
           background: selected
@@ -1810,8 +1813,23 @@ class _CalendarScreenState extends State<CalendarScreen>
     return Padding(
       key: CalendarScreen.laneChipsKey,
       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-      child: LayoutBuilder(
-        builder: (context, box) => SingleChildScrollView(
+      child: LayoutBuilder(builder: (context, box) {
+        // F-07 (owner's QA, 29/09/2026, round 3): every name while the row
+        // fits one line. Past that, "Todas" is its icon and only the
+        // SELECTED child keeps a name — the others are their avatars (the
+        // name in the tooltip and the screen reader), so no name is ever
+        // cut. Measured with every name, so a tap never flips the mode.
+        final named = [
+          PersonChip.widthOf(context, allLabel),
+          for (final c in _children) PersonChip.widthOf(context, c.firstName),
+        ];
+        final compact = named.fold<double>(0, (a, w) => a + w) +
+                Spacing.sm * (named.length - 1) >
+            box.maxWidth;
+        final gap = compact
+            ? Spacing.sm - (PersonChip.target - PersonChip.visual)
+            : Spacing.sm;
+        return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: box.maxWidth),
@@ -1820,27 +1838,38 @@ class _CalendarScreenState extends State<CalendarScreen>
               children: [
                 chip(
                   key: const ValueKey('lane-all'),
-                  label: l[KApp.calLaneAllShort],
+                  label: compact ? null : allLabel,
+                  spoken: allLabel,
                   selected: _lane == null,
                   onTap: () => _selectLane(null),
                   avatar: Icon(Icons.groups_outlined,
-                      size: 20, color: tokens.textMuted),
+                      size: PersonChip.avatarSize, color: tokens.textMuted),
                 ),
                 for (final c in _children) ...[
-                  const SizedBox(width: Spacing.sm),
-                  chip(
-                    key: ValueKey('lane-${c.id}'),
-                    label: c.firstName,
-                    selected: _lane == c.id,
-                    onTap: () => _selectLane(c.id),
-                    avatar: _childAvatar(initials[c.id] ?? '?', 20),
+                  SizedBox(width: gap),
+                  Padding(
+                    // The named chip among compact ones gets the 4 dp each
+                    // side their 40 dp targets already carry.
+                    padding: EdgeInsets.symmetric(
+                        horizontal: compact && _lane == c.id
+                            ? (PersonChip.target - PersonChip.visual) / 2
+                            : 0),
+                    child: chip(
+                      key: ValueKey('lane-${c.id}'),
+                      label: compact && _lane != c.id ? null : c.firstName,
+                      spoken: c.firstName,
+                      selected: _lane == c.id,
+                      onTap: () => _selectLane(c.id),
+                      avatar: _childAvatar(
+                          initials[c.id] ?? '?', PersonChip.avatarSize),
+                    ),
                   ),
                 ],
               ],
             ),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 
@@ -2879,43 +2908,82 @@ class _Legend extends StatelessWidget {
     // left the key, the chip leads to the person instead, and the children's
     // lane chips wear the same shape.
     final names = legendNames({for (final m in active) m.id: m.fullName});
+    final l = AppL10n.of(context).l;
     return Padding(
       padding: const EdgeInsets.fromLTRB(Spacing.sm, 0, Spacing.sm, 0),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: Spacing.sm,
-        children: [
-          for (final m in active)
-            Builder(builder: (context) {
-              final slot = context.tokens.slot(profileSlotIndex(m.id, views));
-              final base = names[m.id] ?? m.fullName;
-              final label = m.isPendingMember
-                  ? '$base ${AppL10n.of(context).l[KApp.calMemberPending]}'
-                  : base;
-              return PersonChip(
-                key: ValueKey('legend-member-${m.id}'),
-                label: label,
-                background: slot.tone.container,
-                border: slot.tone.border,
-                ink: slot.tone.onContainer,
-                onTap: onOpen == null ? null : () => onOpen!(m),
-                avatar: MiniAvatar(
-                  diameter: 20,
-                  letters: displayInitials(m.id, views),
-                  fill: slot.tone.solid,
-                  ink: slot.tone.onSolid,
-                ),
-              );
-            }),
-          if (showSwapKey)
-            _key(context,
-                slot: context.tokens.swapped,
-                label: AppL10n.of(context).l[K.calSwapped],
-                dashed: true),
-        ],
-      ),
+      child: LayoutBuilder(builder: (context, box) {
+        // F-07 (owner's QA, 29/09/2026, round 3): the names while the whole
+        // key fits ONE line; past that, every carer is the avatar alone (the
+        // name goes to the screen reader and a long-press tooltip) — four
+        // carers and "Trocado" on an iPhone SE, where two rows of names took
+        // the grid's height.
+        final swapLabel = l[K.calSwapped];
+        final named = [
+          for (final m in active) PersonChip.widthOf(context, names[m.id]),
+          if (showSwapKey) _swapKeyWidth(context, swapLabel),
+        ];
+        final compact = named.fold<double>(0, (a, w) => a + w) +
+                Spacing.sm * (named.length - 1) >
+            box.maxWidth;
+        return Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          // The compact chip's 40 dp target already holds 8 dp around its
+          // 32 dp circle: no extra gap, or the key spreads.
+          spacing: compact
+              ? Spacing.sm - (PersonChip.target - PersonChip.visual)
+              : Spacing.sm,
+          children: [
+            for (final m in active)
+              Builder(builder: (context) {
+                final slot =
+                    context.tokens.slot(profileSlotIndex(m.id, views));
+                final base = names[m.id] ?? m.fullName;
+                // The pending mark is the hollow avatar, never "(pendente)"
+                // on the chip — the words stay for the screen reader.
+                final pending = m.isPendingMember;
+                return PersonChip(
+                  key: ValueKey('legend-member-${m.id}'),
+                  label: compact ? null : base,
+                  semanticsLabel:
+                      pending ? '$base ${l[KApp.calMemberPending]}' : base,
+                  background: slot.tone.container,
+                  border: slot.tone.border,
+                  ink: slot.tone.onContainer,
+                  onTap: onOpen == null ? null : () => onOpen!(m),
+                  avatar: MiniAvatar(
+                    key: ValueKey('legend-avatar-${m.id}'),
+                    diameter: PersonChip.avatarSize,
+                    letters: displayInitials(m.id, views),
+                    fill: pending
+                        ? Theme.of(context).colorScheme.surface
+                        : slot.tone.solid,
+                    ink: pending ? slot.tone.onContainer : slot.tone.onSolid,
+                    dashedRing: pending ? slot.tone.onContainer : null,
+                  ),
+                );
+              }),
+            if (showSwapKey)
+              _key(context,
+                  slot: context.tokens.swapped, label: swapLabel, dashed: true),
+          ],
+        );
+      }),
     );
+  }
+
+  /// The swap key's width — the [SlotPill] with [Spacing.sm] each side.
+  static double _swapKeyWidth(BuildContext context, String label) {
+    final painter = TextPainter(
+      text: TextSpan(
+          text: label, style: Theme.of(context).textTheme.labelSmall),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width + 2 * Spacing.sm + 2;
+    painter.dispose();
+    return width.ceilToDouble();
   }
 
   /// One key, as the web draws it: a pill in the carer's own colour with their
@@ -3384,11 +3452,27 @@ class _DayCell extends StatelessWidget {
     final split = lanes.length > 1;
     // F-07 (owner's QA, 29/09/2026): one COLUMN per distinct carer, in the
     // children's order — the carer's avatar on top, the children's (neutral)
-    // below, so who has whom reads without a tap. The ground is neutral: the
-    // colour lives in the avatars. `fitSplitCell` (core) sizes it all.
+    // below, so who has whom reads without a tap. `fitSplitCell` (core)
+    // sizes it all. Round 3: each column stands on its carer's light tone
+    // (a white cell read as "not planned"), under a neutral border.
     final carers = <int, List<int?>>{};
     for (final r in lanes) {
       (carers[r.effectiveParentId] ??= []).add(r.childId);
+    }
+    LinearGradient? bands;
+    if (split) {
+      final tones = [
+        for (final id in carers.keys)
+          context.tokens.slot(profileSlotIndex(id, views)).tone.container,
+      ];
+      final n = tones.length;
+      // Hard stops: flat bands, not a blend.
+      bands = LinearGradient(
+        colors: [for (final t in tones) ...[t, t]],
+        stops: [
+          for (var i = 0; i < n; i++) ...[i / n, (i + 1) / n],
+        ],
+      );
     }
     final initial = parentInitial(assignment, views);
     final assigned = paint is! DayUnassigned;
@@ -3470,6 +3554,7 @@ class _DayCell extends StatelessWidget {
                       : assigned
                           ? slot.tone.container
                           : null,
+              gradient: isSelected ? null : bands,
             ),
             // U-48: the border is a FOREGROUND decoration, so the ink below
             // fills the whole cell (a `decoration` border insets the child by
@@ -3485,7 +3570,7 @@ class _DayCell extends StatelessWidget {
                   : isToday
                       ? Border.all(color: tokens.text, width: 2.5)
                       : Border.all(
-                          color: assigned && !isSwapped
+                          color: assigned && !isSwapped && !split
                               ? slot.tone.border
                               : tokens.outline),
             ),
@@ -3523,16 +3608,15 @@ class _DayCell extends StatelessWidget {
                         assigned ? slot.tone.onContainer : null),
                     const SizedBox(height: DayCellType.gap),
                     // F-07: the split day draws its columns in the avatar's
-                    // place and the rest of the cell's height.
+                    // place — number and columns centred as one group, as
+                    // every other cell centres number and avatar (round 3).
                     if (split)
-                      Expanded(
-                        child: _SplitColumns(
-                          key: ValueKey('cell-split-${date.day}'),
-                          carers: carers,
-                          views: views,
-                          laneInitials: laneInitials,
-                          avatarDiameter: type.avatarRadius * 2,
-                        ),
+                      _SplitColumns(
+                        key: ValueKey('cell-split-${date.day}'),
+                        carers: carers,
+                        views: views,
+                        laneInitials: laneInitials,
+                        avatarDiameter: type.avatarRadius * 2,
                       )
                     else
                       DayCellAvatar(
@@ -3658,8 +3742,9 @@ class _SplitColumns extends StatelessWidget {
     final surface = Theme.of(context).colorScheme.surface;
     return LayoutBuilder(builder: (context, box) {
       final entries = carers.entries.toList();
+      final width = box.maxWidth;
       final fit = fitSplitCell(
-        width: box.maxWidth,
+        width: width,
         avatarDiameter: avatarDiameter,
         childrenPerColumn: [for (final e in entries) e.value.length],
       );
@@ -3671,50 +3756,56 @@ class _SplitColumns extends StatelessWidget {
             ring: tokens.textMuted,
             letterScale: SplitCellFit.childLetter,
           );
-      final shift = fit.childDiameter * SplitCellFit.overlap;
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final (i, e) in entries.indexed)
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                () {
-                  final slot = tokens.slot(profileSlotIndex(e.key, views));
-                  return MiniAvatar(
-                    diameter: fit.carerDiameter,
-                    letters: displayInitials(e.key, views),
-                    fill: slot.tone.solid,
-                    ink: slot.tone.onSolid,
-                    letterScale: SplitCellFit.carerLetter,
-                  );
-                }(),
-                const SizedBox(height: 2),
-                SizedBox(
-                  height: fit.childDiameter,
-                  width: fit.childDiameter +
-                      (fit.shown[i] + (fit.more[i] > 0 ? 1 : 0) - 1)
-                              .clamp(0, 99) *
-                          (fit.childDiameter - shift),
-                  child: Stack(
-                    children: [
-                      for (var k = 0; k < fit.shown[i]; k++)
-                        Positioned(
-                          left: k * (fit.childDiameter - shift),
-                          child: child(laneInitials[e.value[k]] ?? '?'),
-                        ),
-                      if (fit.more[i] > 0)
-                        Positioned(
-                          left: fit.shown[i] * (fit.childDiameter - shift),
-                          child: child('+${fit.more[i]}'),
-                        ),
-                    ],
+      // Each column is centred on its band. Round 3 (owner, iPhone SE with
+      // four carers): the carers' floor (14 dp) is wider than a quarter of a
+      // 46 dp cell, so they OVERLAP there, ringed in the surface colour so
+      // each circle stays whole — instead of the fourth falling off the edge.
+      final column = width / entries.length;
+      final overlapping = fit.carerDiameter > column;
+      final step = fit.childDiameter * (1 - SplitCellFit.overlap);
+      double left(double centre, double size) =>
+          (centre - size / 2).clamp(0.0, math.max(0.0, width - size));
+      return SizedBox(
+          width: width,
+          height: fit.carerDiameter + 2 + fit.childDiameter,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (final (i, e) in entries.indexed) ...() {
+                final centre = column * (i + 0.5);
+                final slot = tokens.slot(profileSlotIndex(e.key, views));
+                final count = fit.shown[i] + (fit.more[i] > 0 ? 1 : 0);
+                final start = left(
+                    centre, fit.childDiameter + (count - 1) * step);
+                return [
+                  Positioned(
+                    left: left(centre, fit.carerDiameter),
+                    top: 0,
+                    child: MiniAvatar(
+                      diameter: fit.carerDiameter,
+                      letters: displayInitials(e.key, views),
+                      fill: slot.tone.solid,
+                      ink: slot.tone.onSolid,
+                      ring: overlapping ? surface : null,
+                      letterScale: SplitCellFit.carerLetter,
+                    ),
                   ),
-                ),
-              ],
-            ),
-        ],
+                  for (var k = 0; k < fit.shown[i]; k++)
+                    Positioned(
+                      left: start + k * step,
+                      top: fit.carerDiameter + 2,
+                      child: child(laneInitials[e.value[k]] ?? '?'),
+                    ),
+                  if (fit.more[i] > 0)
+                    Positioned(
+                      left: start + fit.shown[i] * step,
+                      top: fit.carerDiameter + 2,
+                      child: child('+${fit.more[i]}'),
+                    ),
+                ];
+              }(),
+            ],
+          ),
       );
     });
   }

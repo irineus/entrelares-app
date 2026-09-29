@@ -222,6 +222,127 @@ void main() {
     expect(opened, [(MemberLinkTarget.memberProfile, bruno.id)]);
   });
 
+  // ── F-07 (owner's QA, 29/09/2026, round 3): the small phone ──
+
+  const carla = Member(id: 3, fullName: 'Carla Dias', colorSlot: 3);
+  const davi =
+      Member(id: 4, fullName: 'Davi Rocha', colorSlot: 4, userId: 'u4');
+  const bia = Child(id: 12, familyId: 7, firstName: 'Bia', sortOrder: 2);
+  const filho =
+      Child(id: 13, familyId: 7, firstName: 'Filho Pródigo', sortOrder: 3);
+
+  /// Four carers (Carla pending) and four children; on [day] each child is
+  /// with a different carer.
+  FakeCustodyDataSource crowded(int day) =>
+      FakeCustodyDataSource(members: const [ana, bruno, carla, davi], days: [
+        laneRow(1, dayOfMonth(day), ana.id, lia.id),
+        laneRow(2, dayOfMonth(day), bruno.id, theo.id),
+        laneRow(3, dayOfMonth(day), davi.id, bia.id),
+        laneRow(4, dayOfMonth(day), carla.id, filho.id),
+      ])
+        ..family = const Family(
+            id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+        ..children = [lia, theo, bia, filho];
+
+  Future<void> pumpSe(WidgetTester tester, FakeCustodyDataSource ds) async {
+    await tester.binding.setSurfaceSize(const Size(375, 667));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+  }
+
+  Finder inChip(String key, String text) => find.descendant(
+      of: find.byKey(ValueKey(key)), matching: find.text(text));
+
+  testWidgets('a small phone: the key is the avatars, the names are spoken',
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    final semantics = tester.ensureSemantics();
+    await pumpSe(tester, crowded(day));
+    expect(inChip('legend-member-${ana.id}', 'Ana'), findsNothing);
+    expect(find.bySemanticsLabel('Ana'), findsOne);
+    // "Trocado" and every carer on ONE row: the same top for all.
+    final tops = {
+      for (final m in const [ana, bruno, carla, davi])
+        tester.getTopLeft(find.byKey(ValueKey('legend-member-${m.id}'))).dy,
+    };
+    expect(tops, hasLength(1));
+    semantics.dispose();
+  });
+
+  testWidgets('a wide phone keeps the names', (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    await pump(tester, perChildSource(day));
+    expect(inChip('legend-member-${ana.id}', 'Ana'), findsOne);
+    expect(inChip('lane-10', 'Lia'), findsOne);
+    expect(inChip('lane-all', l[KApp.calLaneAllShort]), findsOne);
+  });
+
+  testWidgets('the pending carer is a hollow avatar, never "(pendente)"',
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    final semantics = tester.ensureSemantics();
+    await pump(tester, crowded(day));
+    final avatar = tester.widget<MiniAvatar>(
+        find.byKey(ValueKey('legend-avatar-${carla.id}')));
+    expect(avatar.dashedRing, isNotNull);
+    expect(
+        tester
+            .widget<MiniAvatar>(find.byKey(ValueKey('legend-avatar-${ana.id}')))
+            .dashedRing,
+        isNull);
+    expect(find.textContaining(l[KApp.calMemberPending]), findsNothing);
+    expect(
+        find.bySemanticsLabel('Carla ${l[KApp.calMemberPending]}'), findsOne);
+    semantics.dispose();
+  });
+
+  testWidgets('a small phone: only the selected child keeps a name',
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    await pumpSe(tester, crowded(day));
+    // Todas selected: "Todas" is its icon, every child an avatar.
+    expect(inChip('lane-all', l[KApp.calLaneAllShort]), findsNothing);
+    expect(inChip('lane-13', 'Filho Pródigo'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('lane-13')));
+    await tester.pumpAndSettle();
+    expect(inChip('lane-13', 'Filho Pródigo'), findsOne, reason: 'never cut');
+    expect(inChip('lane-10', 'Lia'), findsNothing);
+    // All five chips on screen, no scroll. (With the test font's wide glyphs
+    // "Filho Pródigo" alone passes the edge; the row then scrolls — never
+    // cuts. Measured with a short name.)
+    await tester.tap(find.byKey(const ValueKey('lane-12')));
+    await tester.pumpAndSettle();
+    expect(inChip('lane-12', 'Bia'), findsOne);
+    final width = tester.getSize(find.byType(MaterialApp)).width;
+    for (final k in ['lane-all', 'lane-10', 'lane-11', 'lane-12', 'lane-13']) {
+      final r = tester.getRect(find.byKey(ValueKey(k)));
+      expect(r.left, greaterThanOrEqualTo(0), reason: k);
+      expect(r.right, lessThanOrEqualTo(width), reason: k);
+    }
+  });
+
+  testWidgets('four carers in a small cell overlap inside it, on their bands',
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    await pumpSe(tester, crowded(day));
+    final split = find.byKey(ValueKey('cell-split-$day'));
+    final cell = tester.getRect(split);
+    final avatars = find.descendant(of: split, matching: find.byType(MiniAvatar));
+    expect(avatars, findsNWidgets(8));
+    for (final e in avatars.evaluate()) {
+      final box = e.renderObject! as RenderBox;
+      final r = box.localToGlobal(Offset.zero) & box.size;
+      expect(r.left, greaterThanOrEqualTo(cell.left - 0.01));
+      expect(r.right, lessThanOrEqualTo(cell.right + 0.01));
+    }
+  });
+
   testWidgets("a child's lane paints that child's carer, not the split",
       (tester) async {
     final day = futureDay;
