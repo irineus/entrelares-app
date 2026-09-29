@@ -205,4 +205,22 @@ void main() {
     await tapVisible(tester, all);
     expect({for (final a in ds.approvedSwaps) a.id}, {1, 2});
   });
+
+  // ── F-07 (PR 5c): the aviso, per lane ──
+
+  testWidgets("holding ONE child's day today is enough to send an aviso",
+      (tester) async {
+    // Todas shows Lia's lane (Bruno), but Ana — me — has Theo today.
+    final ds = FakeCustodyDataSource(members: const [ana, bruno], days: [
+      laneRow(1, dayOfMonth(today.day), bruno.id, lia.id),
+      laneRow(2, dayOfMonth(today.day), ana.id, theo.id),
+    ])
+      ..family = const Family(
+          id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+      ..children = [lia, theo];
+    await pump(tester, ds);
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    expect(find.text(l[KApp.noticeAction]), findsOne);
+  });
 }

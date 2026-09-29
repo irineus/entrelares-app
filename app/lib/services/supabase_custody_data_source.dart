@@ -109,13 +109,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
 
   @override
   Future<DateTime?> fetchLastPlannedDay() async {
-    final rows = await _client
-        .from('care_schedules')
-        .select('schedule_date')
-        .order('schedule_date', ascending: false)
-        .limit(1);
-    if (rows.isEmpty) return null;
-    return DateTime.tryParse(rows.first['schedule_date'] as String);
+    // F-07 (PR 5c): the SAME last day the F-70 reminders use
+    // (`family_plan_last_day`): only the current mode's lanes count, and in a
+    // per-child plan the end is the first child's plan to run out.
+    final result = await _client.rpc<dynamic>('my_plan_last_day');
+    if (result is! String) return null;
+    return DateTime.tryParse(result);
   }
 
   @override

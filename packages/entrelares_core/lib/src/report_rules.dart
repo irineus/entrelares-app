@@ -27,10 +27,31 @@ class ReportDay {
   final int scheduledParentId;
   final int? actualParentId;
 
+  /// F-07: the lane — null for a family day, the child in a per-child plan.
+  final int? childId;
+
   const ReportDay({
     required this.scheduleDate,
     required this.scheduledParentId,
     this.actualParentId,
+    this.childId,
+  });
+}
+
+/// F-07 (PR 5c) — section 1 of a per-child period: one distribution per lane.
+/// [childId] null is the family lane ("todas as crianças": the days planned
+/// before a switch to a plan per child, or after one back).
+class ReportLaneSection {
+  final int? childId;
+  final String label;
+  final List<CaregiverStat> caregivers;
+  final int totalSwaps;
+
+  const ReportLaneSection({
+    required this.childId,
+    required this.label,
+    required this.caregivers,
+    required this.totalSwaps,
   });
 }
 
@@ -630,6 +651,11 @@ class CustodyReport {
   final int totalSwaps;
   final List<ReportAuditEntry> auditEntries;
 
+  /// F-07 (PR 5c): one distribution per lane when the period has any child's
+  /// day — section 1 prints these instead of [caregivers]. Empty for a
+  /// single-plan period, which prints exactly what it always did.
+  final List<ReportLaneSection> laneSections;
+
   /// U-20: built with "considerar trocas futuras já aceitas" — the projected
   /// column is printed and every swap count includes accepted future swaps.
   final bool includesFutureSwaps;
@@ -667,6 +693,7 @@ class CustodyReport {
     required this.caregivers,
     required this.totalSwaps,
     required this.auditEntries,
+    this.laneSections = const [],
     required this.includesFutureSwaps,
     this.caregiverTimelines = const [],
     this.dayAccounts = const [],
@@ -717,6 +744,11 @@ CustodyReport buildCustodyReport({
   ReportExpenses? expenses,
   // F-35: the Conversa section, already in order. Null leaves it out.
   List<ReportChatLine>? chat,
+  // F-07 (PR 5c): child id → first name, in the family's order — the lane
+  // sections' labels and order. A lane whose child is gone keeps its days
+  // under the family label.
+  Map<int, String> childNames = const {},
+  String allChildrenLabel = '',
 }) {
   final stats = caregiverStats(
     members: members,
@@ -727,6 +759,39 @@ CustodyReport buildCustodyReport({
   );
   final visible =
       reportCaregivers(stats, includeFutureSwaps: includeAcceptedFutureSwaps);
+
+  // F-07 (PR 5c): a period with any child's day is read per lane.
+  final laneSections = <ReportLaneSection>[];
+  if (days.any((d) => d.childId != null)) {
+    int? laneOf(ReportDay d) =>
+        d.childId != null && childNames.containsKey(d.childId) ? d.childId : null;
+    final lanes = <int?>[
+      if (days.any((d) => laneOf(d) == null)) null,
+      for (final id in childNames.keys)
+        if (days.any((d) => laneOf(d) == id)) id,
+    ];
+    for (final lane in lanes) {
+      final laneDays = [for (final d in days) if (laneOf(d) == lane) d];
+      laneSections.add(ReportLaneSection(
+        childId: lane,
+        label: lane == null ? allChildrenLabel : childNames[lane]!,
+        caregivers: reportCaregivers(
+            caregiverStats(
+              members: members,
+              days: laneDays,
+              today: today,
+              includeFutureSwaps: includeAcceptedFutureSwaps,
+              roleLabelOf: roleLabelOf,
+            ),
+            includeFutureSwaps: includeAcceptedFutureSwaps),
+        totalSwaps: totalVisibleSwaps(
+          days: laneDays,
+          today: today,
+          includeFutureSwaps: includeAcceptedFutureSwaps,
+        ),
+      ));
+    }
+  }
 
   final entries = [...auditLogs]
     ..sort((a, b) => a.createdAtLocal.compareTo(b.createdAtLocal));
@@ -743,6 +808,7 @@ CustodyReport buildCustodyReport({
     generatedBy: generatedBy,
     appVersion: appVersion,
     caregivers: visible,
+    laneSections: laneSections,
     totalSwaps: totalVisibleSwaps(
       days: days,
       today: today,
