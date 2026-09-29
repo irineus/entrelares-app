@@ -15,6 +15,12 @@ class CareSchedule {
   final int revision;
   final String revisionToken;
 
+  /// F-07: the lane. Null in a single-plan family (one plan for every child);
+  /// the child in a per-child family. The server stamps nothing here — the
+  /// lane guard judges it on INSERT and refuses a change on UPDATE, which is
+  /// why [toUpdateJson] never sends it.
+  final int? childId;
+
   const CareSchedule({
     required this.id,
     required this.scheduleDate,
@@ -26,6 +32,7 @@ class CareSchedule {
     this.updatedAt,
     this.revision = 0,
     this.revisionToken = '',
+    this.childId,
   });
 
   int get effectiveParentId => actualParentId ?? scheduledParentId;
@@ -49,6 +56,7 @@ class CareSchedule {
         updatedAt: json['updated_at'] as String?,
         revision: (json['revision'] as int?) ?? 0,
         revisionToken: (json['revision_token'] as String?) ?? '',
+        childId: json['child_id'] as int?,
       );
 
   /// T-18 — the row back in the shape [fromJson] reads, for the device's
@@ -67,6 +75,7 @@ class CareSchedule {
         'updated_at': updatedAt,
         'revision': revision,
         'revision_token': revisionToken,
+        'child_id': childId,
       };
 
   /// INSERT payload: no id (identity), no tokens (server-stamped), no
@@ -77,6 +86,9 @@ class CareSchedule {
         'scheduled_parent_id': scheduledParentId,
         'actual_parent_id': actualParentId,
         'notes': notes,
+        // F-07: sent only in a lane — a single-plan family's payload is the
+        // one every older server already accepted.
+        'child_id': ?childId,
       };
 
   /// UPDATE payload: the full row, `revision` as read and `submitted_token`
@@ -118,5 +130,6 @@ class CareSchedule {
         updatedAt: updatedAt,
         revision: revision,
         revisionToken: revisionToken,
+        childId: childId,
       );
 }

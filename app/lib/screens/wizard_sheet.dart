@@ -40,6 +40,7 @@ Future<bool?> showWizardSheet({
   AdminModeOfferer? adminOffer,
   AnalyticsService? analytics,
   DateTime? initialStart,
+  int? childId,
 }) {
   return showAppSheet<bool>(
     context: context,
@@ -53,6 +54,7 @@ Future<bool?> showWizardSheet({
       adminOffer: adminOffer,
       analytics: analytics,
       initialStart: initialStart,
+      childId: childId,
     ),
   );
 }
@@ -82,6 +84,11 @@ class _WizardSheet extends StatefulWidget {
   /// behind it would be a value the field could show but never pick.
   final DateTime? initialStart;
 
+  /// F-07: the lane this plan is for — null in a single-plan family, the
+  /// child the calendar is showing in a per-child one. Every generated day
+  /// carries it, and a replace clears only that lane.
+  final int? childId;
+
   const _WizardSheet({
     required this.activeMembers,
     required this.today,
@@ -92,6 +99,7 @@ class _WizardSheet extends StatefulWidget {
     this.adminOffer,
     this.analytics,
     this.initialStart,
+    this.childId,
   });
 
   @override
@@ -254,6 +262,7 @@ class _WizardSheetState extends State<_WizardSheet> {
                 ? null
                 : '${g.handoffTime!.hour.toString().padLeft(2, '0')}:'
                     '${g.handoffTime!.minute.toString().padLeft(2, '0')}:00',
+            childId: widget.childId,
           ),
       ];
 
@@ -277,8 +286,10 @@ class _WizardSheetState extends State<_WizardSheet> {
           // month — the question may over-count by those, never under.
           final count = plannedDaysInRange([
             for (final d in existing)
-              if (d.actualParentId == null ||
-                  d.actualParentId == d.scheduledParentId)
+              // F-07: only this plan's lane is rewritten.
+              if (d.childId == widget.childId &&
+                  (d.actualParentId == null ||
+                      d.actualParentId == d.scheduledParentId))
                 d.scheduleDate,
           ], replaceRange);
           if (count > 0) {
@@ -294,7 +305,8 @@ class _WizardSheetState extends State<_WizardSheet> {
         _replaceConfirmed = false;
         setState(() => _indeterminate = true);
         final result = await widget.dataSource.replaceScheduleRange(
-            replaceRange.from, replaceRange.to, rows);
+            replaceRange.from, replaceRange.to, rows,
+            childId: widget.childId);
         created = result.inserted;
         message = wizardReplaceSummary(l, result);
       } else {

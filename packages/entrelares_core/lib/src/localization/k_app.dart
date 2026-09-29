@@ -519,6 +519,17 @@ abstract final class KApp {
   static const String childFreeCapOne = 'app.child.freeCapOne';
   static const String childFreeCapMany = 'app.child.freeCapMany';
   static const String childMaxCap = 'app.child.maxCap';
+  // F-07 PR 3: the plan's mode, on the Crianças page.
+  static const String childPlanTitle = 'app.child.planTitle';
+  static const String childPlanSingle = 'app.child.planSingle';
+  static const String childPlanPerChild = 'app.child.planPerChild';
+  static const String childPlanNeedsTwo = 'app.child.planNeedsTwo';
+  static const String childPlanToPerChild = 'app.child.planToPerChild';
+  static const String childPlanToPerChildConfirm = 'app.child.planToPerChildConfirm';
+  static const String childPlanToSingle = 'app.child.planToSingle';
+  static const String childPlanToSingleLead = 'app.child.planToSingleLead';
+  static const String childPlanUseChild = 'app.child.planUseChild';
+  static const String childPlanSwitched = 'app.child.planSwitched';
 
   // ── F-55 the day agenda (PR 2). Every key lives under `app.agenda.` — the
   //    ADDRESS vocabulary_test pins the words "agenda" and "nota" to. ──
@@ -1128,6 +1139,16 @@ abstract final class KApp {
     childFreeCapOne,
     childFreeCapMany,
     childMaxCap,
+    childPlanTitle,
+    childPlanSingle,
+    childPlanPerChild,
+    childPlanNeedsTwo,
+    childPlanToPerChild,
+    childPlanToPerChildConfirm,
+    childPlanToSingle,
+    childPlanToSingleLead,
+    childPlanUseChild,
+    childPlanSwitched,
     agendaSection,
     agendaKindSchool,
     agendaKindHealth,
@@ -1876,6 +1897,16 @@ abstract final class StringsAppPtBr {
     KApp.childFreeCapOne: 'No plano gratuito, a família cadastra até {0} criança. Para cadastrar mais, ative o Premium.',
     KApp.childFreeCapMany: 'No plano gratuito, a família cadastra até {0} crianças. Para cadastrar mais, ative o Premium.',
     KApp.childMaxCap: 'A família já tem {0} crianças, o limite.',
+    KApp.childPlanTitle: 'Plano de guarda',
+    KApp.childPlanSingle: 'O plano é o mesmo para todas as crianças.',
+    KApp.childPlanPerChild: 'Cada criança tem o próprio plano.',
+    KApp.childPlanNeedsTwo: 'Com duas crianças ou mais, cada uma pode ter o próprio plano.',
+    KApp.childPlanToPerChild: 'Ter um plano para cada criança',
+    KApp.childPlanToPerChildConfirm: 'A partir de hoje, cada criança passa a ter o próprio plano, começando igual ao plano atual. Os dias que já passaram não mudam.',
+    KApp.childPlanToSingle: 'Voltar a um plano para todas',
+    KApp.childPlanToSingleLead: 'A partir de hoje, o plano da criança escolhida vira o plano de todas. Os planos das outras crianças de hoje em diante são apagados; os dias que já passaram não mudam.',
+    KApp.childPlanUseChild: 'Usar o plano de {0}',
+    KApp.childPlanSwitched: 'Plano de guarda atualizado.',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'Escola',
@@ -2619,6 +2650,16 @@ abstract final class StringsAppEn {
     KApp.childFreeCapOne: 'On the free plan, the family adds up to {0} child. To add more, activate Premium.',
     KApp.childFreeCapMany: 'On the free plan, the family adds up to {0} children. To add more, activate Premium.',
     KApp.childMaxCap: 'The family already has {0} children, the limit.',
+    KApp.childPlanTitle: 'Custody plan',
+    KApp.childPlanSingle: 'The plan is the same for every child.',
+    KApp.childPlanPerChild: 'Each child has their own plan.',
+    KApp.childPlanNeedsTwo: 'With two children or more, each one can have their own plan.',
+    KApp.childPlanToPerChild: 'Give each child their own plan',
+    KApp.childPlanToPerChildConfirm: 'From today on, each child gets their own plan, starting as a copy of the current one. Days already past do not change.',
+    KApp.childPlanToSingle: 'Go back to one plan for all',
+    KApp.childPlanToSingleLead: 'From today on, the chosen child\'s plan becomes everyone\'s. The other children\'s plans from today on are deleted; days already past do not change.',
+    KApp.childPlanUseChild: 'Use {0}\'s plan',
+    KApp.childPlanSwitched: 'Custody plan updated.',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'School',
