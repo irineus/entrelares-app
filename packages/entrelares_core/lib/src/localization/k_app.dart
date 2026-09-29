@@ -530,6 +530,10 @@ abstract final class KApp {
   static const String childPlanToSingleLead = 'app.child.planToSingleLead';
   static const String childPlanUseChild = 'app.child.planUseChild';
   static const String childPlanSwitched = 'app.child.planSwitched';
+  // F-07 PR 4: the calendar's lanes.
+  static const String calLaneAll = 'app.cal.laneAll';
+  static const String calLaneChoose = 'app.cal.laneChoose';
+  static const String calLaneWith = 'app.cal.laneWith';
 
   // ── F-55 the day agenda (PR 2). Every key lives under `app.agenda.` — the
   //    ADDRESS vocabulary_test pins the words "agenda" and "nota" to. ──
@@ -1149,6 +1153,9 @@ abstract final class KApp {
     childPlanToSingleLead,
     childPlanUseChild,
     childPlanSwitched,
+    calLaneAll,
+    calLaneChoose,
+    calLaneWith,
     agendaSection,
     agendaKindSchool,
     agendaKindHealth,
@@ -1907,6 +1914,9 @@ abstract final class StringsAppPtBr {
     KApp.childPlanToSingleLead: 'A partir de hoje, o plano da criança escolhida vira o plano de todas. Os planos das outras crianças de hoje em diante são apagados; os dias que já passaram não mudam.',
     KApp.childPlanUseChild: 'Usar o plano de {0}',
     KApp.childPlanSwitched: 'Plano de guarda atualizado.',
+    KApp.calLaneAll: 'Todas as crianças',
+    KApp.calLaneChoose: 'De qual criança?',
+    KApp.calLaneWith: '{0} com {1}',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'Escola',
@@ -2660,6 +2670,9 @@ abstract final class StringsAppEn {
     KApp.childPlanToSingleLead: 'From today on, the chosen child\'s plan becomes everyone\'s. The other children\'s plans from today on are deleted; days already past do not change.',
     KApp.childPlanUseChild: 'Use {0}\'s plan',
     KApp.childPlanSwitched: 'Custody plan updated.',
+    KApp.calLaneAll: 'All children',
+    KApp.calLaneChoose: 'Which child?',
+    KApp.calLaneWith: '{0} with {1}',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'School',

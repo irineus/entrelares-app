@@ -27,6 +27,7 @@ Future<String?> showQuickSwapSheet({
   required CustodyDataSource dataSource,
   required Member myProfile,
   required List<Member> allProfiles,
+  int? childId,
 }) {
   return showAppSheet<String>(
     context: context,
@@ -36,6 +37,7 @@ Future<String?> showQuickSwapSheet({
       dataSource: dataSource,
       myProfile: myProfile,
       allProfiles: allProfiles,
+      childId: childId,
     ),
   );
 }
@@ -47,12 +49,16 @@ class _QuickSwapSheet extends StatefulWidget {
   final Member myProfile;
   final List<Member> allProfiles;
 
+  /// F-07: the lane the selection lives in (null in a single-plan family).
+  final int? childId;
+
   const _QuickSwapSheet({
     required this.plan,
     required this.daysByIso,
     required this.dataSource,
     required this.myProfile,
     required this.allProfiles,
+    this.childId,
   });
 
   @override
@@ -129,6 +135,7 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
           notes: existing?.notes,
           revision: existing?.revision ?? 0,
           revisionToken: existing?.revisionToken ?? '',
+          childId: widget.childId,
         );
         try {
           if (existing == null) {
@@ -136,7 +143,8 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
           } else {
             await widget.dataSource.updateDay(base);
           }
-          final refreshed = await widget.dataSource.fetchDay(r.date);
+          final refreshed = await widget.dataSource
+              .fetchDay(r.date, childId: widget.childId);
           // No handoff is proposed: the T-27 triggers re-evaluate the
           // transitions when the request is approved.
           await widget.dataSource.createSwapRequest(
