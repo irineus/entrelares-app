@@ -142,9 +142,8 @@ class CalendarScreen extends StatefulWidget {
   /// F-70: the plan-end strip, for tests.
   static const planEndStripKey = Key('plan-end-strip');
 
-  /// F-07: the lane chips, and the "which child?" question.
+  /// F-07: the lane chips.
   static const laneChipsKey = Key('lane-chips');
-  static const laneChooserKey = Key('lane-chooser');
 
   const CalendarScreen(
       {super.key,
@@ -277,6 +276,12 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
     _daysByIso = days.byIso;
     _divergentByIso = _perChild && lane == null ? days.divergent : const {};
+    // F-07 (owner's QA, 29/09/2026): a child's lane marks only that child's
+    // items and the family's notes; Todas marks them all.
+    _agendaByIso = _groupAgenda([
+      for (final e in _monthEvents)
+        if (lane == null || e.childId == null || e.childId == lane) e,
+    ]);
     _frozenByIso = frozen.byIso;
     _upcoming = upcoming.byIso.values.toList()
       ..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
@@ -436,6 +441,10 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// F-55 on the grid (owner's validation, 25/09/2026): each day's live
   /// agenda items, in the day sheet's order, for the month on screen.
   Map<String, List<ChildEvent>> _agendaByIso = const {};
+
+  /// F-07: the month's agenda items, every child — [_agendaByIso] is the
+  /// lane's view of them ([_applyLaneView]).
+  List<ChildEvent> _monthEvents = const [];
   void Function()? _unwatchAgenda;
 
   /// F-70: the day a plan-end notification asked the wizard to open on, held
@@ -807,16 +816,15 @@ class _CalendarScreenState extends State<CalendarScreen>
       } catch (_) {/* keep whatever we had */}
       // F-55: the month's agenda marks. Best-effort like the avisos, and
       // asked only while the module is on for this family.
-      var agendaByIso = _agendaByIso;
+      var monthEvents = _monthEvents;
       if (_settings.childAgendaEnabled) {
         try {
-          final events = await widget.dataSource.fetchChildEvents(
+          monthEvents = await widget.dataSource.fetchChildEvents(
               DateTime(month.year, month.month, 1),
               DateTime(month.year, month.month + 1, 0));
-          agendaByIso = _groupAgenda(events);
         } catch (_) {/* keep whatever we had */}
       } else {
-        agendaByIso = const {};
+        monthEvents = const [];
       }
       // F-07: the children name the lanes; read only for a per-child plan.
       var children = _children;
@@ -853,7 +861,8 @@ class _CalendarScreenState extends State<CalendarScreen>
         _todayNotices = todayNotices;
         _yesterdayRow = yesterdayRow;
         _lastPlannedDay = lastPlannedDay;
-        _agendaByIso = agendaByIso;
+        _monthEvents = monthEvents;
+        _applyLaneView();
         _loadedMonth = month;
         _openInvitation = openInvitation;
         _loading = false;
@@ -1187,47 +1196,12 @@ class _CalendarScreenState extends State<CalendarScreen>
     });
   }
 
-  /// F-07 — in *Todas* a write needs a child. Asks which one (naming who has
-  /// the child on [date], when there is a date) and moves the calendar to
-  /// that child's lane. False when the reader closed the question.
-  Future<bool> _ensureLane({DateTime? date}) async {
-    if (!_perChild || _lane != null) return true;
-    final l = AppL10n.of(context).l;
-    final iso = date == null ? null : CareSchedule.isoDate(date);
-    String? carerOn(Child c) {
-      if (iso == null) return null;
-      final row = _monthRows
-          .where((d) =>
-              d.childId == c.id && CareSchedule.isoDate(d.scheduleDate) == iso)
-          .firstOrNull;
-      if (row == null) return null;
-      return _members
-          .where((m) => m.id == row.effectiveParentId)
-          .firstOrNull
-          ?.fullName;
-    }
-
-    final chosen = await showAppSheet<int>(
-      context: context,
-      builder: (context) => AppSheetFrame(
-        key: CalendarScreen.laneChooserKey,
-        title: l[KApp.calLaneChoose],
-        onClose: () => Navigator.of(context).pop(),
-        closeLabel: l[K.commonClose],
-        children: [
-          for (final c in _children)
-            ListTile(
-              key: ValueKey('lane-choose-${c.id}'),
-              leading: const Icon(Icons.child_care_outlined),
-              title: Text(c.firstName),
-              subtitle: carerOn(c) == null ? null : Text(carerOn(c)!),
-              onTap: () => Navigator.of(context).pop(c.id),
-            ),
-        ],
-      ),
-    );
-    if (chosen == null || !mounted) return false;
-    _selectLane(chosen);
+  /// F-07 (owner's QA, 29/09/2026) — *Todas* reads, a child's lane writes.
+  /// A write started in *Todas* says to pick the child above, and returns
+  /// true when it did (the caller stops).
+  bool _refuseWriteInTodas() {
+    if (!_perChild || _lane != null) return false;
+    showAppSnack(context, AppL10n.of(context).l[KApp.calLanePickFirst]);
     return true;
   }
 
@@ -1244,7 +1218,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// Mirror of LongPressDay: entering selection always ADDS the day.
   Future<void> _onDayLongPress(DateTime date) async {
     if (_iAmViewer) return;
-    if (!await _ensureLane(date: date) || !mounted) return;
+    if (_refuseWriteInTodas()) return;
     HapticFeedback.mediumImpact();
     setState(() => _selectedDays.add(dateOnly(date)));
   }
@@ -1260,8 +1234,11 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   /// What a tap on [date]'s cell opens — also a day cited in the Conversa.
   Future<void> _openDayAsTapped(DateTime date) async {
-    // F-07: in *Todas* the day is some child's — ask whose.
-    if (!await _ensureLane(date: date) || !mounted) return;
+    // F-07: in *Todas* the day is every child's — read it whole.
+    if (_perChild && _lane == null) {
+      await _openAllChildrenDay(date);
+      return;
+    }
     // Web parity (HandleDayClick): a day with a pending request opens the
     // frozen panel instead of the editor — for everyone, admins included.
     final frozen = _frozenByIso[CareSchedule.isoDate(date)];
@@ -1486,6 +1463,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// WITHOUT the admin mode: a handoff time is not a protected field.
   Future<void> _openHandoffRange() async {
     if (_refuseWriteOffline()) return;
+    if (_refuseWriteInTodas()) return;
     final summary = await showHandoffRangeSheet(
       context: context,
       dataSource: widget.dataSource,
@@ -1543,7 +1521,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   Future<void> _openWizard({DateTime? start}) async {
     if (_refuseWriteOffline()) return;
     // F-07: a plan is one child's in a per-child family.
-    if (!await _ensureLane() || !mounted) return;
+    if (_refuseWriteInTodas()) return;
     final generated = await showWizardSheet(
       context: context,
       activeMembers: _assignableMembers,
@@ -1572,6 +1550,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// rules spared. U-27: the confirming action first, the way out after it.
   Future<void> _clearMonth() async {
     if (_refuseWriteOffline()) return;
+    if (_refuseWriteInTodas()) return;
     // F-67 Part B: offered to an admin with the mode off. Yes turns it on
     // and carries on into the month's own "apagar N dias?" — activating the
     // mode never deletes anything by itself.
@@ -1675,6 +1654,53 @@ class _CalendarScreenState extends State<CalendarScreen>
                     CareSchedule.isoDate(r.scheduleDate) == iso))
               DaySheetSibling(childId: c.id, childName: c.firstName, day: d),
     ];
+  }
+
+  /// F-07 (owner's QA, 29/09/2026) — *Todas*: the whole day, read-only. One
+  /// block per child (who has them, the swap, the time, a pending request),
+  /// every child's agenda and the day's relatos; "Editar o dia de `criança`"
+  /// moves the calendar to that child and opens the day there.
+  Future<void> _openAllChildrenDay(DateTime date) async {
+    HapticFeedback.selectionClick();
+    final iso = CareSchedule.isoDate(date);
+    final lanes = [
+      for (final c in _children)
+        DaySheetLane(
+          childId: c.id,
+          childName: c.firstName,
+          day: _monthRows
+              .where((d) =>
+                  d.childId == c.id &&
+                  CareSchedule.isoDate(d.scheduleDate) == iso)
+              .firstOrNull,
+          frozen: _monthFrozen.any((r) =>
+              r.childId == c.id && CareSchedule.isoDate(r.scheduleDate) == iso),
+        ),
+    ];
+    await showDaySheet(
+      context: context,
+      date: date,
+      day: _daysByIso[iso],
+      previousDay: null,
+      members: _assignableMembers,
+      memberViews: _memberViews,
+      today: _today,
+      dataSource: widget.dataSource,
+      ownProfileId: _ownProfile?.id,
+      isPremium: _isPremiumForGate,
+      settings: _settings,
+      myProfile: _ownProfile,
+      allProfiles: _members,
+      offline: _offline,
+      childName: AppL10n.of(context).l[KApp.calLaneAll],
+      allLanes: lanes,
+      onEditLane: _iAmViewer
+          ? null
+          : (childId) {
+              _selectLane(childId);
+              _openDayAsTapped(date);
+            },
+    );
   }
 
   Future<void> _openDay(DateTime date) async {
@@ -3269,21 +3295,17 @@ class _DayCell extends StatelessWidget {
     final paint = dayPaint(assignment, views);
     final slot = _slotOf(context, paint);
     final split = lanes.length > 1;
-    // F-07: one tone per distinct carer, in the children's order.
-    final splitTones = split
+    // F-07 (owner's QA, 29/09/2026): one BAND per distinct carer, in the
+    // children's order, each in the carer's colour AND texture — the texture
+    // is the grid's non-colour channel (U-29), so no letters are drawn. Who
+    // has whom is said aloud here and shown on tap (the read-only day).
+    final splitSlots = split
         ? [
             for (final carer in {for (final r in lanes) r.effectiveParentId})
-              _slotOf(context, DaySlot(profileSlotIndex(carer, views)))
-                  .tone
-                  .container,
+              _slotOf(context, DaySlot(profileSlotIndex(carer, views))),
           ]
-        : const <Color>[];
-    final initial = split
-        ? [
-            for (final carer in {for (final r in lanes) r.effectiveParentId})
-              displayInitials(carer, views),
-          ].join('/')
-        : parentInitial(assignment, views);
+        : const <SlotColors>[];
+    final initial = parentInitial(assignment, views);
     final assigned = paint is! DayUnassigned;
     // The swap wears a dashed border instead of the slot's solid one — the
     // border IS the signal, so it cannot be drawn twice.
@@ -3353,6 +3375,26 @@ class _DayCell extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          if (split && !isSelected)
+            ClipRRect(
+              key: ValueKey('cell-split-${date.day}'),
+              borderRadius: BorderRadius.circular(Radii.md),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final band in splitSlots)
+                    Expanded(
+                      child: ColoredBox(
+                        color: band.tone.container,
+                        child: CustomPaint(
+                          painter: SlotPatternPainter(
+                              band.pattern, band.tone.border),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(Radii.md),
@@ -3363,20 +3405,6 @@ class _DayCell extends StatelessWidget {
                       : assigned
                           ? slot.tone.container
                           : null,
-              // F-07: a hard-stop split, one band per carer.
-              gradient: split && !isSelected
-                  ? LinearGradient(
-                      colors: [
-                        for (final c in splitTones) ...[c, c],
-                      ],
-                      stops: [
-                        for (var i = 0; i < splitTones.length; i++) ...[
-                          i / splitTones.length,
-                          (i + 1) / splitTones.length,
-                        ],
-                      ],
-                    )
-                  : null,
             ),
             // U-48: the border is a FOREGROUND decoration, so the ink below
             // fills the whole cell (a `decoration` border insets the child by
@@ -3429,21 +3457,24 @@ class _DayCell extends StatelessWidget {
                     _numberLine(context, tokens,
                         assigned ? slot.tone.onContainer : null),
                     const SizedBox(height: DayCellType.gap),
-                    DayCellAvatar(
-                      radius: type.avatarRadius,
-                      color: assigned && !split
-                          ? slot.tone.solid
-                          : Colors.transparent,
-                      child: Text(initial,
-                          style: TextStyle(
-                              fontSize: type.initial,
-                              height: 1,
-                              color: split
-                                  ? tokens.text
-                                  : assigned
-                                      ? slot.tone.onSolid
-                                      : Theme.of(context).hintColor)),
-                    ),
+                    // F-07: the split day keeps the avatar's room (the grid
+                    // must not jump) and draws no letter — the bands say it.
+                    if (split)
+                      SizedBox(
+                          height: type.avatarRadius * 2,
+                          width: type.avatarRadius * 2)
+                    else
+                      DayCellAvatar(
+                        radius: type.avatarRadius,
+                        color: assigned ? slot.tone.solid : Colors.transparent,
+                        child: Text(initial,
+                            style: TextStyle(
+                                fontSize: type.initial,
+                                height: 1,
+                                color: assigned
+                                    ? slot.tone.onSolid
+                                    : Theme.of(context).hintColor)),
+                      ),
                     // U-29 round 4 (owner): the same breath the date already
                     // gets above the avatar — without it the time sat glued to
                     // the initial. Gated, so a badge-less cell stays centred.

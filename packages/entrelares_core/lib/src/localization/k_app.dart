@@ -532,7 +532,9 @@ abstract final class KApp {
   static const String childPlanSwitched = 'app.child.planSwitched';
   // F-07 PR 4: the calendar's lanes.
   static const String calLaneAll = 'app.cal.laneAll';
-  static const String calLaneChoose = 'app.cal.laneChoose';
+  static const String calLanePickFirst = 'app.cal.lanePickFirst';
+  static const String calLaneEditDay = 'app.cal.laneEditDay';
+  static const String calLanePending = 'app.cal.lanePending';
   static const String calLaneWith = 'app.cal.laneWith';
   static const String editorAlsoFor = 'app.editor.alsoFor';
   static const String frozenApproveAll = 'app.frozen.approveAll';
@@ -1156,7 +1158,9 @@ abstract final class KApp {
     childPlanUseChild,
     childPlanSwitched,
     calLaneAll,
-    calLaneChoose,
+    calLanePickFirst,
+    calLaneEditDay,
+    calLanePending,
     calLaneWith,
     editorAlsoFor,
     frozenApproveAll,
@@ -1919,7 +1923,9 @@ abstract final class StringsAppPtBr {
     KApp.childPlanUseChild: 'Usar o plano de {0}',
     KApp.childPlanSwitched: 'Plano de guarda atualizado.',
     KApp.calLaneAll: 'Todas as crianças',
-    KApp.calLaneChoose: 'De qual criança?',
+    KApp.calLanePickFirst: 'Escolha uma criança acima para editar.',
+    KApp.calLaneEditDay: 'Editar o dia de {0}',
+    KApp.calLanePending: 'Pedido de troca pendente neste dia.',
     KApp.calLaneWith: '{0} com {1}',
     KApp.editorAlsoFor: 'Também para',
     KApp.frozenApproveAll: 'Aprovar os {0} pedidos deste dia',
@@ -2677,7 +2683,9 @@ abstract final class StringsAppEn {
     KApp.childPlanUseChild: 'Use {0}\'s plan',
     KApp.childPlanSwitched: 'Custody plan updated.',
     KApp.calLaneAll: 'All children',
-    KApp.calLaneChoose: 'Which child?',
+    KApp.calLanePickFirst: 'Choose a child above to edit.',
+    KApp.calLaneEditDay: 'Edit {0}\'s day',
+    KApp.calLanePending: 'A swap request is pending on this day.',
     KApp.calLaneWith: '{0} with {1}',
     KApp.editorAlsoFor: 'Also for',
     KApp.frozenApproveAll: 'Approve the {0} requests for this day',

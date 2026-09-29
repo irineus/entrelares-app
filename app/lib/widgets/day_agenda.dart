@@ -58,6 +58,15 @@ class DayAgendaSection extends StatefulWidget {
   /// to the page that adds it.
   final VoidCallback? onOpenChildren;
 
+  /// F-07 (owner's QA, 29/09/2026): a per-child plan's day is ONE child's.
+  /// The section lists that child's items plus the family's notes (a note
+  /// names no child, F-55), and a new item is that child's — no picker.
+  /// Null: every child's items (a single plan, or the read-only *Todas*).
+  final int? laneChildId;
+
+  /// F-07: the read-only *Todas* day — every child's items, no door.
+  final bool readOnly;
+
   const DayAgendaSection({
     super.key,
     required this.date,
@@ -70,6 +79,8 @@ class DayAgendaSection extends StatefulWidget {
     this.offline = false,
     this.onOpenPlan,
     this.onOpenChildren,
+    this.laneChildId,
+    this.readOnly = false,
   });
 
   @override
@@ -142,6 +153,7 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
   }
 
   bool get _dayWritable =>
+      !widget.readOnly &&
       AgendaRules.canWriteDay(widget.date, widget.today) &&
       !widget.offline &&
       widget.me != null &&
@@ -153,8 +165,24 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
       isPremium: widget.isPremium ?? true,
       premiumOnly: widget.settings.agendaPremiumOnly);
 
+  /// F-07: whether [e] belongs on this lane's day — its child, or no child.
+  bool _inLane(ChildEvent e) =>
+      widget.laneChildId == null ||
+      e.childId == null ||
+      e.childId == widget.laneChildId;
+
+  /// Every live item of the day, every child — what the server's day cap
+  /// counts (`agenda.max_events_per_day`).
+  int get _allLiveCount => [
+        for (final e in _events ?? const <ChildEvent>[])
+          if (!e.isDeleted) e
+      ].length;
+
   List<ChildEvent> get _live => AgendaRules.timeline(
-        [for (final e in _events ?? const <ChildEvent>[]) if (!e.isDeleted) e],
+        [
+          for (final e in _events ?? const <ChildEvent>[])
+            if (!e.isDeleted && _inLane(e)) e
+        ],
         (e) => AgendaEntry(
           id: e.id,
           kind: AgendaKind.parse(e.kind) ?? AgendaKind.other,
@@ -171,7 +199,7 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
   /// only thing it could add is a note, and the server would refuse it.
   bool get _canAdd {
     if (!_dayWritable) return false;
-    if (_live.length >= widget.settings.agendaMaxEventsPerDay) return false;
+    if (_allLiveCount >= widget.settings.agendaMaxEventsPerDay) return false;
     if (_freeLimited &&
         AgendaRules.notesLeft(
                 notesOnDay: _notesToday,
@@ -213,7 +241,14 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
         date: widget.date,
         event: event,
         routine: event == null ? null : _routineOf(event),
-        children: _children,
+        // F-07: in a child's lane the item is that child's — the sheet shows
+        // the one child fixed, no picker.
+        children: widget.laneChildId == null
+            ? _children
+            : [
+                for (final c in _children)
+                  if (c.id == widget.laneChildId) c
+              ],
         settings: widget.settings,
         freeLimited: _freeLimited,
         isAdmin: widget.me?.isAdmin == true,
