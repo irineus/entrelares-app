@@ -836,9 +836,9 @@ void main() {
 
     test('the upload disarms itself when the token is absent', () {
       expect(workflow, contains("if: env.SENTRY_AUTH_TOKEN != ''"),
-          reason: 'an absent secret must skip the step, never paint main red '
-              'for ops that has not happened yet — the same shape the '
-              'Cloudflare publish uses');
+          reason: 'an absent Sentry token costs readable stacks, not the '
+              'channel, so it skips the step instead of painting main red '
+              '(the Cloudflare publish, since S-23, goes red instead)');
     });
 
     // ── T-68: a publish that succeeded loudly and delivered nothing ──────────
