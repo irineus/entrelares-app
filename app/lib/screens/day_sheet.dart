@@ -14,6 +14,7 @@ import '../services/admin_mode.dart';
 import '../services/custody_data_source.dart';
 import '../widgets/admin_mode_offer.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/person_chip.dart';
 import '../widgets/app_snack.dart';
 import '../widgets/slot_pill.dart';
 
@@ -78,12 +79,17 @@ String daySheetCorrectReplyKey(int id) => 'day-sheet-correct-reply-$id';
 class DaySheetLane {
   final int childId;
   final String childName;
+
+  /// The child's avatar letters (`childInitials`) — the same avatar the
+  /// calendar's chips and the split day draw.
+  final String initials;
   final CareSchedule? day;
   final bool frozen;
 
   const DaySheetLane({
     required this.childId,
     required this.childName,
+    this.initials = '',
     required this.day,
     this.frozen = false,
   });
@@ -1594,9 +1600,21 @@ class _DaySheetState extends State<_DaySheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final lane in widget.allLanes) ...[
-          Text(lane.childName,
-              key: ValueKey('day-lane-${lane.childId}'),
-              style: textTheme.titleSmall),
+          Row(
+            key: ValueKey('day-lane-${lane.childId}'),
+            children: [
+              MiniAvatar(
+                diameter: 24,
+                letters: lane.initials.isEmpty ? '?' : lane.initials,
+                fill: Theme.of(context).colorScheme.surface,
+                ink: tokens.text,
+                ring: tokens.textMuted,
+                letterScale: 0.5,
+              ),
+              const SizedBox(width: Spacing.sm),
+              Text(lane.childName, style: textTheme.titleSmall),
+            ],
+          ),
           const SizedBox(height: Spacing.xs),
           if (lane.day == null)
             Text(l[KApp.sheetNoResponsible], style: textTheme.bodyMedium)

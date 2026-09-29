@@ -1895,7 +1895,8 @@ CareSchedule row(int id, DateTime date, int scheduled,
 Widget app(FakeCustodyDataSource ds,
         {AppLanguage language = AppLanguage.ptBr,
         AdminMode? adminMode,
-        AnalyticsService? analytics}) =>
+        AnalyticsService? analytics,
+        void Function(MemberLinkTarget target, int memberId)? onOpenMember}) =>
     AppL10n(
       l: Localization(language),
       setLanguage: (_) async {},
@@ -1904,9 +1905,17 @@ Widget app(FakeCustodyDataSource ds,
           dataSource: ds,
           adminMode: adminMode ?? AdminMode(),
           analytics: analytics,
+          // F-07: the legend's chips are tappable in the app, so they are
+          // measured as targets here too (the U-32 gate reads this app).
+          onOpenMember: onOpenMember ?? (_, _) {},
         ),
       ),
     );
+
+/// A letter in the month grid only: since F-07 the legend's chips wear the
+/// carers' initials too, so a bare find.text('A') would read the legend.
+Finder inGrid(String t) =>
+    find.descendant(of: find.byType(PageView), matching: find.text(t));
 
 /// Tomorrow, unless the month ends today (then the write tests short-circuit
 /// — the fixed today of a CI clock never hits it two runs in a row).
@@ -1998,8 +2007,8 @@ void main() {
     expect(find.text('Bruno'), findsOneWidget);
     expect(find.text('Trocado'), findsOneWidget);
     // Day 10 belongs to Ana ("A"); day 11 is swapped to Bruno ("B").
-    expect(find.text('A'), findsWidgets);
-    expect(find.text('B'), findsWidgets);
+    expect(inGrid('A'), findsWidgets);
+    expect(inGrid('B'), findsWidgets);
   });
 
   testWidgets('unassigned future day: sheet inserts with the chosen parent',

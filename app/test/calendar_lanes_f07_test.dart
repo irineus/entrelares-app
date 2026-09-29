@@ -12,9 +12,11 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
+import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
 import 'package:entrelares_app/screens/calendar_screen.dart';
 import 'package:entrelares_app/screens/day_sheet.dart' show daySheetEditKey;
+import 'package:entrelares_app/widgets/person_chip.dart';
 
 import 'calendar_slice_test.dart';
 
@@ -66,7 +68,7 @@ void main() {
     if (day == null) return;
     await pump(tester, perChildSource(day));
     expect(find.byKey(CalendarScreen.laneChipsKey), findsOne);
-    expect(find.text(l[KApp.calLaneAll]), findsOne);
+    expect(find.text(l[KApp.calLaneAllShort]), findsOne);
     expect(find.text('Lia'), findsOne);
     expect(find.text('Theo'), findsOne);
   });
@@ -103,7 +105,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('day-lanes')), findsNothing);
     final theoChip =
-        tester.widget<ChoiceChip>(find.byKey(const ValueKey('lane-11')));
+        tester.widget<PersonChip>(find.byKey(const ValueKey('lane-11')));
     expect(theoChip.selected, isTrue);
   });
 
@@ -119,12 +121,105 @@ void main() {
     expect(find.text(l[KApp.calLanePickFirst]), findsOne);
   });
 
-  testWidgets('Todas: the split day draws bands, not letters', (tester) async {
+  testWidgets('Todas: the split day draws avatars, not letters', (tester) async {
     final day = futureDay;
     if (day == null) return;
     await pump(tester, perChildSource(day));
     expect(find.byKey(ValueKey('cell-split-$day')), findsOne);
     expect(find.text('A/B'), findsNothing);
+  });
+
+  // ── F-07 (owner's QA, 29/09/2026, round 2): the people, with avatars ──
+
+  List<String> avatarsIn(WidgetTester tester, Finder of) => [
+        for (final a in tester.widgetList<MiniAvatar>(
+            find.descendant(of: of, matching: find.byType(MiniAvatar))))
+          a.letters,
+      ];
+
+  testWidgets('Todas: the split day is one column per carer, children below',
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    await pump(tester, perChildSource(day));
+    final split = find.byKey(ValueKey('cell-split-$day'));
+    final letters = avatarsIn(tester, split);
+    // Two carers, one child each: four avatars, Lia's and Theo's among them.
+    expect(letters, hasLength(4));
+    expect(letters, containsAll(['L', 'T']));
+  });
+
+  testWidgets('the same carer for every child: no split, no child avatar',
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    await pump(
+        tester,
+        FakeCustodyDataSource(members: const [ana, bruno], days: [
+          laneRow(1, dayOfMonth(day), ana.id, lia.id),
+          laneRow(2, dayOfMonth(day), ana.id, theo.id),
+        ])
+          ..family = const Family(
+              id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+          ..children = [lia, theo]);
+    expect(find.byKey(ValueKey('cell-split-$day')), findsNothing);
+  });
+
+  testWidgets("the lane chips carry the child's avatar", (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    await pump(tester, perChildSource(day));
+    expect(avatarsIn(tester, find.byKey(const ValueKey('lane-10'))), ['L']);
+    expect(avatarsIn(tester, find.byKey(const ValueKey('lane-11'))), ['T']);
+  });
+
+  testWidgets("the whole day's blocks open with the child's avatar",
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    await pump(tester, perChildSource(day));
+    await openDay(tester, day);
+    expect(avatarsIn(tester, find.byKey(const ValueKey('day-lane-10'))),
+        contains('L'));
+    expect(avatarsIn(tester, find.byKey(const ValueKey('day-lane-11'))),
+        contains('T'));
+  });
+
+  testWidgets("a carer's chip opens my profile, or the Família",
+      (tester) async {
+    final opened = <(MemberLinkTarget, int)>[];
+    await tester.binding.setSurfaceSize(const Size(420, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(app(
+        FakeCustodyDataSource(members: const [ana, bruno], days: []),
+        onOpenMember: (t, id) => opened.add((t, id))));
+    await tester.pumpAndSettle();
+    // No role in the chip any more: the first name only.
+    expect(find.descendant(
+        of: find.byKey(ValueKey('legend-member-${ana.id}')),
+        matching: find.text('Ana')), findsOne);
+    await tester.tap(find.byKey(ValueKey('legend-member-${ana.id}')));
+    await tester.tap(find.byKey(ValueKey('legend-member-${bruno.id}')));
+    // Ana (me) is not an admin here: Bruno's chip lands on the Família.
+    expect(opened, [
+      (MemberLinkTarget.ownProfile, ana.id),
+      (MemberLinkTarget.family, bruno.id),
+    ]);
+  });
+
+  testWidgets("an admin's tap on another carer opens that profile",
+      (tester) async {
+    final opened = <(MemberLinkTarget, int)>[];
+    const admin = Member(
+        id: 1, fullName: 'Ana Souza', colorSlot: 1, userId: 'u1', isAdmin: true);
+    await tester.binding.setSurfaceSize(const Size(420, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(app(
+        FakeCustodyDataSource(members: const [admin, bruno], days: []),
+        onOpenMember: (t, id) => opened.add((t, id))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('legend-member-${bruno.id}')));
+    expect(opened, [(MemberLinkTarget.memberProfile, bruno.id)]);
   });
 
   testWidgets("a child's lane paints that child's carer, not the split",

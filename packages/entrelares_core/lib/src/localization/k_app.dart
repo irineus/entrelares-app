@@ -532,6 +532,7 @@ abstract final class KApp {
   static const String childPlanSwitched = 'app.child.planSwitched';
   // F-07 PR 4: the calendar's lanes.
   static const String calLaneAll = 'app.cal.laneAll';
+  static const String calLaneAllShort = 'app.cal.laneAllShort';
   static const String calLanePickFirst = 'app.cal.lanePickFirst';
   static const String calLaneEditDay = 'app.cal.laneEditDay';
   static const String calLanePending = 'app.cal.lanePending';
@@ -1158,6 +1159,7 @@ abstract final class KApp {
     childPlanUseChild,
     childPlanSwitched,
     calLaneAll,
+    calLaneAllShort,
     calLanePickFirst,
     calLaneEditDay,
     calLanePending,
@@ -1923,6 +1925,7 @@ abstract final class StringsAppPtBr {
     KApp.childPlanUseChild: 'Usar o plano de {0}',
     KApp.childPlanSwitched: 'Plano de guarda atualizado.',
     KApp.calLaneAll: 'Todas as crianças',
+    KApp.calLaneAllShort: 'Todas',
     KApp.calLanePickFirst: 'Escolha uma criança acima para editar.',
     KApp.calLaneEditDay: 'Editar o dia de {0}',
     KApp.calLanePending: 'Pedido de troca pendente neste dia.',
@@ -2683,6 +2686,7 @@ abstract final class StringsAppEn {
     KApp.childPlanUseChild: 'Use {0}\'s plan',
     KApp.childPlanSwitched: 'Custody plan updated.',
     KApp.calLaneAll: 'All children',
+    KApp.calLaneAllShort: 'All',
     KApp.calLanePickFirst: 'Choose a child above to edit.',
     KApp.calLaneEditDay: 'Edit {0}\'s day',
     KApp.calLanePending: 'A swap request is pending on this day.',
