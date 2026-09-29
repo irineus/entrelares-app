@@ -10,9 +10,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/child.dart';
+import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
 import 'package:entrelares_app/screens/calendar_screen.dart';
+import 'package:entrelares_app/screens/day_sheet.dart' show daySheetEditKey;
 
 import 'calendar_slice_test.dart';
 
@@ -81,20 +83,48 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets("Todas: a tap asks which child, then opens that child's day",
+  testWidgets("Todas: a tap opens the whole day, read-only, one block per child",
       (tester) async {
     final day = futureDay;
     if (day == null) return;
     await pump(tester, perChildSource(day));
     await openDay(tester, day);
-    expect(find.byKey(CalendarScreen.laneChooserKey), findsOne);
-    await tester.tap(find.byKey(const ValueKey('lane-choose-11')));
+    expect(find.byKey(const ValueKey('day-lanes')), findsOne);
+    expect(find.byKey(const ValueKey('day-lane-10')), findsOne);
+    expect(find.byKey(const ValueKey('day-lane-11')), findsOne);
+    // Read-only: no pencil, no save.
+    expect(find.byKey(daySheetEditKey), findsNothing);
+    expect(find.text(l[K.commonSave]), findsNothing);
+    // "Editar o dia de Theo" moves the calendar to Theo and opens his day.
+    final edit = find.byKey(const ValueKey('day-lane-edit-11'));
+    await tester.ensureVisible(edit);
     await tester.pumpAndSettle();
-    // The day sheet is Theo's, and the calendar moved to Theo's lane.
-    expect(find.byKey(CalendarScreen.laneChooserKey), findsNothing);
+    await tester.tap(edit);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('day-lanes')), findsNothing);
     final theoChip =
         tester.widget<ChoiceChip>(find.byKey(const ValueKey('lane-11')));
     expect(theoChip.selected, isTrue);
+  });
+
+  testWidgets('Todas: a long press asks to pick the child above', (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    await pump(tester, perChildSource(day));
+    final cell = find.text('$day').last;
+    await tester.ensureVisible(cell);
+    await tester.pumpAndSettle();
+    await tester.longPress(cell);
+    await tester.pumpAndSettle();
+    expect(find.text(l[KApp.calLanePickFirst]), findsOne);
+  });
+
+  testWidgets('Todas: the split day draws bands, not letters', (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    await pump(tester, perChildSource(day));
+    expect(find.byKey(ValueKey('cell-split-$day')), findsOne);
+    expect(find.text('A/B'), findsNothing);
   });
 
   testWidgets("a child's lane paints that child's carer, not the split",
@@ -222,5 +252,68 @@ void main() {
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
     expect(find.text(l[KApp.noticeAction]), findsOne);
+  });
+
+  // ── F-07 (owner's QA, 29/09/2026): the agenda follows the lane ──
+
+  ChildEvent event(int id, int day, int? child, String kind) =>
+      ChildEvent.fromJson({
+        'id': id,
+        'family_id': 7,
+        'child_id': child,
+        'event_date': CareSchedule.isoDate(dayOfMonth(day)),
+        'start_time': '08:00:00',
+        'kind': kind,
+        'body': 'item $id',
+        'created_by': ana.id,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+
+  testWidgets("a child's day lists that child's items and the family's notes",
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    final ds = perChildSource(day)
+      ..publicSettings = const {'feature.child_agenda': 'true'}
+      ..childEvents = [
+        event(1, day, lia.id, 'school'),
+        event(2, day, theo.id, 'school'),
+        event(3, day, null, 'note'),
+      ];
+    await pump(tester, ds);
+    await tester.ensureVisible(find.byKey(const ValueKey('lane-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('lane-11')));
+    await tester.pumpAndSettle();
+    await openDay(tester, day);
+    expect(find.textContaining('item 2'), findsOne, reason: "Theo's item");
+    expect(find.textContaining('item 3'), findsOne, reason: 'the family note');
+    expect(find.textContaining('item 1'), findsNothing, reason: "Lia's item");
+  });
+
+  testWidgets("a new item in a child's day is that child's — no picker",
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    final ds = perChildSource(day)
+      ..family = const Family(
+          id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+      ..publicSettings = const {'feature.child_agenda': 'true'};
+    await pump(tester, ds);
+    await tester.ensureVisible(find.byKey(const ValueKey('lane-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('lane-11')));
+    await tester.pumpAndSettle();
+    await openDay(tester, day);
+    final add = find.text(l[KApp.agendaAdd]);
+    await tester.ensureVisible(add);
+    await tester.pumpAndSettle();
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    // The kind that needs a child: the child is Theo, fixed.
+    await tester.tap(find.text(l[KApp.agendaKindSchool]).last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('agenda-child')), findsNothing);
+    expect(find.text('Theo'), findsWidgets);
   });
 }

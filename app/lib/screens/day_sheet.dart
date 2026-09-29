@@ -72,6 +72,23 @@ String daySheetCorrectReplyKey(int id) => 'day-sheet-correct-reply-$id';
 /// only when the draft differs from the stored day ([dayDraftChanged]). The
 /// summary stays for the days nothing can be saved on, and for a past day,
 /// whose primary is the relato (F-67).
+/// F-07 (owner's QA, 29/09/2026) — one child's day in the read-only *Todas*
+/// view: whose day it is, the child's row (null = not planned) and whether a
+/// request freezes it.
+class DaySheetLane {
+  final int childId;
+  final String childName;
+  final CareSchedule? day;
+  final bool frozen;
+
+  const DaySheetLane({
+    required this.childId,
+    required this.childName,
+    required this.day,
+    this.frozen = false,
+  });
+}
+
 /// F-07 (PR 4b) — another child's row on the same date, in the SAME state
 /// (same planned carer, same real carer, no request open): a swap asked for
 /// this day can be asked for that child too, as its own request.
@@ -107,6 +124,8 @@ Future<DaySheetOutcome?> showDaySheet({
   int? childId,
   String? childName,
   List<DaySheetSibling> siblings = const [],
+  List<DaySheetLane> allLanes = const [],
+  void Function(int childId)? onEditLane,
 }) {
   return showAppSheet<DaySheetOutcome>(
     context: context,
@@ -132,6 +151,8 @@ Future<DaySheetOutcome?> showDaySheet({
       childId: childId,
       childName: childName,
       siblings: siblings,
+      allLanes: allLanes,
+      onEditLane: onEditLane,
     ),
   );
 }
@@ -185,6 +206,13 @@ class _DaySheet extends StatefulWidget {
   /// F-07 (PR 4b): the other children the same swap can be asked for.
   final List<DaySheetSibling> siblings;
 
+  /// F-07 (owner's QA, 29/09/2026): non-empty = the read-only *Todas* day of
+  /// a per-child plan — one block per child, every child's agenda, the
+  /// relatos, and nothing that writes. [onEditLane] (null for a viewer) is
+  /// the way to edit one child's day: it moves the calendar to that child.
+  final List<DaySheetLane> allLanes;
+  final void Function(int childId)? onEditLane;
+
   const _DaySheet({
     required this.date,
     required this.day,
@@ -207,6 +235,8 @@ class _DaySheet extends StatefulWidget {
     this.childId,
     this.childName,
     this.siblings = const [],
+    this.allLanes = const [],
+    this.onEditLane,
   });
 
   @override
@@ -307,7 +337,8 @@ class _DaySheetState extends State<_DaySheet> {
   /// connection. The RPC is the enforcement.
   bool get _canWriteAccount {
     final me = widget.myProfile;
-    return me != null &&
+    return !_allChildren &&
+        me != null &&
         !me.isViewer &&
         !widget.offline &&
         canWriteDayAccount(
@@ -354,8 +385,14 @@ class _DaySheetState extends State<_DaySheet> {
   /// Past without the admin bypass, frozen, or offline: nothing can be saved,
   /// so there is no editor to reach.
   /// F-50: a Visualizador reads every day and edits none.
+  /// F-07: the read-only *Todas* day of a per-child plan.
+  bool get _allChildren => widget.allLanes.isNotEmpty;
+
   bool get _readOnly =>
-      _saveBlocked || widget.offline || widget.myProfile?.isViewer == true;
+      _allChildren ||
+      _saveBlocked ||
+      widget.offline ||
+      widget.myProfile?.isViewer == true;
   bool get _isFrozen => isDayFrozen(widget.date, widget.frozenDates);
 
   DayAssignment? get _assignment {
@@ -1218,7 +1255,7 @@ class _DaySheetState extends State<_DaySheet> {
       extraAction: reporting || replying
           ? null
           : !editing
-          ? _correctPlanAction(l)
+          ? (_allChildren ? null : _correctPlanAction(l))
           : widget.day == null ||
                   (isClearDayBlocked(adminBypass: _bypass) &&
                       !_canOffer(AdminModeAction.clearDay))
@@ -1238,7 +1275,10 @@ class _DaySheetState extends State<_DaySheet> {
         else if (reporting)
           ..._reportForm(l)
         else if (!editing) ...[
-          _summary(l, day, assignment),
+          if (_allChildren)
+            _lanesSummary(l)
+          else
+            _summary(l, day, assignment),
           if (_agendaOn) _agenda(),
           ..._accountsSection(l),
         ],
@@ -1275,6 +1315,8 @@ class _DaySheetState extends State<_DaySheet> {
                 widget.onOpenPlan!();
               },
         onOpenChildren: widget.onOpenChildren,
+        laneChildId: widget.childId,
+        readOnly: _allChildren,
       );
 
   /// F-67: the day's relatos under the summary, in the order they were
@@ -1541,6 +1583,56 @@ class _DaySheetState extends State<_DaySheet> {
   /// U-25: the day in one glance — the pills say what the grid cell says, in
   /// words, and the lines under them say what the cell CANNOT: whom the day
   /// was planned for, and the note.
+  /// F-07 (owner's QA, 29/09/2026) — *Todas*: one block per child, in the
+  /// family's order — the same pills a child's day shows, and the door to
+  /// edit that child's day.
+  Widget _lanesSummary(Localization l) {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
+    return Column(
+      key: const ValueKey('day-lanes'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final lane in widget.allLanes) ...[
+          Text(lane.childName,
+              key: ValueKey('day-lane-${lane.childId}'),
+              style: textTheme.titleSmall),
+          const SizedBox(height: Spacing.xs),
+          if (lane.day == null)
+            Text(l[KApp.sheetNoResponsible], style: textTheme.bodyMedium)
+          else
+            _statePills(
+                l,
+                lane.day!,
+                DayAssignment(
+                  scheduledParentId: lane.day!.scheduledParentId,
+                  actualParentId: lane.day!.actualParentId,
+                )),
+          if (lane.frozen)
+            Padding(
+              padding: const EdgeInsets.only(top: Spacing.xs),
+              child: Text(l[KApp.calLanePending],
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: tokens.textMuted)),
+            ),
+          if (widget.onEditLane != null)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                key: ValueKey('day-lane-edit-${lane.childId}'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  widget.onEditLane!(lane.childId);
+                },
+                child: Text(l.format(KApp.calLaneEditDay, [lane.childName])),
+              ),
+            ),
+          const SizedBox(height: Spacing.sm),
+        ],
+      ],
+    );
+  }
+
   Widget _summary(
       Localization l, CareSchedule? day, DayAssignment? assignment) {
     if (day == null || assignment == null || _isEmptyDay) {
