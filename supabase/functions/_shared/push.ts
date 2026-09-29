@@ -728,5 +728,11 @@ export function renderPush(
 		? fmt(lang, K.tagOverdue)
 		: "";
 
-	return { title: prefix + fmt(lang, titleKey), body };
+	// F-07: a per-child plan's swap names its child after the heading, as the
+	// in-app renderer's `withChild` does; `params.child` is stamped by the
+	// database, so every writer carries it.
+	const child = (params["child"] ?? "").trim();
+	const lane = child === "" ? "" : ` · ${child}`;
+
+	return { title: prefix + fmt(lang, titleKey) + lane, body };
 }

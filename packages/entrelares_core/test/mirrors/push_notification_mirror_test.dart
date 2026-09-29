@@ -209,5 +209,15 @@ void main() {
           reason: 'renderPush must drop a payload with no day rather than push '
               'a sentence with a hole in it.');
     });
+
+    // F-07 (PR 5b): the push heading names the child exactly as the in-app
+    // one does (`NotificationRenderer.withChild`): " · " + the trimmed name,
+    // nothing when the stamp is absent or blank.
+    test('push.ts appends params.child to the title like withChild', () {
+      final src = _pushSource();
+      expect(src, contains('const child = (params["child"] ?? "").trim();'));
+      expect(src, contains('const lane = child === "" ? "" : ` · \${child}`;'));
+      expect(src, contains('fmt(lang, titleKey) + lane'));
+    });
   });
 }

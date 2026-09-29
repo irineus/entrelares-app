@@ -626,4 +626,22 @@ void main() {
           contains('04/08'));
     });
   });
+
+  // F-07 (PR 5b): a per-child plan's swap names its child after the heading.
+  group('the child of a per-child plan', () {
+    test('params.child follows the heading, in either language', () {
+      const json = '{"date":"2026-10-12","name":"Ana","child":"Lia"}';
+      expect(
+          NotificationRenderer.title('swap_requested', json, 'x', ptBr),
+          '${ptBr[K.notifRenderTitleSwapRequested]} · Lia');
+      expect(NotificationRenderer.title('swap_requested', json, 'x', en),
+          '${en[K.notifRenderTitleSwapRequested]} · Lia');
+    });
+
+    test('no child, or a blank one, leaves the heading alone', () {
+      expect(NotificationRenderer.withChild('Título', null), 'Título');
+      expect(NotificationRenderer.withChild('Título', '  '), 'Título');
+      expect(NotificationRenderer.withChild('Título', ' Theo '), 'Título · Theo');
+    });
+  });
 }
