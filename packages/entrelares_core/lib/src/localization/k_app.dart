@@ -534,6 +534,8 @@ abstract final class KApp {
   static const String calLaneAll = 'app.cal.laneAll';
   static const String calLaneChoose = 'app.cal.laneChoose';
   static const String calLaneWith = 'app.cal.laneWith';
+  static const String editorAlsoFor = 'app.editor.alsoFor';
+  static const String frozenApproveAll = 'app.frozen.approveAll';
 
   // ── F-55 the day agenda (PR 2). Every key lives under `app.agenda.` — the
   //    ADDRESS vocabulary_test pins the words "agenda" and "nota" to. ──
@@ -1156,6 +1158,8 @@ abstract final class KApp {
     calLaneAll,
     calLaneChoose,
     calLaneWith,
+    editorAlsoFor,
+    frozenApproveAll,
     agendaSection,
     agendaKindSchool,
     agendaKindHealth,
@@ -1917,6 +1921,8 @@ abstract final class StringsAppPtBr {
     KApp.calLaneAll: 'Todas as crianças',
     KApp.calLaneChoose: 'De qual criança?',
     KApp.calLaneWith: '{0} com {1}',
+    KApp.editorAlsoFor: 'Também para',
+    KApp.frozenApproveAll: 'Aprovar os {0} pedidos deste dia',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'Escola',
@@ -2673,6 +2679,8 @@ abstract final class StringsAppEn {
     KApp.calLaneAll: 'All children',
     KApp.calLaneChoose: 'Which child?',
     KApp.calLaneWith: '{0} with {1}',
+    KApp.editorAlsoFor: 'Also for',
+    KApp.frozenApproveAll: 'Approve the {0} requests for this day',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'School',

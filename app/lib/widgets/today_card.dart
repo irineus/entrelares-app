@@ -50,11 +50,17 @@ class TodayCard extends StatelessWidget {
   /// already null, so the strip is the only target in it.
   final Widget? noticeStrip;
 
+  /// F-07 (PR 4b): in a per-child plan's *Todas*, when the children are with
+  /// different carers today — "Lia com Ana; Theo com Bruno" in place of the
+  /// one responsible name.
+  final String? laneSummary;
+
   const TodayCard({
     super.key,
     required this.glance,
     required this.userFullName,
     this.responsibleRole,
+    this.laneSummary,
     required this.today,
     required this.nextHandoffDate,
     required this.viewingCurrentMonth,
@@ -276,9 +282,15 @@ class TodayCard extends StatelessWidget {
                   style: textTheme.labelSmall?.copyWith(color: on)),
               // U-28 QA: one line at `titleSmall`. At `titleMedium` over two
               // lines this single field was costing the grid a whole week.
-              Text(glance.responsibleName ?? l[K.homeNotDefined],
+              Text(
+                  laneSummary ??
+                      glance.responsibleName ??
+                      l[K.homeNotDefined],
+                  key: laneSummary == null
+                      ? null
+                      : const ValueKey('today-lane-summary'),
                   style: textTheme.titleSmall?.copyWith(color: on),
-                  maxLines: 1,
+                  maxLines: laneSummary == null ? 1 : 2,
                   overflow: TextOverflow.ellipsis),
               // Web: both badges can appear — swapped and the handoff time are
               // independent. U-28 adds the ROLE, which the port had dropped.

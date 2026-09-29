@@ -72,6 +72,18 @@ String daySheetCorrectReplyKey(int id) => 'day-sheet-correct-reply-$id';
 /// only when the draft differs from the stored day ([dayDraftChanged]). The
 /// summary stays for the days nothing can be saved on, and for a past day,
 /// whose primary is the relato (F-67).
+/// F-07 (PR 4b) — another child's row on the same date, in the SAME state
+/// (same planned carer, same real carer, no request open): a swap asked for
+/// this day can be asked for that child too, as its own request.
+class DaySheetSibling {
+  final int childId;
+  final String childName;
+  final CareSchedule day;
+
+  const DaySheetSibling(
+      {required this.childId, required this.childName, required this.day});
+}
+
 Future<DaySheetOutcome?> showDaySheet({
   required BuildContext context,
   required DateTime date,
@@ -94,6 +106,7 @@ Future<DaySheetOutcome?> showDaySheet({
   VoidCallback? onOpenChildren,
   int? childId,
   String? childName,
+  List<DaySheetSibling> siblings = const [],
 }) {
   return showAppSheet<DaySheetOutcome>(
     context: context,
@@ -118,6 +131,7 @@ Future<DaySheetOutcome?> showDaySheet({
       onOpenChildren: onOpenChildren,
       childId: childId,
       childName: childName,
+      siblings: siblings,
     ),
   );
 }
@@ -168,6 +182,9 @@ class _DaySheet extends StatefulWidget {
   final int? childId;
   final String? childName;
 
+  /// F-07 (PR 4b): the other children the same swap can be asked for.
+  final List<DaySheetSibling> siblings;
+
   const _DaySheet({
     required this.date,
     required this.day,
@@ -189,6 +206,7 @@ class _DaySheet extends StatefulWidget {
     this.onOpenChildren,
     this.childId,
     this.childName,
+    this.siblings = const [],
   });
 
   @override
@@ -200,6 +218,9 @@ class _DaySheetState extends State<_DaySheet> {
   int _actualParentId = 0; // 0 = same as planned (web sentinel)
   late final TextEditingController _notes;
   late final TextEditingController _swapMessage; // F-44
+
+  /// F-07 (PR 4b): the other children this swap is also asked for.
+  final Set<int> _alsoFor = {};
   /// U-37: one value, picked by the platform; null is "no handoff time".
   TimeOfDay? _handoff;
   bool _saving = false;
@@ -902,6 +923,19 @@ class _DaySheetState extends State<_DaySheet> {
           myProfile: _requireMyProfile(),
           allProfiles: widget.allProfiles,
         );
+        // F-07 (PR 4b): one request per child — each lane keeps its own
+        // two-party workflow, and the approver sees them together.
+        for (final sibling in widget.siblings) {
+          if (!_alsoFor.contains(sibling.childId)) continue;
+          await widget.dataSource.createSwapRequest(
+            schedule: sibling.day,
+            proposedActualParentId: proposed,
+            proposedHandoffTime: handoffWire,
+            requestMessage: _swapMessage.text,
+            myProfile: _requireMyProfile(),
+            allProfiles: widget.allProfiles,
+          );
+        }
         if (mounted) _finish(DaySheetOutcome.swapRequested);
         return;
       }
@@ -1852,6 +1886,32 @@ class _DaySheetState extends State<_DaySheet> {
                 controller: _swapMessage,
                 maxLength: 200,
               ),
+              // F-07 (PR 4b): the same swap for the other children whose day
+              // is in the same state — never for a revert, which undoes one
+              // child's approved swap.
+              if (widget.siblings.isNotEmpty &&
+                  widget.day?.actualParentId == null) ...[
+                const SizedBox(height: Spacing.sm),
+                AppFieldLabel(l[KApp.editorAlsoFor]),
+                Wrap(
+                  key: const ValueKey('day-also-for'),
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final sibling in widget.siblings)
+                      FilterChip(
+                        key: ValueKey('day-also-for-${sibling.childId}'),
+                        label: Text(sibling.childName),
+                        selected: _alsoFor.contains(sibling.childId),
+                        onSelected: _saving
+                            ? null
+                            : (on) => setState(() => on
+                                ? _alsoFor.add(sibling.childId)
+                                : _alsoFor.remove(sibling.childId)),
+                      ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

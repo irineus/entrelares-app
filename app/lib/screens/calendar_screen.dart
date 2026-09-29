@@ -1265,6 +1265,7 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Future<void> _openFrozenDay(SwapRequest request) async {
     HapticFeedback.selectionClick();
+    final iso = CareSchedule.isoDate(request.scheduleDate);
     final outcome = await showFrozenDaySheet(
       context: context,
       request: request,
@@ -1272,6 +1273,20 @@ class _CalendarScreenState extends State<CalendarScreen>
       ownProfileId: _ownProfile?.id,
       dataSource: widget.dataSource,
       offline: _offline,
+      childName: _perChild ? _childName(request.childId) : null,
+      // F-07 (PR 4b): the other children's requests of this day, from the
+      // same requester to the same approver — approved together.
+      siblings: _perChild
+          ? [
+              for (final r in _monthFrozen)
+                if (r.id != request.id &&
+                    r.status == request.status &&
+                    r.requestingProfileId == request.requestingProfileId &&
+                    r.targetProfileId == request.targetProfileId &&
+                    CareSchedule.isoDate(r.scheduleDate) == iso)
+                  r,
+            ]
+          : const [],
     );
     if (outcome != null) {
       _load(silent: true);
@@ -1630,6 +1645,29 @@ class _CalendarScreenState extends State<CalendarScreen>
     }
   }
 
+  /// F-07 (PR 4b) — the other children whose [date] is in the SAME state as
+  /// the lane on screen (same planned carer, same real carer, nothing
+  /// pending): a swap asked for this child can be asked for them too.
+  List<DaySheetSibling> _daySiblings(DateTime date) {
+    if (!_perChild || _lane == null) return const [];
+    final iso = CareSchedule.isoDate(date);
+    final mine = _daysByIso[iso];
+    if (mine == null) return const [];
+    return [
+      for (final c in _children)
+        if (c.id != _lane)
+          for (final d in _monthRows)
+            if (d.childId == c.id &&
+                CareSchedule.isoDate(d.scheduleDate) == iso &&
+                d.scheduledParentId == mine.scheduledParentId &&
+                d.actualParentId == mine.actualParentId &&
+                !_monthFrozen.any((r) =>
+                    r.childId == c.id &&
+                    CareSchedule.isoDate(r.scheduleDate) == iso))
+              DaySheetSibling(childId: c.id, childName: c.firstName, day: d),
+    ];
+  }
+
   Future<void> _openDay(DateTime date) async {
     HapticFeedback.selectionClick();
     final iso = CareSchedule.isoDate(date);
@@ -1660,6 +1698,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       onOpenChildren: widget.onOpenChildren,
       childId: _perChild ? _lane : null,
       childName: _perChild ? _childName(_lane) : null,
+      siblings: _daySiblings(date),
     );
     if (outcome != null) {
       _load(silent: true);
@@ -1674,6 +1713,31 @@ class _CalendarScreenState extends State<CalendarScreen>
             }]);
       }
     }
+  }
+
+  /// F-07 (PR 4b) — *Todas*, today, children with different carers: who has
+  /// whom, in the family's order. Null everywhere else.
+  String? _todayLaneSummary(Localization l) {
+    if (!_perChild || _lane != null) return null;
+    final todayIso = CareSchedule.isoDate(_today);
+    final rows = [
+      for (final c in _children)
+        for (final d in _upcomingRows)
+          if (d.childId == c.id && CareSchedule.isoDate(d.scheduleDate) == todayIso)
+            d,
+    ];
+    if ({for (final r in rows) r.effectiveParentId}.length < 2) return null;
+    return [
+      for (final r in rows)
+        l.format(KApp.calLaneWith, [
+          _childName(r.childId) ?? '',
+          _members
+                  .where((m) => m.id == r.effectiveParentId)
+                  .firstOrNull
+                  ?.fullName ??
+              '',
+        ]),
+    ].join('; ');
   }
 
   /// F-07 — whose plan is on screen: *Todas as crianças* or one child.
@@ -1767,6 +1831,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       onGoToToday: _goToToday,
       onInvite: _onInviteNudgeTap,
       noticeStrip: _noticeStrip(context, todayRow, nextHandoff),
+      laneSummary: _todayLaneSummary(AppL10n.of(context).l),
     );
   }
 
