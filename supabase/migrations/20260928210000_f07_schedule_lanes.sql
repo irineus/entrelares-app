@@ -349,6 +349,15 @@ BEGIN
 		RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
 	END IF;
 
+	-- F-07: the plan-mode switch (`set_schedule_mode`, PR 3) moves the plan
+	-- from today on between lanes as ONE admin act — an approved swap's day
+	-- is copied with its real parent, which a direct write could never do.
+	-- The RPC has already checked the flag, the admin, and that no request is
+	-- pending from today on; a client cannot set a GUC through PostgREST.
+	IF current_setting('app.schedule_mode_switch', true) = 'on' THEN
+		RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+	END IF;
+
 	-- System context (service_role: F-24 auto-approval, migrations): unrestricted.
 	SELECT id, is_admin INTO cur_profile_id, cur_is_admin
 	FROM public.profiles WHERE user_id = auth.uid();
