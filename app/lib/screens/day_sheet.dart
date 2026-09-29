@@ -92,6 +92,8 @@ Future<DaySheetOutcome?> showDaySheet({
   bool offline = false,
   VoidCallback? onOpenPlan,
   VoidCallback? onOpenChildren,
+  int? childId,
+  String? childName,
 }) {
   return showAppSheet<DaySheetOutcome>(
     context: context,
@@ -114,6 +116,8 @@ Future<DaySheetOutcome?> showDaySheet({
       offline: offline,
       onOpenPlan: onOpenPlan,
       onOpenChildren: onOpenChildren,
+      childId: childId,
+      childName: childName,
     ),
   );
 }
@@ -158,6 +162,12 @@ class _DaySheet extends StatefulWidget {
   /// Where the agenda's "add the child" door lands (`/family/children`).
   final VoidCallback? onOpenChildren;
 
+  /// F-07: the lane this day belongs to — null in a single-plan family, the
+  /// child in a per-child one. Every read and write of the day stays in it;
+  /// [childName] heads the sheet so nobody edits one child's day for another.
+  final int? childId;
+  final String? childName;
+
   const _DaySheet({
     required this.date,
     required this.day,
@@ -177,6 +187,8 @@ class _DaySheet extends StatefulWidget {
     this.offline = false,
     this.onOpenPlan,
     this.onOpenChildren,
+    this.childId,
+    this.childName,
   });
 
   @override
@@ -408,7 +420,8 @@ class _DaySheetState extends State<_DaySheet> {
       // failed read behaves like "no previous day": transition, T-27 keeps
       // the time and the T-45 DB rule remains the enforcement).
       _prevEffective = widget.dataSource
-          .fetchDay(widget.date.subtract(const Duration(days: 1)))
+          .fetchDay(widget.date.subtract(const Duration(days: 1)),
+              childId: widget.childId)
           .then((s) => s?.effectiveParentId)
           .catchError((_) => null);
     } else {
@@ -843,6 +856,8 @@ class _DaySheetState extends State<_DaySheet> {
           restoreNotes: _revertNotesChoice ?? false,
           myProfile: _requireMyProfile(),
           allProfiles: widget.allProfiles,
+          childId: widget.childId,
+          scheduleId: widget.day?.id,
         );
         if (mounted) _finish(DaySheetOutcome.revertRequested);
         return;
@@ -868,6 +883,7 @@ class _DaySheetState extends State<_DaySheet> {
           notes: notesText.isEmpty ? null : notesText,
           revision: existing?.revision ?? 0,
           revisionToken: existing?.revisionToken ?? '',
+          childId: widget.childId,
         );
         if (existing == null) {
           await widget.dataSource.insertDay(base);
@@ -876,7 +892,8 @@ class _DaySheetState extends State<_DaySheet> {
         }
         _trackNote(existing?.notes, notesText);
         // Reload to get the id (and fresh tokens) if it was just inserted.
-        final refreshed = await widget.dataSource.fetchDay(widget.date);
+        final refreshed = await widget.dataSource
+            .fetchDay(widget.date, childId: widget.childId);
         await widget.dataSource.createSwapRequest(
           schedule: refreshed ?? base,
           proposedActualParentId: proposed,
@@ -899,6 +916,7 @@ class _DaySheetState extends State<_DaySheet> {
         notes: notesText.isEmpty ? null : notesText,
         revision: existing?.revision ?? 0,
         revisionToken: existing?.revisionToken ?? '',
+        childId: widget.childId,
       );
       if (existing == null) {
         await widget.dataSource.insertDay(row);
@@ -939,7 +957,8 @@ class _DaySheetState extends State<_DaySheet> {
     // moves no text (the server ignores the choice too).
     if (_agendaOn) return false;
     final snapshot =
-        await widget.dataSource.fetchPreEditNotes(widget.date);
+        await widget.dataSource
+            .fetchPreEditNotes(widget.date, childId: widget.childId);
     if (snapshot == null) return false;
     final current = widget.day?.notes;
     if (!notesDifferForRevert(current, snapshot.notes)) return false;
@@ -1087,6 +1106,8 @@ class _DaySheetState extends State<_DaySheet> {
     return AppSheetFrame(
       title: _capitalize('${formatHandoffDate(widget.date, l)} · '
           '${daysUntilLabel(widget.date, widget.today, l)}'),
+      // F-07: in a per-child plan the sheet names whose day it is.
+      subtitle: widget.childName,
       // U-25: the visible way out, in both modes.
       onClose: () => Navigator.of(context).pop(),
       closeLabel: l[K.commonClose],

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -141,6 +142,10 @@ class CalendarScreen extends StatefulWidget {
   /// F-70: the plan-end strip, for tests.
   static const planEndStripKey = Key('plan-end-strip');
 
+  /// F-07: the lane chips, and the "which child?" question.
+  static const laneChipsKey = Key('lane-chips');
+  static const laneChooserKey = Key('lane-chooser');
+
   const CalendarScreen(
       {super.key,
       required this.dataSource,
@@ -211,6 +216,68 @@ class _CalendarScreenState extends State<CalendarScreen>
   // F-12: the visible month's OPEN swap requests — the frozen-day source
   // (paint, guards, panel). Keyed alongside _daysByIso on every load.
   Map<String, SwapRequest> _frozenByIso = const {};
+
+  // ── F-07: the plan per child ──
+  /// Every row of the visible month, EVERY lane — [_daysByIso] and
+  /// [_frozenByIso] are the view of them the screen shows ([_applyLaneView]).
+  List<CareSchedule> _monthRows = const [];
+  List<SwapRequest> _monthFrozen = const [];
+  List<CareSchedule> _upcomingRows = const [];
+
+  /// The family's children, in their order — read only for a per-child plan.
+  List<Child> _children = const [];
+
+  /// The lane on screen in a per-child family: a child, or null for *Todas*.
+  int? _lane;
+
+  /// *Todas*: the dates whose children are with different carers, each with
+  /// every lane's row — the cell paints the split, a tap asks which child.
+  Map<String, List<CareSchedule>> _divergentByIso = const {};
+
+  bool get _perChild => (_family?.isPerChild ?? false) && _children.isNotEmpty;
+
+  String? _childName(int? id) =>
+      _children.where((c) => c.id == id).firstOrNull?.firstName;
+
+  /// Derives what the grid, the sheets and the today card read from the
+  /// month's rows and the lane on screen. A single-plan family gets exactly
+  /// what it always had: its rows are all in the family lane.
+  void _applyLaneView() {
+    final lane = _perChild ? _lane : null;
+    final order = [for (final c in _children) c.id];
+    final days = LaneViewRules.view<CareSchedule>(
+      rows: _monthRows,
+      isoOf: (d) => CareSchedule.isoDate(d.scheduleDate),
+      childOf: (d) => d.childId,
+      effectiveOf: (d) => d.effectiveParentId,
+      lane: lane,
+      childOrder: order,
+    );
+    // Web parity (Home's frozenRequests.First per day): one request per date
+    // and lane — the DB's one-pending-per-date-per-lane index guarantees it.
+    final frozen = LaneViewRules.view<SwapRequest>(
+      rows: _monthFrozen,
+      isoOf: (r) => CareSchedule.isoDate(r.scheduleDate),
+      childOf: (r) => r.childId,
+      effectiveOf: (r) => r.proposedActualParentId,
+      lane: lane,
+      childOrder: order,
+    );
+    final upcoming = LaneViewRules.view<CareSchedule>(
+      rows: _upcomingRows,
+      isoOf: (d) => CareSchedule.isoDate(d.scheduleDate),
+      childOf: (d) => d.childId,
+      effectiveOf: (d) => d.effectiveParentId,
+      lane: lane,
+      childOrder: order,
+    );
+    _daysByIso = days.byIso;
+    _divergentByIso = _perChild && lane == null ? days.divergent : const {};
+    _frozenByIso = frozen.byIso;
+    _upcoming = upcoming.byIso.values.toList()
+      ..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
+  }
+
   bool _loading = true;
 
   /// F-51: the Realtime burst of a range operation folds into one reload.
@@ -457,18 +524,15 @@ class _CalendarScreenState extends State<CalendarScreen>
       if (_members.isEmpty) _members = snap.members;
       if (_roles.isEmpty) _roles = snap.roles;
       _ownProfile ??= snap.ownProfile;
-      if (_upcoming.isEmpty) _upcoming = snap.upcoming;
+      if (_upcomingRows.isEmpty) _upcomingRows = snap.upcoming;
       if (fillsGrid) {
-        _daysByIso = {
-          for (final d in snap.days) CareSchedule.isoDate(d.scheduleDate): d
-        };
-        _frozenByIso = {
-          for (final r in snap.frozen) CareSchedule.isoDate(r.scheduleDate): r
-        };
+        _monthRows = snap.days;
+        _monthFrozen = snap.frozen;
         _loadedMonth = month;
         _loading = false;
         _loadError = null;
       }
+      _applyLaneView();
     });
     // U-28: the account button in every tab's app bar wears the profile — from
     // the copy too, or an offline boot shows a "?" where the reader's initial
@@ -559,6 +623,10 @@ class _CalendarScreenState extends State<CalendarScreen>
       final agendaTurnedOn = settings != null &&
           settings.childAgendaEnabled &&
           !_settings.childAgendaEnabled;
+      // F-07: a switch of the plan's mode (here or on another device) needs
+      // the children and the lanes — the next load reads them.
+      final modeChanged = !failed &&
+          (family?.isPerChild ?? false) != (_family?.isPerChild ?? false);
       setState(() {
         if (!failed || _family == null) {
           _family = family;
@@ -569,7 +637,9 @@ class _CalendarScreenState extends State<CalendarScreen>
           _settingsRead = true;
         }
       });
-      if (agendaTurnedOn && _loadedMonth != null) _load(silent: true);
+      if ((agendaTurnedOn || modeChanged) && _loadedMonth != null) {
+        _load(silent: true);
+      }
     } finally {
       _horizonInFlight = false;
       if (mounted) {
@@ -744,6 +814,15 @@ class _CalendarScreenState extends State<CalendarScreen>
       } else {
         agendaByIso = const {};
       }
+      // F-07: the children name the lanes; read only for a per-child plan.
+      var children = _children;
+      if (_family?.isPerChild ?? false) {
+        try {
+          children = await widget.dataSource.fetchChildren();
+        } catch (_) {/* keep whatever we had */}
+      } else {
+        children = const [];
+      }
       var todayNotices = _todayNotices;
       var yesterdayRow = _yesterdayRow;
       try {
@@ -755,16 +834,13 @@ class _CalendarScreenState extends State<CalendarScreen>
       setState(() {
         _members = members;
         _roles = roles;
-        _daysByIso = {
-          for (final d in days) CareSchedule.isoDate(d.scheduleDate): d
-        };
-        // Web parity (Home's frozenRequests.First per day): one request per
-        // date matters — the DB's one-pending-per-date index guarantees it.
-        _frozenByIso = {
-          for (final r in frozen) CareSchedule.isoDate(r.scheduleDate): r
-        };
+        _monthRows = days;
+        _monthFrozen = frozen;
+        _children = children;
+        if (_lane != null && !children.any((c) => c.id == _lane)) _lane = null;
         _ownProfile = ownProfile;
-        _upcoming = upcoming;
+        _upcomingRows = upcoming;
+        _applyLaneView();
         _todayNotices = todayNotices;
         _yesterdayRow = yesterdayRow;
         _lastPlannedDay = lastPlannedDay;
@@ -1102,9 +1178,64 @@ class _CalendarScreenState extends State<CalendarScreen>
     });
   }
 
+  /// F-07 — in *Todas* a write needs a child. Asks which one (naming who has
+  /// the child on [date], when there is a date) and moves the calendar to
+  /// that child's lane. False when the reader closed the question.
+  Future<bool> _ensureLane({DateTime? date}) async {
+    if (!_perChild || _lane != null) return true;
+    final l = AppL10n.of(context).l;
+    final iso = date == null ? null : CareSchedule.isoDate(date);
+    String? carerOn(Child c) {
+      if (iso == null) return null;
+      final row = _monthRows
+          .where((d) =>
+              d.childId == c.id && CareSchedule.isoDate(d.scheduleDate) == iso)
+          .firstOrNull;
+      if (row == null) return null;
+      return _members
+          .where((m) => m.id == row.effectiveParentId)
+          .firstOrNull
+          ?.fullName;
+    }
+
+    final chosen = await showAppSheet<int>(
+      context: context,
+      builder: (context) => AppSheetFrame(
+        key: CalendarScreen.laneChooserKey,
+        title: l[KApp.calLaneChoose],
+        onClose: () => Navigator.of(context).pop(),
+        closeLabel: l[K.commonClose],
+        children: [
+          for (final c in _children)
+            ListTile(
+              key: ValueKey('lane-choose-${c.id}'),
+              leading: const Icon(Icons.child_care_outlined),
+              title: Text(c.firstName),
+              subtitle: carerOn(c) == null ? null : Text(carerOn(c)!),
+              onTap: () => Navigator.of(context).pop(c.id),
+            ),
+        ],
+      ),
+    );
+    if (chosen == null || !mounted) return false;
+    _selectLane(chosen);
+    return true;
+  }
+
+  void _selectLane(int? lane) {
+    if (lane == _lane) return;
+    setState(() {
+      _lane = lane;
+      // A selection belongs to the lane it was made in.
+      _selectedDays.clear();
+      _applyLaneView();
+    });
+  }
+
   /// Mirror of LongPressDay: entering selection always ADDS the day.
-  void _onDayLongPress(DateTime date) {
+  Future<void> _onDayLongPress(DateTime date) async {
     if (_iAmViewer) return;
+    if (!await _ensureLane(date: date) || !mounted) return;
     HapticFeedback.mediumImpact();
     setState(() => _selectedDays.add(dateOnly(date)));
   }
@@ -1119,7 +1250,9 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   /// What a tap on [date]'s cell opens — also a day cited in the Conversa.
-  void _openDayAsTapped(DateTime date) {
+  Future<void> _openDayAsTapped(DateTime date) async {
+    // F-07: in *Todas* the day is some child's — ask whose.
+    if (!await _ensureLane(date: date) || !mounted) return;
     // Web parity (HandleDayClick): a day with a pending request opens the
     // frozen panel instead of the editor — for everyone, admins included.
     final frozen = _frozenByIso[CareSchedule.isoDate(date)];
@@ -1182,6 +1315,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       frozenDates: [for (final r in _frozenByIso.values) r.scheduleDate],
       myProfile: _ownProfile,
       allProfiles: _members,
+      childId: _lane,
     );
     if (summary != null) {
       // Mirror of FinishBulkSave: the selection clears (armed state stays),
@@ -1258,6 +1392,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       dataSource: widget.dataSource,
       myProfile: my,
       allProfiles: _members,
+      childId: _lane,
     );
     if (summary != null) {
       // Same exit as the bulk sheet: selection clears, month reloads, the
@@ -1383,6 +1518,8 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Future<void> _openWizard({DateTime? start}) async {
     if (_refuseWriteOffline()) return;
+    // F-07: a plan is one child's in a per-child family.
+    if (!await _ensureLane() || !mounted) return;
     final generated = await showWizardSheet(
       context: context,
       activeMembers: _assignableMembers,
@@ -1397,6 +1534,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       adminBypass: _adminBypass,
       adminOffer: _adminOfferer,
       analytics: widget.analytics,
+      childId: _lane,
     );
     if (generated == true) _load(silent: true);
   }
@@ -1433,13 +1571,22 @@ class _CalendarScreenState extends State<CalendarScreen>
     // Only what the server will actually delete: a frozen day (pending
     // request) and a day holding an approved swap are kept by the RPC's
     // WHERE, so they must not be counted as "serão apagados" here either.
-    final count = plannedDaysInRange([
-      for (final d in _daysByIso.values)
-        if (!_frozenByIso.containsKey(CareSchedule.isoDate(d.scheduleDate)) &&
+    // F-07: the lane on screen — or, in *Todas*, every lane (one row each).
+    final lane = _perChild ? _lane : null;
+    bool frozenRow(CareSchedule d) => _monthFrozen.any((r) =>
+        r.childId == d.childId &&
+        CareSchedule.isoDate(r.scheduleDate) ==
+            CareSchedule.isoDate(d.scheduleDate));
+    final count = [
+      for (final d in _monthRows)
+        if ((lane == null || d.childId == lane) &&
+            !frozenRow(d) &&
             (d.actualParentId == null ||
-                d.actualParentId == d.scheduledParentId))
-          d.scheduleDate,
-    ], range);
+                d.actualParentId == d.scheduledParentId) &&
+            !d.scheduleDate.isBefore(range.from) &&
+            !d.scheduleDate.isAfter(range.to))
+          d,
+    ].length;
     if (count == 0) {
       showAppSnack(
           context, l.format(K.calClearMonthNothing, [fromText, toText]));
@@ -1467,7 +1614,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (proceed != true || !mounted) return;
     try {
       final result =
-          await widget.dataSource.clearScheduleRange(range.from, range.to);
+          await widget.dataSource
+              .clearScheduleRange(range.from, range.to, childId: lane);
       if (!mounted) return;
       _load(silent: true);
       showAppSnack(context, clearRangeSummary(l, result));
@@ -1510,6 +1658,8 @@ class _CalendarScreenState extends State<CalendarScreen>
       offline: _offline,
       onOpenPlan: widget.onOpenPlan,
       onOpenChildren: widget.onOpenChildren,
+      childId: _perChild ? _lane : null,
+      childName: _perChild ? _childName(_lane) : null,
     );
     if (outcome != null) {
       _load(silent: true);
@@ -1525,6 +1675,35 @@ class _CalendarScreenState extends State<CalendarScreen>
       }
     }
   }
+
+  /// F-07 — whose plan is on screen: *Todas as crianças* or one child.
+  Widget _laneChips(Localization l) => Padding(
+        key: CalendarScreen.laneChipsKey,
+        padding: const EdgeInsets.fromLTRB(
+            Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              ChoiceChip(
+                key: const ValueKey('lane-all'),
+                label: Text(l[KApp.calLaneAll]),
+                selected: _lane == null,
+                onSelected: (_) => _selectLane(null),
+              ),
+              for (final c in _children) ...[
+                const SizedBox(width: Spacing.sm),
+                ChoiceChip(
+                  key: ValueKey('lane-${c.id}'),
+                  label: Text(c.firstName),
+                  selected: _lane == c.id,
+                  onSelected: (_) => _selectLane(c.id),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
 
   /// Web: GoToToday — no-op when already on the current month (the card is
   /// not tappable then anyway).
@@ -2232,6 +2411,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               ),
             ),
           const Divider(height: 1),
+          if (_perChild) _laneChips(l),
           Expanded(
             child: PageView.builder(
               controller: _pageController,
@@ -2265,6 +2445,11 @@ class _CalendarScreenState extends State<CalendarScreen>
                       : _MonthGrid(
                           month: month,
                           daysByIso: isVisible ? _daysByIso : const {},
+                          divergentByIso:
+                              isVisible ? _divergentByIso : const {},
+                          laneNames: {
+                            for (final c in _children) c.id: c.firstName
+                          },
                           frozenByIso: isVisible ? _frozenByIso : const {},
                           agendaByIso: isVisible ? _agendaByIso : const {},
                           ownProfileId: _ownProfile?.id,
@@ -2518,6 +2703,12 @@ class _Legend extends StatelessWidget {
 class _MonthGrid extends StatelessWidget {
   final DateTime month;
   final Map<String, CareSchedule> daysByIso;
+
+  /// F-07: *Todas* — the dates whose children are with different carers.
+  final Map<String, List<CareSchedule>> divergentByIso;
+
+  /// F-07: child id → first name, for the split cell's spoken label.
+  final Map<int, String> laneNames;
   final Map<String, SwapRequest> frozenByIso;
   final Map<String, List<ChildEvent>> agendaByIso;
   final int? ownProfileId;
@@ -2541,6 +2732,8 @@ class _MonthGrid extends StatelessWidget {
   const _MonthGrid({
     required this.month,
     required this.daysByIso,
+    this.divergentByIso = const {},
+    this.laneNames = const {},
     required this.frozenByIso,
     this.agendaByIso = const {},
     required this.ownProfileId,
@@ -2712,6 +2905,10 @@ class _MonthGrid extends StatelessWidget {
                   date: DateTime(month.year, month.month, day),
                   day: daysByIso[CareSchedule.isoDate(
                       DateTime(month.year, month.month, day))],
+                  lanes: divergentByIso[CareSchedule.isoDate(
+                          DateTime(month.year, month.month, day))] ??
+                      const [],
+                  laneNames: laneNames,
                   frozenMark: _markFor(
                       frozenByIso[CareSchedule.isoDate(
                           DateTime(month.year, month.month, day))],
@@ -2834,6 +3031,11 @@ class _FrozenMark {
 class _DayCell extends StatelessWidget {
   final DateTime date;
   final CareSchedule? day;
+
+  /// F-07: on a divergent date of *Todas*, every child's row — the fill is
+  /// split between their carers' tones and the cell says who has whom.
+  final List<CareSchedule> lanes;
+  final Map<int, String> laneNames;
   final _FrozenMark? frozenMark;
   final List<MemberView> views;
 
@@ -2851,6 +3053,8 @@ class _DayCell extends StatelessWidget {
   const _DayCell({
     required this.date,
     required this.day,
+    this.lanes = const [],
+    this.laneNames = const {},
     required this.frozenMark,
     required this.views,
     this.agenda = const [],
@@ -2937,7 +3141,22 @@ class _DayCell extends StatelessWidget {
           );
     final paint = dayPaint(assignment, views);
     final slot = _slotOf(context, paint);
-    final initial = parentInitial(assignment, views);
+    final split = lanes.length > 1;
+    // F-07: one tone per distinct carer, in the children's order.
+    final splitTones = split
+        ? [
+            for (final carer in {for (final r in lanes) r.effectiveParentId})
+              _slotOf(context, DaySlot(profileSlotIndex(carer, views)))
+                  .tone
+                  .container,
+          ]
+        : const <Color>[];
+    final initial = split
+        ? [
+            for (final carer in {for (final r in lanes) r.effectiveParentId})
+              displayInitials(carer, views),
+          ].join('/')
+        : parentInitial(assignment, views);
     final assigned = paint is! DayUnassigned;
     // The swap wears a dashed border instead of the slot's solid one — the
     // border IS the signal, so it cannot be drawn twice.
@@ -2953,7 +3172,16 @@ class _DayCell extends StatelessWidget {
     // responsible, the swap and the handoff time are the whole calendar.
     String? responsibleName;
     final effectiveId = assignment?.effectiveParentId;
-    if (effectiveId != null) {
+    if (split) {
+      // F-07: "Lia com Ana; Theo com Bruno" — the split said aloud.
+      String nameOf(int id) =>
+          views.where((v) => v.id == id).firstOrNull?.fullName ?? '';
+      responsibleName = [
+        for (final r in lanes)
+          l.format(KApp.calLaneWith,
+              [laneNames[r.childId] ?? '', nameOf(r.effectiveParentId)]),
+      ].join('; ');
+    } else if (effectiveId != null) {
       for (final v in views) {
         if (v.id == effectiveId) {
           responsibleName = v.fullName;
@@ -3003,9 +3231,25 @@ class _DayCell extends StatelessWidget {
               borderRadius: BorderRadius.circular(Radii.md),
               color: isSelected
                   ? primary.withValues(alpha: 0.12)
-                  : assigned
-                      ? slot.tone.container
-                      : null,
+                  : split
+                      ? null
+                      : assigned
+                          ? slot.tone.container
+                          : null,
+              // F-07: a hard-stop split, one band per carer.
+              gradient: split && !isSelected
+                  ? LinearGradient(
+                      colors: [
+                        for (final c in splitTones) ...[c, c],
+                      ],
+                      stops: [
+                        for (var i = 0; i < splitTones.length; i++) ...[
+                          i / splitTones.length,
+                          (i + 1) / splitTones.length,
+                        ],
+                      ],
+                    )
+                  : null,
             ),
             // U-48: the border is a FOREGROUND decoration, so the ink below
             // fills the whole cell (a `decoration` border insets the child by
@@ -3045,7 +3289,7 @@ class _DayCell extends StatelessWidget {
                 hoverColor: (assigned ? slot.tone.solid : tokens.text)
                     .withValues(alpha: _hoverAlpha),
                 child: CustomPaint(
-              painter: assigned
+              painter: assigned && !split
                   ? SlotPatternPainter(slot.pattern, slot.tone.border)
                   : null,
               // U-39: one clamp over the cell's texts, a no-op wherever the
@@ -3060,14 +3304,18 @@ class _DayCell extends StatelessWidget {
                     const SizedBox(height: DayCellType.gap),
                     DayCellAvatar(
                       radius: type.avatarRadius,
-                      color: assigned ? slot.tone.solid : Colors.transparent,
+                      color: assigned && !split
+                          ? slot.tone.solid
+                          : Colors.transparent,
                       child: Text(initial,
                           style: TextStyle(
                               fontSize: type.initial,
                               height: 1,
-                              color: assigned
-                                  ? slot.tone.onSolid
-                                  : Theme.of(context).hintColor)),
+                              color: split
+                                  ? tokens.text
+                                  : assigned
+                                      ? slot.tone.onSolid
+                                      : Theme.of(context).hintColor)),
                     ),
                     // U-29 round 4 (owner): the same breath the date already
                     // gets above the avatar — without it the time sat glued to

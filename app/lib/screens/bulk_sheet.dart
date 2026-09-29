@@ -34,6 +34,7 @@ Future<String?> showBulkSheet({
   Iterable<DateTime> frozenDates = const [],
   Member? myProfile,
   List<Member> allProfiles = const [],
+  int? childId,
 }) {
   return showAppSheet<String>(
     context: context,
@@ -50,6 +51,7 @@ Future<String?> showBulkSheet({
       frozenDates: frozenDates,
       myProfile: myProfile,
       allProfiles: allProfiles,
+      childId: childId,
     ),
   );
 }
@@ -78,6 +80,9 @@ class _BulkSheet extends StatefulWidget {
   final Member? myProfile;
   final List<Member> allProfiles;
 
+  /// F-07: the lane the selection lives in (null in a single-plan family).
+  final int? childId;
+
   const _BulkSheet({
     required this.selectedDays,
     required this.daysByIso,
@@ -91,6 +96,7 @@ class _BulkSheet extends StatefulWidget {
     required this.frozenDates,
     required this.myProfile,
     required this.allProfiles,
+    this.childId,
   });
 
   @override
@@ -285,7 +291,9 @@ class _BulkSheetState extends State<_BulkSheet> {
     // Outside the loaded month (the 1st): ask the server, best-effort.
     if (date.day == 1) {
       try {
-        return (await widget.dataSource.fetchDay(prev))?.effectiveParentId;
+        return (await widget.dataSource
+                .fetchDay(prev, childId: widget.childId))
+            ?.effectiveParentId;
       } catch (_) {
         return null;
       }
@@ -491,6 +499,7 @@ class _BulkSheetState extends State<_BulkSheet> {
                     : existingRow?.notes,
             revision: existingRow?.revision ?? 0,
             revisionToken: existingRow?.revisionToken ?? '',
+            childId: widget.childId,
           );
           // T-33: a conflicted day (someone else saved/requested first) is
           // counted and skipped — the rest of the batch proceeds.
@@ -500,7 +509,8 @@ class _BulkSheetState extends State<_BulkSheet> {
             } else {
               await widget.dataSource.updateDay(base);
             }
-            final refreshed = await widget.dataSource.fetchDay(date);
+            final refreshed = await widget.dataSource
+                .fetchDay(date, childId: widget.childId);
             await widget.dataSource.createSwapRequest(
               schedule: refreshed ?? base,
               proposedActualParentId: _actualParentId,
@@ -580,6 +590,7 @@ class _BulkSheetState extends State<_BulkSheet> {
           notes: proposed.notes,
           revision: existingRow?.revision ?? 0,
           revisionToken: existingRow?.revisionToken ?? '',
+          childId: widget.childId,
         );
         try {
           if (existingRow == null) {
