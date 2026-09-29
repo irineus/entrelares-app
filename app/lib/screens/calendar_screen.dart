@@ -227,6 +227,10 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// The family's children, in their order — read only for a per-child plan.
   List<Child> _children = const [];
 
+  /// F-07 (PR 5c): yesterday in every lane — the aviso's second end, per
+  /// child. Read only for a per-child plan ([_yesterdayRow] is the family's).
+  List<CareSchedule> _yesterdayRows = const [];
+
   /// The lane on screen in a per-child family: a child, or null for *Todas*.
   int? _lane;
 
@@ -816,12 +820,16 @@ class _CalendarScreenState extends State<CalendarScreen>
       }
       // F-07: the children name the lanes; read only for a per-child plan.
       var children = _children;
+      var yesterdayRows = _yesterdayRows;
       if (_family?.isPerChild ?? false) {
         try {
           children = await widget.dataSource.fetchChildren();
+          yesterdayRows = await widget.dataSource.fetchUpcoming(
+              DateTime(_today.year, _today.month, _today.day - 1), 0);
         } catch (_) {/* keep whatever we had */}
       } else {
         children = const [];
+        yesterdayRows = const [];
       }
       var todayNotices = _todayNotices;
       var yesterdayRow = _yesterdayRow;
@@ -837,6 +845,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         _monthRows = days;
         _monthFrozen = frozen;
         _children = children;
+        _yesterdayRows = yesterdayRows;
         if (_lane != null && !children.any((c) => c.id == _lane)) _lane = null;
         _ownProfile = ownProfile;
         _upcomingRows = upcoming;
@@ -1857,6 +1866,9 @@ class _CalendarScreenState extends State<CalendarScreen>
   bool _canSendNotice(CareSchedule? todayRow, DateTime? nextHandoff) {
     final me = _ownProfile?.id;
     if (me == null) return false;
+    // F-07 (PR 5c): per child, the ends of the day in ANY lane — the server's
+    // own rule since PR 5a.
+    if (_perChild) return _laneNoticeSenders().contains(me);
     CareSchedule? nextRow;
     if (nextHandoff != null) {
       final iso = CareSchedule.isoDate(nextHandoff);
@@ -1872,6 +1884,47 @@ class _CalendarScreenState extends State<CalendarScreen>
       previousParentId: _yesterdayRow?.effectiveParentId,
       nextHandoffParentId: nextRow?.effectiveParentId,
     ).contains(me);
+  }
+
+  /// F-07 (PR 5c) — `noticeSenderIds` for every child's lane, united.
+  Set<int> _laneNoticeSenders() {
+    final todayIso = CareSchedule.isoDate(_today);
+    final senders = <int>{};
+    for (final c in _children) {
+      final lane = [
+        for (final d in _upcomingRows)
+          if (d.childId == c.id) d,
+      ]..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
+      final today = lane
+          .where((d) => CareSchedule.isoDate(d.scheduleDate) == todayIso)
+          .firstOrNull;
+      final yesterday =
+          _yesterdayRows.where((d) => d.childId == c.id).firstOrNull;
+      final next = today == null
+          ? null
+          : nextHandoffDate(today.effectiveParentId, [
+              for (final d in lane)
+                if (CareSchedule.isoDate(d.scheduleDate) != todayIso)
+                  (
+                    date: d.scheduleDate,
+                    scheduledParentId: d.scheduledParentId,
+                    actualParentId: d.actualParentId,
+                  ),
+            ]);
+      final nextRow = next == null
+          ? null
+          : lane
+              .where((d) =>
+                  CareSchedule.isoDate(d.scheduleDate) ==
+                  CareSchedule.isoDate(next))
+              .firstOrNull;
+      senders.addAll(noticeSenderIds(
+        dayParentId: today?.effectiveParentId,
+        previousParentId: yesterday?.effectiveParentId,
+        nextHandoffParentId: nextRow?.effectiveParentId,
+      ));
+    }
+    return senders;
   }
 
   /// The sentence a reader sees for an open aviso — the SAME one the
@@ -2152,7 +2205,16 @@ class _CalendarScreenState extends State<CalendarScreen>
       for (final n in _todayNotices)
         if (n.senderProfileId == me) n
     ].length;
-    unawaited(_openNoticeSheet(todayRow?.effectiveParentId, sentToday));
+    // F-07 (PR 5c): per child, I may offer the day when I hold it in ANY
+    // lane — taking it moves every lane that is mine (server, PR 5a).
+    final todayIso = CareSchedule.isoDate(_today);
+    final holdsAnyLane = _perChild &&
+        _upcomingRows.any((d) =>
+            d.childId != null &&
+            CareSchedule.isoDate(d.scheduleDate) == todayIso &&
+            d.effectiveParentId == me);
+    unawaited(_openNoticeSheet(
+        holdsAnyLane ? me : todayRow?.effectiveParentId, sentToday));
   }
 
   /// Today's row out of [_upcoming], which the load fetches starting today.

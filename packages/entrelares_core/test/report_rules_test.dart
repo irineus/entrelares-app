@@ -645,4 +645,50 @@ void main() {
       expect(reportYearRange(2026).length, 4);
     });
   });
+
+  // F-07 (PR 5c): a per-child period is read per lane in section 1.
+  group('lane sections', () {
+    final l = Localization(AppLanguage.ptBr);
+    CustodyReport build(List<ReportDay> days) => buildCustodyReport(
+          familyName: 'Família Prado',
+          childName: 'Lia e Theo',
+          start: DateTime(2026, 8, 15),
+          end: DateTime(2026, 8, 16),
+          today: _today,
+          days: days,
+          members: _members,
+          auditLogs: const [],
+          roleLabelOf: (_) => 'Papel',
+          diffFor: (_) => const [],
+          generatedBy: 'Ana Prado',
+          generatedAtLocal: DateTime(2026, 8, 19, 21, 5),
+          appVersion: '3.0.14+178',
+          l: l,
+          childNames: const {20: 'Lia', 10: 'Theo'},
+          allChildrenLabel: 'Todas as crianças',
+        );
+
+    test('a single-plan period has none — section 1 is unchanged', () {
+      expect(build(_period()).laneSections, isEmpty);
+    });
+
+    test("one table per lane, the family's days first, children in order", () {
+      final report = build([
+        ReportDay(scheduleDate: DateTime(2026, 8, 15), scheduledParentId: 1),
+        ReportDay(
+            scheduleDate: DateTime(2026, 8, 16),
+            scheduledParentId: 2,
+            childId: 10),
+        ReportDay(
+            scheduleDate: DateTime(2026, 8, 16),
+            scheduledParentId: 1,
+            childId: 20),
+      ]);
+      expect([for (final s in report.laneSections) s.label],
+          ['Todas as crianças', 'Lia', 'Theo']);
+      final theo = report.laneSections.last;
+      expect([for (final c in theo.caregivers) c.name], ['Bruno Prado']);
+      expect(theo.caregivers.single.plannedDays, 1);
+    });
+  });
 }

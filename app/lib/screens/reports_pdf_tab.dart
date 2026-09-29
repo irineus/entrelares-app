@@ -100,6 +100,9 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   /// header and this tab say *Crianças*.
   int _registeredChildCount = 1;
 
+  /// F-07 (PR 5c): child id → first name, in order, for the per-lane tables.
+  Map<int, String> _childNamesById = const {};
+
   /// F-55: the agenda is on for this build — the PDF prints section 5.
   bool _agendaOn = false;
 
@@ -173,6 +176,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       final children = await widget.dataSource.fetchChildren();
       if (!mounted) return null;
       _registeredChildCount = children.isEmpty ? 1 : children.length;
+      _childNamesById = {for (final c in children) c.id: c.firstName};
       return ChildRules.joinNames([for (final c in children) c.firstName],
           and: AppL10n.of(context).l[KApp.childAnd]);
     } catch (_) {
@@ -425,6 +429,9 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         childName: _registeredChildNames ?? _childName.text,
         childCount:
             _registeredChildNames == null ? 1 : _registeredChildCount,
+        // F-07 (PR 5c): the lane sections' labels, in the family's order.
+        childNames: _childNamesById,
+        allChildrenLabel: l[KApp.calLaneAll],
         start: start,
         end: end,
         today: widget.now(),
@@ -434,6 +441,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               scheduleDate: d.scheduleDate,
               scheduledParentId: d.scheduledParentId,
               actualParentId: d.actualParentId,
+              childId: d.childId,
             ),
         ],
         members: [for (final m in members) m.toView()],

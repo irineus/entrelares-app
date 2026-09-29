@@ -251,9 +251,31 @@ pw.TableRow _metaRow(String label, String value) => pw.TableRow(children: [
       ),
     ]);
 
-List<pw.Widget> _summarySection(CustodyReport report, Localization l) => [
+List<pw.Widget> _summarySection(CustodyReport report, Localization l) =>
+    report.laneSections.isEmpty
+        ? _familySummary(report, l)
+        : [
+            _sectionTitle(l[K.pdfDocSection1]),
+            // F-07 (PR 5c): a per-child period — one table per lane.
+            for (final lane in report.laneSections) ...[
+              pw.SizedBox(height: 4),
+              pw.Text(lane.label,
+                  style: pw.TextStyle(
+                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 2),
+              ..._distribution(report, lane.caregivers, lane.totalSwaps, l),
+            ],
+          ];
+
+List<pw.Widget> _familySummary(CustodyReport report, Localization l) => [
       _sectionTitle(l[K.pdfDocSection1]),
-      if (report.caregivers.isEmpty)
+      ..._distribution(report, report.caregivers, report.totalSwaps, l),
+    ];
+
+List<pw.Widget> _distribution(CustodyReport report,
+        List<CaregiverStat> caregivers, int totalSwaps, Localization l) =>
+    [
+      if (caregivers.isEmpty)
         _paragraph(l[K.pdfDocEmptySummary])
       else ...[
         pw.Table(
@@ -271,7 +293,7 @@ List<pw.Widget> _summarySection(CustodyReport report, Localization l) => [
                 _cell(l[K.pdfDocColSwaps], bold: true),
               ],
             ),
-            for (final c in report.caregivers)
+            for (final c in caregivers)
               pw.TableRow(children: [
                 _cell(c.name),
                 _cell(c.role),
@@ -287,7 +309,7 @@ List<pw.Widget> _summarySection(CustodyReport report, Localization l) => [
             report.includesFutureSwaps
                 ? K.pdfDocTotalSwapsFuture
                 : K.pdfDocTotalSwaps,
-            [report.totalSwaps]))),
+            [totalSwaps]))),
       ],
     ];
 
