@@ -495,4 +495,79 @@ void scheduleLaneTests(GateFixture fx) {
           reason: 'the chosen lane is the family plan now');
     });
   });
+
+  // F-07 (PR 5a): the aviso, the plan's end — the rest of the server per lane.
+  group('F-07 · lanes beyond the day', () {
+    late ThrowawayFamily fam;
+    late String agendaBefore;
+    late int childA;
+    late int childB;
+    final today = saoPauloToday();
+
+    Future<List<Map<String, dynamic>>> rowsOn(DateTime d) async =>
+        (await fx.service
+                .from('care_schedules')
+                .select()
+                .eq('family_id', fam.familyId)
+                .eq('schedule_date', isoDate(d))
+                .order('child_id', ascending: true))
+            .cast<Map<String, dynamic>>();
+
+    setUpAll(() async {
+      agendaBefore = await readFlag(fx, agendaFlag);
+      await writeFlag(fx, agendaFlag, 'true');
+      fam = await fx.createFamily('f07more');
+      await fx.service.from('families').update({
+        'comp_premium_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', fam.familyId);
+      childA = await fam.admin
+          .rpc<dynamic>('add_child', params: {'p_first_name': 'Lia'}) as int;
+      childB = await fam.admin
+          .rpc<dynamic>('add_child', params: {'p_first_name': 'Theo'}) as int;
+      await fx.service
+          .from('families')
+          .update({'schedule_mode': 'per_child'}).eq('id', fam.familyId);
+      // Today both children are with the member; Lia's plan runs 10 days
+      // ahead, Theo's only 3.
+      for (final (child, days) in [(childA, 10), (childB, 3)]) {
+        for (var i = 0; i <= days; i++) {
+          await fam.admin.from('care_schedules').insert({
+            'schedule_date': isoDate(addDays(today, i)),
+            'scheduled_parent_id': fam.memberProfile.id,
+            'child_id': child,
+          });
+        }
+      }
+    });
+
+    tearDownAll(() async => writeFlag(fx, agendaFlag, agendaBefore));
+
+    test('the plan ends when the FIRST child runs out', () async {
+      final last = await fam.admin.rpc<dynamic>('my_plan_last_day');
+      expect(last, isoDate(addDays(today, 3)));
+    });
+
+    test("the member holds today in every lane: the aviso offers the day, "
+        "and taking it moves every lane", () async {
+      final noticeId = await fam.member.rpc<dynamic>('send_day_notice',
+          params: {'p_reason': 'atraso', 'p_request': 'keep'}) as int;
+      final swapId = await fam.admin.rpc<dynamic>('answer_day_notice',
+          params: {'p_notice_id': noticeId, 'p_outcome': 'keeping'});
+      expect(swapId, isNotNull);
+
+      final rows = await rowsOn(today);
+      expect([for (final r in rows) r['child_id']], [childA, childB]);
+      for (final r in rows) {
+        expect(r['actual_parent_id'], fam.adminProfile.id,
+            reason: 'lane ${r['child_id']} moved');
+      }
+      final swaps = await fx.service
+          .from('swap_requests')
+          .select('child_id, status')
+          .eq('family_id', fam.familyId)
+          .eq('schedule_date', isoDate(today));
+      expect({for (final s in swaps) s['child_id']}, {childA, childB});
+      expect({for (final s in swaps) s['status']}, {'approved'});
+    });
+  });
 }
