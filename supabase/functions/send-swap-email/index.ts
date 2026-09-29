@@ -211,6 +211,22 @@ serve(async (req: Request) => {
     console.log(`[send-swap-email] priorityTag=${priorityTag ?? "none"} (computed at send time)`);
     const emails = buildEmails(emailType, swap, requester, target, appUrl, priorityTag);
 
+    // F-07: in a per-child plan the request is ONE child's day — the subject
+    // says whose, as the in-app and push headings do. The name is family
+    // data, never translated.
+    const childId = (swapData as { child_id?: number | null }).child_id;
+    if (childId) {
+      const { data: child } = await supabase
+        .from("children")
+        .select("first_name")
+        .eq("id", childId)
+        .maybeSingle();
+      const childName = (child as { first_name?: string } | null)?.first_name?.trim();
+      if (childName) {
+        for (const e of emails) e.subject = `${e.subject} · ${childName}`;
+      }
+    }
+
     console.log(`[send-swap-email] built ${emails.length} email(s) to send`);
 
     const results = await Promise.allSettled(

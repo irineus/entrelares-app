@@ -591,11 +591,22 @@ abstract final class NotificationRenderer {
       return l.format(key, [p['percent'] ?? '80']);
     }
 
-    return switch (p['tag']) {
+    final heading = switch (p['tag']) {
       'urgent' => l[K.notifRenderTagUrgent] + l[key],
       'overdue' => l[K.notifRenderTagOverdue] + l[key],
       _ => l[key],
     };
+    return withChild(heading, p['child']);
+  }
+
+  /// F-07 — in a per-child plan a swap's notification names its child after
+  /// the heading ("Nova solicitação de troca · Lia"). The name is family
+  /// data (never translated) and `params.child` is stamped by the database
+  /// (`stamp_notification_child`), so every writer — app, cron, aviso — gets
+  /// it; `_shared/push.ts` appends it the same way.
+  static String withChild(String heading, String? child) {
+    final name = child?.trim() ?? '';
+    return name.isEmpty ? heading : '$heading · $name';
   }
 
   /// Flat string map from the JSONB payload. Returns null for absent, blank
