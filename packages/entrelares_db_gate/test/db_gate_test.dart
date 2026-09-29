@@ -69,6 +69,7 @@ import 'suites/resolution_log_link.dart';
 import 'suites/revert_notes.dart';
 import 'suites/rls_hardening.dart';
 import 'suites/schedule_range.dart';
+import 'suites/schedule_lanes.dart';
 import 'suites/session_has_password.dart';
 import 'suites/sudo_elevation.dart';
 import 'suites/support_request.dart';
@@ -161,6 +162,8 @@ void main() {
   customRoleTests(fx);
   // F-55: the child entity — dark by flag, admin-only, family-scoped.
   childrenTests(fx);
+  // F-07 PR 2: the plan per child — every day rule reads its own lane.
+  scheduleLaneTests(fx);
   // F-55 PR 2: the agenda — kinds, the free note, Premium, the past, the
   // frozen observation and the conversion.
   agendaTests(fx);
