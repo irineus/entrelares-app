@@ -3,19 +3,28 @@ import 'package:test/test.dart';
 
 /// F-07 (owner's QA, 29/09/2026) — the calendar's people, with avatars.
 void main() {
-  group('childInitials', () {
+  group("childInitials — the carers' rule (F-28)", () {
     test('one letter while unique', () {
       expect(childInitials({1: 'Benicio', 2: 'Catarina', 3: 'Lucas'}),
           {1: 'B', 2: 'C', 3: 'L'});
     });
 
-    test('a shared first letter takes two', () {
-      expect(childInitials({1: 'Benicio', 2: 'Bianca', 3: 'Lucas'}),
-          {1: 'Be', 2: 'Bi', 3: 'L'});
+    test("a shared letter takes the first and last words' initials", () {
+      expect(childInitials({1: 'Ana Clara', 2: 'Ana Luiza', 3: 'Lucas'}),
+          {1: 'AC', 2: 'AL', 3: 'L'});
     });
 
-    test('two shared letters add the place in the order', () {
-      expect(childInitials({1: 'Ana', 2: 'Ana Clara'}), {1: 'An1', 2: 'An2'});
+    test('one word each, still colliding: the place in id order', () {
+      expect(childInitials({1: 'Benicio', 2: 'Bianca'}), {1: 'B1', 2: 'B2'});
+    });
+
+    test('the same letters a carer with that name would get', () {
+      final names = {7: 'Filho Pródigo', 8: 'Fernanda'};
+      final views = [
+        for (final e in names.entries) MemberView(id: e.key, fullName: e.value),
+      ];
+      expect(childInitials(names),
+          {for (final v in views) v.id: displayInitials(v.id, views)});
     });
   });
 
@@ -28,6 +37,11 @@ void main() {
     test("a shared first name takes the surname's initial", () {
       expect(legendNames({1: 'Ana Souza', 2: 'Ana Lima', 3: 'Bruno'}),
           {1: 'Ana S.', 2: 'Ana L.', 3: 'Bruno'});
+    });
+
+    test("a child's chip too: the first word only", () {
+      expect(legendNames({1: 'Filho Pródigo', 2: 'Ana Clara', 3: 'Ana Luiza'}),
+          {1: 'Filho', 2: 'Ana C.', 3: 'Ana L.'});
     });
   });
 

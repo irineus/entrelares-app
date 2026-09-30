@@ -6,34 +6,25 @@ library;
 
 import 'dart:math' as math;
 
-/// A child's avatar letters, per child id. The carers' rule (F-28) with the
-/// one difference a child has: only a first name. One letter while it is
-/// unique in the family ("B"); on a collision, the first two letters
-/// ("Be", "Bi"); still colliding, those plus the child's place in the order.
-Map<int, String> childInitials(Map<int, String> firstNames) {
-  String one(String n) => n.trim().isEmpty ? '?' : n.trim()[0].toUpperCase();
-  String two(String n) {
-    final t = n.trim();
-    if (t.length < 2) return one(t);
-    return t[0].toUpperCase() + t[1].toLowerCase();
-  }
+import 'calendar_rules.dart' show MemberView, displayInitials;
 
-  final ids = firstNames.keys.toList()..sort();
-  return {
-    for (final (i, id) in ids.indexed)
-      id: () {
-        final name = firstNames[id]!;
-        final a = one(name);
-        if (firstNames.values.where((n) => one(n) == a).length <= 1) return a;
-        final b = two(name);
-        if (firstNames.values.where((n) => two(n) == b).length <= 1) return b;
-        return '$b${i + 1}';
-      }(),
-  };
+/// A child's avatar letters, per child id — the carers' rule itself
+/// ([displayInitials], F-28), by the owner's decision (29/09/2026, round 3:
+/// "a mesma regra de nome e avatar para os dois"): one letter while unique;
+/// on a collision, the first and last words' initials ("Ana Clara" → "AC");
+/// still colliding, those plus the place in id order ("B1", "B2").
+Map<int, String> childInitials(Map<int, String> names) {
+  final views = [
+    for (final MapEntry(key: id, value: name) in names.entries)
+      MemberView(id: id, fullName: name),
+  ];
+  return {for (final v in views) v.id: displayInitials(v.id, views)};
 }
 
-/// The legend's name for each carer: the first name while it is unique in
-/// the family, else the first name and the surname's initial ("Ana S.").
+/// The short name on a person's chip — a carer's in the legend and, since
+/// round 3 (owner, 29/09/2026), a child's in the lane row too: the first
+/// word while it is unique in the family, else that word and the last
+/// word's initial ("Ana S.", "Ana C.").
 /// The role left the legend (owner, 29/09/2026) — the chip leads to the
 /// person instead.
 Map<int, String> legendNames(Map<int, String> fullNames) {

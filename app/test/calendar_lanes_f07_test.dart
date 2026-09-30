@@ -271,6 +271,15 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets("a child's chip takes the carers' short name and letters",
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    await pump(tester, crowded(day));
+    // "Filho Pródigo": the chip says "Filho"; the avatar "F", as a carer's.
+    expect(avatarsIn(tester, find.byKey(const ValueKey('lane-13'))), ['F']);
+  });
+
   testWidgets('a wide phone keeps the names', (tester) async {
     final day = futureDay;
     if (day == null) return;
@@ -307,17 +316,14 @@ void main() {
     await pumpSe(tester, crowded(day));
     // Todas selected: "Todas" is its icon, every child an avatar.
     expect(inChip('lane-all', l[KApp.calLaneAllShort]), findsNothing);
-    expect(inChip('lane-13', 'Filho Pródigo'), findsNothing);
+    expect(inChip('lane-13', 'Filho'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('lane-13')));
     await tester.pumpAndSettle();
-    expect(inChip('lane-13', 'Filho Pródigo'), findsOne, reason: 'never cut');
+    // The carers' rule: the first word — never the whole "Filho Pródigo".
+    expect(inChip('lane-13', 'Filho'), findsOne);
+    expect(find.text('Filho Pródigo'), findsNothing);
     expect(inChip('lane-10', 'Lia'), findsNothing);
-    // All five chips on screen, no scroll. (With the test font's wide glyphs
-    // "Filho Pródigo" alone passes the edge; the row then scrolls — never
-    // cuts. Measured with a short name.)
-    await tester.tap(find.byKey(const ValueKey('lane-12')));
-    await tester.pumpAndSettle();
-    expect(inChip('lane-12', 'Bia'), findsOne);
+    // All five chips on screen, no scroll.
     final width = tester.getSize(find.byType(MaterialApp)).width;
     for (final k in ['lane-all', 'lane-10', 'lane-11', 'lane-12', 'lane-13']) {
       final r = tester.getRect(find.byKey(ValueKey(k)));
