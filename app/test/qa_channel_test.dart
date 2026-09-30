@@ -178,6 +178,91 @@ void main() {
     });
   });
 
+  // S-23 (29/09/2026): every production credential of the CI sat at REPO
+  // level. A job's `if: github.ref_name == 'main'` is written in the workflow,
+  // and a same-repo branch can edit the workflow — so the `if` stops a job
+  // from RUNNING elsewhere, and only an Environment whose branch rule is
+  // `main` stops a branch from READING the secret. These pin the half that
+  // lives in the repo; the branch rule itself lives in the owner's console and
+  // is read with `gh api repos/irineus/entrelares-app/environments/production`.
+  group('production credentials only main can read (S-23)', () {
+    // `(?![A-Z0-9_])` so that `CLOUDFLARE_API_TOKEN_QA` is not read as the
+    // production `CLOUDFLARE_API_TOKEN`.
+    final prodSecret = RegExp(r'secrets\.(SUPABASE_ACCESS_TOKEN_PROD|'
+        r'SUPABASE_DB_PASSWORD_PROD|SUPABASE_PROJECT_REF_PROD|'
+        r'CLOUDFLARE_API_TOKEN|SENTRY_AUTH_TOKEN)(?![A-Z0-9_])');
+
+    Map<String, String> jobsOf(String source) {
+      final lines = source.split('\n');
+      final start = lines.indexOf('jobs:');
+      expect(start, isNot(-1), reason: 'the workflow has a jobs: block');
+      return {
+        for (final line in lines.skip(start + 1))
+          if (RegExp(r'^  ([a-z0-9-]+):$').firstMatch(line) case final m?)
+            m.group(1)!: _job(source, m.group(1)!),
+      };
+    }
+
+    test('every job that reads a production secret runs in `production`', () {
+      final workflows = Directory('../.github/workflows')
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.yml') || f.path.endsWith('.yaml'));
+      var readers = 0;
+      for (final file in workflows) {
+        final source = _code(file.readAsStringSync());
+        jobsOf(source).forEach((name, job) {
+          if (!prodSecret.hasMatch(job)) return;
+          readers++;
+          expect(job, contains('    environment: production\n'),
+              reason: '${file.path} · $name reads a production secret outside '
+                  'the Environment only `main` can deploy to');
+        });
+      }
+      expect(readers, greaterThanOrEqualTo(2),
+          reason: 'a guard that finds no reader is green over nothing (T-58)');
+    });
+
+    test('the two publish jobs are the ones in it', () {
+      for (final name in ['db-prod', 'deploy-web']) {
+        expect(_job(workflow, name), contains('    environment: production\n'),
+            reason: '$name holds the production credentials');
+      }
+    });
+
+    test('the QA lanes hold their OWN Cloudflare token', () {
+      for (final name in ['qa-preview', 'qa-web']) {
+        final job = _job(workflow, name);
+        expect(job,
+            contains(r'CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_QA }}'),
+            reason: '$name deploys with the QA token');
+        expect(prodSecret.hasMatch(job), isFalse,
+            reason: '$name runs on same-repo PRs: a production secret there is '
+                'readable by every branch');
+      }
+      expect(_job(workflow, 'deploy-web'), isNot(contains('_QA')),
+          reason: 'production never publishes with the QA token');
+    });
+
+    test('an empty credential in production is RED, never a silent skip', () {
+      // A secret deleted before its Environment copy existed used to arrive
+      // empty and SKIP the publish with `main` green — T-68's non-publish.
+      for (final (name, variable) in [
+        ('db-prod', 'SUPABASE_ACCESS_TOKEN'),
+        ('deploy-web', 'CLOUDFLARE_API_TOKEN'),
+      ]) {
+        final job = _job(workflow, name);
+        final guard = job.indexOf("if: env.$variable == ''");
+        expect(guard, isNot(-1), reason: '$name checks for an empty $variable');
+        final step = job.substring(guard, job.indexOf('- name:', guard) == -1
+            ? job.length
+            : job.indexOf('- name:', guard));
+        expect(step, contains('exit 1'),
+            reason: '$name must fail, so ops-alert fires');
+      }
+    });
+  });
+
   group('Firebase App Distribution', () {
     test('the Fastfile names the dev flavour\'s own Firebase app', () {
       final json = jsonDecode(File('android/app/src/dev/google-services.json')

@@ -2452,13 +2452,16 @@ them back, which a hand-written client does not send. Matching here is by releas
 exactly why step 2 is worth a test.
 
 **The secret this needs — armed 11/09/2026.** The upload step disarms itself while
-`SENTRY_AUTH_TOKEN` is absent (the same shape as the Cloudflare publish beside it): the deploy
-still publishes and the run summary says the stacks will read minified.
+`SENTRY_AUTH_TOKEN` is absent: the deploy still publishes and the run summary says the stacks will
+read minified. (The Cloudflare publish beside it used to disarm the same way; since S-23 an empty
+Cloudflare token is RED — a missing Sentry token costs readable stacks, a missing Cloudflare one
+costs the channel.)
 
 To arm it (or to rotate it): Sentry → Settings → **Organization Tokens** → Create New
 Organization Token (https://irineu-pinheiro.sentry.io/settings/auth-tokens/new-token/), then add
-the value as the repository secret `SENTRY_AUTH_TOKEN`
-(https://github.com/irineus/entrelares-app/settings/secrets/actions).
+the value as the secret `SENTRY_AUTH_TOKEN` of the **`production` Environment**
+(https://github.com/irineus/entrelares-app/settings/environments) — never at repository level,
+which every same-repo branch can read (S-23, 29/09/2026).
 
 **An organization token's scope is not chosen — it is fixed at `org:ci`**, which the screen spells
 out as *Source Map Upload, Release Creation, Code Mappings*. That is exactly what the three
