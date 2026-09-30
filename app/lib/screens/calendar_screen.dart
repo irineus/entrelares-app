@@ -1492,19 +1492,51 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Widget _planEndStrip(Localization l, String kind) {
     final last = _lastPlannedDay!;
+    final tone = context.tokens.info;
+    // Owner (29/09/2026): the AppBanner took ~90 dp between the Hoje card
+    // and the month and pushed the grid down on a small phone. It is a
+    // STATE line, not an alert: one tinted row — the mark, the date, a
+    // one-word action at the end — no taller than the action's 48 dp.
     return Padding(
       key: CalendarScreen.planEndStripKey,
       padding: const EdgeInsets.fromLTRB(
           Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
-      child: AppBanner(
-        tone: context.tokens.info,
-        icon: Icons.event_note_outlined,
-        message: l.format(kind == 'ended' ? K.calPlanEnded : K.calPlanEnding,
-            [l.formatDate(last)]),
-        actionLabel: _iAmViewer ? null : l[K.notifPlanAction],
-        onAction: _iAmViewer
-            ? null
-            : () => _openWizard(start: PlanEndRules.startAfter(last, _today)),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 36),
+        padding: const EdgeInsetsDirectional.only(start: Spacing.sm),
+        decoration: BoxDecoration(
+          color: tone.container,
+          borderRadius: BorderRadius.circular(Radii.md),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.event_note_outlined, size: 18, color: tone.onContainer),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                l.format(kind == 'ended' ? K.calPlanEnded : K.calPlanEnding,
+                    [l.formatDate(last)]),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: tone.onContainer),
+              ),
+            ),
+            if (!_iAmViewer)
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: tone.onContainer,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                ),
+                onPressed: () =>
+                    _openWizard(start: PlanEndRules.startAfter(last, _today)),
+                child: Text(l[KApp.calPlanEndAction]),
+              )
+            else
+              const SizedBox(width: Spacing.sm),
+          ],
+        ),
       ),
     );
   }
@@ -1789,6 +1821,11 @@ class _CalendarScreenState extends State<CalendarScreen>
     final tokens = context.tokens;
     final scheme = Theme.of(context).colorScheme;
     final initials = _childInitials;
+    // Round 3 (owner, 29/09/2026): the carers' short-name rule — the first
+    // word, "Ana C." on a clash — so "Filho Pródigo" does not spend the
+    // width that would let every name show.
+    final short =
+        legendNames({for (final c in _children) c.id: c.firstName});
     final allLabel = l[KApp.calLaneAllShort];
     PersonChip chip(
             {required Key key,
@@ -1821,7 +1858,8 @@ class _CalendarScreenState extends State<CalendarScreen>
         // cut. Measured with every name, so a tap never flips the mode.
         final named = [
           PersonChip.widthOf(context, allLabel),
-          for (final c in _children) PersonChip.widthOf(context, c.firstName),
+          for (final c in _children)
+            PersonChip.widthOf(context, short[c.id] ?? c.firstName),
         ];
         final compact = named.fold<double>(0, (a, w) => a + w) +
                 Spacing.sm * (named.length - 1) >
@@ -1856,7 +1894,9 @@ class _CalendarScreenState extends State<CalendarScreen>
                             : 0),
                     child: chip(
                       key: ValueKey('lane-${c.id}'),
-                      label: compact && _lane != c.id ? null : c.firstName,
+                      label: compact && _lane != c.id
+                          ? null
+                          : short[c.id] ?? c.firstName,
                       spoken: c.firstName,
                       selected: _lane == c.id,
                       onTap: () => _selectLane(c.id),

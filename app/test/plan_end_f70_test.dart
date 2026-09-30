@@ -167,7 +167,7 @@ void main() {
           find.text(_pt.format(K.calPlanEnded, [_pt.formatDate(last)])),
           findsOneWidget);
       await tester.tap(find.descendant(
-          of: strip(), matching: find.text(_pt[K.notifPlanAction])));
+          of: strip(), matching: find.text(_pt[KApp.calPlanEndAction])));
       await tester.pumpAndSettle();
       expect(find.text(_pt[K.wizTitle]), findsOneWidget);
       expect(_wizardStart(day), findsOneWidget);
@@ -182,7 +182,7 @@ void main() {
           find.text(_pt.format(K.calPlanEnding, [_pt.formatDate(last)])),
           findsOneWidget);
       await tester.tap(find.descendant(
-          of: strip(), matching: find.text(_pt[K.notifPlanAction])));
+          of: strip(), matching: find.text(_pt[KApp.calPlanEndAction])));
       await tester.pumpAndSettle();
       expect(_wizardStart(DateTime(last.year, last.month, last.day + 1)),
           findsOneWidget);
