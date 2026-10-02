@@ -38,6 +38,8 @@ const _senders = [
   'supabase/functions/send-account-email/index.ts',
   'supabase/functions/send-auth-email/index.ts',
   'supabase/functions/send-support-request/index.ts',
+  // T-99: the weekly bulletin to the operator.
+  'supabase/functions/weekly-bulletin/index.ts',
 ];
 
 /// WCAG AA for body text. Every pair in the layer clears it, headings included,

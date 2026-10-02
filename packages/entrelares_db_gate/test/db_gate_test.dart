@@ -58,6 +58,7 @@ import 'suites/server_parameters.dart';
 import 'suites/plan_end_reminders.dart';
 import 'suites/trial_end_reminders.dart';
 import 'suites/unplanned_nudges.dart';
+import 'suites/weekly_bulletin.dart';
 import 'suites/planning_horizon_gate.dart';
 import 'suites/platform_operator.dart';
 import 'suites/premium_entitlement.dart';
@@ -204,6 +205,9 @@ void main() {
   planEndReminderTests(fx);
   trialEndReminderTests(fx);
   unplannedNudgeTests(fx);
+  // T-99: the operator's weekly bulletin — counts only, closed keys, no
+  // client, and a week sent once.
+  weeklyBulletinTests(fx);
   billingHistoryTests(fx);
   billingReactivateTests(fx);
   billingAvulsoTests(fx);
