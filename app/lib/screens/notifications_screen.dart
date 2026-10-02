@@ -75,6 +75,12 @@ class NotificationsScreen extends StatefulWidget {
   /// F-34: an expense or settle-up row's "Abrir Despesas". Null hides it.
   final VoidCallback? onOpenExpenses;
 
+  /// F-77: a Premium-trial row's "Ver o plano" — the host opens
+  /// `/family/plan`. Null hides it.
+  final VoidCallback? onOpenPlan;
+
+  static Key trialActionKey(int id) => Key('notif-trial-$id');
+
   /// The notification types whose row opens Despesas.
   static const Set<String> expenseTypes = {
     'expense_changed',
@@ -105,6 +111,7 @@ class NotificationsScreen extends StatefulWidget {
       this.analytics,
       this.onPlanFrom,
       this.onOpenExpenses,
+      this.onOpenPlan,
       this.embedded = false,
       this.onApprovalSeen,
       this.landing,
@@ -150,6 +157,7 @@ IconData notifIcon(String type) => switch (type) {
       'email_cap_last' || 'email_cap_reached' => Icons.mail_outline,
       'billing' => Icons.credit_card,
       'plan_ending' => Icons.event_note_outlined,
+      'premium_trial' => Icons.workspace_premium_outlined,
       _ => Icons.notifications_none,
     };
 
@@ -254,6 +262,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       NotificationLanding.incoming => _Tab.incoming,
       NotificationLanding.history => _Tab.history,
       NotificationLanding.chat => _Tab.history,
+      NotificationLanding.plan => _Tab.history,
     };
   }
 
@@ -1016,7 +1025,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         timestamp:
             createdLocal == null ? '' : l.formatDateTime(createdLocal),
-        detail: _planAction(notif, l) ?? _expenseAction(notif, l),
+        detail: _planAction(notif, l) ??
+            _expenseAction(notif, l) ??
+            _trialAction(notif, l),
       ),
     );
   }
@@ -1037,6 +1048,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         icon: const Icon(Icons.receipt_long_outlined),
         label: Text(l[KApp.expenseOpen]),
         onPressed: open,
+      ),
+    );
+  }
+
+  /// F-77: a Premium-trial row opens the plan page, where the subscribe
+  /// button is. Any member may see the page; the row only reaches admins.
+  Widget? _trialAction(AppNotification notif, Localization l) {
+    final open = widget.onOpenPlan;
+    if (open == null ||
+        !PushRouting.planTypes.contains(notif.type)) {
+      return null;
+    }
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: NotificationsScreen.trialActionKey(notif.id),
+        icon: const Icon(Icons.workspace_premium_outlined),
+        label: Text(l[K.notifTrialAction]),
+        onPressed: () {
+          _trackListOpen(notif.type);
+          open();
+        },
       ),
     );
   }

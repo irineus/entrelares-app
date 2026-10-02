@@ -64,6 +64,13 @@ void main() {
           NotificationLanding.history);
     });
 
+    test("the Premium trial's end opens the plan page (F-77)", () {
+      expect(PushRouting.landingFor('premium_trial', kind: 'ending'),
+          NotificationLanding.plan);
+      expect(PushRouting.landingFor('premium_trial', kind: 'ended'),
+          NotificationLanding.plan);
+    });
+
     test('an unknown or missing type falls to "Todas"', () {
       // A future writer's notice is a receipt until somebody decides
       // otherwise, and the wrong guess this way shows a full list rather than

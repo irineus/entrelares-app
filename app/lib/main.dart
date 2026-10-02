@@ -653,6 +653,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                           _router.go('/');
                         },
                         onOpenExpenses: () => _router.go('/expenses'),
+                        onOpenPlan: () => _router.go('/family/plan'),
                         onApprovalSeen: () =>
                             unawaited(_reviewPrompt.approvalSeen()),
                         embedded: embedded,
@@ -919,11 +920,17 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       }));
       final landing =
           PushRouting.landingFor(data['type'], kind: data['kind']);
+      // F-77: the trial's end asks one thing, and the plan page answers it.
+      if (landing == NotificationLanding.plan) {
+        _router.go('/family/plan');
+        return;
+      }
       final query = {
         'tab': switch (landing) {
           NotificationLanding.incoming => 'incoming',
           NotificationLanding.history => 'history',
           NotificationLanding.chat => 'chat',
+          NotificationLanding.plan => 'history',
         },
         if ((data['notificationId'] ?? '').isNotEmpty)
           'n': data['notificationId']!,

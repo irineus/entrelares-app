@@ -286,6 +286,12 @@ abstract final class NotificationRenderer {
       case 'plan_ending' when kind == 'ended' && date != null:
         return l.format(K.notifRenderPlanEnded, [date]);
 
+      // ── The Premium trial runs out (F-77) ──
+      case 'premium_trial' when kind == 'ending' && date != null:
+        return l.format(K.notifRenderTrialEnding, [date]);
+      case 'premium_trial' when kind == 'ended' && date != null:
+        return l.format(K.notifRenderTrialEnded, [date]);
+
       // ── Shared expenses (F-34) ──
       // The amount travels in cents and is printed in the reader's money
       // format; the category is a closed key; the description stays as typed.
@@ -532,6 +538,14 @@ abstract final class NotificationRenderer {
           : switch (kind) {
               'ending' => K.notifRenderTitlePlanEnding,
               'ended' => K.notifRenderTitlePlanEnded,
+              _ => null,
+            },
+      // F-77: same shape as F-70's.
+      'premium_trial' => p['date'] == null
+          ? null
+          : switch (kind) {
+              'ending' => K.notifRenderTitleTrialEnding,
+              'ended' => K.notifRenderTitleTrialEnded,
               _ => null,
             },
       // F-55: the heading only where the body is rebuilt too.

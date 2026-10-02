@@ -58,6 +58,7 @@ void main() {
 
   late List<String> actionableKindsInJs;
   late List<String> chatInJs;
+  late List<String> planInJs;
 
   setUp(() {
     worker = repoFile(_worker);
@@ -78,12 +79,20 @@ void main() {
       RegExp(r'const CHAT_TYPES = \[([^\]]*)\]'),
       _worker,
     );
+    // F-77: the third destination — not a tab, the plan page.
+    planInJs = _stringList(
+      worker,
+      RegExp(r'const PLAN_TYPES = \[([^\]]*)\]'),
+      _worker,
+    );
   });
 
   /// What the JS would decide for a payload, read from the worker's own lists.
   NotificationLanding jsLanding(String type, String? kind) =>
       chatInJs.contains(type)
           ? NotificationLanding.chat
+          : planInJs.contains(type)
+          ? NotificationLanding.plan
           : actionableInJs.contains(type) ||
               (type == 'day_notice' && actionableKindsInJs.contains(kind))
           ? NotificationLanding.incoming
