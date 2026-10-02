@@ -1864,6 +1864,16 @@ class FakeCustodyDataSource implements CustodyDataSource {
   /// Keyed on the token alone: this fake serves one profile, and the server's
   /// own answer for another profile's device is `false` either way — RLS hides
   /// the row, so there is nothing to model.
+  /// F-59: what [fetchPushReach] answers — no device anywhere, nothing
+  /// unread, unless a scene says otherwise.
+  bool accountHasPush = false;
+  DateTime? newestUnreadAt;
+
+  @override
+  Future<({bool accountHasPush, DateTime? newestUnreadAt})> fetchPushReach(
+          int myProfileId) async =>
+      (accountHasPush: accountHasPush, newestUnreadAt: newestUnreadAt);
+
   @override
   Future<bool> isDeviceRegistered({
     required int myProfileId,

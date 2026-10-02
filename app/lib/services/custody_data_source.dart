@@ -407,6 +407,13 @@ abstract class CustodyDataSource {
     required String token,
   });
 
+  /// F-59 — what the Hoje strip needs to tell that a notice reached nobody:
+  /// whether ANY device of [myProfileId] receives push (here the profile-wide
+  /// question is the right one — a reader whose other phone rings was told),
+  /// and when the newest unread notification addressed to them was written.
+  Future<({bool accountHasPush, DateTime? newestUnreadAt})> fetchPushReach(
+      int myProfileId);
+
   /// Listens for swap_requests + notifications changes — the lote-3 twin of
   /// [watchChanges] (frozen paint, badge, page refresh). Safe to call from
   /// more than one subscriber. Returns a dispose callback.

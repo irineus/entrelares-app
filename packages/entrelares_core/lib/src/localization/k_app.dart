@@ -195,6 +195,11 @@ abstract final class KApp {
   static const String pushHintReallowBrowser = 'app.push.hintReallowBrowser';
   static const String pushHintUnsupportedHere = 'app.push.hintUnsupportedHere';
   static const String pushEnable = 'app.push.enable';
+  // ── F-59 — the strip under the Hoje card that points to Notificações for
+  //    a device without push, now that most notices left e-mail. ──
+  static const String pushTodayMessage = 'app.push.todayMessage';
+  static const String pushTodayAction = 'app.push.todayAction';
+  static const String pushTodayDismiss = 'app.push.todayDismiss';
   static const String pushDisable = 'app.push.disable';
   /// U-43: the app-bar icon that replaces the card once push is on — its
   /// tooltip is also the name a screen reader gives the button.
@@ -917,6 +922,9 @@ abstract final class KApp {
     pushHintReallowBrowser,
     pushHintUnsupportedHere,
     pushEnable,
+    pushTodayMessage,
+    pushTodayAction,
+    pushTodayDismiss,
     pushDisable,
     pushStatusOnTooltip,
     pushToastOn,
@@ -1560,7 +1568,7 @@ abstract final class StringsAppPtBr {
     KApp.pushHintOn: 'Este aparelho recebe notificações de trocas e prazos.',
     KApp.pushHintUnsupported:
         'Notificações no celular funcionam no aplicativo instalado. Aqui no '
-            'navegador, você continua vendo tudo nesta tela e por e-mail.',
+            'navegador, você vê tudo nesta tela.',
     KApp.pushHintInstallIos:
         'No iPhone, as notificações só funcionam com o Entrelares na Tela de '
             'Início.',
@@ -1586,6 +1594,11 @@ abstract final class StringsAppPtBr {
         'Este aparelho não recebe notificações do Entrelares. Você continua '
             'vendo tudo nesta tela e por e-mail.',
     KApp.pushEnable: 'Ativar notificações',
+    KApp.pushTodayMessage:
+        'Ative as notificações neste aparelho: pedidos de troca e mudanças na '
+            'família chegam por elas, não por e-mail.',
+    KApp.pushTodayAction: 'Ativar',
+    KApp.pushTodayDismiss: 'Agora não',
     KApp.pushDisable: 'Desativar',
     KApp.pushStatusOnTooltip: 'Notificações no celular: ativadas',
     KApp.pushToastOn: 'Notificações ativadas neste aparelho.',
@@ -2324,7 +2337,7 @@ abstract final class StringsAppEn {
     KApp.pushHintOn: 'This device receives swap and deadline notifications.',
     KApp.pushHintUnsupported:
         'Phone notifications work in the installed app. Here in the browser you '
-            'still see everything on this screen and by e-mail.',
+            'see everything on this screen.',
     KApp.pushHintInstallIos:
         'On iPhone, notifications only work with Entrelares on your Home '
             'Screen.',
@@ -2350,6 +2363,11 @@ abstract final class StringsAppEn {
         'This device does not receive notifications from Entrelares. You still '
             'see everything on this screen and by e-mail.',
     KApp.pushEnable: 'Turn notifications on',
+    KApp.pushTodayMessage:
+        'Turn notifications on for this device: swap requests and family '
+            'changes arrive that way, not by e-mail.',
+    KApp.pushTodayAction: 'Turn on',
+    KApp.pushTodayDismiss: 'Not now',
     KApp.pushDisable: 'Turn off',
     KApp.pushStatusOnTooltip: 'Phone notifications: on',
     KApp.pushToastOn: 'Notifications are on for this device.',

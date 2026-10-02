@@ -38,6 +38,8 @@ import 'quick_swap_sheet.dart';
 import 'resolve_sheet.dart';
 import '../services/handoff_nudge_prefs.dart';
 import '../services/onboarding_service.dart';
+import '../services/push_service.dart';
+import '../services/push_today_prefs.dart';
 import '../widgets/invitee_welcome_sheet.dart';
 import '../widgets/onboarding.dart';
 import '../widgets/person_chip.dart';
@@ -144,8 +146,23 @@ class CalendarScreen extends StatefulWidget {
   /// opens that day's sheet once the month has loaded.
   final ValueNotifier<DateTime?>? dayRequest;
 
+  /// F-59: this device's push, read for the *Ativar notificações* strip under
+  /// the Hoje card. Null (tests, a host without push) shows no strip.
+  final PushService? push;
+
+  /// F-59: the U-51 browser facts (null in the native app), so the strip
+  /// offers what THIS device can do — the same step Notificações shows.
+  final BrowserInstallFacts? installFacts;
+
+  /// F-59: where the strip's dismissals are kept on this device. Null keeps
+  /// them for the session.
+  final PushTodayPrefs? pushTodayPrefs;
+
   /// F-70: the plan-end strip, for tests.
   static const planEndStripKey = Key('plan-end-strip');
+
+  /// F-59: the *Ativar notificações* strip, for tests.
+  static const pushTodayKey = Key('push-today');
 
   /// F-07: the lane chips.
   static const laneChipsKey = Key('lane-chips');
@@ -165,6 +182,9 @@ class CalendarScreen extends StatefulWidget {
       this.onOpenChildren,
       this.onOpenMember,
       this.handoffNudgePrefs,
+      this.push,
+      this.installFacts,
+      this.pushTodayPrefs,
       this.planRequest,
       this.dayRequest});
 
@@ -206,6 +226,11 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// U-55: the strip was sent away in THIS session (the prefs keep it for
   /// good; this covers a host without them and the frame before the write).
   bool _handoffNudgeDismissed = false;
+
+  /// F-59: what the server said about this account's push, and the strip's
+  /// dismissal in THIS session (the prefs keep the rhythm across openings).
+  ({bool accountHasPush, DateTime? newestUnreadAt})? _pushReach;
+  DateTime? _pushTodayDismissedAt;
   // Today + the next-handoff window ([today, today + 91] — the web scans
   // [tomorrow, tomorrow + 90]; one query serves the card's row and the scan).
   List<CareSchedule> _upcoming = const [];
@@ -378,6 +403,9 @@ class _CalendarScreenState extends State<CalendarScreen>
     // passos" ping this — the State lives on in the tab stack, so nothing
     // else runs when the user lands back.
     widget.onboarding?.addListener(_onOnboardingPing);
+    // F-59: the strip follows the push state — enabling it on Notificações
+    // (the State lives on in the tab stack) takes it away here too.
+    widget.push?.addListener(_onPushChanged);
     _wasOffline = widget.connectivity?.offline ?? false;
     widget.connectivity?.addListener(_onConnectivityChanged);
     // T-18: a boot that already knows there is no network paints the device's
@@ -750,6 +778,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     WidgetsBinding.instance.removeObserver(this);
     widget.adminMode.removeListener(_onAdminModeChanged);
     widget.onboarding?.removeListener(_onOnboardingPing);
+    widget.push?.removeListener(_onPushChanged);
     widget.connectivity?.removeListener(_onConnectivityChanged);
     widget.planRequest?.removeListener(_onPlanRequest);
     widget.dayRequest?.removeListener(_onDayRequest);
@@ -897,6 +926,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       AccountScope.identityOf(context)?.adopt(
           fullName: ownProfile?.fullName, colorSlot: ownProfile?.colorSlot);
       unawaited(_refreshOnboarding(ownProfile, members));
+      if (ownProfile != null) unawaited(_loadPushReach(ownProfile.id));
       // T-76 — the impression the Flutter port lost: `invite_nudge_shown` fed
       // Umami until the 23/08/2026 cutover and then simply stopped, leaving
       // the one loop that brings a new adult into the product unmeasured.
@@ -1479,6 +1509,75 @@ class _CalendarScreenState extends State<CalendarScreen>
     showAppSnack(context, summary);
     _load(silent: true);
   }
+
+  // ── F-59: a device without push, now that most notices left e-mail ────────
+
+  PushNudgeStep get _pushStep => PushNudgeRules.step(
+      state: widget.push?.state ?? PushState.unsupported,
+      facts: widget.installFacts);
+
+  void _onPushChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Fire-and-forget, and only when the strip could show at all: a device
+  /// whose push is on, or that cannot have it, costs no query.
+  Future<void> _loadPushReach(int profileId) async {
+    if (!_pushStep.isActionable) return;
+    try {
+      final reach = await widget.dataSource.fetchPushReach(profileId);
+      if (mounted) setState(() => _pushReach = reach);
+    } catch (_) {/* no answer: the rhythm alone decides */}
+  }
+
+  bool get _showPushToday {
+    if (_loading || _ownProfile == null) return false;
+    final now = DateTime.now();
+    var dismissals =
+        widget.pushTodayPrefs?.read() ?? InstallHintDismissals.none;
+    // This session's dismissal, until the prefs have it (or with no prefs at
+    // all). The stored time is in milliseconds, hence the tolerance.
+    final session = _pushTodayDismissedAt;
+    final stored = dismissals.last;
+    if (session != null &&
+        (stored == null ||
+            session.difference(stored) > const Duration(seconds: 1))) {
+      dismissals = dismissals.next(session);
+    }
+    return PushTodayRules.show(
+      step: _pushStep,
+      dismissals: dismissals,
+      now: now,
+      // Unknown reads as "has push": a failed read never chases the reader.
+      accountHasPush: _pushReach?.accountHasPush ?? true,
+      newestUnreadAt: _pushReach?.newestUnreadAt,
+    );
+  }
+
+  void _dismissPushToday() {
+    final now = DateTime.now();
+    setState(() => _pushTodayDismissedAt = now);
+    unawaited(widget.pushTodayPrefs?.dismiss(now));
+  }
+
+  Widget _pushToday(Localization l) => Padding(
+        key: CalendarScreen.pushTodayKey,
+        padding: const EdgeInsets.fromLTRB(
+            Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
+        child: AppBanner(
+          tone: context.tokens.info,
+          icon: Icons.notifications_outlined,
+          message: l[KApp.pushTodayMessage],
+          // F-09: Notificações is the ONE door to the OS dialog; this strip
+          // only points to it.
+          actionLabel: widget.onOpenNotifications == null
+              ? null
+              : l[KApp.pushTodayAction],
+          onAction: widget.onOpenNotifications,
+          onClose: _dismissPushToday,
+          closeTooltip: l[KApp.pushTodayDismiss],
+        ),
+      );
 
   // ── F-70: the plan is running out ─────────────────────────────────────────
 
@@ -2663,6 +2762,7 @@ class _CalendarScreenState extends State<CalendarScreen>
             KeyedSubtree(
                 key: widget.tourKeys?.keyFor(TourTarget.todayCard),
                 child: _todayCard(context)),
+          if (_showPushToday) _pushToday(l),
           if (_showHandoffNudge) _handoffNudge(l),
           if (_iAmViewer)
             Padding(

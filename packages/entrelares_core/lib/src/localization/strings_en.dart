@@ -1000,7 +1000,7 @@ abstract final class StringsEn {
     K.profLeaveConsequenceAccount: 'Your account will be permanently erased after 30 days. During that period you can cancel your departure — as long as the family still has a free seat.',
     K.profLeaveConsequenceDays: 'Your future days will be released irreversibly: if you come back, they do not return on their own and will need to be set again by hand.',
     K.profLeaveConsequenceHistory: 'Past history keeps your name on it (the record of who did what on the calendar).',
-    K.profLeaveConsequenceNotice: 'The other caregivers will be notified of your departure (in the app and by e-mail).',
+    K.profLeaveConsequenceNotice: 'The other caregivers will be notified of your departure in the app.',
     K.profLeaveConsequenceSuccessor: 'You are the only administrator: choose below who takes over the administration before you leave.',
     K.profSuccessorLabel: 'New administrator',
     K.profSuccessorPlaceholder: 'Select…',
