@@ -25,8 +25,12 @@ points at them; this directory is about the *presence*, not the pipeline.
 
 - The copy is versioned here: [`listing-pt-BR.txt`](listing-pt-BR.txt) and
   [`listing-en-US.txt`](listing-en-US.txt) — app name, short description and full description,
-  with the Play character limits noted inline. **Edit the files, review in a PR, then paste into
-  the Console** — never draft in the Console directly, where nothing is versioned.
+  each under a `=== <label> (<= N …) ===` header that states Play's limit. **Since T-98
+  (02/10/2026) nothing is pasted into the Console: edit the files → PR → after the merge,
+  dispatch the `play-listing` workflow — dry run first, then for real — and approve it on the
+  `play-production` Environment** ([§9](#9--publishing-the-listing--the-play-listing-workflow-t-98)).
+  Never draft in the Console, and never edit the text there either: the next dispatch writes
+  the files over whatever the Console holds.
 - **Both files were re-verified sentence by sentence against the code on 28/08/2026 (T-57)**,
   and three claims moved. *"Funciona também offline"* / *"Works offline too"* was **deleted**:
   it was written for the Blazor PWA's service worker, the cutover falsified it, and **T-18 is
@@ -36,7 +40,7 @@ points at them; this directory is about the *presence*, not the pipeline.
   PDF report is named as Premium, which is where `reports_pdf_tab.dart` gates it. In their
   place the bullet list gained the web channel, which does exist. **A listing is a claim about
   the system (the S-15 rule): re-read it against the code before every republish, and never
-  paste a sentence a test could not defend.**
+  publish a sentence a test could not defend.**
 - **Re-verified again on 27/09/2026, after T-59 made the listing public** — a month of features
   had shipped past the 28/08 text. What moved, with the code that makes each sentence true:
   - **"aprovada automaticamente após 48 horas" was FALSE** since F-60: the window is anchored
@@ -59,9 +63,10 @@ points at them; this directory is about the *presence*, not the pipeline.
     price (the store price is Play's), and the vocabulary is `vocabulary_test`'s.
   - en-US also stopped saying "after a divorce" (pt says *pais separados*) and "approved
     swaps" (read as if only approved swaps were free).
-- **English translation** (the app is bilingual since U-13): at the top of the Main store
-  listing page → **Manage translations** → **Add your own translation** → **English (United
-  States) – en-US** → paste from `listing-en-US.txt`. The default language stays pt-BR.
+- **English translation** (the app is bilingual since U-13): the listing carries an **English
+  (United States) – en-US** translation beside the default pt-BR, and `play-listing` writes
+  both languages on every run — the file suffix is the Play locale code. The default language
+  stays pt-BR, and it is chosen in the Console, not by the workflow.
 - **Categories**: app category **Parenting** (fallback: Lifestyle). Tags: family, calendar.
 - **Contact details**: e-mail `suporte@entrelares.app`; website `https://entrelares.app`.
 - **Screenshots (phone)** — **generated from the app's own widgets since T-97 (02/10/2026)**:
@@ -484,3 +489,45 @@ legacy `com.guardacompartilhada.app` and came out with **T-52** (09/09/2026), on
 was deleted; `web_channel_test` now asserts its ABSENCE, so it cannot drift back in. If the
 browser bar ever comes back on an installed app, that file in PRODUCTION is the first thing to
 check.
+
+## 9 · Publishing the listing — the `play-listing` workflow (T-98)
+
+The Main store listing leaves `store/` the way a build does: through a workflow the owner
+dispatches and approves, never through the Console's text boxes (owner, 02/10/2026).
+
+1. **Edit `listing-pt-BR.txt` / `listing-en-US.txt` in a PR.** `app/test/play_listing_test.dart`
+   parses both with the rules the lane uses and fails the PR on a broken file or a field over
+   Play's limit — **30** (name), **80** (short), **4000** (full) characters. The format: three
+   `=== <label> (<= N …) ===` headers, in the order name → short → full; the `N` must be Play's
+   limit for that position, so a swapped section is refused; each text is everything up to the
+   next header, trimmed; name and short are one line. The test reads the header pattern and the
+   field order from the Fastfile, so the two cannot drift.
+2. **After the merge — dry run.** [Actions → play-listing](https://github.com/irineus/entrelares-app/actions/workflows/play-listing.yml)
+   → *Run workflow* on `main`, `dry_run` ticked (the default) → **Approve** on `play-production`.
+   Play validates the whole edit and nothing is committed; the run summary lists the
+   character count of every field.
+3. **For real.** The same dispatch with `dry_run` unticked, approved again. **A green run means
+   the change was SENT, not that it is live**: Google reviews a listing change like a release,
+   and the Console's **Publishing overview** says when it is published.
+4. **Screenshots** go up only with `upload_screenshots` ticked (default off), and only after the
+   owner approved the PNGs. Each language's phone set is then **replaced** by
+   `store/screenshots/<lang>/phone-<n>.png` — 2 to 8 files, numbered from 1 with no gap, shown in
+   that order; an identical prefix already on Play is kept, the rest deleted and re-sent. A
+   language with no folder keeps exactly what Play has.
+
+What the lane never touches: binaries, tracks, release notes, the icon, the feature graphic
+(both still re-uploaded by hand, §2/§3), the promo video, categories and contact details. supply
+hangs a metadata edit on one release of a track, so the lane names the build **Internal testing**
+holds — read, not changed; Internal must hold a build (it always has since T-79). The job shares
+the `play-production` concurrency group with `play-promote`: one Play edit from the owner's
+workflows at a time.
+
+**The service account.** The workflow authenticates as `PLAY_RELEASE_SERVICE_ACCOUNT`, the
+release account of T-79 (Environment secret), which needs, on this app, the Play Console
+permission to edit the store listing — **Manage store presence** — besides the release ones.
+There are **two** service accounts on this Play account, and they are easy to mix up: the
+**billing** one (`PLAY_SERVICE_ACCOUNT`, read by the Edge Functions to verify purchases,
+[`supabase/README.md`](../supabase/README.md) §9-bis) and the **release** one. A run that fails
+with *"The caller does not have permission"* almost always means the permission was granted to
+the OTHER account: compare the `client_email` inside the secret's JSON with the list in
+**Users and permissions** before changing anything else.
