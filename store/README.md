@@ -64,7 +64,12 @@ points at them; this directory is about the *presence*, not the pipeline.
   States) – en-US** → paste from `listing-en-US.txt`. The default language stays pt-BR.
 - **Categories**: app category **Parenting** (fallback: Lifestyle). Tags: family, calendar.
 - **Contact details**: e-mail `suporte@entrelares.app`; website `https://entrelares.app`.
-- **Screenshots (phone)** — **current since 28/08/2026** ([T-57](../backlog/archive/phase-7.md)).
+- **Screenshots (phone)** — **generated from the app's own widgets since T-97 (02/10/2026)**:
+  [`screenshots/pt-BR/`](screenshots/pt-BR/) and [`screenshots/en-US/`](screenshots/en-US/).
+  See [§1.1](#11--phone-screenshots-generated-t-97). The paragraph below is the T-57 set, which
+  the Console carries until T-98 uploads the generated one, and which the landing and
+  `app/web/screenshots/` keep using either way.
+- **The T-57 photographs** — current since 28/08/2026 ([T-57](../backlog/archive/phase-7.md)).
   The Console and the landing share one set, and it is now TWO sets: `pt-BR` from
   `entrelares-site/public/img/screenshots/`, `en-US` from `.../screenshots/en/`, eight frames
   each at 1080×1920 with a `webp`+`png` pair. They photograph the **Flutter** app in production
@@ -82,6 +87,66 @@ points at them; this directory is about the *presence*, not the pipeline.
   because `web/manifest.json` names them and the web channel's `img-src` allows only its own
   origin — pointed at the landing, Chrome fetched them on every load and our CSP refused all
   six. Copy them over in the same delivery; `web_channel_test` fails a `src` that does not ship.
+
+### 1.1 · Phone screenshots, generated (T-97)
+
+**One command regenerates both sets:**
+
+```
+cd app && fvm flutter test store_screenshots/
+```
+
+It writes `store/screenshots/pt-BR/phone-<n>.png` and `store/screenshots/en-US/phone-<n>.png`,
+1080×1920 (Play's 9∶16), numbered in **listing order**, and empties both folders of
+`phone-*.png` first — a scene taken out of the list cannot leave an old image behind to be
+uploaded by mistake. A run takes about 20 seconds.
+
+**Nothing on the phone is drawn by hand.** The harness (`app/store_screenshots/`) pumps the
+app's real shell and screens — `HomeShell` with the five branches `main.dart` builds, every
+module flag at its production value (S-22, F-75, F-07) — against the same
+`FakeCustodyDataSource` the widget suites use (`test/calendar_slice_test.dart`), filled with a
+**fictional family**: Ana (mother, the signed-in admin) and Bruno (father), Lia and Theo, the
+grandmother Rosa and the nanny Carla as a Visualizador. The phone is the 360×740 dp screen the
+U-32 suite measures every page on, in the light theme, with the real Inter and Material icons
+loaded from the test bundle's `FontManifest.json`; a finger opens sheets and switches tabs the
+way the widget suites do. `store_frame.dart` only places that screen inside a phone outline
+under a fixed caption band (same phone size and position on every image), every colour a
+`tokens.dart` token. What the family typed — the swap message, the Conversa, the expenses, the
+agenda — is written in each screenshot's language.
+
+**Why it is not in CI.** The directory sits outside `test/`, and the CI's bare `flutter test`
+discovers `test/` only, so the gate never renders PNGs. `flutter analyze` does read it — it has
+to stay clean — and it imports the fakes from `test/`, so a change to the data source interface
+that breaks it shows up there.
+
+**The dates move with the run.** The calendar reads `DateTime.now()` and takes no clock, so
+every date in the fixture is relative to the day the command runs: the month on screen is
+always the current one, populated. The flip side is that two runs on different days produce
+different images — **regenerate, then approve what was regenerated**.
+
+| n | Screen | PT-BR caption | en-US caption | Plan |
+|---|---|---|---|---|
+| 1 | Calendar: the month, today's caregiver card, a swapped day, a pending request's bell | Quem fica com as crianças, dia a dia | Who has the kids, day by day | Free — two caregivers, no module |
+| 2 | Day sheet: Bruno's pending swap request with his message, Aprovar/Recusar | Trocas de dia pedidas e respondidas no app | Day swaps, asked and answered in the app | Free — swaps have no gate |
+| 3 | Relatórios → PDF: the year's report generated, the verifiable reports issued | Relatório em PDF verificável | A verifiable PDF report | **Premium** — `reports_pdf_tab.dart` shows the upsell when `!_isPremium`; the QR (F-64) is issued only for Premium |
+| 4 | Família: two parents, the grandmother as a third caregiver, the nanny as Visualizador | Avó, babá e quem mais cuida | Grandma, the nanny and everyone who helps | **Premium** — a third caregiver is beyond `free_caregivers` |
+| 5 | Day sheet: a day's agenda for both children | A agenda de cada criança | Each child's agenda | **Premium** — every kind but the note (`AgendaKind.isStructured`, `agenda.premium_only`) |
+| 6 | Comunicação → Conversa: the permanent-record notice, two messages, a cited day | A conversa da família, registrada | The family chat, on record | **Premium** — `chat.premium_only` (`chat_view.dart`) |
+| 7 | Despesas: the balance, the activity list | As despesas das crianças, divididas | The kids' expenses, shared | **Premium** — `expenses.premium_only` (`expenses_screen.dart`) |
+| 8 | Relatórios → Resumo: the year in days per parent | Quantos dias com cada um | How many days with each parent | Free — the Resumo has no gate |
+
+Each caption also has a one-line detail under the headline (in `store_screenshots_test.dart`,
+next to the scene). The rules the captions follow are the listing's: **every sentence true of
+the code (S-15)**; **a Premium scene carries the "Premium" pill**, so no image sells a Premium
+feature as free; **no number an operator can change** — trial days, months of calendar,
+caregiver counts (U-57); no emoji (U-31). The harness fails a caption that does not fit its
+two lines, and an overflow anywhere on the phone fails the scene, as it does in the widget
+suites.
+
+**The owner approves the PNGs before T-98 publishes them.** Play serves its own copies: the
+pt-BR set goes to the Main store listing's *Phone screenshots*, the en-US set to *Manage
+translations → English (United States)*. A change to a screen, a caption or the scene list
+means a new run, a new look, and a new approval.
 
 ## 2 · Brand assets
 
