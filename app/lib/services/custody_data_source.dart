@@ -464,6 +464,13 @@ abstract class CustodyDataSource {
   ///
   /// Throws [SignUpFailure] with the catalog key to show — including for the
   /// anti-enumeration "silent duplicate" shape.
+  ///
+  /// F-80: [referralCode] — the code of the family that referred this one,
+  /// sent ONLY while `feature.referral` is on (the caller asks
+  /// [fetchReferralEnabled] first). It rides in the sign-up metadata because
+  /// the founder has no session until the e-mail is confirmed; the server
+  /// strips it from the auth row and attributes it in the same transaction
+  /// that creates the family.
   Future<void> signUpFounder({
     required String email,
     required String password,
@@ -471,7 +478,22 @@ abstract class CustodyDataSource {
     required String role,
     required String familyName,
     required String languageCode,
+    String? referralCode,
   });
+
+  // ── F-80: family referral (built dark) ────────────────────────────────────
+
+  /// Whether `feature.referral` is on — answerable WITHOUT a session (the
+  /// `referral_enabled` RPC), because the register screen runs before one.
+  /// Any failure is `false`: a module that cannot prove it is on is off.
+  Future<bool> fetchReferralEnabled();
+
+  /// `attribute_referral` — the founder of a family created in the last 24 h
+  /// names the code that brought it. Returns the server's closed answer
+  /// (`attributed` / `ignored`), or null when the call failed or was refused.
+  /// Never throws: attribution is fire-and-forget.
+  Future<String?> attributeReferral(
+      {required String code, required String channel});
 
   /// The INVITEE branch (U-17), which is auto-confirmed and therefore cannot
   /// go through GoTrue sign-up: the `register-invitee` Edge Function creates

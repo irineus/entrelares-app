@@ -65,6 +65,7 @@ import 'suites/premium_entitlement.dart';
 import 'suites/profile_language.dart';
 import 'suites/profile_self_service.dart';
 import 'suites/push_subscriptions.dart';
+import 'suites/referral.dart';
 import 'suites/reconsent_gate.dart';
 import 'suites/register_invitee.dart';
 import 'suites/resolution_log_link.dart';
@@ -208,6 +209,9 @@ void main() {
   // T-99: the operator's weekly bulletin — counts only, closed keys, no
   // client, and a week sent once.
   weeklyBulletinTests(fx);
+  // F-80: family referral — dark by flag, an opaque code, first touch wins,
+  // and nothing a client can read.
+  referralTests(fx);
   billingHistoryTests(fx);
   billingReactivateTests(fx);
   billingAvulsoTests(fx);

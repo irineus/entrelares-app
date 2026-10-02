@@ -44,6 +44,7 @@ Future<void> pumpOnboarding(
   Future<void> Function()? onSignOut,
   String? initialInviteToken,
   void Function(InviteInfo invite)? onInviteeJoined,
+  VoidCallback? onFamilyFounded,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 1600));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -52,6 +53,7 @@ Future<void> pumpOnboarding(
     prefs: prefs,
     initialInviteToken: initialInviteToken,
     onInviteeJoined: onInviteeJoined,
+    onFamilyFounded: onFamilyFounded,
     onSignOut: onSignOut ?? () async {},
     onCompleted: onCompleted ?? () async {},
   )));

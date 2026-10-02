@@ -47,9 +47,15 @@ class OauthOnboardingScreen extends StatefulWidget {
   /// calendar shows before the tour. Called before the sign-in that lands.
   final void Function(InviteInfo invite)? onInviteeJoined;
 
+  /// F-80 — this session just FOUNDED a family (never on the claim branch):
+  /// `main.dart` attributes a pending referral code, if the module is on.
+  /// Called before [onCompleted], and not awaited.
+  final VoidCallback? onFamilyFounded;
+
   const OauthOnboardingScreen({
     super.key,
     this.onInviteeJoined,
+    this.onFamilyFounded,
     required this.dataSource,
     this.analytics,
     required this.prefs,
@@ -190,6 +196,9 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
       // T-37: same funnel event the register form emits — the channel is in
       // the pageview, never a person.
       widget.analytics?.trackEvent(AnalyticsEvents.familyCreated);
+      // F-80: the family now exists and this session founded it — the one
+      // moment `attribute_referral` accepts. Fire-and-forget by contract.
+      widget.onFamilyFounded?.call();
       await _clearPendingToken();
       await widget.onCompleted();
     } on OnboardingRefused catch (e) {

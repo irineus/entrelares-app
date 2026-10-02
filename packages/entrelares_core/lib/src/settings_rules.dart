@@ -111,6 +111,12 @@ class PublicSettings {
   bool get perChildScheduleEnabled =>
       parseBoolSetting(values, 'feature.per_child_schedule', false);
 
+  /// F-80 — family referral (`my_referral_code`, `attribute_referral`). Dark
+  /// in production until the policy 2.1 ships with the flip; the server
+  /// refuses both RPCs and drops a sign-up's code while it is off.
+  bool get referralEnabled =>
+      parseBoolSetting(values, 'feature.referral', false);
+
   // F-55 PR 2 — the agenda's operator keys (the RPCs read the same ones).
   bool get agendaPremiumOnly =>
       parseBoolSetting(values, 'agenda.premium_only', true);

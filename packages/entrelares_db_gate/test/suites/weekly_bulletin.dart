@@ -179,7 +179,8 @@ void weeklyBulletinTests(GateFixture fx) {
         isoDate(addDays(thisMonday, -14)),
         isoDate(addDays(thisMonday, -7)),
       ]);
-      // F-80 fills it; until then it is a key with no value.
+      // F-80: a key with no value while `feature.referral` is off (the
+      // referral suite covers the count with the module on).
       expect(b.containsKey('referrals'), isTrue);
       expect(b['referrals'], isNull);
     });
