@@ -80,8 +80,6 @@ void serverParametersTests(GateFixture fx) {
           contains: 'de 0 a 90 dias');
       await expectRejected(() => setSetting('invitation.valid_days', '31'),
           contains: 'de 1 a 30 dias');
-      await expectRejected(() => setSetting('email_quota.warn_percent', '96'),
-          contains: 'de 50% a 95%');
       await expectRejected(() => setSetting('billing.asaas_due_days', '0'),
           contains: 'de 1 a 30 dias');
       await expectRejected(() => setSetting('usage_report.weeks', '53'),
@@ -126,6 +124,14 @@ void serverParametersTests(GateFixture fx) {
       // own filter — no second copy of the twelve types.
       await withSetting('push.disabled_types', '["swap_requested"]', () async {
         expect(await getSetting('push.disabled_types'), '["swap_requested"]');
+      });
+      // F-59: the membership notices push since e-mail stopped carrying them,
+      // so the dispatcher's own list names them and the switch accepts them.
+      await withSetting(
+          'push.disabled_types', '["member_joined", "family_deletion"]',
+          () async {
+        expect(await getSetting('push.disabled_types'),
+            '["member_joined", "family_deletion"]');
       });
       await expectRejected(
           () => setSetting('push.disabled_types', '["billing"]'),

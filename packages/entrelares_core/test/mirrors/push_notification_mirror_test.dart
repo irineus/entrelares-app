@@ -161,6 +161,46 @@ void main() {
       }
     });
 
+    // F-59 — the membership types carry receipts and news under ONE type
+    // (`account_deletion` is also the leaver's own confirmation; `family_deletion`
+    // is also the requester's own receipt and the answers addressed to them).
+    // Only the wordings about someone else may ring a phone, and the line is
+    // drawn twice: the dispatcher filters by `kind`, and renderPush refuses any
+    // other kind on its own.
+    test('a membership notice pushes only the kinds about someone else', () {
+      final trigger = _dispatcherMigration();
+      expect(trigger, contains("IS DISTINCT FROM 'other_left'"),
+          reason: "the dispatcher lets the leaver's own confirmation ring.");
+      expect(
+          trigger,
+          contains("NOT IN ('requested_other', 'refused', 'withdrawn', "
+              "'reminder')"),
+          reason: 'the dispatcher lets a family_deletion receipt ring.');
+      expect(trigger, contains('latest.resolved_by = NEW.recipient_profile_id'),
+          reason: 'whoever refused or withdrew would be pushed their own act.');
+
+      final source = _pushSource();
+      final body = source.substring(
+          source.indexOf('function renderMembership('),
+          source.indexOf('export interface PushCopy'));
+      for (final kind in ['requested_other', 'refused', 'withdrawn', 'reminder']) {
+        expect(body, contains('case "$kind":'),
+            reason: 'family_deletion `$kind` reaches renderPush with no copy.');
+      }
+      expect(body, contains('kind !== "other_left"'));
+      for (final receipt in [
+        'self',
+        'self_last',
+        'requested_self',
+        'agreed',
+        'agreement_undone',
+      ]) {
+        expect(body, isNot(contains('"$receipt"')),
+            reason: '`$receipt` is a receipt or an answer to the requester — '
+                'it must stay in-app.');
+      }
+    });
+
     // F-52 — the assertion that exists because its defect SHIPPED, twice, and
     // was silent both times.
     //

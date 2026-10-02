@@ -87,9 +87,9 @@ void publicSettingsTests(GateFixture fx) {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       final values = (body['values'] as Map).cast<String, dynamic>();
       expect(values.keys.toSet(), whitelist);
-      // The e-mail caps are server-only: the CHECK keeps them out, and this is
-      // the end-to-end proof.
-      expect(values.containsKey('email_cap_free'), isFalse);
+      // A server-only key: the CHECK keeps it out, and this is the end-to-end
+      // proof.
+      expect(values.containsKey('usage_report.weeks'), isFalse);
       expect(values.containsKey('policy.current_version'), isFalse);
       expect(body['updated_at'], isA<String>());
 

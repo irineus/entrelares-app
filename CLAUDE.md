@@ -137,7 +137,9 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # `_shared/i18n.ts` podia seguir prometendo 24h enquanto o app dizia o instante, as duas
 # frases bem formadas e o build calado; o espelho lê os TRÊS lados fora do Dart, o corpo
 # VIVO de `auto_approve_expired` inclusive, e recusa janela citada numa FRASE — o
-# `interval '48 hours'` ao lado dela é a regra, que o item não tocou), e os números da porta
+# `interval '48 hours'` ao lado dela é a regra, que o item não tocou; desde o F-59, 02/10/2026,
+# o lembrete e a aprovação automática não são mais e-mail, e o lado do i18n.ts prende que
+# essa cópia SUMIU — um e-mail de prazo que volte tem de voltar com a própria guarda), e os números da porta
 # de suporte (F-68: tamanho da mensagem, os limites por hora/dia e as cinco categorias moram
 # em `send-support-request/index.ts`; o espelho lê esse arquivo e o CHECK da migração —
 # errar aqui recusa depois do Enviar justamente quem já estava travado; desde o T-83 os

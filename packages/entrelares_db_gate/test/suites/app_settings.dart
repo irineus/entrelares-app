@@ -29,8 +29,7 @@ void appSettingsTests(GateFixture fx) {
       expect(keys, contains('calendar_months_premium'));
       expect(keys, contains('free_caregivers'));
       expect(keys, contains('max_caregivers'));
-      expect(keys, isNot(contains('email_cap_free')));
-      expect(keys, isNot(contains('email_cap_premium')));
+      expect(keys, isNot(contains('usage_report.weeks')));
     });
 
     test("the operator's columns stay out of a client's reach", () async {
@@ -65,8 +64,20 @@ void appSettingsTests(GateFixture fx) {
     test('the service role sees every setting', () async {
       final keys = await keysSeenBy(fx.service);
 
-      expect(keys, contains('email_cap_free'));
+      expect(keys, contains('usage_report.weeks'));
       expect(keys, contains('calendar_months_free'));
+    });
+
+    test('the F-38 e-mail quota is gone', () async {
+      // F-59 (02/10/2026): e-mail only where nothing else reaches the reader.
+      // The quota counted the swap e-mails and the invitation; with the first
+      // gone it would only ration invitations, so its keys and its counter
+      // left. A key with no reader is a knob that turns nothing.
+      final rows = await fx.service.from('app_settings').select('key').inFilter(
+          'key', ['email_cap_free', 'email_cap_premium', 'email_quota.warn_percent']);
+      expect(rows, isEmpty);
+      await expectRejected(() => fx.service.rpc<dynamic>('consume_email_quota',
+          params: {'p_family_id': fx.familyId}));
     });
 
     test('an authenticated client cannot write settings', () async {

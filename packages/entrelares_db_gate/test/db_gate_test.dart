@@ -40,7 +40,6 @@ import 'suites/day_protection.dart';
 import 'suites/e2e_date_allocator.dart';
 import 'suites/edge_function_auth.dart';
 import 'suites/elevation_code.dart';
-import 'suites/email_quota_gate.dart';
 import 'suites/family_deletion.dart';
 import 'suites/family_isolation.dart';
 import 'suites/handoff_range.dart';
@@ -189,7 +188,6 @@ void main() {
   edgeFunctionAuthTests(fx);
   notificationParamsTests(fx);
   pushSubscriptionsTests(fx);
-  emailQuotaGateTests(fx);
   testRecipientSuppressionTests(fx);
   // F-68: the support door — who the reply goes to, the limit, retention,
   // and a table no client can read.

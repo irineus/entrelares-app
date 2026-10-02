@@ -195,13 +195,13 @@ npx supabase functions deploy billing-checkout     --project-ref <project-ref>
 
 | Function | Purpose |
 |---|---|
-| `send-swap-email` | Transactional e-mails (Resend) for every workflow event, the F-24 `reminder`/`auto_approved` types, the F-15 `invitation` type; computes the F-20 priority tag at send time |
-| `auto-approve-expired` | Cron worker (F-24): calls the `auto_approve_expired()` RPC (24 h reminders + 48 h auto-approval) and dispatches e-mails via `send-swap-email` |
+| `send-swap-email` | Since F-59 (02/10/2026) the F-15 `invitation` e-mail ONLY. The swap-workflow types (request, answers, cancellations, reverts, the F-24 `reminder`/`auto_approved`) are push + in-app; Android builds already in Production still call them, and they get 200 `{skipped: "push_only"}` |
+| `auto-approve-expired` | Cron worker (F-24): calls the `auto_approve_expired()` RPC (24 h reminders + 48 h auto-approval). The rows it writes push through the notifications trigger; no e-mail since F-59 |
 | `register-invitee` | F-15 invite sign-up: `admin.createUser` + profile/family wiring for a user joining via an invitation link (first casualty if the JWT key is on ES256 — see S-16) |
 | `elevate` | S-10 sudo elevation: opens the short-lived window the guarded destructive actions require. Two proofs since S-21 — the current password, or a one-time code mailed through `send-account-email`, which is the only door a Google session has |
 | `purge-deleted` | S-11 cron worker: hard-deletes accounts (and families) past their 30-day grace. Also carries the retention/notice duties added since: `purge_old_notifications` (S-13, read notices > 6 months), **`purge_stale_invitations`** (S-15/A-4, never-accepted invitations > 30 days — what makes the invite e-mail's purge promise true) and **`billing_grace_warnings_due`** (S-15/B-3, warns admins by e-mail before the Premium grace expires; the RPC writes the in-app notice, the e-mail here is the best-effort twin), `purge_old_support_requests` (F-68, 12 months) and **`purge_old_member_activity`** (T-78, `member_activity_days` older than 400 days plus any removed account's rows — the period §11 of the policy promises) |
-| `send-push-notification` | F-09: the push dispatcher. Fired by an AFTER INSERT trigger on `notifications` (pg_net, hence `--no-verify-jwt` and the secret key on `apikey`), so push, in-app and e-mail are three renderings of ONE event. Pushes ten types only — the rule is "push only what the recipient did not just do" — renders the copy per recipient from `_shared/push.ts` in that reader's language, and deletes the tokens FCM retires. **Fails closed and quiet on every branch**: no `FCM_SERVICE_ACCOUNT`, no device, or an unrenderable payload each answer 200 with a reason (arming: section 11) |
-| `send-account-email` | S-11 account-lifecycle e-mails (deletion scheduled/cancelled, family-deletion consent); mirrors the F-20 priority tag in `America/Sao_Paulo`. S-15/B-3 added `premium_grace_ending` — the only type that e-mails ONLY the subject (a family admin), since billing is admin-only. S-21 added `elevation_code`, the odd one out: keyed by `userId` (the subject may have no profile yet), secret-key callers only (`elevate`), and the destination address is read from `auth.users` instead of trusted from the payload |
+| `send-push-notification` | F-09: the push dispatcher. Fired by an AFTER INSERT trigger on `notifications` (pg_net, hence `--no-verify-jwt` and the secret key on `apikey`), so push and in-app are two renderings of ONE event (e-mail is a third only where F-59 kept it). Pushes the types in `PUSH_TYPES` only — since F-59 also the membership notices, by `kind` — and the rule is "push only what the recipient did not just do" — renders the copy per recipient from `_shared/push.ts` in that reader's language, and deletes the tokens FCM retires. **Fails closed and quiet on every branch**: no `FCM_SERVICE_ACCOUNT`, no device, or an unrenderable payload each answer 200 with a reason (arming: section 11) |
+| `send-account-email` | S-11 account-lifecycle e-mails. Since F-59 (02/10/2026): the leaver's OWN confirmation, the family-deletion request (requester + every other member) and its D-3 reminder, and the post-purge farewell. Someone joining, coming back or leaving (to the others), a deletion refused or withdrawn, and F-70's plan end are push + in-app; their types answer 200 `{skipped: "push_only"}` for the builds that still ask. S-15/B-3 added `premium_grace_ending` — the only type that e-mails ONLY the subject (a family admin), since billing is admin-only. S-21 added `elevation_code`, the odd one out: keyed by `userId` (the subject may have no profile yet), secret-key callers only (`elevate`), and the destination address is read from `auth.users` instead of trusted from the payload |
 
 | `billing-webhook` | T-39: receives Asaas events (auth = the `ASAAS_WEBHOOK_TOKEN` shared secret in `asaas-access-token`, hence `--no-verify-jwt`). **Idempotent by the provider's event id** — a redelivery is recorded and ignored — and applies every effect through `set_family_plan`, adopting the subscription created by the payment link (`externalReference family:<id>`, link-id fallback) |
 | `billing-checkout` | T-39: called with the **user's** JWT and admin-only (guard chain 401→403→409→503); creates the Asaas Payment Link (`RECURRENT`, `dueDateLimitDays` — the API rejects it without one) so payer data is typed only on the provider's PCI page, and handles `cancel` honouring the period already paid. Refuses everything while `billing.enabled` is false; gateway failures are audited as `CHECKOUT_ERROR` in the ledger |
@@ -214,6 +214,17 @@ npx supabase functions deploy billing-checkout     --project-ref <project-ref>
 >
 > An outdated `send-swap-email` used to silently build **0 e-mails** for unknown
 > types — the historical gotcha the automated redeploy-on-every-push eliminates.
+
+> **What is still e-mail (F-59, 02/10/2026).** The owner's rule: e-mail only where nothing
+> else can reach the reader, or where a written promise names e-mail. That is the auth links
+> (`send-auth-email`: sign-up, recovery, e-mail change), the S-21 sudo code, the invitation,
+> the F-68 support confirmation, the family-deletion request + its D-3 reminder, the
+> post-purge farewell, the Premium grace warning (the Terms promise it by e-mail) and the
+> leaver's own confirmation. Everything else is push + in-app, and a reader without push is
+> walked to it by the *Ativar notificações* card on Hoje. The F-38 monthly quota retired with
+> the swap e-mails (its counter, functions and keys were dropped). A new e-mail type needs the
+> same justification — it spends the per-account Resend allowance (100/day, shared with GoTrue
+> and, since 02/09/2026, with a second product's domain).
 
 ---
 

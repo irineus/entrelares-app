@@ -383,6 +383,13 @@ List<String> _under(List<(String, Color, Color)> pairs, double floor) => [
 /// A month with the four things a cell can carry: today with a handoff time,
 /// a swapped day, a frozen day (overdue, awaiting the reader) and the rest
 /// unplanned.
+/// The fixture's frozen day: early in the month, and never today nor the
+/// planned neighbour. It used to be the 2nd outright, so on every 2nd of the
+/// month TODAY was frozen and the today-cell assertion below read a frozen
+/// label (02/10/2026).
+int _frozenDay(int d, int other) =>
+    [2, 3, 4].firstWhere((i) => i != d && i != other);
+
 cal.FakeCustodyDataSource _calendarSource() {
   final d = cal.today.day;
   final other = d < 28 ? d + 1 : d - 1;
@@ -392,7 +399,7 @@ cal.FakeCustodyDataSource _calendarSource() {
       cal.row(1, cal.dayOfMonth(d), 1, handoffTime: '18:00'),
       cal.row(2, cal.dayOfMonth(other), 2, actual: 1),
     ],
-  )..frozenRequests = [frz.swapReq(10, cal.dayOfMonth(2))];
+  )..frozenRequests = [frz.swapReq(10, cal.dayOfMonth(_frozenDay(d, other)))];
 }
 
 Widget _calendar(cal.FakeCustodyDataSource ds, {required bool dark}) => _host(
@@ -1259,7 +1266,7 @@ void main() {
       final other = d < 28 ? d + 1 : d - 1;
       final empty = [
         for (var i = 3; i <= 28; i++) i,
-      ].firstWhere((i) => i != d && i != other);
+      ].firstWhere((i) => i != d && i != other && i != _frozenDay(d, other));
       final node = tester.getSemantics(
         find.bySemanticsLabel(
           RegExp('^$empty, ${pt[K.calAriaNoResponsible]}\$'),

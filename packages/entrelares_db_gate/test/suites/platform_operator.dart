@@ -203,7 +203,7 @@ void platformOperatorTests(GateFixture fx) {
       try {
         final settings =
             await fx.founder.rpc<dynamic>('admin_list_settings');
-        expect(settings.toString(), contains('email_cap_free'));
+        expect(settings.toString(), contains('usage_report.weeks'));
 
         await expectRejected(
           () => fx.founder.rpc<dynamic>('admin_update_setting',
