@@ -285,6 +285,9 @@ abstract final class NotificationRenderer {
         return l.format(K.notifRenderPlanEnding, [date]);
       case 'plan_ending' when kind == 'ended' && date != null:
         return l.format(K.notifRenderPlanEnded, [date]);
+      // F-78: the plan never started.
+      case 'plan_ending' when kind == 'unplanned' && date != null:
+        return l[K.notifRenderPlanUnplanned];
 
       // ── The Premium trial runs out (F-77) ──
       case 'premium_trial' when kind == 'ending' && date != null:
@@ -538,6 +541,7 @@ abstract final class NotificationRenderer {
           : switch (kind) {
               'ending' => K.notifRenderTitlePlanEnding,
               'ended' => K.notifRenderTitlePlanEnded,
+              'unplanned' => K.notifRenderTitlePlanUnplanned,
               _ => null,
             },
       // F-77: same shape as F-70's.

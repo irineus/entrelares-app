@@ -57,6 +57,7 @@ import 'suites/public_settings.dart';
 import 'suites/server_parameters.dart';
 import 'suites/plan_end_reminders.dart';
 import 'suites/trial_end_reminders.dart';
+import 'suites/unplanned_nudges.dart';
 import 'suites/planning_horizon_gate.dart';
 import 'suites/platform_operator.dart';
 import 'suites/premium_entitlement.dart';
@@ -202,6 +203,7 @@ void main() {
   billingGraceWarningTests(fx);
   planEndReminderTests(fx);
   trialEndReminderTests(fx);
+  unplannedNudgeTests(fx);
   billingHistoryTests(fx);
   billingReactivateTests(fx);
   billingAvulsoTests(fx);

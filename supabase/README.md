@@ -345,6 +345,26 @@ select count(distinct t.family_id) filter (where s.family_id is not null) as con
  where t.stage in ('d7','d1') and t.trial_ends_at + interval '7 days' < now();
 ```
 
+### 4.6-ter The `unplanned-family-nudges` cron (F-78) — nothing to do by hand
+
+Created by `20261002180000_f78_unplanned_nudge.sql`: **`unplanned-family-nudges-daily`**,
+`0 12 * * *`, the job being `SELECT public.unplanned_family_nudges_due();`. A
+family with no `care_schedules` row in any lane `onboarding.unplanned_nudge_hours`
+(default 48) after it was created is told once — every active, non-viewer member
+with an account — as a `plan_ending` row of kind `unplanned` (push + in-app, no
+e-mail). The first run is the one-time backfill for the families already dormant.
+Check a run, and the measure it exists for (nudged families that planned within
+7 days):
+```sql
+select jobname, schedule from cron.job where jobname = 'unplanned-family-nudges-daily';
+select count(*) filter (where exists (
+         select 1 from public.care_schedules cs
+          where cs.family_id = n.family_id and cs.created_at <= n.sent_at + interval '7 days')) as planned,
+       count(*) as nudged
+  from public.unplanned_family_nudges n
+ where n.sent_at + interval '7 days' < now();
+```
+
 ### 4.7 The `public-settings` feed (T-81) — what the landing may read
 
 `GET /functions/v1/public-settings`, **no credential** (`verify_jwt = false`),

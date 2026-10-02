@@ -122,6 +122,9 @@ const CHAT_TYPES = ['chat_message'];
 // F-77: a notice about the Premium trial's end opens the plan page, where the
 // subscribe button is.
 const PLAN_TYPES = ['premium_trial'];
+// F-78: a `plan_ending` that says the plan never started opens the calendar
+// with the wizard on today (`/?plan=first`, read by the app's `/` route).
+const PLAN_FIRST_KINDS = ['unplanned'];
 
 /// Where a tapped notification lands — the same URL `main.dart` builds for the
 /// Android tap, which is what makes the two channels agree: the Notificações
@@ -129,6 +132,9 @@ const PLAN_TYPES = ['premium_trial'];
 function landingUrl(data) {
   if (PLAN_TYPES.includes(data.type)) {
     return new URL('/family/plan', self.location.origin).href;
+  }
+  if (data.type === 'plan_ending' && PLAN_FIRST_KINDS.includes(data.kind)) {
+    return new URL('/?plan=first', self.location.origin).href;
   }
   const actionable = ACTIONABLE_TYPES.includes(data.type) ||
     (data.type === 'day_notice' && ACTIONABLE_KINDS.includes(data.kind));

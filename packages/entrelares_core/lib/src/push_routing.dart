@@ -33,6 +33,10 @@ enum NotificationLanding {
   /// end asks one thing, and the page that answers it is where the subscribe
   /// button is. The row stays in "Todas" with the same way in.
   plan,
+
+  /// F-78 — the calendar with the wizard open on today: a family that never
+  /// planned is asked to plan, and the wizard is where that happens.
+  planFirst,
 }
 
 abstract final class PushRouting {
@@ -75,7 +79,12 @@ abstract final class PushRouting {
           ? NotificationLanding.chat
           : _plan.contains(type)
               ? NotificationLanding.plan
-              : _landingForNotice(type, kind: kind);
+              : type == 'plan_ending' && planFirstKinds.contains(kind)
+                  ? NotificationLanding.planFirst
+                  : _landingForNotice(type, kind: kind);
+
+  /// F-78: the `plan_ending` kinds whose tap opens the wizard.
+  static const Set<String> planFirstKinds = {'unplanned'};
 
   /// F-35: the types that open the Conversa.
   static const Set<String> _chat = {'chat_message'};
