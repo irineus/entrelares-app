@@ -1009,7 +1009,7 @@ abstract final class StringsPtBr {
     K.profLeaveConsequenceAccount: 'Sua conta será apagada definitivamente após 30 dias. Nesse período você pode cancelar a saída — desde que ainda haja vaga na família.',
     K.profLeaveConsequenceDays: 'Seus dias futuros serão liberados de forma irreversível: se você voltar, eles não voltam sozinhos e precisarão de novo ajuste manual.',
     K.profLeaveConsequenceHistory: 'O histórico passado permanece com o seu nome (registro de quem fez cada ação no calendário).',
-    K.profLeaveConsequenceNotice: 'Os demais responsáveis serão avisados da sua saída (no app e por e-mail).',
+    K.profLeaveConsequenceNotice: 'Os demais responsáveis serão avisados da sua saída no app.',
     K.profLeaveConsequenceSuccessor: 'Você é o único administrador: indique abaixo quem assume a administração antes de sair.',
     K.profSuccessorLabel: 'Novo administrador',
     K.profSuccessorPlaceholder: 'Selecione…',

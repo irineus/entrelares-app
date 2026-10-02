@@ -56,6 +56,7 @@ import 'services/crash_reporter.dart';
 import 'services/custody_data_source.dart';
 import 'services/google_identity.dart';
 import 'services/handoff_nudge_prefs.dart';
+import 'services/push_today_prefs.dart';
 import 'services/install_hint.dart';
 import 'services/installed_app.dart';
 import 'services/notification_badge.dart';
@@ -497,6 +498,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                     MemberLinkTarget.family => '/family',
                   }),
                   handoffNudgePrefs: _handoffNudgePrefs,
+                  push: _push,
+                  installFacts: _browserFacts,
+                  pushTodayPrefs: _pushTodayPrefs,
                   planRequest: _planRequest,
                   dayRequest: _dayRequest),
             ),
@@ -790,6 +794,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
 
   /// U-55: the "Definir horário" strip's dismissal, per family, per device.
   late final _handoffNudgePrefs = SharedHandoffNudgePrefs(widget.prefs);
+  late final _pushTodayPrefs = SharedPushTodayPrefs(widget.prefs);
 
   /// F-70: Notificações → calendar, carrying the day the wizard opens on.
   /// The calendar consumes it (sets it back to null) once it opens.

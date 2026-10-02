@@ -1212,6 +1212,28 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<({bool accountHasPush, DateTime? newestUnreadAt})> fetchPushReach(
+      int myProfileId) async {
+    final devices = await _client
+        .from('push_subscriptions')
+        .select('id')
+        .eq('profile_id', myProfileId)
+        .limit(1);
+    final unread = await _client
+        .from('notifications')
+        .select('created_at')
+        .eq('recipient_profile_id', myProfileId)
+        .eq('is_read', false)
+        .order('created_at', ascending: false)
+        .limit(1);
+    final at = unread.isEmpty ? null : unread.first['created_at'] as String?;
+    return (
+      accountHasPush: devices.isNotEmpty,
+      newestUnreadAt: at == null ? null : DateTime.parse(at).toUtc(),
+    );
+  }
+
+  @override
   Future<void Function()> watchWorkflowChanges(void Function() onChange,
       {void Function(bool connected)? onStatus}) async {
     final channel = _client
