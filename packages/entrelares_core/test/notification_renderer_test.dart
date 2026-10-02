@@ -417,6 +417,9 @@ void main() {
         'O planejamento da família vai até 12/11/2026. Planeje os próximos meses.'),
     ('plan_ending', '{"kind":"ended","date":"2026-09-22"}',
         'O último dia planejado foi 22/09/2026. Planeje os próximos meses no calendário.'),
+    // F-78: what unplanned_family_nudges_due() stores, word for word.
+    ('plan_ending', '{"kind":"unplanned","date":"2026-10-04"}',
+        'O calendário da família ainda não tem nenhum dia planejado. Comece pelo primeiro mês.'),
     // F-77: what trial_end_reminders_due() stores, word for word.
     ('premium_trial', '{"kind":"ending","date":"2026-10-09"}',
         'A avaliação Premium da família vai até 09/10/2026. Para continuar com o Premium depois dessa data, veja o plano.'),
@@ -507,6 +510,7 @@ void main() {
       ('plan_ending', '{"kind":"ended","date":"2026-09-22"}'),
       ('premium_trial', '{"kind":"ending","date":"2026-10-09"}'),
       ('premium_trial', '{"kind":"ended","date":"2026-10-09"}'),
+      ('plan_ending', '{"kind":"unplanned","date":"2026-10-04"}'),
       ('agenda_notice',
           '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia","name":"Ana"}'),
       ('agenda_notice',

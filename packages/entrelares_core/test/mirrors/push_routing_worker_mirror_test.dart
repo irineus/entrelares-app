@@ -59,6 +59,7 @@ void main() {
   late List<String> actionableKindsInJs;
   late List<String> chatInJs;
   late List<String> planInJs;
+  late List<String> planFirstKindsInJs;
 
   setUp(() {
     worker = repoFile(_worker);
@@ -85,6 +86,11 @@ void main() {
       RegExp(r'const PLAN_TYPES = \[([^\]]*)\]'),
       _worker,
     );
+    planFirstKindsInJs = _stringList(
+      worker,
+      RegExp(r'const PLAN_FIRST_KINDS = \[([^\]]*)\]'),
+      _worker,
+    );
   });
 
   /// What the JS would decide for a payload, read from the worker's own lists.
@@ -93,6 +99,8 @@ void main() {
           ? NotificationLanding.chat
           : planInJs.contains(type)
           ? NotificationLanding.plan
+          : type == 'plan_ending' && planFirstKindsInJs.contains(kind)
+          ? NotificationLanding.planFirst
           : actionableInJs.contains(type) ||
               (type == 'day_notice' && actionableKindsInJs.contains(kind))
           ? NotificationLanding.incoming
@@ -120,6 +128,7 @@ void main() {
       'cancelled',
       'helping',
       'keeping',
+      ...planFirstKindsInJs,
     ];
 
     for (final type in pushTypes) {

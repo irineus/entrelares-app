@@ -64,6 +64,13 @@ void main() {
           NotificationLanding.history);
     });
 
+    test('a plan that never started opens the wizard (F-78)', () {
+      expect(PushRouting.landingFor('plan_ending', kind: 'unplanned'),
+          NotificationLanding.planFirst);
+      expect(PushRouting.landingFor('plan_ending', kind: 'ending'),
+          NotificationLanding.history);
+    });
+
     test("the Premium trial's end opens the plan page (F-77)", () {
       expect(PushRouting.landingFor('premium_trial', kind: 'ending'),
           NotificationLanding.plan);

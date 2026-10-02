@@ -800,6 +800,10 @@ abstract final class StringsPtBr {
     K.notifRenderPlanEnding: 'O planejamento da família vai até {0}. Planeje os próximos meses.',
     K.notifRenderPlanEnded: 'O último dia planejado foi {0}. Planeje os próximos meses no calendário.',
     K.notifPlanAction: 'Planejar os próximos meses',
+    // F-78: byte-identical to what unplanned_family_nudges_due() stores.
+    K.notifRenderTitlePlanUnplanned: 'Falta planejar o primeiro mês',
+    K.notifRenderPlanUnplanned: 'O calendário da família ainda não tem nenhum dia planejado. Comece pelo primeiro mês.',
+    K.notifPlanFirstAction: 'Planejar o primeiro mês',
     K.calPlanEnding: 'O planejamento vai até {0}.',
     K.calPlanEnded: 'O planejamento terminou em {0}.',
     // F-77: byte-identical to what trial_end_reminders_due() stores (U-13).

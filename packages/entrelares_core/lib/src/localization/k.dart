@@ -901,6 +901,10 @@ abstract final class K {
   static const String notifRenderPlanEnding = 'notifRender.planEnding';
   static const String notifRenderPlanEnded = 'notifRender.planEnded';
   static const String notifPlanAction = 'notif.planAction';
+  // ── The first month to plan (F-78) ──
+  static const String notifRenderTitlePlanUnplanned = 'notifRender.title.planUnplanned';
+  static const String notifRenderPlanUnplanned = 'notifRender.planUnplanned';
+  static const String notifPlanFirstAction = 'notif.planFirstAction';
   static const String calPlanEnding = 'cal.planEnd.ending';
   static const String calPlanEnded = 'cal.planEnd.ended';
 
@@ -2053,6 +2057,9 @@ abstract final class K {
     notifRenderPlanEnding,
     notifRenderPlanEnded,
     notifPlanAction,
+    notifRenderTitlePlanUnplanned,
+    notifRenderPlanUnplanned,
+    notifPlanFirstAction,
     calPlanEnding,
     calPlanEnded,
     notifRenderTitleTrialEnding,

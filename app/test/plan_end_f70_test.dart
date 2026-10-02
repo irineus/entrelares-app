@@ -83,6 +83,21 @@ void main() {
     expect(asked, day);
   });
 
+  testWidgets('F-78: a never-planned row offers "Planejar o primeiro mês" '
+      'and hands over today', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..notifications = [_planRow(9, 'unplanned', day)];
+    DateTime? asked;
+    await tester.pumpWidget(_notifApp(ds, (d) => asked = d));
+    await tester.pumpAndSettle();
+
+    expect(find.text(_pt[K.notifRenderTitlePlanUnplanned]), findsOneWidget);
+    expect(find.text(_pt[K.notifPlanFirstAction]), findsOneWidget);
+    await tester.tap(find.byKey(NotificationsScreen.planActionKey(9)));
+    await tester.pumpAndSettle();
+    expect(asked, day);
+  });
+
   testWidgets('other rows, and a plan row the rule cannot read, offer nothing',
       (tester) async {
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])

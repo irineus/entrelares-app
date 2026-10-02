@@ -158,6 +158,7 @@ const K = {
 	titlePlanEnding: "notifRender.title.planEnding",
 	titlePlanEnded: "notifRender.title.planEnded",
 	titleTrialEnding: "notifRender.title.trialEnding",
+	titlePlanUnplanned: "notifRender.title.planUnplanned",
 	titleTrialEnded: "notifRender.title.trialEnded",
 	titleExpenseAdded: "notifRender.title.expenseAdded",
 	titleExpenseUpdated: "notifRender.title.expenseUpdated",
@@ -198,6 +199,7 @@ const K = {
 	planEnding: "notifRender.planEnding",
 	planEnded: "notifRender.planEnded",
 	trialEnding: "notifRender.trialEnding",
+	planUnplanned: "notifRender.planUnplanned",
 	trialEnded: "notifRender.trialEnded",
 
 	titleMemberJoined: "notifRender.title.memberJoined",
@@ -274,6 +276,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.planEnding": "O planejamento da família vai até {0}. Planeje os próximos meses.",
 		"notifRender.planEnded": "O último dia planejado foi {0}. Planeje os próximos meses no calendário.",
 		"notifRender.title.trialEnding": "A avaliação Premium termina em breve",
+		"notifRender.title.planUnplanned": "Falta planejar o primeiro mês",
+		"notifRender.planUnplanned": "O calendário da família ainda não tem nenhum dia planejado. Comece pelo primeiro mês.",
 		"notifRender.title.trialEnded": "A avaliação Premium terminou",
 		"notifRender.trialEnding": "A avaliação Premium da família vai até {0}. Para continuar com o Premium depois dessa data, veja o plano.",
 		"notifRender.trialEnded": "A avaliação Premium da família terminou em {0}. A família segue no plano gratuito, e o Premium pode ser assinado a qualquer momento.",
@@ -381,6 +385,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.planEnding": "Your family's plan runs until {0}. Plan the next months.",
 		"notifRender.planEnded": "The last planned day was {0}. Plan the next months in the calendar.",
 		"notifRender.title.trialEnding": "Your Premium trial ends soon",
+		"notifRender.title.planUnplanned": "The first month still needs a plan",
+		"notifRender.planUnplanned": "Your family's calendar has no planned day yet. Start with the first month.",
 		"notifRender.title.trialEnded": "Your Premium trial has ended",
 		"notifRender.trialEnding": "Your family's Premium trial runs until {0}. To keep Premium after that date, see the plan.",
 		"notifRender.trialEnded": "Your family's Premium trial ended on {0}. The family stays on the free plan, and Premium can be subscribed at any time.",
@@ -741,6 +747,10 @@ export function renderPush(
 			} else if (kind === "ended") {
 				titleKey = K.titlePlanEnded;
 				body = fmt(lang, K.planEnded, [date]);
+			} else if (kind === "unplanned") {
+				// F-78: the plan never started; the sentence states no day.
+				titleKey = K.titlePlanUnplanned;
+				body = fmt(lang, K.planUnplanned);
 			} else {
 				return null;
 			}

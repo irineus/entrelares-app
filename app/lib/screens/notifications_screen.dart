@@ -263,6 +263,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       NotificationLanding.history => _Tab.history,
       NotificationLanding.chat => _Tab.history,
       NotificationLanding.plan => _Tab.history,
+      NotificationLanding.planFirst => _Tab.history,
     };
   }
 
@@ -1087,7 +1088,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child: TextButton.icon(
         key: NotificationsScreen.planActionKey(notif.id),
         icon: const Icon(Icons.edit_calendar_outlined),
-        label: Text(l[K.notifPlanAction]),
+        label: Text(l[PlanEndRules.isUnplanned(notif.paramsJson)
+            ? K.notifPlanFirstAction
+            : K.notifPlanAction]),
         onPressed: () {
           _trackListOpen(PlanEndRules.type);
           onPlanFrom(start);

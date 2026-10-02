@@ -479,7 +479,15 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/',
-              builder: (_, _) => CalendarScreen(
+              builder: (_, state) {
+                // F-78: the web's push lands on `/?plan=first` (the service
+                // worker cannot call Dart); the request is consumed once and
+                // the address cleaned.
+                if (state.uri.queryParameters['plan'] == 'first') {
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _openWizardOnToday());
+                }
+                return CalendarScreen(
                   dataSource: _dataSource,
                   connectivity: appConnectivity,
                   offlineCache: _offlineCache,
@@ -502,7 +510,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   installFacts: _browserFacts,
                   pushTodayPrefs: _pushTodayPrefs,
                   planRequest: _planRequest,
-                  dayRequest: _dayRequest),
+                  dayRequest: _dayRequest);
+              },
             ),
           ]),
           // U-35: the branch's navigator reports to the roster's observer, so
@@ -801,6 +810,13 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// The calendar consumes it (sets it back to null) once it opens.
   final _planRequest = ValueNotifier<DateTime?>(null);
 
+  /// F-78 — the calendar with the wizard open on today.
+  void _openWizardOnToday() {
+    final now = DateTime.now();
+    _planRequest.value = DateTime(now.year, now.month, now.day);
+    _router.go('/');
+  }
+
   /// What the browser says about itself (U-51's seam), read ONCE: the shell
   /// strip and the Notificações step (U-54) must agree on the same answer.
   /// Null in the native app.
@@ -925,12 +941,18 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         _router.go('/family/plan');
         return;
       }
+      // F-78: a family that never planned is taken to the wizard on today.
+      if (landing == NotificationLanding.planFirst) {
+        _openWizardOnToday();
+        return;
+      }
       final query = {
         'tab': switch (landing) {
           NotificationLanding.incoming => 'incoming',
           NotificationLanding.history => 'history',
           NotificationLanding.chat => 'chat',
           NotificationLanding.plan => 'history',
+          NotificationLanding.planFirst => 'history',
         },
         if ((data['notificationId'] ?? '').isNotEmpty)
           'n': data['notificationId']!,
