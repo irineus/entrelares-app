@@ -417,6 +417,11 @@ void main() {
         'O planejamento da família vai até 12/11/2026. Planeje os próximos meses.'),
     ('plan_ending', '{"kind":"ended","date":"2026-09-22"}',
         'O último dia planejado foi 22/09/2026. Planeje os próximos meses no calendário.'),
+    // F-77: what trial_end_reminders_due() stores, word for word.
+    ('premium_trial', '{"kind":"ending","date":"2026-10-09"}',
+        'A avaliação Premium da família vai até 09/10/2026. Para continuar com o Premium depois dessa data, veja o plano.'),
+    ('premium_trial', '{"kind":"ended","date":"2026-10-09"}',
+        'A avaliação Premium da família terminou em 09/10/2026. A família segue no plano gratuito, e o Premium pode ser assinado a qualquer momento.'),
     // F-55 PR 4: what agenda_notify() stores, word for word.
     ('agenda_notice',
         '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia","name":"Ana","msg":"5 ml"}',
@@ -500,6 +505,8 @@ void main() {
       ('billing', '{"kind":"grace_warning","date":"12/08/2026"}'),
       ('plan_ending', '{"kind":"ending","date":"2026-11-12"}'),
       ('plan_ending', '{"kind":"ended","date":"2026-09-22"}'),
+      ('premium_trial', '{"kind":"ending","date":"2026-10-09"}'),
+      ('premium_trial', '{"kind":"ended","date":"2026-10-09"}'),
       ('agenda_notice',
           '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia","name":"Ana"}'),
       ('agenda_notice',

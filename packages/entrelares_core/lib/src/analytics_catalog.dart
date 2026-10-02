@@ -164,10 +164,12 @@ abstract final class AnalyticsCatalog {
   /// reported as `other`. The ten F-09 push types, the F-52 aviso, the F-70
   /// plan end (from 23/09/2026 — its opens are that item's success measure),
   /// the F-55 agenda notice and reminder (from 24/09/2026), the F-59
-  /// membership notices (from 02/10/2026, when they stopped being e-mail) and
-  /// the three things a row in *Para você* opens.
+  /// membership notices (from 02/10/2026, when they stopped being e-mail), the
+  /// F-77 Premium trial's end (from 02/10/2026 — its opens are the first step
+  /// of that item's funnel) and the three things a row in *Para você* opens.
   static const notificationTypes = {
     'plan_ending',
+    'premium_trial',
     'agenda_notice',
     'agenda_reminder',
     'expense_changed',

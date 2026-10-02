@@ -119,11 +119,17 @@ const ACTIONABLE_TYPES = ['swap_requested', 'revert_requested', 'auto_reminder']
 const ACTIONABLE_KINDS = ['pickup', 'keep'];
 // F-35: a chat notice opens the Conversa itself, where the text is.
 const CHAT_TYPES = ['chat_message'];
+// F-77: a notice about the Premium trial's end opens the plan page, where the
+// subscribe button is.
+const PLAN_TYPES = ['premium_trial'];
 
 /// Where a tapped notification lands — the same URL `main.dart` builds for the
 /// Android tap, which is what makes the two channels agree: the Notificações
 /// screen reads `tab` and `n` from the query string either way.
 function landingUrl(data) {
+  if (PLAN_TYPES.includes(data.type)) {
+    return new URL('/family/plan', self.location.origin).href;
+  }
   const actionable = ACTIONABLE_TYPES.includes(data.type) ||
     (data.type === 'day_notice' && ACTIONABLE_KINDS.includes(data.kind));
   const tab = CHAT_TYPES.includes(data.type)

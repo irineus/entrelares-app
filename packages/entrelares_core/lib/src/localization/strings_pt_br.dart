@@ -802,6 +802,13 @@ abstract final class StringsPtBr {
     K.notifPlanAction: 'Planejar os próximos meses',
     K.calPlanEnding: 'O planejamento vai até {0}.',
     K.calPlanEnded: 'O planejamento terminou em {0}.',
+    // F-77: byte-identical to what trial_end_reminders_due() stores (U-13).
+    // The DATE, never the trial's length (U-57).
+    K.notifRenderTitleTrialEnding: 'A avaliação Premium termina em breve',
+    K.notifRenderTitleTrialEnded: 'A avaliação Premium terminou',
+    K.notifRenderTrialEnding: 'A avaliação Premium da família vai até {0}. Para continuar com o Premium depois dessa data, veja o plano.',
+    K.notifRenderTrialEnded: 'A avaliação Premium da família terminou em {0}. A família segue no plano gratuito, e o Premium pode ser assinado a qualquer momento.',
+    K.notifTrialAction: 'Ver o plano',
     // F-34: byte-identical to what expense_notify()/settlement_notify() store.
     K.notifRenderTitleExpenseAdded: 'Despesa lançada',
     K.notifRenderTitleExpenseUpdated: 'Despesa alterada',

@@ -28,6 +28,11 @@ enum NotificationLanding {
   /// F-35 — the Conversa: a chat notice opens the conversation itself, where
   /// the text is, not the notification that announced it.
   chat,
+
+  /// F-77 — the plan page (`/family/plan`): a notice about the Premium trial's
+  /// end asks one thing, and the page that answers it is where the subscribe
+  /// button is. The row stays in "Todas" with the same way in.
+  plan,
 }
 
 abstract final class PushRouting {
@@ -68,10 +73,16 @@ abstract final class PushRouting {
   static NotificationLanding landingFor(String? type, {String? kind}) =>
       _chat.contains(type)
           ? NotificationLanding.chat
-          : _landingForNotice(type, kind: kind);
+          : _plan.contains(type)
+              ? NotificationLanding.plan
+              : _landingForNotice(type, kind: kind);
 
   /// F-35: the types that open the Conversa.
   static const Set<String> _chat = {'chat_message'};
+
+  /// F-77: the types that open the plan page.
+  static const Set<String> planTypes = {'premium_trial'};
+  static const Set<String> _plan = planTypes;
 
   static NotificationLanding _landingForNotice(String? type, {String? kind}) =>
       _actionable.contains(type) ||

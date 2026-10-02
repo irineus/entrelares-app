@@ -322,6 +322,29 @@ select jobname, schedule from cron.job where jobname = 'plan-end-reminders-daily
 select * from public.plan_end_reminders order by sent_at desc limit 20;
 ```
 
+### 4.6-bis The `trial-end-reminders` cron (F-77) — nothing to do by hand
+
+Created by its own migration (`20261002170000_f77_trial_end_reminders.sql`):
+**`trial-end-reminders-daily`**, `0 12 * * *`, beside F-70's. No e-mail twin
+(F-59), so there is no Edge Function — the job is `SELECT
+public.trial_end_reminders_due();` itself and needs no Vault read (the push
+trigger reads its own). It tells a family's ADMINS that the Premium trial ends
+(D-7, D-1) or ended — the `ended` only after a D-7/D-1 of the same end (no
+backfill) — and skips a family that pays on either rail or has a pending
+deletion. Check a run, and the conversion it exists for (reminded families
+that subscribed by their trial end + 7 days):
+```sql
+select jobname, schedule from cron.job where jobname = 'trial-end-reminders-daily';
+select * from public.trial_end_reminders order by sent_at desc limit 20;
+select count(distinct t.family_id) filter (where s.family_id is not null) as converted,
+       count(distinct t.family_id) as reminded
+  from public.trial_end_reminders t
+  left join public.subscriptions s
+    on s.family_id = t.family_id and s.status in ('active','scheduled','overdue')
+   and s.created_at <= t.trial_ends_at + interval '7 days'
+ where t.stage in ('d7','d1') and t.trial_ends_at + interval '7 days' < now();
+```
+
 ### 4.7 The `public-settings` feed (T-81) — what the landing may read
 
 `GET /functions/v1/public-settings`, **no credential** (`verify_jwt = false`),

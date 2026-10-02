@@ -90,6 +90,10 @@ export const PUSH_TYPES: readonly string[] = [
 	"member_returned",
 	"account_deletion",
 	"family_deletion",
+	// F-77. The family's Premium trial ends (D-7, D-1) or ended. Nobody did
+	// anything: the trial runs out under the family, and only its admins
+	// can subscribe, so only they are written to. Lands on the plan page.
+	"premium_trial",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -153,6 +157,8 @@ const K = {
 
 	titlePlanEnding: "notifRender.title.planEnding",
 	titlePlanEnded: "notifRender.title.planEnded",
+	titleTrialEnding: "notifRender.title.trialEnding",
+	titleTrialEnded: "notifRender.title.trialEnded",
 	titleExpenseAdded: "notifRender.title.expenseAdded",
 	titleExpenseUpdated: "notifRender.title.expenseUpdated",
 	titleExpenseDeleted: "notifRender.title.expenseDeleted",
@@ -191,6 +197,8 @@ const K = {
 	agendaKindOther: "notifRender.agendaKind.other",
 	planEnding: "notifRender.planEnding",
 	planEnded: "notifRender.planEnded",
+	trialEnding: "notifRender.trialEnding",
+	trialEnded: "notifRender.trialEnded",
 
 	titleMemberJoined: "notifRender.title.memberJoined",
 	titleMemberReturned: "notifRender.title.memberReturned",
@@ -265,6 +273,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.planEnded": "O planejamento terminou",
 		"notifRender.planEnding": "O planejamento da família vai até {0}. Planeje os próximos meses.",
 		"notifRender.planEnded": "O último dia planejado foi {0}. Planeje os próximos meses no calendário.",
+		"notifRender.title.trialEnding": "A avaliação Premium termina em breve",
+		"notifRender.title.trialEnded": "A avaliação Premium terminou",
+		"notifRender.trialEnding": "A avaliação Premium da família vai até {0}. Para continuar com o Premium depois dessa data, veja o plano.",
+		"notifRender.trialEnded": "A avaliação Premium da família terminou em {0}. A família segue no plano gratuito, e o Premium pode ser assinado a qualquer momento.",
 		"notifRender.title.expenseAdded": "Despesa lançada",
 		"notifRender.title.expenseUpdated": "Despesa alterada",
 		"notifRender.title.expenseDeleted": "Despesa apagada",
@@ -368,6 +380,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.planEnded": "Your plan has ended",
 		"notifRender.planEnding": "Your family's plan runs until {0}. Plan the next months.",
 		"notifRender.planEnded": "The last planned day was {0}. Plan the next months in the calendar.",
+		"notifRender.title.trialEnding": "Your Premium trial ends soon",
+		"notifRender.title.trialEnded": "Your Premium trial has ended",
+		"notifRender.trialEnding": "Your family's Premium trial runs until {0}. To keep Premium after that date, see the plan.",
+		"notifRender.trialEnded": "Your family's Premium trial ended on {0}. The family stays on the free plan, and Premium can be subscribed at any time.",
 		"notifRender.title.expenseAdded": "Expense added",
 		"notifRender.title.expenseUpdated": "Expense changed",
 		"notifRender.title.expenseDeleted": "Expense deleted",
@@ -725,6 +741,19 @@ export function renderPush(
 			} else if (kind === "ended") {
 				titleKey = K.titlePlanEnded;
 				body = fmt(lang, K.planEnded, [date]);
+			} else {
+				return null;
+			}
+			break;
+
+		// F-77: the same two kinds, about the Premium trial's end.
+		case "premium_trial":
+			if (kind === "ending") {
+				titleKey = K.titleTrialEnding;
+				body = fmt(lang, K.trialEnding, [date]);
+			} else if (kind === "ended") {
+				titleKey = K.titleTrialEnded;
+				body = fmt(lang, K.trialEnded, [date]);
 			} else {
 				return null;
 			}

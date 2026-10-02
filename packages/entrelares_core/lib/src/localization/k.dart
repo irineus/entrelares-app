@@ -904,6 +904,13 @@ abstract final class K {
   static const String calPlanEnding = 'cal.planEnd.ending';
   static const String calPlanEnded = 'cal.planEnd.ended';
 
+  // ── Premium trial ending (F-77) ──
+  static const String notifRenderTitleTrialEnding = 'notifRender.title.trialEnding';
+  static const String notifRenderTitleTrialEnded = 'notifRender.title.trialEnded';
+  static const String notifRenderTrialEnding = 'notifRender.trialEnding';
+  static const String notifRenderTrialEnded = 'notifRender.trialEnded';
+  static const String notifTrialAction = 'notif.trialAction';
+
   // ── Shared expenses (F-34) ──
   static const String notifRenderTitleExpenseAdded = 'notifRender.title.expenseAdded';
   static const String notifRenderTitleExpenseUpdated = 'notifRender.title.expenseUpdated';
@@ -2048,6 +2055,11 @@ abstract final class K {
     notifPlanAction,
     calPlanEnding,
     calPlanEnded,
+    notifRenderTitleTrialEnding,
+    notifRenderTitleTrialEnded,
+    notifRenderTrialEnding,
+    notifRenderTrialEnded,
+    notifTrialAction,
     notifRenderTitleExpenseAdded,
     notifRenderTitleExpenseUpdated,
     notifRenderTitleExpenseDeleted,
