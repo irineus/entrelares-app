@@ -163,8 +163,9 @@ abstract final class AnalyticsCatalog {
   /// The notification types `notification-open` may name; anything else is
   /// reported as `other`. The ten F-09 push types, the F-52 aviso, the F-70
   /// plan end (from 23/09/2026 — its opens are that item's success measure),
-  /// the F-55 agenda notice and reminder (from 24/09/2026), and the three
-  /// things a row in *Para você* opens.
+  /// the F-55 agenda notice and reminder (from 24/09/2026), the F-59
+  /// membership notices (from 02/10/2026, when they stopped being e-mail) and
+  /// the three things a row in *Para você* opens.
   static const notificationTypes = {
     'plan_ending',
     'agenda_notice',
@@ -187,6 +188,10 @@ abstract final class AnalyticsCatalog {
     'day_notice',
     'swap_request',
     'revert_request',
+    'member_joined',
+    'member_returned',
+    'account_deletion',
+    'family_deletion',
   };
 
   static String notificationType(String? type) =>

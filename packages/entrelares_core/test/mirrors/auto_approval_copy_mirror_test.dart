@@ -13,16 +13,17 @@
 ///     `notification_renderer_test.dart`;
 ///   * `_shared/push.ts` — the F-09 duplicate, pinned byte-for-byte against
 ///     Dart by `push_notification_mirror_test.dart`;
-///   * `_shared/i18n.ts` — the e-mail copy, which has no Dart twin to be
-///     compared against and is therefore only guarded HERE;
+///   * `_shared/i18n.ts` — the e-mail copy, until F-59 (02/10/2026) made the
+///     reminder and the auto-approval push + in-app only; what is pinned now is
+///     that it stays gone;
 ///   * the migration's STORED sentence, the fallback record every reader with
 ///     an old client still sees.
 ///
-/// Each one can be edited alone, and each failure is silent: the e-mail keeps
-/// promising 24 h while the app names an instant, and both are well-formed
-/// sentences nobody's build complains about. So this suite reads all three
-/// non-Dart sides and refuses the two things that made F-60 a defect — a
-/// quoted window, and a reminder that does not carry the instant.
+/// Each one can be edited alone, and each failure is silent: the e-mail kept
+/// promising 24 h while the app named an instant, and both were well-formed
+/// sentences nobody's build complained about. So this suite reads the non-Dart
+/// sides and refuses the two things that made F-60 a defect — a quoted window,
+/// and a reminder that does not carry the instant.
 library;
 
 import 'dart:convert';
@@ -75,14 +76,14 @@ String _liveAutoApproveBody() {
 }
 
 void main() {
-  group('F-60 · the e-mail copy (_shared/i18n.ts)', () {
-    final source = i18nSource();
-
-    // Without this, a renamed key would make every assertion below pass over
-    // an empty list — the failure mode the mirror family exists to prevent.
-    test('the reminder and auto-approval texts are actually being read', () {
+  group('F-59 · no e-mail states the deadline any more', () {
+    // The reminder and the auto-approval stopped being e-mail on 02/10/2026:
+    // push + in-app only. This mirror used to read their e-mail copy; what it
+    // pins now is that the copy is really gone, so a reminder e-mail cannot
+    // come back without bringing its own guard against a quoted window.
+    test('_shared/i18n.ts carries no reminder or auto-approval text', () {
       expect(
-          _tsLinesFor(source, [
+          _tsLinesFor(i18nSource(), [
             'subjReminder',
             'reminderTitle',
             'reminderBanner',
@@ -91,53 +92,10 @@ void main() {
             'autoApprovedApprover',
             'autoApprovedRequester',
           ]),
-          // Seven keys, two languages, plus the interface declarations.
-          hasLength(greaterThanOrEqualTo(14)));
-    });
-
-    test('no e-mail sentence quotes a window', () {
-      final lines = _tsLinesFor(source, [
-        'subjReminder',
-        'reminderTitle',
-        'reminderBanner',
-        'reminderHeading',
-        'reminderBody',
-        'autoApprovedApprover',
-        'autoApprovedRequester',
-      ]);
-      for (final line in lines) {
-        for (final window in _windows) {
-          expect(line, isNot(contains(window)),
-              reason: 'an e-mail sentence promises "$window" again. The window '
-                  'is measured from the DAY, so no request ever had it: '
-                  '$line');
-        }
-      }
-    });
-
-    test('the reminder states the instant instead', () {
-      // The four texts the approver reads take `dd`/`dt` — the deadline day
-      // and hour, already formatted for that recipient. A text that stopped
-      // taking them would be back to describing nothing.
-      for (final key in [
-        'subjReminder',
-        'reminderBanner',
-        'reminderHeading',
-        'reminderBody',
-      ]) {
-        // The implementations, not the interface declaration beside them: a
-        // template literal is the only one that can carry a value.
-        final lines = _tsLinesFor(source, [key])
-            .where((l) => l.contains('=>') && l.contains('`'))
-            .toList();
-        expect(lines, hasLength(greaterThanOrEqualTo(2)),
-            reason: '$key is no longer a function of the deadline in both '
-                'languages.');
-        for (final line in lines) {
-          expect(line, contains(r'${dd}'), reason: '$key: $line');
-          expect(line, contains(r'${dt}'), reason: '$key: $line');
-        }
-      }
+          isEmpty,
+          reason: 'an auto-approval e-mail is back. Restore the F-60 checks '
+              'for it here (no quoted window, the instant in every text) in '
+              'the same delivery.');
     });
   });
 

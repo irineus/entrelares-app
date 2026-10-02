@@ -3,28 +3,29 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretKey } from "../_shared/keys.ts";
 import { hasValidUserSession, isSecretKeyCaller } from "../_shared/auth.ts";
 import { isTestRecipient } from "../_shared/mail.ts";
-import { button, code as codeBlock, emailDocument, heading, list, paragraph } from "../_shared/email_layout.ts";
+import { code as codeBlock, emailDocument, heading, list, paragraph } from "../_shared/email_layout.ts";
 import { account, common, formatDateIn, type Lang, resolveLang } from "../_shared/i18n.ts";
 
 // S-11 — account-lifecycle e-mails (Resend). Separate from send-swap-email
 // (which is swap-centric) so account/family-deletion notices have a clean home;
 // PR2 adds family-deletion e-mail types here.
 //
+// F-59 (owner, 02/10/2026): e-mail only where nothing else can reach the
+// reader or where a promise was made in writing. The heads-ups to the REST of
+// the family — someone joined, came back or left, a deletion was refused or
+// withdrawn — and the plan's end are push + in-app only now; the database rows
+// that already existed for each of them earn a push instead (see the F-59
+// migration). Android builds already in Production still ask for those types,
+// so they are answered 200 with `skipped`, never 400.
+//
 // Types (all identify the subject by profileId, except family_deletion_completed):
 //   · member_left     — a member requested to leave: confirmation (with grace/
-//     cancel/irreversibility) to the LEAVER + heads-up to every other active
-//     member. Guarded: only fires when the profile is really leaving.
-//   · member_joined   — a new member joined: heads-up to every OTHER active
-//     member (the subject just signed up, so not e-mailed).
-//   · member_returned — a member cancelled their exit: heads-up to every OTHER
-//     active member.
+//     cancel/irreversibility) to the LEAVER only. Guarded: only fires when the
+//     profile is really leaving.
 //   · family_deletion_requested — subject = the requesting admin: confirmation
 //     to them + consent notice (deadline, right to refuse) to every other
-//     active member. Deadline read from the family's pending request.
-//   · family_deletion_refused   — subject = the refuser: everyone (subject
-//     included) learns the request ended and the family continues.
-//   · family_deletion_withdrawn — subject = the requester: everyone learns the
-//     request was withdrawn.
+//     active member. Deadline read from the family's pending request. Kept: the
+//     silence of whoever does not read it is consent to erase everyone's data.
 //   · family_deletion_reminder  — subject = the requester (cron, D-3): everyone
 //     gets the final heads-up with the purge date.
 //   · family_deletion_completed — cron only, AFTER the purge: the profiles are
@@ -43,11 +44,6 @@ import { account, common, formatDateIn, type Lang, resolveLang } from "../_share
 //     subscription panel are admin-only, so an alarm to someone who cannot act on
 //     it is noise. The deadline arrives in the payload (`graceEndsAt`) because
 //     the caller already computed it from billing.grace_days.
-//   · plan_ending — F-70, cron only (`plan-end-reminders`): subject = one
-//     active member, told that the family's plan runs until `planEnd` (D-7) or
-//     ran out on it (`planEnded`). The cron already fans out one call per
-//     member, so this e-mails ONLY the subject. Refused to a user session, like
-//     elevation_code: nobody has a reason to ask for it but the job.
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
@@ -66,13 +62,20 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 type EmailType =
-  | "member_left" | "member_joined" | "member_returned"
-  | "family_deletion_requested" | "family_deletion_refused"
-  | "family_deletion_withdrawn" | "family_deletion_reminder"
+  | "member_left"
+  | "family_deletion_requested" | "family_deletion_reminder"
   | "family_deletion_completed"
   | "premium_grace_ending"
-  | "plan_ending"
   | "elevation_code";
+
+/** F-59: types this function used to mail. Push + in-app only now. */
+const RETIRED_ACCOUNT_EMAIL_TYPES: readonly string[] = [
+  "member_joined",
+  "member_returned",
+  "family_deletion_refused",
+  "family_deletion_withdrawn",
+  "plan_ending",
+];
 
 interface Payload {
   emailType: EmailType;
@@ -83,10 +86,6 @@ interface Payload {
   familyName?: string;
   // premium_grace_ending only — ISO date the grace period runs out.
   graceEndsAt?: string;
-  // plan_ending only — the last planned day (ISO `yyyy-MM-dd`) and whether it
-  // is already past.
-  planEnd?: string;
-  planEnded?: boolean;
   // elevation_code only — the subject and the code itself. `elevate` mints the
   // code, stores only its digest, and hands the plaintext here; this is the one
   // place it exists outside that function's memory.
@@ -136,13 +135,17 @@ serve(async (req: Request) => {
     }
 
     const { emailType, profileId, environmentPrefix = "", recipients, familyName, graceEndsAt,
-            planEnd, planEnded, userId, code, expiresInMinutes }: Payload = await req.json();
+            userId, code, expiresInMinutes }: Payload = await req.json();
+
+    if (RETIRED_ACCOUNT_EMAIL_TYPES.includes(emailType)) {
+      console.log(`[send-account-email] ${emailType} — push and in-app only since F-59, nothing sent`);
+      return jsonResponse({ sent: 0, suppressed: 0, failed: 0, skipped: "push_only" });
+    }
 
     const validTypes: EmailType[] = [
-      "member_left", "member_joined", "member_returned",
-      "family_deletion_requested", "family_deletion_refused",
-      "family_deletion_withdrawn", "family_deletion_reminder",
-      "family_deletion_completed", "premium_grace_ending", "plan_ending", "elevation_code",
+      "member_left",
+      "family_deletion_requested", "family_deletion_reminder",
+      "family_deletion_completed", "premium_grace_ending", "elevation_code",
     ];
     if (!validTypes.includes(emailType)) {
       return jsonResponse({ error: "Payload inválido." }, 400);
@@ -187,12 +190,6 @@ serve(async (req: Request) => {
       // S-13: never log the address, and never the code.
       console.log(`[send-account-email] elevation_code → ${lang}${sent ? "" : " (suppressed)"}`);
       return jsonResponse({ sent: sent ? 1 : 0, suppressed: sent ? 0 : 1, failed: 0 });
-    }
-
-    // F-70 — the cron is the only caller with a reason to send this.
-    if (emailType === "plan_ending" && !isSecretKeyCaller(req, serviceKey)) {
-      console.warn("[send-account-email] plan_ending refused — not a secret-key caller");
-      return jsonResponse({ error: "Não autorizado." }, 401);
     }
 
     // The purge already removed the profiles — recipients come in the payload.
@@ -265,26 +262,7 @@ serve(async (req: Request) => {
     // cannot read.
     const langOf = (p: Profile): Lang => resolveLang(p.language_effective);
 
-    if (emailType === "plan_ending") {
-      // The day is the whole message; a missing one would state nothing true.
-      if (!planEnd || !/^\d{4}-\d{2}-\d{2}$/.test(planEnd)) {
-        return jsonResponse({ error: "Payload inválido: planEnd ausente." }, 400);
-      }
-      // A member who left between the job and this call is not written to,
-      // and a viewer (F-50) is never written to.
-      if (s.left_at || s.membership_type === "viewer") {
-        return jsonResponse({ sent: 0, suppressed: 0, failed: 0 });
-      }
-      const lang = langOf(s);
-      const t = account(lang);
-      const day = formatDateIn(lang, planEnd);
-      const appUrl = (Deno.env.get("APP_URL") ?? "https://web.entrelares.app").replace(/\/$/, "");
-      messages.push({
-        to: s.email,
-        subject: `${environmentPrefix}${planEnded ? t.subjPlanEnded : t.subjPlanEnding(day)}`,
-        html: planEndingHtml(lang, s.full_name, day, planEnded === true, `${appUrl}/notifications?tab=history`),
-      });
-    } else if (emailType === "premium_grace_ending") {
+    if (emailType === "premium_grace_ending") {
       // The deadline is the whole point of this e-mail, and the "in 30 days"
       // fallback belongs to the account-deletion grace — printing it here would
       // state a period that is not this one. Refuse instead of misinform.
@@ -299,35 +277,16 @@ serve(async (req: Request) => {
         html: graceEndingHtml(lang, s.full_name, deadlineFor(lang, graceEndsAt)),
       });
     } else if (emailType === "member_left") {
-      // The leaver gets the full-consequence confirmation...
+      // The leaver gets the full-consequence confirmation. F-59: the rest of
+      // the family learns it from the `account_deletion` row and its push.
       const selfLang = langOf(s);
       messages.push({
         to: s.email,
         subject: `${environmentPrefix}${account(selfLang).subjLeftSelf}`,
         html: selfHtml(selfLang, s.full_name, deadlineFor(selfLang, s.deletion_scheduled_for)),
       });
-      // ...and every other active member a heads-up to check the calendar.
-      for (const o of (others ?? []) as Profile[]) {
-        const lang = langOf(o);
-        messages.push({
-          to: o.email,
-          subject: `${environmentPrefix}${account(lang).subjLeftOthers(s.full_name)}`,
-          html: othersHtml(lang, o.full_name, s.full_name),
-        });
-      }
-    } else if (emailType === "member_joined" || emailType === "member_returned") {
-      // Notify the OTHER active members only.
-      const joined = emailType === "member_joined";
-      for (const o of (others ?? []) as Profile[]) {
-        const lang = langOf(o);
-        const t = account(lang);
-        messages.push({
-          to: o.email,
-          subject: `${environmentPrefix}${joined ? t.subjJoined(s.full_name) : t.subjReturned(s.full_name)}`,
-          html: joined ? joinedHtml(lang, o.full_name, s.full_name) : returnedHtml(lang, o.full_name, s.full_name),
-        });
-      }
-    } else if (emailType === "family_deletion_requested" || emailType === "family_deletion_reminder") {
+    } else {
+      // family_deletion_requested / family_deletion_reminder.
       // Both carry the purge deadline, read from the family's pending request.
       const { data: request } = await supabase
         .from("family_deletion_requests")
@@ -367,21 +326,6 @@ serve(async (req: Request) => {
             html: fdReminderHtml(lang, m.full_name, deadlineIn(lang)),
           });
         }
-      }
-    } else {
-      // family_deletion_refused / family_deletion_withdrawn: everyone
-      // (subject included) learns the request ended and the family continues.
-      const refused = emailType === "family_deletion_refused";
-      for (const m of [s, ...((others ?? []) as Profile[])]) {
-        const lang = langOf(m);
-        const t = account(lang);
-        messages.push({
-          to: m.email,
-          subject: `${environmentPrefix}${refused ? t.subjFdRefused : t.subjFdWithdrawn}`,
-          html: refused
-            ? fdRefusedHtml(lang, m.full_name, s.full_name)
-            : fdWithdrawnHtml(lang, m.full_name, s.full_name),
-        });
       }
     }
 
@@ -454,41 +398,9 @@ function graceEndingHtml(lang: Lang, name: string, graceDate: string): string {
       ${paragraph(t.graceHowTo)}`);
 }
 
-// F-70 -- the plan is running out, or ran out. Says the day, what that means
-// (no caregiver set after it) and where the next step is. The button opens the
-// notification list, where the row carries the one-tap way into the wizard; a
-// signed-out reader passes the login first and lands on the calendar.
-function planEndingHtml(lang: Lang, name: string, day: string, ended: boolean, href: string): string {
-  const t = account(lang);
-  return shell(lang, ended ? t.planEndedHeading : t.planEndingHeading, `
-      ${paragraph(common(lang).greeting(escapeHtml(name)))}
-      ${paragraph(ended ? t.planEndedIntro(day) : t.planEndingIntro(day))}
-      ${paragraph(t.planHowTo)}
-      ${button(href, t.planButton)}`);
-}
 
-function othersHtml(lang: Lang, recipientName: string, leaverName: string): string {
-  const t = account(lang);
-  return shell(lang, t.othersHeading, `
-      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
-      ${paragraph(t.othersBody(escapeHtml(leaverName)))}
-      ${paragraph(t.othersHistory)}`);
-}
 
-function joinedHtml(lang: Lang, recipientName: string, joinerName: string): string {
-  const t = account(lang);
-  return shell(lang, t.joinedHeading, `
-      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
-      ${paragraph(t.joinedBody(escapeHtml(joinerName)))}
-      ${paragraph(t.joinedClosing)}`);
-}
 
-function returnedHtml(lang: Lang, recipientName: string, returnerName: string): string {
-  const t = account(lang);
-  return shell(lang, t.returnedHeading, `
-      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
-      ${paragraph(t.returnedBody(escapeHtml(returnerName)))}`);
-}
 
 function fdRequesterHtml(lang: Lang, name: string, deadline: string): string {
   const t = account(lang);
@@ -507,19 +419,7 @@ function fdOthersHtml(lang: Lang, recipientName: string, requesterName: string, 
       ${list([t.fdOthersBullet1(deadline), t.fdOthersBullet2, t.fdOthersBullet3, t.fdOthersBullet4])}`);
 }
 
-function fdRefusedHtml(lang: Lang, recipientName: string, refuserName: string): string {
-  const t = account(lang);
-  return shell(lang, t.fdRefusedHeading, `
-      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
-      ${paragraph(t.fdRefusedBody(escapeHtml(refuserName)))}`);
-}
 
-function fdWithdrawnHtml(lang: Lang, recipientName: string, requesterName: string): string {
-  const t = account(lang);
-  return shell(lang, t.fdWithdrawnHeading, `
-      ${paragraph(common(lang).greeting(escapeHtml(recipientName)))}
-      ${paragraph(t.fdWithdrawnBody(escapeHtml(requesterName)))}`);
-}
 
 function fdReminderHtml(lang: Lang, recipientName: string, deadline: string): string {
   const t = account(lang);

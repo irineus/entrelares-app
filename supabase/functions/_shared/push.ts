@@ -17,9 +17,13 @@
 // not just do.** A receipt for your own action (`swap_sent`, `revert_sent`,
 // `swap_approved_self`, `revert_approved_self`) reaches a person who is holding
 // the phone that produced it. The F-28 family fan-out (`swap_family_info`) is
-// information, not a call to action. Membership, account/family deletion,
-// e-mail quota and billing all already have an e-mail and a screen, and none of
-// them is time-critical the way a day starting tomorrow is.
+// information, not a call to action. Billing has an e-mail and a screen.
+//
+// F-59 (02/10/2026) moved the line for membership: someone joining, coming
+// back or leaving, and a family deletion asked for, refused, withdrawn or about
+// to run, used to reach the rest of the family by e-mail. E-mail is now kept
+// only where nothing else can reach the reader, so these push instead — the
+// wordings about SOMEONE ELSE only; the dispatcher filters the rest by `kind`.
 //
 // Anything outside PUSH_TYPES simply never reaches this module — the database
 // trigger filters first, and `renderPush` refuses a second time, because a
@@ -78,6 +82,14 @@ export const PUSH_TYPES: readonly string[] = [
 	// a params.push of false and the dispatcher never calls this. Lands on
 	// the Conversa tab. Never e-mail.
 	"chat_message",
+	// F-59. The membership notices, which used to be e-mail + in-app. Only the
+	// `kind`s about someone else reach this module (the dispatcher filters the
+	// rest), and none of them states a day of the plan — so they are rendered
+	// before the date guard below. All land on "Todas".
+	"member_joined",
+	"member_returned",
+	"account_deletion",
+	"family_deletion",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -179,6 +191,21 @@ const K = {
 	agendaKindOther: "notifRender.agendaKind.other",
 	planEnding: "notifRender.planEnding",
 	planEnded: "notifRender.planEnded",
+
+	titleMemberJoined: "notifRender.title.memberJoined",
+	titleMemberReturned: "notifRender.title.memberReturned",
+	titleMemberLeft: "notifRender.title.memberLeft",
+	titleFamilyDeletionRequested: "notifRender.title.familyDeletionRequested",
+	titleFamilyDeletionCancelled: "notifRender.title.familyDeletionCancelled",
+	titleFamilyDeletionWithdrawn: "notifRender.title.familyDeletionWithdrawn",
+	titleFamilyDeletionNear: "notifRender.title.familyDeletionNear",
+	memberJoined: "notifRender.memberJoined",
+	memberReturned: "notifRender.memberReturned",
+	leaveOther: "notifRender.leave.other",
+	famDelRequestedOther: "notifRender.famDel.requestedOther",
+	famDelRefused: "notifRender.famDel.refused",
+	famDelWithdrawn: "notifRender.famDel.withdrawn",
+	famDelReminder: "notifRender.famDel.reminder",
 } as const;
 
 /// The strings themselves — byte-identical to `StringsPtBr`/`StringsEn` for
@@ -274,6 +301,20 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.agendaKind.free": "Livre",
 		"notifRender.agendaKind.note": "Nota",
 		"notifRender.agendaKind.other": "Outro",
+		"notifRender.title.memberJoined": "Novo responsável na família",
+		"notifRender.title.memberReturned": "Responsável voltou à família",
+		"notifRender.title.memberLeft": "Um responsável saiu",
+		"notifRender.title.familyDeletionRequested": "Exclusão da família solicitada",
+		"notifRender.title.familyDeletionCancelled": "Exclusão da família cancelada",
+		"notifRender.title.familyDeletionWithdrawn": "Exclusão da família retirada",
+		"notifRender.title.familyDeletionNear": "Exclusão da família se aproxima",
+		"notifRender.memberJoined": "{0} juntou-se à família. Confira o calendário para incluí-lo no planejamento.",
+		"notifRender.memberReturned": "{0} cancelou a saída e voltou à família.",
+		"notifRender.leave.other": "{0} saiu da família. Os dias futuros dessa pessoa foram liberados — verifique o calendário e reatribua o que for necessário.",
+		"notifRender.famDel.requestedOther": "{0} solicitou a exclusão da família. Se ninguém recusar até {1}, TODOS os dados (calendário, histórico e contas de todos) serão apagados definitivamente. Você pode recusar em Perfil > Exclusão da família — qualquer recusa cancela a exclusão.",
+		"notifRender.famDel.refused": "{0} recusou a exclusão da família. A solicitação foi encerrada e a família continua.",
+		"notifRender.famDel.withdrawn": "{0} retirou a solicitação de exclusão da família. A família continua normalmente.",
+		"notifRender.famDel.reminder": "A família será excluída definitivamente em {0}. Você ainda pode recusar em Perfil > Exclusão da família, ou exportar seus dados antes.",
 	},
 	"en": {
 		"notifRender.title.autoReminder": "Pending request awaiting your reply",
@@ -363,6 +404,20 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.agendaKind.free": "Free time",
 		"notifRender.agendaKind.note": "Note",
 		"notifRender.agendaKind.other": "Other",
+		"notifRender.title.memberJoined": "New caregiver in the family",
+		"notifRender.title.memberReturned": "A caregiver is back",
+		"notifRender.title.memberLeft": "A caregiver left",
+		"notifRender.title.familyDeletionRequested": "Family deletion requested",
+		"notifRender.title.familyDeletionCancelled": "Family deletion cancelled",
+		"notifRender.title.familyDeletionWithdrawn": "Family deletion withdrawn",
+		"notifRender.title.familyDeletionNear": "Family deletion is near",
+		"notifRender.memberJoined": "{0} joined the family. Check the calendar to include them in the planning.",
+		"notifRender.memberReturned": "{0} cancelled their departure and is back in the family.",
+		"notifRender.leave.other": "{0} left the family. That person's future days were freed — check the calendar and reassign whatever is needed.",
+		"notifRender.famDel.requestedOther": "{0} requested the deletion of the family. If nobody refuses by {1}, EVERYONE's data (calendar, history and accounts) will be permanently erased. You can refuse under Profile > Family deletion — a single refusal cancels the deletion.",
+		"notifRender.famDel.refused": "{0} refused to delete the family. The request is closed and the family continues.",
+		"notifRender.famDel.withdrawn": "{0} withdrew the family deletion request. The family continues normally.",
+		"notifRender.famDel.reminder": "The family will be permanently deleted on {0}. You can still refuse under Profile > Family deletion, or export your data first.",
 	},
 };
 
@@ -406,6 +461,57 @@ function fmt(lang: Lang, key: string, args: string[] = []): string {
 	return template.replace(/\{(\d+)\}/g, (whole, index) => args[Number(index)] ?? whole);
 }
 
+/// F-59: the pushable types that state no day of the plan.
+const MEMBERSHIP_TYPES: readonly string[] = [
+	"member_joined",
+	"member_returned",
+	"account_deletion",
+	"family_deletion",
+];
+
+/// F-59 — someone joined, came back or left; a family deletion was asked for,
+/// refused, withdrawn or is about to run. Each `kind` the dispatcher lets
+/// through has a branch; any other is a receipt for the reader's own action or
+/// a future writer's shape, and gets no push, never a guess.
+function renderMembership(lang: Lang, type: string, params: PushParams): PushCopy | null {
+	const who = params["name"] ?? fmt(lang, K.fbOtherCap);
+	const kind = params["kind"];
+	switch (type) {
+		case "member_joined":
+			if (params["name"] === undefined) return null;
+			return { title: fmt(lang, K.titleMemberJoined), body: fmt(lang, K.memberJoined, [who]) };
+		case "member_returned":
+			if (params["name"] === undefined) return null;
+			return { title: fmt(lang, K.titleMemberReturned), body: fmt(lang, K.memberReturned, [who]) };
+		case "account_deletion":
+			if (kind !== "other_left") return null;
+			return { title: fmt(lang, K.titleMemberLeft), body: fmt(lang, K.leaveOther, [who]) };
+		case "family_deletion": {
+			const isoDate = params["date"];
+			const date = isoDate ? formatDateIn(lang, isoDate) : null;
+			switch (kind) {
+				case "requested_other":
+					if (date === null) return null;
+					return {
+						title: fmt(lang, K.titleFamilyDeletionRequested),
+						body: fmt(lang, K.famDelRequestedOther, [who, date]),
+					};
+				case "refused":
+					return { title: fmt(lang, K.titleFamilyDeletionCancelled), body: fmt(lang, K.famDelRefused, [who]) };
+				case "withdrawn":
+					return { title: fmt(lang, K.titleFamilyDeletionWithdrawn), body: fmt(lang, K.famDelWithdrawn, [who]) };
+				case "reminder":
+					if (date === null) return null;
+					return { title: fmt(lang, K.titleFamilyDeletionNear), body: fmt(lang, K.famDelReminder, [date]) };
+				default:
+					return null;
+			}
+		}
+		default:
+			return null;
+	}
+}
+
 export interface PushCopy {
 	title: string;
 	body: string;
@@ -430,6 +536,9 @@ export function renderPush(
 ): PushCopy | null {
 	if (!PUSH_TYPES.includes(type)) return null;
 	if (params === null) return null;
+
+	// F-59: the membership notices name a person, not a day of the plan.
+	if (MEMBERSHIP_TYPES.includes(type)) return renderMembership(lang, type, params);
 
 	const isoDate = params["date"];
 	const date = isoDate ? formatDateIn(lang, isoDate) : null;

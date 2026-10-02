@@ -25,7 +25,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretKey } from "../_shared/keys.ts";
-import { internalCallHeaders } from "../_shared/auth.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -173,26 +172,9 @@ serve(async (req: Request) => {
       return jsonResponse({ error: dbMessage }, 400);
     }
 
-    // S-11: notify the existing family members that someone joined (best-effort;
-    // the in-app notification is written by the notify_member_joined trigger).
-    try {
-      const { data: joined } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("email", invitation.email)
-        .maybeSingle();
-      if (joined?.id) {
-        const envName   = Deno.env.get("APP_ENVIRONMENT") ?? "Production";
-        const envPrefix = envName.toLowerCase() === "production" ? "" : "[Dev] ";
-        await fetch(`${supabaseUrl}/functions/v1/send-account-email`, {
-          method: "POST",
-          headers: internalCallHeaders(serviceKey),
-          body: JSON.stringify({ emailType: "member_joined", profileId: joined.id, environmentPrefix: envPrefix }),
-        });
-      }
-    } catch (mailErr) {
-      console.error(`[register-invitee] join e-mail skipped: ${mailErr instanceof Error ? mailErr.message : mailErr}`);
-    }
+    // S-11 + F-59: the existing members learn that someone joined from the
+    // `member_joined` row the notify_member_joined trigger writes, and from its
+    // push. There is no e-mail any more — it was the third copy of one fact.
 
     return jsonResponse({ ok: true });
   } catch (err) {
