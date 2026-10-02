@@ -8,6 +8,7 @@ import '../deep_link_urls.dart';
 import 'package:entrelares_db_contracts/models/invite_info.dart';
 import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
+import '../services/install_referrer.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/google_sign_in_button.dart';
 import '../widgets/role_picker.dart';
@@ -71,6 +72,15 @@ class RegisterScreen extends StatefulWidget {
   /// answered true — dark, nothing leaves.
   final String? referralCode;
 
+  /// F-80 PR 2 — the Android door: the code the Play install carried, read
+  /// through the Install Referrer API. Non-null only on an Android build
+  /// (`main.dart`), and asked only on the founder branch, with no `?ref=`
+  /// code, AFTER `referral_enabled` answered true — dark, nothing is read.
+  /// Read before the sign-up because the e-mail founder has no session until
+  /// the address is confirmed; the code rides in the sign-up metadata with
+  /// `referral_channel: 'android'`, which the PR 1 triggers accept.
+  final InstallReferrer? installReferrer;
+
   const RegisterScreen({
     this.analytics,
     this.onInviteeJoined,
@@ -83,6 +93,7 @@ class RegisterScreen extends StatefulWidget {
     this.onGoogleIdToken,
     this.inviteToken,
     this.referralCode,
+    this.installReferrer,
   });
 
   @override
@@ -131,9 +142,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool get _isInvited => _invite != null;
 
-  /// F-80 — whether the module is on, asked once when a code came in. Null
-  /// means no code (nothing to ask), and an unanswered question is "off".
-  Future<bool>? _referralEnabled;
+  /// F-80 — the code to send with the founder's sign-up, resolved once: the
+  /// flag is asked first and the code (the link's, or the Install Referrer's
+  /// on Android) only counts when it answered "on". Null means there was
+  /// nothing to ask; a slow or failed answer is "no code".
+  Future<String?>? _referralCode;
+
+  /// The server's word for where [_referralCode] came from.
+  String _referralChannel = ReferralRules.channel(isWeb: kIsWeb);
 
   bool get _onFamilyStep => !_isInvited && _step == 1;
 
@@ -146,9 +162,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _loadingInvite = true;
       _resolveInvite(token.trim());
     }
-    if (!invited && widget.referralCode != null) {
-      _referralEnabled = widget.dataSource.fetchReferralEnabled();
+    if (!invited) _referralCode = _resolveReferral();
+  }
+
+  /// F-80 — null when there is nothing to ask (no `?ref=` code and no
+  /// Install Referrer reader); otherwise the flag first, then the code.
+  Future<String?>? _resolveReferral() {
+    final linkCode = widget.referralCode;
+    final install = widget.installReferrer;
+    if (linkCode == null && install == null) return null;
+    if (linkCode == null) {
+      _referralChannel = ReferralRules.channel(isWeb: false);
     }
+    return () async {
+      try {
+        if (!await widget.dataSource.fetchReferralEnabled()) return null;
+        return linkCode ?? await install!.code();
+      } catch (_) {
+        return null;
+      }
+    }();
   }
 
   @override
@@ -226,11 +259,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   /// one came in AND the server said the module is on. A slow or failed
   /// answer is "off" — the sign-up never waits on a referral.
   Future<String?> _referralToSend() async {
-    final code = widget.referralCode;
-    final enabled = _referralEnabled;
-    if (code == null || enabled == null) return null;
+    final pending = _referralCode;
+    if (pending == null) return null;
     try {
-      return await enabled.timeout(const Duration(seconds: 3)) ? code : null;
+      return await pending.timeout(const Duration(seconds: 3));
     } catch (_) {
       return null;
     }
@@ -247,6 +279,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         familyName: _familyName.text.trim(),
         languageCode: l.current.code,
         referralCode: referral,
+        referralChannel: referral == null ? null : _referralChannel,
       );
       if (!mounted) return;
       // T-37: a founder created a new family (activation funnel).
@@ -255,7 +288,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // attributed it in the same transaction). The channel, never the code.
       if (referral != null) {
         widget.analytics?.trackEvent(AnalyticsEvents.referralSignup,
-            props: {'channel': ReferralRules.channel(isWeb: kIsWeb)});
+            props: {'channel': _referralChannel});
       }
       // The account exists but is unusable until the e-mail is confirmed —
       // this screen is the end of the founder's flow, not a step in it.

@@ -828,6 +828,10 @@ abstract final class KApp {
   static const String expensePremiumBenefit = 'app.expense.premiumBenefit';
   static const String chatPremiumBenefit = 'app.chat.premiumBenefit';
   static const String viewerPremiumBenefit = 'app.viewer.premiumBenefit';
+  // ── F-80 PR 2: the Família card "Indique uma família" (built dark) ──
+  static const String famReferralTitle = 'app.fam.referralTitle';
+  static const String famReferralRule = 'app.fam.referralRule';
+  static const String famReferralShareText = 'app.fam.referralShareText';
 
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -1447,6 +1451,9 @@ abstract final class KApp {
     expensePremiumBenefit,
     chatPremiumBenefit,
     viewerPremiumBenefit,
+    famReferralTitle,
+    famReferralRule,
+    famReferralShareText,
   ];
 }
 
@@ -2220,6 +2227,9 @@ abstract final class StringsAppPtBr {
     KApp.expensePremiumBenefit: 'Despesas compartilhadas, com o acerto confirmado por quem recebe',
     KApp.chatPremiumBenefit: 'Conversa da família, permanente e com leitura confirmada',
     KApp.viewerPremiumBenefit: 'Até {0} visualizadores, que acompanham o plano sem editar',
+    KApp.famReferralTitle: 'Indique uma família',
+    KApp.famReferralRule: 'Quando uma família que vocês indicaram assinar o Premium e o primeiro pagamento dela passar um período sem estorno, a sua família ganha um mês de Premium, até um limite por ano.',
+    KApp.famReferralShareText: 'Usamos o Entrelares para organizar o calendário da guarda compartilhada. Para criar o da sua família, comece por este link:',
   };
 }
 
@@ -2987,5 +2997,8 @@ abstract final class StringsAppEn {
     KApp.expensePremiumBenefit: 'Shared expenses, with settle-ups confirmed by whoever receives them',
     KApp.chatPremiumBenefit: 'A family chat that is permanent, with read receipts',
     KApp.viewerPremiumBenefit: 'Up to {0} viewers, who follow the plan without editing it',
+    KApp.famReferralTitle: 'Refer a family',
+    KApp.famReferralRule: 'When a family you referred subscribes to Premium and its first payment stands for a period with no refund, your family gets a month of Premium, up to a yearly limit.',
+    KApp.famReferralShareText: 'We use Entrelares to organize our shared custody calendar. To start one for your family, begin with this link:',
   };
 }

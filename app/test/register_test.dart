@@ -20,6 +20,7 @@ import 'package:entrelares_db_contracts/models/invite_info.dart';
 import 'package:entrelares_app/screens/register_screen.dart';
 import 'package:entrelares_app/services/analytics_service.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
+import 'package:entrelares_app/services/install_referrer.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/role_picker.dart';
 
@@ -42,6 +43,7 @@ Future<void> pumpRegister(
   required FakeCustodyDataSource dataSource,
   String? inviteToken,
   String? referralCode,
+  InstallReferrer? installReferrer,
   AppLanguage language = AppLanguage.ptBr,
   List<String>? signIns,
   VoidCallback? onBackToLogin,
@@ -63,6 +65,7 @@ Future<void> pumpRegister(
         analytics: analytics,
         inviteToken: inviteToken,
         referralCode: referralCode,
+        installReferrer: installReferrer,
         onSignIn: (email, password) async => signIns?.add(email),
         onInviteeJoined: onInviteeJoined,
         onBackToLogin: onBackToLogin ?? () {},

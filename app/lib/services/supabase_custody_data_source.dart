@@ -1367,6 +1367,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     required String familyName,
     required String languageCode,
     String? referralCode,
+    String? referralChannel,
   }) async {
     final AuthResponse response;
     try {
@@ -1388,7 +1389,8 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
           // removes both keys before the auth row is stored.
           if (ReferralRules.parseCode(referralCode) case final code?) ...{
             'referral_code': code,
-            'referral_channel': ReferralRules.channel(isWeb: kIsWeb),
+            'referral_channel':
+                referralChannel ?? ReferralRules.channel(isWeb: kIsWeb),
           },
         },
       );
@@ -1454,6 +1456,16 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       final answer = await _client.rpc<dynamic>('attribute_referral',
           params: {'p_code': code, 'p_channel': channel});
       return answer is String ? answer : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<String?> fetchMyReferralCode() async {
+    try {
+      final code = await _client.rpc<dynamic>('my_referral_code');
+      return ReferralRules.parseCode(code is String ? code : null);
     } catch (_) {
       return null;
     }

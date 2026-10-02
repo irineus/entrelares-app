@@ -145,3 +145,11 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // F-80 PR 2 — Google's Install Referrer client, read by the app's own
+    // platform channel (InstallReferrerChannel.kt). 2.2 is the latest release
+    // on Google's Maven (checked 02/10/2026). Its manifest merges one
+    // permission, BIND_GET_INSTALL_REFERRER_SERVICE — not a runtime one.
+    implementation("com.android.installreferrer:installreferrer:2.2")
+}

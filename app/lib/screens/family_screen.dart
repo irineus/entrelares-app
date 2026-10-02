@@ -1,4 +1,5 @@
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
 import 'package:flutter/services.dart';
@@ -92,6 +93,9 @@ class FamilyScreen extends StatefulWidget {
   /// a widget test can read what would be sent; null uses share_plus.
   final Future<void> Function(String message)? onShareInvite;
 
+  /// F-80 PR 2: the same seam for the "Indique uma família" card's message.
+  final Future<void> Function(String message)? onShareReferral;
+
   const FamilyScreen({
     super.key,
     required this.dataSource,
@@ -106,6 +110,7 @@ class FamilyScreen extends StatefulWidget {
     this.onOpenDeletion,
     this.onOpenChildren,
     this.onShareInvite,
+    this.onShareReferral,
   });
 
   @override
@@ -124,6 +129,10 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
   PublicSettings _settings = PublicSettings.unloaded;
   // F-55: read only while the flag is on (null = not asked).
   List<Child>? _children;
+  // F-80 PR 2: the family's referral code — asked only while
+  // `feature.referral` is on and only for an active full member; null hides
+  // the card (dark, refused, or failed alike).
+  String? _referralCode;
 
   // Rename
   bool _editingName = false;
@@ -289,8 +298,20 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
           ? await widget.dataSource.fetchSubscription()
           : null;
 
+      // F-80 PR 2: dark, nothing is asked. A viewer reads the family, it does
+      // not represent it to another one (the server refuses it too), and a
+      // departed or account-less member speaks for no family.
+      final me = results[3] as Member?;
+      final referralCode = settings.referralEnabled &&
+              me != null &&
+              me.isActiveMember &&
+              !me.isViewer
+          ? await widget.dataSource.fetchMyReferralCode()
+          : null;
+
       if (!mounted) return;
       setState(() {
+        _referralCode = referralCode;
         _children = children;
         _subscription = subscription;
         _deletion = deletion;
@@ -488,6 +509,53 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     }
   }
 
+  /// F-80 PR 2 — the family's link to the share sheet, in the F-63 shape:
+  /// one sentence, then the link alone on its own line. The event says the
+  /// sheet opened and on which channel — never the code nor the link.
+  Future<void> _shareReferral(String code, Localization l) async {
+    final message = InviteFormRules.inviteShareMessage(
+        l[KApp.famReferralShareText], ReferralRules.shareLink(code));
+    widget.analytics?.trackEvent(AnalyticsEvents.referralShare,
+        props: {'channel': ReferralRules.channel(isWeb: kIsWeb)});
+    final share = widget.onShareReferral;
+    if (share != null) {
+      await share(message);
+    } else {
+      await Share.share(message);
+    }
+  }
+
+  /// F-80 PR 2 — "Indique uma família": the link, the share button and the
+  /// rule in one sentence that types none of the operator's numbers (U-57).
+  /// No counts yet (PR 3) and never another family's name.
+  Widget _referralCard(String code, Localization l) {
+    final theme = Theme.of(context);
+    return Card(
+      key: const ValueKey('family-referral-card'),
+      margin: const EdgeInsets.only(top: 24),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l[KApp.famReferralTitle], style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(l[KApp.famReferralRule], style: theme.textTheme.bodySmall),
+            const SizedBox(height: 8),
+            Text(ReferralRules.shareLink(code),
+                style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              icon: const Icon(Icons.share_outlined, size: 18),
+              label: Text(l[KApp.commonShare]),
+              onPressed: () => _shareReferral(code, l),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// F-56: invite a placeholder that has no open invitation — the one moment
   /// the invitee's e-mail enters the system, and only for as long as the
   /// invitation lives.
@@ -646,6 +714,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             const SizedBox(height: 24),
             _inviteSection(l),
             if (_isAdmin && _settings.viewersEnabled) _viewerSection(l),
+            if (_referralCode case final code?) _referralCard(code, l),
             // U-35: the three things that are not the family, one tap away.
             // The plan row is for everyone (the state is the family's); the
             // mode is the admin's tool; the deletion row appears only while
