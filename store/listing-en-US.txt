@@ -1,5 +1,5 @@
 === APP NAME (<= 30 chars) ===
-Entrelares
+Entrelares: Co-Parenting
 
 === SHORT DESCRIPTION (<= 80 chars) ===
 Shared custody calendar: who has the child today, and every swap.
@@ -32,7 +32,7 @@ MORE PEOPLE IN THE ROUTINE
 Grandparents, a nanny or another caregiver can join the family with their own role, invited by e-mail by the administrators; caregivers beyond the free plan's limit join with Premium. And a Viewer follows along without taking part: sees the calendar, the agenda and the reports, and changes nothing.
 
 ALWAYS UP TO DATE
-With the app open, the calendar updates in real time: requests, approvals and changes appear without a reload. With the app closed, requests, approvals, notices and reminders arrive as phone notifications — and swaps by e-mail too.
+With the app open, the calendar updates in real time: requests, approvals and changes appear without a reload. With the app closed, requests, approvals, notices and reminders arrive as phone notifications.
 
 BUILT FOR EVERYDAY USE
 • In English and Portuguese — each person in the family reads in their own language, notifications and e-mails included

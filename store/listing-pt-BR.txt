@@ -1,11 +1,14 @@
 === NOME DO APP (<= 30 caracteres) ===
-Entrelares
+Entrelares: Guarda de Filhos
 
 === DESCRICAO CURTA (<= 80 caracteres) ===
 Calendário de guarda compartilhada: quem está com a criança hoje e as trocas.
 
 === DESCRICAO COMPLETA (<= 4000 caracteres) ===
 Duas casas, uma mesma infância. O Entrelares organiza a rotina de pais separados: um calendário único mostra quem está com a criança hoje, quem assume em seguida e o horário de transferência de cada dia.
+
+GUARDA COMPARTILHADA NO DIA A DIA
+Desde a Lei 13.058/2014, a guarda compartilhada é a regra no Brasil quando os dois genitores estão aptos, e o tempo de convívio com os filhos deve ser dividido de forma equilibrada entre a mãe e o pai. O Entrelares não dá orientação jurídica nem substitui o acordo da família: ele ajuda a cumprir, no dia a dia, o que foi combinado.
 
 QUEM ESTÁ COM A CRIANÇA HOJE
 Abra o app e a resposta está na primeira tela. O calendário do mês mostra os dias de cada responsável por cor, com o horário de entrega quando a criança troca de casa.
@@ -32,7 +35,7 @@ MAIS GENTE NA ROTINA
 Avós, babá ou outro responsável podem participar da família com papel próprio, convidados por e-mail pelos administradores; responsáveis além do limite do plano gratuito entram com o Premium. E o Visualizador acompanha sem participar: vê o calendário, a agenda e os relatórios, e não altera nada.
 
 SEMPRE ATUALIZADO
-Com o app aberto, o calendário se atualiza em tempo real: solicitações, aprovações e mudanças aparecem sem precisar recarregar. Com o app fechado, solicitações, aprovações, avisos e lembretes chegam como notificação no celular — e as trocas também por e-mail.
+Com o app aberto, o calendário se atualiza em tempo real: solicitações, aprovações e mudanças aparecem sem precisar recarregar. Com o app fechado, solicitações, aprovações, avisos e lembretes chegam como notificação no celular.
 
 FEITO PARA O SEU DIA A DIA
 • Em português e em inglês — cada pessoa da família lê no seu idioma, inclusive as notificações e os e-mails
