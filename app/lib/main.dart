@@ -324,6 +324,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           dataSource: _dataSource,
           analytics: _analytics,
           inviteToken: InviteFormRules.inviteTokenFrom(state.uri),
+          referralCode: _pendingReferralCode,
           onSignIn: _signIn,
           onInviteeJoined: _welcomeInvitee,
           onBackToLogin: () => _router.go('/login'),
@@ -349,6 +350,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           // stays in memory instead of in the prefs stash.
           initialInviteToken: _pendingInviteToken,
           onInviteeJoined: _welcomeInvitee,
+          onFamilyFounded: _attributePendingReferral,
           onSignOut: _signOut,
           onCompleted: () async {
             _pendingInviteToken = null;
@@ -905,6 +907,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     WidgetsBinding.instance.addObserver(this);
     _gate = SessionGate(_client.auth);
     _analytics = AnalyticsService(language: widget.initialLanguage.code);
+    // F-80: the referral code of a sign-up link, read from the address the
+    // browser opened BEFORE the router exists — so before any pageview — and
+    // kept in memory only. The pageview path drops the query anyway
+    // (`sanitizeAnalyticsPath`); the code is never a prop of any event.
+    _pendingReferralCode = kIsWeb ? ReferralRules.codeFromUri(Uri.base) : null;
     _dataSource = SupabaseCustodyDataSource(_client,
         environmentPrefix:
             environmentTitlePrefix(isProduction: Env.current.isProduction),
@@ -1496,6 +1503,37 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// F-71 — the invitation a native Google sign-in started from, kept until
   /// the onboarding screen claims it or the session ends.
   String? _pendingInviteToken;
+
+  /// F-80 — the code a `/register?ref=` link opened the web app with. Memory
+  /// only: no prefs (Android Auto Backup copies them) and no browser storage —
+  /// the Google door (F-71) never leaves the page, and the e-mail sign-up
+  /// hands the code to the server inside the sign-up itself.
+  String? _pendingReferralCode;
+
+  /// F-80 — a Google founder just created the family: attribute the pending
+  /// code, if any, ONLY when `feature.referral` is on. Fire-and-forget — a
+  /// referral never delays nor fails an onboarding — and used once.
+  void _attributePendingReferral() {
+    final code = _pendingReferralCode;
+    if (code == null) return;
+    _pendingReferralCode = null;
+    unawaited(() async {
+      Map<String, String> values;
+      try {
+        values = await _dataSource.fetchPublicSettings();
+      } catch (_) {
+        return;
+      }
+      if (!PublicSettings(values).referralEnabled) return;
+      final channel = ReferralRules.channel(isWeb: kIsWeb);
+      final answer =
+          await _dataSource.attributeReferral(code: code, channel: channel);
+      if (answer == ReferralRules.attributed) {
+        unawaited(_analytics.trackEvent(AnalyticsEvents.referralSignup,
+            props: {'channel': channel}));
+      }
+    }());
+  }
 
   /// F-57 — a validated session is AUTHED only if it has a profile; a
   /// deferred OAuth sign-up has none yet and lives on the onboarding screen.

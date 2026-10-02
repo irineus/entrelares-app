@@ -449,13 +449,18 @@ class GateFixture {
   /// DESTRUCTIVE tests — leaving a member mutates the family, so it must not
   /// touch the shared [familyId] the rest of the gate uses. Purged (and its
   /// auth users removed) in [dispose].
-  Future<ThrowawayFamily> createFamily(String tag) async {
+  ///
+  /// [founderMetadata] is merged into the founder's sign-up metadata — F-80
+  /// sends its `referral_code` through it, the way the register form does.
+  Future<ThrowawayFamily> createFamily(String tag,
+      {Map<String, dynamic> founderMetadata = const {}}) async {
     final adminEmail = testEmail('$tag-adm');
     _userIds.add(await _admin.createConfirmedUser(adminEmail, password, {
       'full_name': 'E2E $tag Adm',
       'role': 'father',
       'family_name': '${TestEnv.e2eFamilyPrefix}$runId-$tag',
       'policy_version': PolicyVersions.current,
+      ...founderMetadata,
     }));
     final adminClient = await signIn(adminEmail);
     final adminProfile = (await _profilesOf(adminClient)).single;

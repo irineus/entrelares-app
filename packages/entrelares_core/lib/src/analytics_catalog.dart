@@ -28,6 +28,14 @@ abstract final class AnalyticsEvents {
   static const inviteSent = 'invite_sent'; // email = none/sent/link_only
   static const inviteNudgeShown = 'invite_nudge_shown'; // once — T-76, 18/09/2026
   static const inviteNudgeClick = 'invite_nudge_click'; // T-76, 18/09/2026
+  // F-80, 02/10/2026 — built dark: no event until `feature.referral` is on.
+  // A founder's sign-up carried a referral code the server took: e-mail
+  // sign-up = the account was created carrying a valid-shaped code (the
+  // server attributes in the same transaction and drops an unknown code
+  // silently, so this may count a few the ledger does not); Google = the
+  // RPC answered `attributed`. `family_referrals` is the exact count (T-99).
+  // `channel` only — never the code.
+  static const referralSignup = 'referral-signup';
 
   // ── Planning and the swap workflow ──────────────────────────────────────
   static const wizardStarted = 'wizard-started'; // T-78, 23/09/2026
@@ -89,6 +97,7 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.inviteSent: {'email'},
     AnalyticsEvents.inviteNudgeShown: {'channel'},
     AnalyticsEvents.inviteNudgeClick: {'channel'},
+    AnalyticsEvents.referralSignup: {'channel'},
     AnalyticsEvents.wizardStarted: {},
     AnalyticsEvents.wizardCompleted: {'created', 'replaced', 'handoff'},
     AnalyticsEvents.swapRequested: {'scenario'},

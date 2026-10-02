@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -1365,6 +1366,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     required String role,
     required String familyName,
     required String languageCode,
+    String? referralCode,
   }) async {
     final AuthResponse response;
     try {
@@ -1382,6 +1384,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
           'family_name': familyName,
           'policy_version': PolicyVersions.current,
           'language': languageCode,
+          // F-80: present only when the caller saw the flag on. The server
+          // removes both keys before the auth row is stored.
+          if (ReferralRules.parseCode(referralCode) case final code?) ...{
+            'referral_code': code,
+            'referral_channel': ReferralRules.channel(isWeb: kIsWeb),
+          },
         },
       );
     } on AuthException catch (e) {
@@ -1429,6 +1437,27 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   // ── F-57: social-login onboarding (deferred profile) ─────────────────────
+
+  @override
+  Future<bool> fetchReferralEnabled() async {
+    try {
+      return await _client.rpc<dynamic>('referral_enabled') == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<String?> attributeReferral(
+      {required String code, required String channel}) async {
+    try {
+      final answer = await _client.rpc<dynamic>('attribute_referral',
+          params: {'p_code': code, 'p_channel': channel});
+      return answer is String ? answer : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Future<void> completeOauthOnboarding({

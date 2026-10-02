@@ -101,7 +101,9 @@ interface Bulletin {
     trials_ending_7d: number;
     dunning: number;
   };
-  referrals: null;
+  // F-80: families attributed to a referral in the week; null while
+  // `feature.referral` is off (the module is dark until policy 2.1).
+  referrals: number | null;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -169,10 +171,11 @@ export function htmlOf(b: Bulletin): string {
         p.trial_reminders.d7 + p.trial_reminders.d1 + p.trial_reminders.ended
       } no total)`,
     `"Falta planejar o primeiro mês" (F-78): ${vs(w.unplanned_nudges, p.unplanned_nudges)}`,
-    // F-80 fills `referrals`; until then the line says so instead of a zero.
+    // F-80: null while `feature.referral` is off — the line says so instead
+    // of a zero that would read as a result.
     b.referrals === null
-      ? "Indicações: ainda não medidas (chegam com o F-80)."
-      : `Indicações: <strong>${Number(b.referrals)}</strong>`,
+      ? "Indicações (F-80): não medidas — o módulo de indicação está desligado."
+      : `Famílias que chegaram por indicação (F-80): <strong>${Number(b.referrals)}</strong>`,
   ]);
 
   const trend = list(b.trend.map((t) =>

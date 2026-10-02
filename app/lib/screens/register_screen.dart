@@ -1,4 +1,5 @@
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -63,6 +64,13 @@ class RegisterScreen extends StatefulWidget {
   /// calendar shows before the tour. Called before the sign-in that lands.
   final void Function(InviteInfo invite)? onInviteeJoined;
 
+  /// F-80 — the referral code the sign-up link carried (`?ref=`), already
+  /// shaped by [ReferralRules.parseCode]; null for almost everyone. Read by
+  /// `main.dart` from the boot URL, never from analytics. It reaches the
+  /// server ONLY on the founder branch and only when `referral_enabled`
+  /// answered true — dark, nothing leaves.
+  final String? referralCode;
+
   const RegisterScreen({
     this.analytics,
     this.onInviteeJoined,
@@ -74,6 +82,7 @@ class RegisterScreen extends StatefulWidget {
     this.onSignInWithGoogle,
     this.onGoogleIdToken,
     this.inviteToken,
+    this.referralCode,
   });
 
   @override
@@ -122,15 +131,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool get _isInvited => _invite != null;
 
+  /// F-80 — whether the module is on, asked once when a code came in. Null
+  /// means no code (nothing to ask), and an unanswered question is "off".
+  Future<bool>? _referralEnabled;
+
   bool get _onFamilyStep => !_isInvited && _step == 1;
 
   @override
   void initState() {
     super.initState();
     final token = widget.inviteToken;
-    if (token != null && token.trim().isNotEmpty) {
+    final invited = token != null && token.trim().isNotEmpty;
+    if (invited) {
       _loadingInvite = true;
       _resolveInvite(token.trim());
+    }
+    if (!invited && widget.referralCode != null) {
+      _referralEnabled = widget.dataSource.fetchReferralEnabled();
     }
   }
 
@@ -205,8 +222,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  /// F-80 — the code to send with the founder's sign-up, or null: only when
+  /// one came in AND the server said the module is on. A slow or failed
+  /// answer is "off" — the sign-up never waits on a referral.
+  Future<String?> _referralToSend() async {
+    final code = widget.referralCode;
+    final enabled = _referralEnabled;
+    if (code == null || enabled == null) return null;
+    try {
+      return await enabled.timeout(const Duration(seconds: 3)) ? code : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _submitFounder(Localization l) async {
     try {
+      final referral = await _referralToSend();
       await widget.dataSource.signUpFounder(
         email: _email.text.trim(),
         password: _password.text,
@@ -214,10 +246,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         role: _role!,
         familyName: _familyName.text.trim(),
         languageCode: l.current.code,
+        referralCode: referral,
       );
       if (!mounted) return;
       // T-37: a founder created a new family (activation funnel).
       widget.analytics?.trackEvent(AnalyticsEvents.familyCreated);
+      // F-80: the account was created carrying a referral (the server
+      // attributed it in the same transaction). The channel, never the code.
+      if (referral != null) {
+        widget.analytics?.trackEvent(AnalyticsEvents.referralSignup,
+            props: {'channel': ReferralRules.channel(isWeb: kIsWeb)});
+      }
       // The account exists but is unusable until the e-mail is confirmed —
       // this screen is the end of the founder's flow, not a step in it.
       setState(() {

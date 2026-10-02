@@ -41,6 +41,7 @@ Future<void> pumpRegister(
   WidgetTester tester, {
   required FakeCustodyDataSource dataSource,
   String? inviteToken,
+  String? referralCode,
   AppLanguage language = AppLanguage.ptBr,
   List<String>? signIns,
   VoidCallback? onBackToLogin,
@@ -61,6 +62,7 @@ Future<void> pumpRegister(
         dataSource: dataSource,
         analytics: analytics,
         inviteToken: inviteToken,
+        referralCode: referralCode,
         onSignIn: (email, password) async => signIns?.add(email),
         onInviteeJoined: onInviteeJoined,
         onBackToLogin: onBackToLogin ?? () {},

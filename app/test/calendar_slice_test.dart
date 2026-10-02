@@ -739,6 +739,27 @@ class FakeCustodyDataSource implements CustodyDataSource {
   final List<Map<String, Object?>> signUps = [];
   final List<Map<String, Object?>> inviteeRegistrations = [];
 
+  /// F-80: what `referral_enabled` answers (dark by default, like prod).
+  bool referralEnabled = false;
+  int referralEnabledFetches = 0;
+
+  /// F-80: what `attribute_referral` answers, and the calls it received.
+  String? attributeAnswer = 'attributed';
+  final List<Map<String, String>> attributions = [];
+
+  @override
+  Future<bool> fetchReferralEnabled() async {
+    referralEnabledFetches++;
+    return referralEnabled;
+  }
+
+  @override
+  Future<String?> attributeReferral(
+      {required String code, required String channel}) async {
+    attributions.add({'code': code, 'channel': channel});
+    return attributeAnswer;
+  }
+
   @override
   Future<InviteInfo?> fetchInviteInfo(String token) async =>
       InviteFormRules.isTokenShaped(token) ? inviteInfo : null;
@@ -751,6 +772,7 @@ class FakeCustodyDataSource implements CustodyDataSource {
     required String role,
     required String familyName,
     required String languageCode,
+    String? referralCode,
   }) async {
     signUps.add({
       'email': email,
@@ -758,6 +780,7 @@ class FakeCustodyDataSource implements CustodyDataSource {
       'role': role,
       'familyName': familyName,
       'language': languageCode,
+      'referralCode': referralCode,
     });
     if (signUpFailureKey != null) throw SignUpFailure(signUpFailureKey!);
   }
