@@ -712,8 +712,26 @@ void main() {
       // channel, so it must not be reachable only from the legal page.
       await _pump(tester, _source());
 
-      expect(_text(l[K.premGuarantee]), findsOne);
+      expect(
+          _text(l.format(K.premGuarantee, [SupportRules.supportEmail])),
+          findsOne);
       expect(_text(l[K.premPaymentHint]), findsOne);
+    });
+
+    testWidgets('F-79: the guarantee ends on the support address, both '
+        'languages', (tester) async {
+      // It used to stop at "É só escrever para" — a promise with no address.
+      for (final language in AppLanguage.values) {
+        final lang = Localization(language);
+        await _pump(tester, _source(), language: language);
+        final sentence = stripRichText(
+            lang.format(K.premGuarantee, [SupportRules.supportEmail]));
+        expect(sentence, endsWith('${SupportRules.supportEmail}.'));
+        expect(find.text(sentence), findsOne);
+        // The address is the support constant, never typed in the catalog.
+        expect(lang[K.premGuarantee], isNot(contains('@')));
+        expect(lang[K.payGuarantee], isNot(contains('@')));
+      }
     });
 
     testWidgets('a refused checkout says what the SERVER said, and goes nowhere',
@@ -833,6 +851,90 @@ void main() {
     });
   });
 
+  group('F-79 — the decision above the list', () {
+    final benefits = find.byKey(const ValueKey('premium-benefits'));
+    double top(WidgetTester tester, Finder f) => tester.getTopLeft(f).dy;
+
+    testWidgets('an admin on the web rail meets "Assinar" before the benefits',
+        (tester) async {
+      await _pump(tester, _source());
+
+      expect(benefits, findsOne);
+      expect(top(tester, _priceCard), lessThan(top(tester, benefits)));
+      expect(top(tester, _subscribe), lessThan(top(tester, benefits)));
+      // The one line of value stays above the button...
+      expect(top(tester, _text(l[K.premIntroOffer])),
+          lessThan(top(tester, _subscribe)));
+      // ...and the rest of the payment surface follows the list, with the
+      // free-essentials sentence between them. Nothing was dropped.
+      expect(top(tester, _text(l[K.premIntro])),
+          greaterThan(top(tester, benefits)));
+      expect(top(tester, _avulso), greaterThan(top(tester, benefits)));
+      expect(
+          top(tester,
+              _text(l.format(K.premGuarantee, [SupportRules.supportEmail]))),
+          greaterThan(top(tester, _avulso)));
+    });
+
+    testWidgets('the trial line sits right under "Assinar", same sentence',
+        (tester) async {
+      final trialEnd = now.add(const Duration(days: 10));
+      await _pump(tester, _source(trialEndsAt: trialEnd));
+
+      final trial = _text(
+          l.format(K.premTrialAdditive, [l.formatDate(trialEnd.toLocal())]));
+      expect(trial, findsOne);
+      expect(top(tester, trial), greaterThan(top(tester, _subscribe)));
+      expect(top(tester, trial), lessThan(top(tester, benefits)));
+    });
+
+    testWidgets('the F-42 way back still leads, above the list', (tester) async {
+      await _pump(
+        tester,
+        _source(
+          plan: 'premium',
+          subscription: _subscription(
+            status: 'canceled',
+            currentPeriodEnd: now.add(const Duration(days: 20)),
+            billingType: 'PIX',
+            externalCustomerId: 'cus_1',
+          ),
+        ),
+      );
+
+      final back = _text(l[K.premReactivateButton]);
+      expect(back, findsOne);
+      expect(top(tester, back), lessThan(top(tester, _subscribe)));
+      expect(top(tester, _subscribe), lessThan(top(tester, benefits)));
+    });
+
+    testWidgets('a member who cannot pay reads the note first, no price',
+        (tester) async {
+      await _pump(tester, _source(members: const [_plain, _admin]));
+
+      expect(top(tester, _text(l[K.premAdminOnly])),
+          lessThan(top(tester, benefits)));
+      expect(_priceCard, findsNothing);
+      expect(_avulso, findsNothing);
+    });
+
+    testWidgets('a store build with nothing on sale keeps the note after the '
+        'list', (tester) async {
+      await _pump(tester, _source(), store: true);
+
+      expect(top(tester, _text(l[K.premStoreNote])),
+          greaterThan(top(tester, benefits)));
+    });
+
+    testWidgets('every other state keeps the old order', (tester) async {
+      await _pump(tester,
+          _source(plan: 'premium', subscription: _subscription()));
+
+      expect(top(tester, _text(l[K.premIntro])),
+          lessThan(top(tester, benefits)));
+    });
+  });
+
   group('funnel (T-37)', () {
     // U-35: "visit" is a visit to THIS page — the roster no longer counts.
     testWidgets('the paywall view fires once per visit, only on the offer',
@@ -841,7 +943,9 @@ void main() {
       await _pump(tester, _source(), funnel: funnel);
 
       expect(funnel.count('premium-paywall-view'), 1);
-      expect(funnel.dataOf('premium-paywall-view'), {'channel': 'web'});
+      // F-79: same name, same moment — plus who saw it.
+      expect(funnel.dataOf('premium-paywall-view'),
+          {'channel': 'web', 'admin': true, 'buyable': true});
 
       // A reload within the same visit must not count again.
       await tester.drag(find.byType(RefreshIndicator), const Offset(0, 400));
@@ -866,7 +970,20 @@ void main() {
       final funnel = _Funnel();
       await _pump(tester, _source(), funnel: funnel, store: true);
 
-      expect(funnel.dataOf('premium-paywall-view'), {'channel': 'store'});
+      // F-79: no store rail on this build — the note only, nothing to buy.
+      expect(funnel.dataOf('premium-paywall-view'),
+          {'channel': 'store', 'admin': true, 'buyable': false});
+    });
+
+    testWidgets('F-79: a member who cannot pay is still a view, not a buyer',
+        (tester) async {
+      final funnel = _Funnel();
+      await _pump(tester, _source(members: const [_plain, _admin]),
+          funnel: funnel);
+
+      expect(funnel.count('premium-paywall-view'), 1);
+      expect(funnel.dataOf('premium-paywall-view'),
+          {'channel': 'web', 'admin': false, 'buyable': false});
     });
   });
 

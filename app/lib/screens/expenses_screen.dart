@@ -464,7 +464,16 @@ class _ExpensesScreenState extends State<ExpensesScreen>
               message: l[KApp.expensePremium],
               actionLabel:
                   widget.onOpenPlan == null ? null : l[K.famSeePremium],
-              onAction: widget.onOpenPlan,
+              onAction: widget.onOpenPlan == null
+                  ? null
+                  : () {
+                      // F-79: this gate's door now counts its click, like the rest.
+                      unawaited(widget.dataSource.analytics?.trackEvent(
+                              AnalyticsEvents.premiumGateClick,
+                              props: {'gate': 'expenses'}) ??
+                          Future<void>.value());
+                      widget.onOpenPlan!();
+                    },
             ),
             const SizedBox(height: Spacing.md),
           ],

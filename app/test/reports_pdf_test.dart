@@ -21,6 +21,7 @@ import 'package:entrelares_app/services/report_pdf.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource;
+import 'family_page_test.dart' show FakeFunnel;
 
 const roleMother = Role(id: 1, roleName: 'mother');
 const roleFather = Role(id: 2, roleName: 'father');
@@ -61,6 +62,7 @@ Future<void> pumpPdf(
   AppLanguage language = AppLanguage.ptBr,
   void Function(Uint8List bytes, String fileName)? onShare,
   void Function(Uint8List bytes, String fileName)? onPrint,
+  VoidCallback? onOpenPlan,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 2000));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -78,6 +80,7 @@ Future<void> pumpPdf(
           onPrint: onPrint == null
               ? null
               : (b, f) async => onPrint(b, f),
+          onOpenPlan: onOpenPlan,
         ),
       ),
     ),
@@ -95,8 +98,25 @@ void main() {
 
       expect(find.text(l[K.pdfUpsellTitle]), findsOne);
       expect(find.text(l[K.pdfGenerate]), findsNothing);
-      // T-38: the neutral paywall carries NO checkout affordance.
+      // T-38: the neutral paywall carries NO checkout affordance — and with
+      // no plan route handed in, no button at all.
       expect(find.text(l[K.pdfUpsellButton]), findsNothing);
+    });
+
+    testWidgets('F-79: the upsell opens the plan page and counts the click',
+        (tester) async {
+      final funnel = FakeFunnel();
+      final ds = source(plan: 'free')..analytics = funnel.service;
+      var opened = 0;
+      await pumpPdf(tester, ds, onOpenPlan: () => opened++);
+
+      await tester.tap(find.text(l[K.pdfUpsellButton]));
+      await tester.pumpAndSettle();
+
+      expect(opened, 1);
+      expect(funnel.dataOf('premium-gate-click'), {'gate': 'pdf'});
+      // Still neutral: the door is the app's own plan page, never a price.
+      expect(find.textContaining('R\$'), findsNothing);
     });
 
     testWidgets('a family inside its trial is premium', (tester) async {

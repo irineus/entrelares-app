@@ -626,7 +626,16 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
           icon: Icons.workspace_premium_outlined,
           message: l[KApp.chatPremium],
           actionLabel: widget.onOpenPlan == null ? null : l[K.famSeePremium],
-          onAction: widget.onOpenPlan,
+          onAction: widget.onOpenPlan == null
+              ? null
+              : () {
+                  // F-79: this gate's door now counts its click, like the rest.
+                  unawaited(widget.dataSource.analytics?.trackEvent(
+                          AnalyticsEvents.premiumGateClick,
+                          props: {'gate': 'chat'}) ??
+                      Future<void>.value());
+                  widget.onOpenPlan!();
+                },
         ),
       );
     }

@@ -125,8 +125,9 @@ class _PremiumReturnScreenState extends State<PremiumReturnScreen> {
         Text(l[K.payActiveBody], textAlign: TextAlign.center),
         const SizedBox(height: 8),
         // F-48: the guarantee travels to the confirmation too — the moment of
-        // payment is when the promise matters most.
-        Text(l[K.payGuarantee],
+        // payment is when the promise matters most. F-79: the sentence ends
+        // on the address it promises — never typed in the catalog.
+        Text(l.format(K.payGuarantee, [SupportRules.supportEmail]),
             textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
         const SizedBox(height: 16),
         FilledButton(

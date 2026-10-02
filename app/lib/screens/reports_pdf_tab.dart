@@ -53,6 +53,11 @@ class ReportsPdfTab extends StatefulWidget {
   /// Hosted inside a sheet's own scroll view (U-59): no scroll of its own.
   final bool embedded;
 
+  /// F-79: where the upsell's "Ver o Premium" lands (`/family/plan`). Null
+  /// keeps the upsell a sentence with no button — the plan page is the app's
+  /// own screen, so the store build may carry it (no external checkout).
+  final VoidCallback? onOpenPlan;
+
   const ReportsPdfTab({
     super.key,
     required this.dataSource,
@@ -63,6 +68,7 @@ class ReportsPdfTab extends StatefulWidget {
     this.initialIncludeChat = false,
     this.analyticsSource = 'reports',
     this.embedded = false,
+    this.onOpenPlan,
   });
 
   @override
@@ -628,8 +634,9 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   }
 
   /// The F-33 gate. **Neutral by design** (T-38): it says what the report is
-  /// and stops — the plan/checkout surface belongs to the billing batch, and a
-  /// store build may never carry an external checkout link.
+  /// and carries no price and no external checkout link — a store build may
+  /// never have one. F-79: it does open the app's OWN plan page, like every
+  /// other Premium gate, when the shell hands it [ReportsPdfTab.onOpenPlan].
   Widget _upsell(Localization l) => Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -651,6 +658,23 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               const SizedBox(height: 8),
               RichLabel.of(l, K.pdfUpsellText,
                   style: Theme.of(context).textTheme.bodyMedium),
+              if (widget.onOpenPlan case final openPlan?) ...[
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  key: const ValueKey('pdf-upsell-plan'),
+                  icon: const Icon(Icons.auto_awesome),
+                  label: Text(l[K.pdfUpsellButton]),
+                  onPressed: () {
+                    // F-79: the one Premium gate that had no door counted no
+                    // click either; `pdf` starts its own row in the gate split.
+                    unawaited(widget.dataSource.analytics?.trackEvent(
+                            AnalyticsEvents.premiumGateClick,
+                            props: {'gate': 'pdf'}) ??
+                        Future<void>.value());
+                    openPlan();
+                  },
+                ),
+              ],
             ],
           ),
         ),

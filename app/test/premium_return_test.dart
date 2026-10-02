@@ -110,7 +110,11 @@ void main() {
     expect(find.text(l[K.payActiveTitle]), findsOne);
     // F-48: the guarantee travels to the confirmation — the moment of payment
     // is when the promise matters most.
-    expect(find.text(l[K.payGuarantee]), findsOne);
+    expect(find.text(l.format(K.payGuarantee, [SupportRules.supportEmail])),
+        findsOne);
+    // F-79: the sentence used to stop at "É só escrever para" — it ends on
+    // the address now, and the address is the support constant.
+    expect(find.textContaining('${SupportRules.supportEmail}.'), findsOne);
     expect(dataOf('premium-checkout-return'), {'channel': 'store'});
     expect(dataOf('premium-checkout-outcome'),
         {'channel': 'store', 'outcome': 'confirmed'});
