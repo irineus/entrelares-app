@@ -202,6 +202,7 @@ npx supabase functions deploy billing-checkout     --project-ref <project-ref>
 | `purge-deleted` | S-11 cron worker: hard-deletes accounts (and families) past their 30-day grace. Also carries the retention/notice duties added since: `purge_old_notifications` (S-13, read notices > 6 months), **`purge_stale_invitations`** (S-15/A-4, never-accepted invitations > 30 days — what makes the invite e-mail's purge promise true) and **`billing_grace_warnings_due`** (S-15/B-3, warns admins by e-mail before the Premium grace expires; the RPC writes the in-app notice, the e-mail here is the best-effort twin), `purge_old_support_requests` (F-68, 12 months) and **`purge_old_member_activity`** (T-78, `member_activity_days` older than 400 days plus any removed account's rows — the period §11 of the policy promises) |
 | `send-push-notification` | F-09: the push dispatcher. Fired by an AFTER INSERT trigger on `notifications` (pg_net, hence `--no-verify-jwt` and the secret key on `apikey`), so push and in-app are two renderings of ONE event (e-mail is a third only where F-59 kept it). Pushes the types in `PUSH_TYPES` only — since F-59 also the membership notices, by `kind` — and the rule is "push only what the recipient did not just do" — renders the copy per recipient from `_shared/push.ts` in that reader's language, and deletes the tokens FCM retires. **Fails closed and quiet on every branch**: no `FCM_SERVICE_ACCOUNT`, no device, or an unrenderable payload each answer 200 with a reason (arming: section 11) |
 | `send-account-email` | S-11 account-lifecycle e-mails. Since F-59 (02/10/2026): the leaver's OWN confirmation, the family-deletion request (requester + every other member) and its D-3 reminder, and the post-purge farewell. Someone joining, coming back or leaving (to the others), a deletion refused or withdrawn, and F-70's plan end are push + in-app; their types answer 200 `{skipped: "push_only"}` for the builds that still ask. S-15/B-3 added `premium_grace_ending` — the only type that e-mails ONLY the subject (a family admin), since billing is admin-only. S-21 added `elevation_code`, the odd one out: keyed by `userId` (the subject may have no profile yet), secret-key callers only (`elevate`), and the destination address is read from `auth.users` instead of trusted from the payload |
+| `weekly-bulletin` | T-99 cron worker (Mondays 12:00 UTC): e-mails the operator (`contato@`) the weekly sales bulletin from `admin_weekly_sales_bulletin()` — counts only. Secret key on `apikey` (hence `--no-verify-jwt`); `{"dry_run": true}` returns the subject and HTML without sending (the DB gate uses it); kill switch `ops.weekly_bulletin.enabled` |
 
 | `billing-webhook` | T-39: receives Asaas events (auth = the `ASAAS_WEBHOOK_TOKEN` shared secret in `asaas-access-token`, hence `--no-verify-jwt`). **Idempotent by the provider's event id** — a redelivery is recorded and ignored — and applies every effect through `set_family_plan`, adopting the subscription created by the payment link (`externalReference family:<id>`, link-id fallback) |
 | `billing-checkout` | T-39: called with the **user's** JWT and admin-only (guard chain 401→403→409→503); creates the Asaas Payment Link (`RECURRENT`, `dueDateLimitDays` — the API rejects it without one) so payer data is typed only on the provider's PCI page, and handles `cancel` honouring the period already paid. Refuses everything while `billing.enabled` is false; gateway failures are audited as `CHECKOUT_ERROR` in the ledger |
@@ -363,6 +364,28 @@ select count(*) filter (where exists (
        count(*) as nudged
   from public.unplanned_family_nudges n
  where n.sent_at + interval '7 days' < now();
+```
+
+### 4.6-quater The `weekly-bulletin` cron (T-99) — nothing to do by hand
+
+Created by `20261002190000_t99_weekly_bulletin.sql`: **`weekly-bulletin`**,
+`0 12 * * 1` (Mondays, 09:00 in Brasília), calling the `weekly-bulletin` Edge
+Function with the SAME Vault secrets as 4.6 (`functions_base_url`, `secret_key`
+on `apikey`) — a project armed for push is armed for this. The function reads
+`admin_weekly_sales_bulletin()` (service role only: the week that just ended vs
+the one before, a 4-week trend and a snapshot — counts, dates and closed enums,
+never a name, an e-mail or a family id) and e-mails it to
+`contato@entrelares.app` (`OPERATOR_INBOX` overrides), subject `Boletim semanal —
+semana de DD/MM a DD/MM` (`[Dev] ` outside production). One send per week: the
+week is claimed in `weekly_bulletin_sends` before the send and released if Resend
+refuses. Kill switch: `ops.weekly_bulletin.enabled` (operator console). On the
+dev project the numbers include the E2E families — switch it off there if the
+`[Dev]` copy is noise. Check a run, or read the numbers without sending:
+```sql
+select jobname, schedule from cron.job where jobname = 'weekly-bulletin';
+select * from public.weekly_bulletin_sends order by week_start desc limit 5;
+select public.admin_weekly_sales_bulletin();             -- the week that just ended
+select public.admin_weekly_sales_bulletin(current_date); -- the week in progress
 ```
 
 ### 4.7 The `public-settings` feed (T-81) — what the landing may read

@@ -455,6 +455,11 @@ verify_jwt = false
 [functions.plan-end-reminders]
 verify_jwt = false
 
+# T-99: the weekly operator bulletin (pg_cron from the migration, Mondays,
+# secret key on `apikey`) — same shape as plan-end-reminders.
+[functions.weekly-bulletin]
+verify_jwt = false
+
 # T-81: the public feed the landing reads (L-34). Anonymous by design — what it
 # may say is the `landing_visible` column (which implies is_public), not the
 # caller. CI mirrors this with --no-verify-jwt on deploy.

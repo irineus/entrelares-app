@@ -79,6 +79,8 @@ void edgeFunctionAuthTests(GateFixture fx) {
       'purge-deleted',
       'send-swap-email',
       'send-account-email',
+      // T-99: the weekly operator bulletin — it mails the real operator inbox.
+      'weekly-bulletin',
     ];
 
     for (final function in gateless) {
