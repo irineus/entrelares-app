@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -348,7 +350,16 @@ class _DayAgendaSectionState extends State<DayAgendaSection> {
                   [freeNotes]),
               actionLabel:
                   widget.onOpenPlan == null ? null : l[K.famSeePremium],
-              onAction: widget.onOpenPlan,
+              onAction: widget.onOpenPlan == null
+                  ? null
+                  : () {
+                      // F-79: this gate's door now counts its click, like the rest.
+                      unawaited(widget.dataSource.analytics?.trackEvent(
+                              AnalyticsEvents.premiumGateClick,
+                              props: {'gate': 'agenda'}) ??
+                          Future<void>.value());
+                      widget.onOpenPlan!();
+                    },
             ),
           ],
         ],

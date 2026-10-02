@@ -145,6 +145,16 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     );
   }
 
+  /// F-79: whether THIS reader is looking at something they can buy — a price
+  /// card and "Assinar" are built. The same facts [_offerPanel] branches on,
+  /// read in one place so the funnel's `buyable` cannot disagree with the
+  /// screen.
+  bool get _offerBuyable {
+    if (_billingUi != BillingUi.offer || !_isAdmin) return false;
+    if (!_isStoreChannel) return true;
+    return _storeOfferState == StoreOffer.offer && _storeCycles.isNotEmpty;
+  }
+
   /// Play's payments policy forbids steering a Play-distributed app to an
   /// external purchase flow, so the store branch of the offer carries no price
   /// and no checkout link (Play Billing itself arrives in this batch, behind
@@ -195,20 +205,6 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       }
 
       if (!mounted) return;
-      // F-48: first funnel step — the offer became VISIBLE. Guarded so a
-      // reload within the same visit (e.g. after a cancel) counts once. U-35:
-      // "visible" is THIS page now, not the Família tab.
-      final ui = computeBillingUi(
-        billingEnabled: settings.billingEnabled,
-        isPremium: plan.isPremium,
-        onTrial: plan.onTrial,
-        subscriptionStatus: subscription?.status,
-      );
-      if (ui == BillingUi.offer && !_paywallViewTracked) {
-        _paywallViewTracked = true;
-        widget.analytics?.trackEvent(AnalyticsEvents.premiumPaywallView,
-            props: analyticsFunnelProps(channel: _channel));
-      }
       setState(() {
         _subscription = subscription;
         _hasPremiumInterest = interest;
@@ -217,6 +213,25 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         _settings = settings;
         _loading = false;
       });
+      // F-48: first funnel step — the offer became VISIBLE. Guarded so a
+      // reload within the same visit (e.g. after a cancel) counts once. U-35:
+      // "visible" is THIS page now, not the Família tab.
+      //
+      // F-79 (02/10/2026): same name, same moment — the series goes on — but
+      // the view now says WHO saw it. `admin` is whether this reader may pay
+      // at all (a member sees only "ask an administrator"), and `buyable` is
+      // whether a price card and "Assinar" were actually built for them (the
+      // store rail switched off, or a store that did not answer, leaves only
+      // a note). Before this date every view counted as a buyer.
+      if (_billingUi == BillingUi.offer && !_paywallViewTracked) {
+        _paywallViewTracked = true;
+        widget.analytics?.trackEvent(AnalyticsEvents.premiumPaywallView,
+            props: {
+              ...analyticsFunnelProps(channel: _channel),
+              'admin': _isAdmin,
+              'buyable': _offerBuyable,
+            });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -528,6 +543,15 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   Widget _premiumSection(Localization l) {
     final theme = Theme.of(context);
     final ui = _billingUi;
+    // F-79: with the offer on, the decision comes first. On a 360 dp phone
+    // the full benefit list (five to ten lines) used to push "Assinar" about
+    // two screens down; now the reader meets one line of value, the price and
+    // the button, and the list follows as the reasons. The free-essentials
+    // sentence and the secondary payment facts (Pix avulso, how to pay, the
+    // guarantee) come after it — every sentence the page said before, none
+    // dropped. Every other state keeps the old order: there, the list is
+    // what the family already has, or what the waitlist promises.
+    final offer = ui == BillingUi.offer ? _offerPanel(l) : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -542,61 +566,74 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
               children: [
                 _premiumBadge(l),
                 const SizedBox(height: 8),
-                RichLabel.of(l, K.premIntro, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 4),
-                RichLabel.of(
-                  l,
-                  ui == BillingUi.waitlist
-                      ? K.premIntroWaitlist
-                      : K.premIntroOffer,
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: Spacing.md),
-                // U-28: the benefits as a real list with aligned icons.
-                //
-                // This block is where a Free family decides to spend money, and
-                // it was the least composed thing on the screen: one `Text` per
-                // line with a literal `•` glued in front of an emoji, so a
-                // wrapping benefit restarted under its own bullet and the icons
-                // did not line up with each other. `AppBulletList` gives the
-                // hanging indent; the icons are the app's own, not emoji, so
-                // the list reads as a feature table rather than as chat.
-                // U-57: the two numbers are the live `free_caregivers` and
-                // `calendar_months_free` — what the server enforces.
-                AppBulletList(
-                  items: [
-                    l.format(K.premFeatureCaregivers,
-                        [_settings.freeCaregivers]),
-                    l.format(
-                        K.premFeatureHorizon, [_settings.calendarMonthsFree]),
-                    l[K.premFeaturePdf],
-                    l[K.premFeatureAdminMode],
-                    l[K.premFeatureRoles],
-                    // S-22: each phase-6 module lists itself while its flag
-                    // is on AND it is Premium-only (a gate the operator lifted
-                    // is not a benefit any more). The viewer cap is the live
-                    // `max_viewers` (U-57).
-                    for (final b in _phase6Benefits(l)) b.text,
-                  ],
-                  leadingIcons: [
-                    const Icon(Icons.group_outlined, size: TypeScale.subtitle),
-                    const Icon(Icons.event_available_outlined,
-                        size: TypeScale.subtitle),
-                    const Icon(Icons.picture_as_pdf_outlined,
-                        size: TypeScale.subtitle),
-                    const Icon(Icons.shield_outlined, size: TypeScale.subtitle),
-                    const Icon(Icons.sell_outlined, size: TypeScale.subtitle),
-                    for (final b in _phase6Benefits(l))
-                      Icon(b.icon, size: TypeScale.subtitle),
-                  ],
-                ),
-                const SizedBox(height: Spacing.md),
-                ..._premiumStateBlock(l, ui),
+                if (offer == null) ...[
+                  RichLabel.of(l, K.premIntro,
+                      style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 4),
+                  RichLabel.of(
+                    l,
+                    ui == BillingUi.waitlist
+                        ? K.premIntroWaitlist
+                        : K.premIntroOffer,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: Spacing.md),
+                  _benefitList(l),
+                  const SizedBox(height: Spacing.md),
+                  ..._premiumStateBlock(l, ui),
+                ] else ...[
+                  RichLabel.of(l, K.premIntroOffer,
+                      style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 4),
+                  ...offer.primary,
+                  const SizedBox(height: Spacing.md),
+                  _benefitList(l),
+                  const SizedBox(height: Spacing.sm),
+                  RichLabel.of(l, K.premIntro,
+                      style: theme.textTheme.bodyMedium),
+                  ...offer.secondary,
+                ],
                 ..._historyPanel(l),
               ],
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  // U-28: the benefits as a real list with aligned icons.
+  //
+  // This block is where a Free family decides to spend money, and it was the
+  // least composed thing on the screen: one `Text` per line with a literal `•`
+  // glued in front of an emoji, so a wrapping benefit restarted under its own
+  // bullet and the icons did not line up with each other. `AppBulletList`
+  // gives the hanging indent; the icons are the app's own, not emoji, so the
+  // list reads as a feature table rather than as chat.
+  // U-57: the two numbers are the live `free_caregivers` and
+  // `calendar_months_free` — what the server enforces.
+  Widget _benefitList(Localization l) {
+    final phase6 = _phase6Benefits(l);
+    return AppBulletList(
+      key: const ValueKey('premium-benefits'),
+      items: [
+        l.format(K.premFeatureCaregivers, [_settings.freeCaregivers]),
+        l.format(K.premFeatureHorizon, [_settings.calendarMonthsFree]),
+        l[K.premFeaturePdf],
+        l[K.premFeatureAdminMode],
+        l[K.premFeatureRoles],
+        // S-22: each phase-6 module lists itself while its flag is on AND it
+        // is Premium-only (a gate the operator lifted is not a benefit any
+        // more). The viewer cap is the live `max_viewers` (U-57).
+        for (final b in phase6) b.text,
+      ],
+      leadingIcons: [
+        const Icon(Icons.group_outlined, size: TypeScale.subtitle),
+        const Icon(Icons.event_available_outlined, size: TypeScale.subtitle),
+        const Icon(Icons.picture_as_pdf_outlined, size: TypeScale.subtitle),
+        const Icon(Icons.shield_outlined, size: TypeScale.subtitle),
+        const Icon(Icons.sell_outlined, size: TypeScale.subtitle),
+        for (final b in phase6) Icon(b.icon, size: TypeScale.subtitle),
       ],
     );
   }
@@ -640,7 +677,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       case BillingUi.manageScheduled:
         return _scheduledPanel(l);
       case BillingUi.offer:
-        return _offerPanel(l);
+        // [_premiumSection] lays the offer out itself (F-79); this branch
+        // only keeps the switch whole.
+        final offer = _offerPanel(l);
+        return [...offer.primary, ...offer.secondary];
       case BillingUi.waitlist:
         return _waitlistPanel(l);
     }
@@ -766,7 +806,12 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     ];
   }
 
-  List<Widget> _offerPanel(Localization l) {
+  /// The offer in two parts (F-79): [primary] is what the reader decides on —
+  /// what they already have, then the price and the button (or the note that
+  /// they cannot buy) — and goes ABOVE the benefit list; [secondary] is the
+  /// rest of the payment surface and goes below it.
+  ({List<Widget> primary, List<Widget> secondary}) _offerPanel(
+      Localization l) {
     final subscription = _subscription;
     final now = DateTime.now().toUtc();
     final stillPaid = paidUntil(
@@ -800,10 +845,18 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                   args: [l.formatDate(trialEnd.toLocal())])),
         const SizedBox(height: 4),
       ];
-      return [...status, ..._storeBranch(l)];
+      // A store that can sell puts the price and the button up top; every
+      // other store state is a note (or Play's own management link), which
+      // reads better after the list it refers to.
+      return _storeOfferState == StoreOffer.offer
+          ? (primary: [...status, ..._storeBranch(l)], secondary: const [])
+          : (
+              primary: status,
+              secondary: [const SizedBox(height: Spacing.sm), ..._storeBranch(l)]
+            );
     }
 
-    return [
+    final primary = [
       if (stillPaid != null) ...[
         // T-39 (QA): a canceled-but-paid subscription keeps its Premium until
         // the period end — say so, and that re-subscribing ADDS to that date
@@ -826,14 +879,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
               RichLabel.of(l,
                   daysLeft == 1 ? K.premExpiringSoonOne : K.premExpiringSoonMany,
                   args: [daysLeft])),
-      ] else if (_planStatus.onTrial && trialEnd != null)
-        // F-46: a family paying DURING its trial starts the paid cycle at the
-        // trial end — say it before any checkout button.
-        _marked(
-            Icons.auto_awesome,
-            context.tokens.accent.solid,
-            RichLabel.of(l, K.premTrialAdditive,
-                args: [l.formatDate(trialEnd.toLocal())])),
+      ],
       if (!_isAdmin)
         _marked(Icons.info_outline, context.tokens.textMuted,
             RichLabel.of(l, K.premAdminOnly))
@@ -853,7 +899,22 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         ] else
           ..._checkoutControls(l, primaryTaken: false),
       ],
+      // F-46: a family paying DURING its trial starts the paid cycle at the
+      // trial end. F-79: said right under "Assinar" rather than above the
+      // price — the same sentence, now where the reader asks "and my trial?".
+      if (stillPaid == null && _planStatus.onTrial && trialEnd != null) ...[
+        const SizedBox(height: Spacing.sm),
+        _marked(
+            Icons.auto_awesome,
+            context.tokens.accent.solid,
+            RichLabel.of(l, K.premTrialAdditive,
+                args: [l.formatDate(trialEnd.toLocal())])),
+      ],
     ];
+    return (
+      primary: primary,
+      secondary: _isAdmin ? _checkoutSecondary(l) : const <Widget>[],
+    );
   }
 
   // ── U-46: the offer as one decision at a time. The cycle picker and the
@@ -945,15 +1006,22 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   /// T-48: what the STORE channel may offer. With the rail off — or with a
   /// store that cannot answer — this is the T-38 neutral note, which is what
   /// Play always accepts and what the app shipped with until now.
+  StoreOffer get _storeOfferState => computeStoreOffer(
+        storeBillingEnabled: _settings.storeBillingEnabled,
+        storeAvailable: _storeAvailable,
+        hasProducts: _storeProducts.isNotEmpty,
+        purchasePending: _storePurchasePending,
+        premiumThroughStore: isStoreGateway(_subscription?.gateway),
+      );
+
+  /// The cycles Play answered for, in the picker's order.
+  List<String> get _storeCycles => [
+        for (final cycle in const ['monthly', 'annual'])
+          if (_storeProducts.any((p) => p.cycle == cycle)) cycle,
+      ];
+
   List<Widget> _storeBranch(Localization l) {
-    final state = computeStoreOffer(
-      storeBillingEnabled: _settings.storeBillingEnabled,
-      storeAvailable: _storeAvailable,
-      hasProducts: _storeProducts.isNotEmpty,
-      purchasePending: _storePurchasePending,
-      premiumThroughStore: isStoreGateway(_subscription?.gateway),
-    );
-    return switch (state) {
+    return switch (_storeOfferState) {
       StoreOffer.neutralNote => [RichLabel.of(l, K.premStoreNote)],
       StoreOffer.pendingVerification => [Text(l[KApp.storePending])],
       StoreOffer.managed => [
@@ -971,13 +1039,9 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
             RichLabel.of(l, K.premAdminOnly))
       ];
     }
-    // The cycles Play answered for, in the picker's order. A selected cycle
-    // the store did not answer for falls back to whatever it did — the card
-    // never shows a price for a product that does not exist.
-    final cycles = [
-      for (final cycle in const ['monthly', 'annual'])
-        if (_storeProducts.any((p) => p.cycle == cycle)) cycle,
-    ];
+    // A selected cycle the store did not answer for falls back to whatever it
+    // did — the card never shows a price for a product that does not exist.
+    final cycles = _storeCycles;
     // The service already drops ids it does not recognise; this is the same
     // fail-closed default one layer up, so the card can never be built around
     // nothing.
@@ -1058,11 +1122,18 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     }
   }
 
+  /// The web rail's price for the cycle the picker holds — the card, the
+  /// subscribe button and the Pix avulso button all quote this one number.
+  String get _webOfferPrice => formatPriceBrl(_offerCycle == 'annual'
+      ? _settings.priceAnnualCents
+      : _settings.priceMonthlyCents);
+
+  /// The web rail's decision: picker, price card, "Assinar".
   List<Widget> _checkoutControls(Localization l, {required bool primaryTaken}) {
     final monthlyCents = _settings.priceMonthlyCents;
     final annualCents = _settings.priceAnnualCents;
     final annual = _offerCycle == 'annual';
-    final price = formatPriceBrl(annual ? annualCents : monthlyCents);
+    final price = _webOfferPrice;
     return [
       const SizedBox(height: 12),
       _cyclePicker(l, cycles: const ['monthly', 'annual']),
@@ -1091,7 +1162,15 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
             ? null
             : () => _startCheckout(l, _offerCycle, avulso: false),
       ),
-      const SizedBox(height: 8),
+    ];
+  }
+
+  /// The rest of the web rail's payment surface, below the benefit list
+  /// (F-79): the second way to pay, how paying works, and the guarantee.
+  List<Widget> _checkoutSecondary(Localization l) {
+    final price = _webOfferPrice;
+    return [
+      const SizedBox(height: Spacing.md),
       // F-48: Pix avulso — the no-recurrence rail. One single charge for one
       // period: no card on file, no auto-renew, renewing later is an explicit
       // new payment (additive). It follows the cycle chosen above.
@@ -1113,7 +1192,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       _marked(
           Icons.verified_user_outlined,
           context.tokens.success.solid,
+          // F-79: the sentence ends on the address it promises — the support
+          // constant, never typed into the catalog.
           RichLabel.of(l, K.premGuarantee,
+              args: [SupportRules.supportEmail],
               style: Theme.of(context).textTheme.bodySmall)),
     ];
   }

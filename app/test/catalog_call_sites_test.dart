@@ -75,7 +75,6 @@ const _webOnly = <String>{
   'K.pdfErrPrint',
   'K.pdfPageTitle',
   'K.pdfPrintHint',
-  'K.pdfUpsellButton',
   'K.repFilter',
   'K.repTabsAria',
   'K.sumPageTitle',

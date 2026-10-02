@@ -122,7 +122,11 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.preferenceChanged: {'pref', 'value'},
     AnalyticsEvents.supportContactSent: {'category', 'signed_in'},
     AnalyticsEvents.premiumGateClick: {'gate'},
-    AnalyticsEvents.premiumPaywallView: {'channel'},
+    // F-79 (02/10/2026): `admin` (may this reader pay at all) and `buyable`
+    // (were a price card and "Assinar" built for them) — before that date
+    // every view counted as a buyer, the member who can only ask an
+    // administrator and the store build with nothing on sale included.
+    AnalyticsEvents.premiumPaywallView: {'channel', 'admin', 'buyable'},
     AnalyticsEvents.premiumInterest: {'source', 'trial'},
     AnalyticsEvents.premiumCheckoutStart: _funnel,
     AnalyticsEvents.premiumCheckoutReturn: _funnel,

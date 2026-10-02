@@ -85,6 +85,18 @@ void main() {
       expect(AnalyticsCatalog.isKnown('made-up'), isFalse);
     });
 
+    test('F-79: the paywall view keeps its channel and says who saw it', () {
+      expect(
+          AnalyticsCatalog.filterProps(AnalyticsEvents.premiumPaywallView,
+              {'channel': 'web', 'admin': true, 'buyable': false}),
+          {'channel': 'web', 'admin': true, 'buyable': false});
+      // The series' one original prop still travels alone.
+      expect(
+          AnalyticsCatalog.filterProps(
+              AnalyticsEvents.premiumPaywallView, {'channel': 'store'}),
+          {'channel': 'store'});
+    });
+
     test('every existing funnel prop still passes (no series loses a prop)',
         () {
       final funnel = analyticsFunnelProps(

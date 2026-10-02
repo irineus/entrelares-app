@@ -712,7 +712,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   onOpenDay: (day) {
                     _dayRequest.value = day;
                     _router.go('/');
-                  }),
+                  },
+                  // F-79: the PDF upsell's "Ver o Premium".
+                  onOpenPlan: () => _router.go('/family/plan')),
             ),
           ]),
         ],

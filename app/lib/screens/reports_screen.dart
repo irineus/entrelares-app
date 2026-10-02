@@ -27,11 +27,15 @@ class ReportsScreen extends StatelessWidget {
   /// F-76: a Histórico search result opens its day in the month view.
   final ValueChanged<DateTime>? onOpenDay;
 
+  /// F-79: the PDF tab's upsell opens the plan page.
+  final VoidCallback? onOpenPlan;
+
   const ReportsScreen(
       {super.key,
       required this.dataSource,
       this.onOpenCalendar,
-      this.onOpenDay});
+      this.onOpenDay,
+      this.onOpenPlan});
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +70,7 @@ class ReportsScreen extends StatelessWidget {
             ReportsSummaryTab(
                 dataSource: dataSource, onOpenCalendar: onOpenCalendar),
             ReportsAuditTab(dataSource: dataSource, onOpenDay: onOpenDay),
-            ReportsPdfTab(dataSource: dataSource),
+            ReportsPdfTab(dataSource: dataSource, onOpenPlan: onOpenPlan),
           ],
         ),
       ),
