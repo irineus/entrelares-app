@@ -5,6 +5,7 @@ import 'package:entrelares_db_gate/entrelares_db_gate.dart';
 import 'package:test/test.dart';
 
 import 'suites/account_deletion.dart';
+import 'suites/admin_change_notice.dart';
 import 'suites/admin_override_tier.dart';
 import 'suites/admin_rpc.dart';
 import 'suites/adversarial.dart';
@@ -171,6 +172,9 @@ void main() {
   scheduleLaneTests(fx);
   // F-07 PR 5b: a swap notification names its child.
   notificationChildTests(fx);
+  // F-81: an admin's direct change tells the caregivers it affects — one
+  // notification per action and recipient, never one per day.
+  adminChangeNoticeTests(fx);
   // F-55 PR 2: the agenda — kinds, the free note, Premium, the past, the
   // frozen observation and the conversion.
   agendaTests(fx);

@@ -919,6 +919,14 @@ abstract final class K {
   static const String notifRenderTitleReferralReward = 'notifRender.title.referralReward';
   static const String notifRenderReferralReward = 'notifRender.referralReward';
 
+  // ── An admin changed the reader's days directly (F-81) ──
+  static const String notifRenderTitleDayAdminChangeSingle = 'notifRender.title.dayAdminChange.single';
+  static const String notifRenderTitleDayAdminChangeBatch = 'notifRender.title.dayAdminChange.batch';
+  static const String notifRenderDayAdminChangeSingle = 'notifRender.dayAdminChange.single';
+  static const String notifRenderDayAdminChangeBatch = 'notifRender.dayAdminChange.batch';
+  static const String notifDayAdminChangeDayAction = 'notif.dayAdminChange.dayAction';
+  static const String notifDayAdminChangeTrailAction = 'notif.dayAdminChange.trailAction';
+
   // ── Shared expenses (F-34) ──
   static const String notifRenderTitleExpenseAdded = 'notifRender.title.expenseAdded';
   static const String notifRenderTitleExpenseUpdated = 'notifRender.title.expenseUpdated';
@@ -2073,6 +2081,12 @@ abstract final class K {
     notifTrialAction,
     notifRenderTitleReferralReward,
     notifRenderReferralReward,
+    notifRenderTitleDayAdminChangeSingle,
+    notifRenderTitleDayAdminChangeBatch,
+    notifRenderDayAdminChangeSingle,
+    notifRenderDayAdminChangeBatch,
+    notifDayAdminChangeDayAction,
+    notifDayAdminChangeTrailAction,
     notifRenderTitleExpenseAdded,
     notifRenderTitleExpenseUpdated,
     notifRenderTitleExpenseDeleted,

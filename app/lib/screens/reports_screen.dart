@@ -30,18 +30,27 @@ class ReportsScreen extends StatelessWidget {
   /// F-79: the PDF tab's upsell opens the plan page.
   final VoidCallback? onOpenPlan;
 
+  /// F-81: the tab the screen opens on — [historyTab] when a notification
+  /// about an admin's batch change lands here.
+  final int initialTab;
+
+  /// The Histórico's index in the tab bar.
+  static const historyTab = 1;
+
   const ReportsScreen(
       {super.key,
       required this.dataSource,
       this.onOpenCalendar,
       this.onOpenDay,
-      this.onOpenPlan});
+      this.onOpenPlan,
+      this.initialTab = 0});
 
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
     return DefaultTabController(
       length: 3,
+      initialIndex: initialTab.clamp(0, 2),
       child: Scaffold(
         appBar: AppBar(
           title: Text(l[K.navReports]),

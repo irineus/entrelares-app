@@ -491,6 +491,14 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   WidgetsBinding.instance
                       .addPostFrameCallback((_) => _openWizardOnToday());
                 }
+                // F-81: the same for an admin's change of ONE day —
+                // `/?day=YYYY-MM-DD` opens that day's sheet, once.
+                final askedDay = AdminChangeRules.parseIsoDay(
+                    state.uri.queryParameters['day']);
+                if (askedDay != null) {
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _openDay(askedDay));
+                }
                 return CalendarScreen(
                   dataSource: _dataSource,
                   connectivity: appConnectivity,
@@ -667,6 +675,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                         },
                         onOpenExpenses: () => _router.go('/expenses'),
                         onOpenPlan: () => _router.go('/family/plan'),
+                        // F-81: an admin's direct change — the day, or the
+                        // Histórico when it was several.
+                        onOpenDay: _openDay,
+                        onOpenAuditTrail: (id) => _openAuditTrail('$id'),
                         onApprovalSeen: () =>
                             unawaited(_reviewPrompt.approvalSeen()),
                         embedded: embedded,
@@ -708,7 +720,15 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/reports',
-              builder: (_, _) => ReportsScreen(
+              // F-81: `?tab=history` opens on the Histórico (a push or a row
+              // about an admin's batch change). The key follows `n`, so a
+              // second landing re-applies the tab the reader moved away from.
+              builder: (_, state) => ReportsScreen(
+                  key: ValueKey('reports:${state.uri.queryParameters['tab']}:'
+                      '${state.uri.queryParameters['n']}'),
+                  initialTab: state.uri.queryParameters['tab'] == 'history'
+                      ? ReportsScreen.historyTab
+                      : 0,
                   dataSource: _dataSource,
                   onOpenCalendar: () => _router.go('/'),
                   // F-76: a search result opens its day in the month view,
@@ -815,6 +835,20 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// F-70: Notificações → calendar, carrying the day the wizard opens on.
   /// The calendar consumes it (sets it back to null) once it opens.
   final _planRequest = ValueNotifier<DateTime?>(null);
+
+  /// F-81 — the calendar with [day]'s sheet open (the Conversa's door).
+  void _openDay(DateTime day) {
+    _dayRequest.value = DateTime(day.year, day.month, day.day);
+    _router.go('/');
+  }
+
+  /// F-81 — Relatórios → Histórico; [nonce] makes a second landing apply.
+  void _openAuditTrail(String nonce) => _router.go(Uri(
+      path: '/reports',
+      queryParameters: {
+        'tab': 'history',
+        if (nonce.isNotEmpty) 'n': nonce,
+      }).toString());
 
   /// F-78 — the calendar with the wizard open on today.
   void _openWizardOnToday() {
@@ -957,6 +991,20 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         _openWizardOnToday();
         return;
       }
+      // F-81: an admin changed one of my days — that day; several — the
+      // Histórico. A `single` with no real day falls to "Todas" below, the
+      // same fallback the web worker takes.
+      if (landing == NotificationLanding.day) {
+        final day = AdminChangeRules.parseIsoDay(data['date']);
+        if (day != null) {
+          _openDay(day);
+          return;
+        }
+      }
+      if (landing == NotificationLanding.auditTrail) {
+        _openAuditTrail(data['notificationId'] ?? '');
+        return;
+      }
       final query = {
         'tab': switch (landing) {
           NotificationLanding.incoming => 'incoming',
@@ -964,6 +1012,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           NotificationLanding.chat => 'chat',
           NotificationLanding.plan => 'history',
           NotificationLanding.planFirst => 'history',
+          NotificationLanding.day => 'history',
+          NotificationLanding.auditTrail => 'history',
         },
         if ((data['notificationId'] ?? '').isNotEmpty)
           'n': data['notificationId']!,

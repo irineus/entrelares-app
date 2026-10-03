@@ -71,6 +71,18 @@ void main() {
           NotificationLanding.history);
     });
 
+    test("an admin's direct change opens the day or the Histórico (F-81)", () {
+      expect(PushRouting.landingFor('day_admin_change', kind: 'single'),
+          NotificationLanding.day);
+      expect(PushRouting.landingFor('day_admin_change', kind: 'batch'),
+          NotificationLanding.auditTrail);
+      // A future kind is a receipt until someone decides otherwise.
+      expect(PushRouting.landingFor('day_admin_change', kind: 'undone'),
+          NotificationLanding.history);
+      expect(PushRouting.landingFor('day_admin_change'),
+          NotificationLanding.history);
+    });
+
     test('the referral reward opens the plan page (F-80 PR 3)', () {
       expect(PushRouting.landingFor('referral_reward', kind: 'granted'),
           NotificationLanding.plan);

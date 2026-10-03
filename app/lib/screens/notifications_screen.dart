@@ -81,6 +81,17 @@ class NotificationsScreen extends StatefulWidget {
 
   static Key trialActionKey(int id) => Key('notif-trial-$id');
 
+  /// F-81: an admin's direct change of one of my days — "Ver o dia" opens
+  /// the calendar on that day's sheet. Null hides it.
+  final ValueChanged<DateTime>? onOpenDay;
+
+  /// F-81: the same about several days — "Ver o Histórico" opens Relatórios
+  /// → Histórico; the row's id makes a second tap re-apply the tab. Null
+  /// hides it.
+  final ValueChanged<int>? onOpenAuditTrail;
+
+  static Key adminChangeActionKey(int id) => Key('notif-admin-change-$id');
+
   /// The notification types whose row opens Despesas.
   static const Set<String> expenseTypes = {
     'expense_changed',
@@ -112,6 +123,8 @@ class NotificationsScreen extends StatefulWidget {
       this.onPlanFrom,
       this.onOpenExpenses,
       this.onOpenPlan,
+      this.onOpenDay,
+      this.onOpenAuditTrail,
       this.embedded = false,
       this.onApprovalSeen,
       this.landing,
@@ -159,6 +172,7 @@ IconData notifIcon(String type) => switch (type) {
       'plan_ending' => Icons.event_note_outlined,
       'premium_trial' => Icons.workspace_premium_outlined,
       'referral_reward' => Icons.card_giftcard_outlined,
+      'day_admin_change' => Icons.edit_calendar_outlined,
       _ => Icons.notifications_none,
     };
 
@@ -265,6 +279,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       NotificationLanding.chat => _Tab.history,
       NotificationLanding.plan => _Tab.history,
       NotificationLanding.planFirst => _Tab.history,
+      NotificationLanding.day => _Tab.history,
+      NotificationLanding.auditTrail => _Tab.history,
     };
   }
 
@@ -1029,7 +1045,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             createdLocal == null ? '' : l.formatDateTime(createdLocal),
         detail: _planAction(notif, l) ??
             _expenseAction(notif, l) ??
-            _trialAction(notif, l),
+            _trialAction(notif, l) ??
+            _adminChangeAction(notif, l),
       ),
     );
   }
@@ -1072,6 +1089,37 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         onPressed: () {
           _trackListOpen(notif.type);
           open();
+        },
+      ),
+    );
+  }
+
+  /// F-81: an admin changed one of my days directly. One day opens it; several
+  /// open the Histórico, where the action reads as one entry. A row whose
+  /// params the rule cannot read offers nothing and still renders.
+  Widget? _adminChangeAction(AppNotification notif, Localization l) {
+    final target = AdminChangeRules.targetOf(notif.type, notif.paramsJson);
+    final day = AdminChangeRules.dayOf(notif.type, notif.paramsJson);
+    final VoidCallback? onPressed = switch (target) {
+      AdminChangeTarget.day when day != null && widget.onOpenDay != null =>
+        () => widget.onOpenDay!(day),
+      AdminChangeTarget.auditTrail when widget.onOpenAuditTrail != null =>
+        () => widget.onOpenAuditTrail!(notif.id),
+      _ => null,
+    };
+    if (onPressed == null) return null;
+    final isDay = target == AdminChangeTarget.day;
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: NotificationsScreen.adminChangeActionKey(notif.id),
+        icon: Icon(isDay ? Icons.event_outlined : Icons.history),
+        label: Text(l[isDay
+            ? K.notifDayAdminChangeDayAction
+            : K.notifDayAdminChangeTrailAction]),
+        onPressed: () {
+          _trackListOpen(notif.type);
+          onPressed();
         },
       ),
     );

@@ -423,6 +423,12 @@ void main() {
     // F-80 PR 3: what referral_reward_notify() stores, word for word.
     ('referral_reward', '{"kind":"granted"}',
         'Uma família que vocês indicaram assinou o Premium: a sua família ganhou um mês de Premium.'),
+    // F-81: what flush_admin_change_notices() stores, word for word.
+    ('day_admin_change', '{"kind":"single","date":"2026-10-12","name":"Ana"}',
+        'Ana alterou o dia 12/10/2026 no calendário.'),
+    ('day_admin_change',
+        '{"kind":"batch","date":"2026-10-12","to":"2026-11-30","count":"14","name":"Ana"}',
+        'Ana alterou 14 dias entre 12/10/2026 e 30/11/2026 no calendário.'),
     // F-77: what trial_end_reminders_due() stores, word for word.
     ('premium_trial', '{"kind":"ending","date":"2026-10-09"}',
         'A avaliação Premium da família vai até 09/10/2026. Para continuar com o Premium depois dessa data, veja o plano.'),
@@ -514,6 +520,9 @@ void main() {
       ('premium_trial', '{"kind":"ending","date":"2026-10-09"}'),
       ('premium_trial', '{"kind":"ended","date":"2026-10-09"}'),
       ('referral_reward', '{"kind":"granted"}'),
+      ('day_admin_change', '{"kind":"single","date":"2026-10-12","name":"Ana"}'),
+      ('day_admin_change',
+          '{"kind":"batch","date":"2026-10-12","to":"2026-11-30","count":"14","name":"Ana"}'),
       ('plan_ending', '{"kind":"unplanned","date":"2026-10-04"}'),
       ('agenda_notice',
           '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia","name":"Ana"}'),
@@ -676,6 +685,68 @@ void main() {
           'referral_reward', '{"kind":"granted"}', sentinel, en);
       expect(text, en[K.notifRenderReferralReward]);
       expect(RegExp(r'\d').hasMatch(text), isFalse);
+    });
+  });
+
+  // F-81: an admin's direct change. The heading follows the body: a batch
+  // with no count or no last day keeps the stored sentence AND heading, and a
+  // future kind is never guessed.
+  group("an admin's direct change of the reader's days", () {
+    test('one day: the heading, the day in the reader format, the name', () {
+      const json = '{"kind":"single","date":"2026-10-12","name":"Ana"}';
+      expect(NotificationRenderer.title('day_admin_change', json, sentinel, ptBr),
+          'Dia alterado no calendário');
+      expect(NotificationRenderer.title('day_admin_change', json, sentinel, en),
+          en[K.notifRenderTitleDayAdminChangeSingle]);
+      final text =
+          NotificationRenderer.message('day_admin_change', json, sentinel, en);
+      expect(text, startsWith('Ana changed '));
+      expect(text, contains(en.formatIsoDate('2026-10-12')));
+    });
+
+    test('several days: count, first and last day', () {
+      const json =
+          '{"kind":"batch","date":"2026-10-12","to":"2026-11-30","count":"14","name":"Ana"}';
+      expect(NotificationRenderer.title('day_admin_change', json, sentinel, ptBr),
+          'Dias alterados no calendário');
+      final text =
+          NotificationRenderer.message('day_admin_change', json, sentinel, en);
+      expect(text, contains('14 days'));
+      expect(text, contains(en.formatIsoDate('2026-10-12')));
+      expect(text, contains(en.formatIsoDate('2026-11-30')));
+    });
+
+    test('no name falls back to "another caregiver", never a blank', () {
+      final text = NotificationRenderer.message('day_admin_change',
+          '{"kind":"single","date":"2026-10-12"}', sentinel, ptBr);
+      expect(text, startsWith(ptBr[K.notifRenderFbOtherCap]));
+    });
+
+    test('the child of a per-child plan follows the heading', () {
+      expect(
+          NotificationRenderer.title('day_admin_change',
+              '{"kind":"single","date":"2026-10-12","name":"Ana","child":"Lia"}',
+              sentinel, ptBr),
+          'Dia alterado no calendário · Lia');
+    });
+
+    test('a malformed batch or an unknown kind keeps the stored row', () {
+      for (final json in [
+        '{"kind":"batch","date":"2026-10-12","to":"2026-11-30","name":"Ana"}',
+        '{"kind":"batch","date":"2026-10-12","count":"x","to":"2026-11-30"}',
+        '{"kind":"batch","date":"2026-10-12","count":"3"}',
+        '{"kind":"undone","date":"2026-10-12","name":"Ana"}',
+        '{"kind":"single","name":"Ana"}',
+      ]) {
+        expect(
+            NotificationRenderer.message('day_admin_change', json, sentinel, en),
+            sentinel,
+            reason: json);
+        expect(
+            NotificationRenderer.title('day_admin_change', json, sentinel, en),
+            sentinel,
+            reason: json);
+      }
     });
   });
 }

@@ -126,6 +126,12 @@ const PLAN_TYPES = ['premium_trial', 'referral_reward'];
 // F-78: a `plan_ending` that says the plan never started opens the calendar
 // with the wizard on today (`/?plan=first`, read by the app's `/` route).
 const PLAN_FIRST_KINDS = ['unplanned'];
+// F-81: an admin's direct change of the reader's days. One day opens the
+// calendar with that day's sheet (`/?day=YYYY-MM-DD`, read once by the app's
+// `/` route); several open Relatórios → Histórico (`/reports?tab=history`).
+const ADMIN_CHANGE_TYPES = ['day_admin_change'];
+const ADMIN_CHANGE_DAY_KINDS = ['single'];
+const ADMIN_CHANGE_TRAIL_KINDS = ['batch'];
 
 /// Where a tapped notification lands — the same URL `main.dart` builds for the
 /// Android tap, which is what makes the two channels agree: the Notificações
@@ -137,12 +143,23 @@ function landingUrl(data) {
   if (data.type === 'plan_ending' && PLAN_FIRST_KINDS.includes(data.kind)) {
     return new URL('/?plan=first', self.location.origin).href;
   }
+  const id = data.notificationId || '';
+  if (ADMIN_CHANGE_TYPES.includes(data.type)) {
+    // A day that is not a real `YYYY-MM-DD` falls to "Todas", as on Android.
+    if (ADMIN_CHANGE_DAY_KINDS.includes(data.kind) &&
+        /^\d{4}-\d{2}-\d{2}$/.test(data.date || '')) {
+      return new URL(`/?day=${data.date}`, self.location.origin).href;
+    }
+    if (ADMIN_CHANGE_TRAIL_KINDS.includes(data.kind)) {
+      const n = id ? `&n=${encodeURIComponent(id)}` : '';
+      return new URL(`/reports?tab=history${n}`, self.location.origin).href;
+    }
+  }
   const actionable = ACTIONABLE_TYPES.includes(data.type) ||
     (data.type === 'day_notice' && ACTIONABLE_KINDS.includes(data.kind));
   const tab = CHAT_TYPES.includes(data.type)
     ? 'chat'
     : actionable ? 'incoming' : 'history';
-  const id = data.notificationId || '';
   const query = id ? `?tab=${tab}&n=${encodeURIComponent(id)}` : `?tab=${tab}`;
   return new URL(`/notifications${query}`, self.location.origin).href;
 }

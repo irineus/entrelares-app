@@ -99,6 +99,12 @@ export const PUSH_TYPES: readonly string[] = [
 	// States no day and names no family (params carries the kind alone),
 	// so it is rendered before the date guard. Lands on the plan page.
 	"referral_reward",
+	// F-81. An admin changed, on their own authority, a day that is (or was)
+	// the reader's — the reader did nothing, and found out by opening the
+	// calendar until now. ONE per action and recipient: `single` names the day
+	// and lands on it; `batch` names the first and last day and the count, and
+	// lands on Relatórios → Histórico. Never e-mail.
+	"day_admin_change",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -208,6 +214,10 @@ const K = {
 	trialEnded: "notifRender.trialEnded",
 	titleReferralReward: "notifRender.title.referralReward",
 	referralReward: "notifRender.referralReward",
+	titleDayAdminChangeSingle: "notifRender.title.dayAdminChange.single",
+	titleDayAdminChangeBatch: "notifRender.title.dayAdminChange.batch",
+	dayAdminChangeSingle: "notifRender.dayAdminChange.single",
+	dayAdminChangeBatch: "notifRender.dayAdminChange.batch",
 
 	titleMemberJoined: "notifRender.title.memberJoined",
 	titleMemberReturned: "notifRender.title.memberReturned",
@@ -290,6 +300,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.trialEnded": "A avaliação Premium da família terminou em {0}. A família segue no plano gratuito, e o Premium pode ser assinado a qualquer momento.",
 		"notifRender.title.referralReward": "Um mês de Premium pela indicação",
 		"notifRender.referralReward": "Uma família que vocês indicaram assinou o Premium: a sua família ganhou um mês de Premium.",
+		"notifRender.title.dayAdminChange.single": "Dia alterado no calendário",
+		"notifRender.title.dayAdminChange.batch": "Dias alterados no calendário",
+		"notifRender.dayAdminChange.single": "{0} alterou o dia {1} no calendário.",
+		"notifRender.dayAdminChange.batch": "{0} alterou {1} dias entre {2} e {3} no calendário.",
 		"notifRender.title.expenseAdded": "Despesa lançada",
 		"notifRender.title.expenseUpdated": "Despesa alterada",
 		"notifRender.title.expenseDeleted": "Despesa apagada",
@@ -401,6 +415,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.trialEnded": "Your family's Premium trial ended on {0}. The family stays on the free plan, and Premium can be subscribed at any time.",
 		"notifRender.title.referralReward": "A month of Premium for your referral",
 		"notifRender.referralReward": "A family you referred subscribed to Premium: your family got one month of Premium.",
+		"notifRender.title.dayAdminChange.single": "Day changed on the calendar",
+		"notifRender.title.dayAdminChange.batch": "Days changed on the calendar",
+		"notifRender.dayAdminChange.single": "{0} changed {1} on the calendar.",
+		"notifRender.dayAdminChange.batch": "{0} changed {1} days between {2} and {3} on the calendar.",
 		"notifRender.title.expenseAdded": "Expense added",
 		"notifRender.title.expenseUpdated": "Expense changed",
 		"notifRender.title.expenseDeleted": "Expense deleted",
@@ -868,6 +886,30 @@ export function renderPush(
 		case "settlement_reminder": {
 			titleKey = K.titleSettlementReminder;
 			body = fmt(lang, K.settlementReminder, [name ?? otherCap()]);
+			break;
+		}
+
+		// F-81. An admin's direct change: one day, or several with the first
+		// (`date`), the last (`to`) and how many (`count`). An unknown kind or
+		// an off-shape batch is a future writer's — no push, never a guess.
+		case "day_admin_change": {
+			if (kind === "single") {
+				titleKey = K.titleDayAdminChangeSingle;
+				body = fmt(lang, K.dayAdminChangeSingle, [name ?? otherCap(), date]);
+			} else if (kind === "batch") {
+				const count = params["count"];
+				const last = params["to"];
+				if (!count || !/^\d+$/.test(count) || !last) return null;
+				titleKey = K.titleDayAdminChangeBatch;
+				body = fmt(lang, K.dayAdminChangeBatch, [
+					name ?? otherCap(),
+					count,
+					date,
+					formatDateIn(lang, last),
+				]);
+			} else {
+				return null;
+			}
 			break;
 		}
 

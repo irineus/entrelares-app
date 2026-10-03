@@ -7,6 +7,7 @@ library;
 
 export 'src/account_rules.dart';
 export 'src/activity_rules.dart';
+export 'src/admin_change_rules.dart';
 export 'src/admin_mode_offer.dart';
 export 'src/agenda_rules.dart';
 export 'src/chat_export_rules.dart';
