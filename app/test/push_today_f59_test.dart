@@ -7,10 +7,12 @@ import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/services/push_messaging.dart';
 import 'package:entrelares_app/services/push_service.dart';
 import 'package:entrelares_app/services/push_today_prefs.dart';
+import 'package:entrelares_app/theme/app_theme.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource, row, today;
@@ -20,6 +22,13 @@ final _pt = Localization(AppLanguage.ptBr);
 
 const _me = Member(
     id: 1, fullName: 'Ana Souza', colorSlot: 1, userId: 'u1', familyId: 7);
+const _admin = Member(
+    id: 1,
+    fullName: 'Ana Souza',
+    colorSlot: 1,
+    userId: 'u1',
+    familyId: 7,
+    isAdmin: true);
 const _other = Member(
     id: 2, fullName: 'Bruno Lima', colorSlot: 2, userId: 'u2', familyId: 7);
 
@@ -135,5 +144,84 @@ void main() {
     await tester.pumpWidget(_app(ds, push: push, prefs: prefs));
     await tester.pumpAndSettle();
     expect(_strip, findsNothing);
+  });
+
+  // 03/10/2026 — the strip is a STATE line, and the calendar holds with it on.
+  // As an AppBanner it measured 146 dp on a Pixel 6: the Android E2E lane
+  // (run 37124944050) had the founder — admin, push not asked, one day planned
+  // three days ahead, so the U-55 nudge and the F-70 strip on too — type the
+  // swap message, and with the keyboard up the column behind the editor
+  // overflowed by 20 px. Measured with Inter and the product theme: the test
+  // font draws every glyph as a square, and a line height is the question.
+  group('on a phone', () {
+    setUpAll(() async {
+      final inter = FontLoader('Inter')
+        ..addFont(rootBundle.load('assets/fonts/Inter-Regular.ttf'))
+        ..addFont(rootBundle.load('assets/fonts/Inter-Medium.ttf'));
+      await inter.load();
+    });
+
+    /// [body] is what the shell leaves the calendar's Scaffold under its own
+    /// 48 dp app bar; 411.4 x 729.5 is the Pixel 6 the lane runs on.
+    Future<void> pumpPhone(WidgetTester tester, Size body,
+        {Member me = _me,
+        double keyboard = 0,
+        AppLanguage language = AppLanguage.ptBr}) async {
+      final size = Size(body.width, body.height + 48);
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final ds = FakeCustodyDataSource(
+          members: [me, _other],
+          days: [row(100, today.add(const Duration(days: 3)), 1)]);
+      final push = await _push(ds, PushPermission.notAsked);
+      await tester.pumpWidget(AppL10n(
+        l: Localization(language),
+        setLanguage: (_) async {},
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: CalendarScreen(
+            dataSource: ds,
+            adminMode: AdminMode(),
+            push: push,
+            onOpenNotifications: () {},
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      if (keyboard > 0) {
+        tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpAndSettle();
+      }
+    }
+
+    for (final language in AppLanguage.values) {
+      for (final width in [360.0, 411.4]) {
+        testWidgets('one row, no taller than its 48 dp action, at $width dp '
+            '(${language.name})', (tester) async {
+          await pumpPhone(tester, Size(width, 729.5), language: language);
+          expect(_strip, findsOneWidget);
+          // The row plus its 4 dp above and below.
+          expect(tester.getSize(_strip).height, lessThanOrEqualTo(48 + 8),
+              reason: 'the strip sits between the Hoje card and the month; '
+                  'every point it takes is a point the month does not get');
+        });
+      }
+    }
+
+    testWidgets("the E2E founder's calendar holds with the editor's keyboard "
+        'up', (tester) async {
+      await pumpPhone(tester, const Size(411.4, 729.5),
+          me: _admin, keyboard: 250);
+      // Every strip the lane had on — otherwise this holds about nothing.
+      expect(_strip, findsOneWidget);
+      expect(find.byKey(const Key('handoff-nudge')), findsOneWidget);
+      expect(find.byKey(CalendarScreen.planEndStripKey), findsOneWidget);
+      expect(tester.takeException(), isNull,
+          reason: 'the column behind the editor overflowed (run 37124944050)');
+    });
   });
 }
