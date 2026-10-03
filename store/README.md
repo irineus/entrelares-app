@@ -71,11 +71,12 @@ points at them; this directory is about the *presence*, not the pipeline.
 - **Contact details**: e-mail `suporte@entrelares.app`; website `https://entrelares.app`.
 - **Screenshots (phone)** — **generated from the app's own widgets since T-97 (02/10/2026)**:
   [`screenshots/pt-BR/`](screenshots/pt-BR/) and [`screenshots/en-US/`](screenshots/en-US/).
-  See [§1.1](#11--phone-screenshots-generated-t-97). The paragraph below is the T-57 set, which
-  the Console carries until T-98 uploads the generated one, and which the landing and
-  `app/web/screenshots/` keep using either way.
-- **The T-57 photographs** — current since 28/08/2026 ([T-57](../backlog/archive/phase-7.md)).
-  The Console and the landing share one set, and it is now TWO sets: `pt-BR` from
+  See [§1.1](#11--phone-screenshots-generated-t-97). Play has carried the generated set since
+  02/10/2026 (`play-listing` run 37088097075, 8 pt-BR + 8 en-US). The paragraph below is the
+  T-57 set, which the Console carried until then and which the landing and
+  `app/web/screenshots/` keep using.
+- **The T-57 photographs** — current on the landing since 28/08/2026 ([T-57](../backlog/archive/phase-7.md)),
+  and on the Console until T-97 replaced them there (02/10/2026). They are TWO sets: `pt-BR` from
   `entrelares-site/public/img/screenshots/`, `en-US` from `.../screenshots/en/`, eight frames
   each at 1080×1920 with a `webp`+`png` pair. They photograph the **Flutter** app in production
   configuration, under the U-27 visual system — the previous ones were the **Blazor** client,
@@ -148,7 +149,7 @@ caregiver counts (U-57); no emoji (U-31). The harness fails a caption that does 
 two lines, and an overflow anywhere on the phone fails the scene, as it does in the widget
 suites.
 
-**The owner approves the PNGs before T-98 publishes them.** Play serves its own copies: the
+**The owner approves the PNGs before `play-listing` uploads them** (§9; the first set was approved on 02/10/2026). Play serves its own copies: the
 pt-BR set goes to the Main store listing's *Phone screenshots*, the en-US set to *Manage
 translations → English (United States)*. A change to a screen, a caption or the scene list
 means a new run, a new look, and a new approval.
