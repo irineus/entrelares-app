@@ -300,6 +300,22 @@ abstract final class NotificationRenderer {
       case 'referral_reward' when kind == 'granted':
         return l[K.notifRenderReferralReward];
 
+      // ── An admin changed the reader's days directly (F-81) ──
+      // One day names it; several name the first, the last and how many. The
+      // name is the admin's own (user data, never translated).
+      case 'day_admin_change' when date != null && kind == 'single':
+        return l.format(K.notifRenderDayAdminChangeSingle,
+            [name ?? l[K.notifRenderFbOtherCap], date]);
+      case 'day_admin_change'
+          when date != null && kind == 'batch' && _adminBatch(p) != null:
+        final (count, to) = _adminBatch(p)!;
+        return l.format(K.notifRenderDayAdminChangeBatch, [
+          name ?? l[K.notifRenderFbOtherCap],
+          count,
+          date,
+          l.formatIsoDate(to),
+        ]);
+
       // ── Shared expenses (F-34) ──
       // The amount travels in cents and is printed in the reader's money
       // format; the category is a closed key; the description stays as typed.
@@ -388,6 +404,17 @@ abstract final class NotificationRenderer {
     return text == null || text.trim().isEmpty
         ? ''
         : l.format(K.notifRenderAgendaTextSuffix, [text]);
+  }
+
+  /// F-81: a batch's count and last day, or null when either is missing or
+  /// off-shape — the row then keeps its stored sentence and heading.
+  static (String, String)? _adminBatch(Map<String, String> p) {
+    final count = p['count'];
+    final to = p['to'];
+    if (count == null || int.tryParse(count) == null || to == null) {
+      return null;
+    }
+    return (count, to);
   }
 
   /// F-34: `params.amount` (cents) in the reader's money format, or null.
@@ -560,6 +587,14 @@ abstract final class NotificationRenderer {
       // F-80 PR 3: the heading only for the kind the body rebuilds.
       'referral_reward' =>
         kind == 'granted' ? K.notifRenderTitleReferralReward : null,
+      // F-81: the heading only where the body is rebuilt too.
+      'day_admin_change' => p['date'] == null
+          ? null
+          : kind == 'single'
+              ? K.notifRenderTitleDayAdminChangeSingle
+              : kind == 'batch' && _adminBatch(p) != null
+                  ? K.notifRenderTitleDayAdminChangeBatch
+                  : null,
       // F-55: the heading only where the body is rebuilt too.
       'agenda_notice' => p['date'] != null && _agendaKind(kind) != null
           ? K.notifRenderTitleAgendaNotice

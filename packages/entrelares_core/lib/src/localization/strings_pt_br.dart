@@ -817,6 +817,14 @@ abstract final class StringsPtBr {
     // (U-13). Names no family; "um mês" is the reward's unit, not a setting.
     K.notifRenderTitleReferralReward: 'Um mês de Premium pela indicação',
     K.notifRenderReferralReward: 'Uma família que vocês indicaram assinou o Premium: a sua família ganhou um mês de Premium.',
+    // F-81: byte-identical to what flush_admin_change_notices() stores (U-13).
+    // {0} is the admin's own name; the count is a value, never a setting.
+    K.notifRenderTitleDayAdminChangeSingle: 'Dia alterado no calendário',
+    K.notifRenderTitleDayAdminChangeBatch: 'Dias alterados no calendário',
+    K.notifRenderDayAdminChangeSingle: '{0} alterou o dia {1} no calendário.',
+    K.notifRenderDayAdminChangeBatch: '{0} alterou {1} dias entre {2} e {3} no calendário.',
+    K.notifDayAdminChangeDayAction: 'Ver o dia',
+    K.notifDayAdminChangeTrailAction: 'Ver o Histórico',
     // F-34: byte-identical to what expense_notify()/settlement_notify() store.
     K.notifRenderTitleExpenseAdded: 'Despesa lançada',
     K.notifRenderTitleExpenseUpdated: 'Despesa alterada',

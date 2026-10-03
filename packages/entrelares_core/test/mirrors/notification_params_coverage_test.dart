@@ -113,6 +113,8 @@ void main() {
       'expense_notify',
       'settlement_notify',
       'send_chat_message',
+      // F-81: an admin's direct change, one per action and recipient.
+      'flush_admin_change_notices',
     ]) {
       expect(writers, contains(expected));
     }

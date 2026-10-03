@@ -37,6 +37,17 @@ enum NotificationLanding {
   /// F-78 — the calendar with the wizard open on today: a family that never
   /// planned is asked to plan, and the wizard is where that happens.
   planFirst,
+
+  /// F-81 — the calendar with ONE day's sheet open: an admin changed that day
+  /// of the reader's, and the day itself answers "what changed?". The day
+  /// rides in the payload (`date`); without a real one the tap falls back to
+  /// "Todas", where the row always is.
+  day,
+
+  /// F-81 — Relatórios → Histórico: an admin changed SEVERAL of the reader's
+  /// days in one action, and the Histórico is where that action reads as one
+  /// entry (F-51's fold) with every day in it.
+  auditTrail,
 }
 
 abstract final class PushRouting {
@@ -81,10 +92,22 @@ abstract final class PushRouting {
               ? NotificationLanding.plan
               : type == 'plan_ending' && planFirstKinds.contains(kind)
                   ? NotificationLanding.planFirst
-                  : _landingForNotice(type, kind: kind);
+                  : type == adminChangeType && adminChangeDayKinds.contains(kind)
+                      ? NotificationLanding.day
+                      : type == adminChangeType &&
+                              adminChangeTrailKinds.contains(kind)
+                          ? NotificationLanding.auditTrail
+                          : _landingForNotice(type, kind: kind);
 
   /// F-78: the `plan_ending` kinds whose tap opens the wizard.
   static const Set<String> planFirstKinds = {'unplanned'};
+
+  /// F-81: an admin's direct change of the reader's days — one day opens
+  /// that day, several open the Histórico. Any other kind is a future
+  /// writer's shape and falls to "Todas".
+  static const String adminChangeType = 'day_admin_change';
+  static const Set<String> adminChangeDayKinds = {'single'};
+  static const Set<String> adminChangeTrailKinds = {'batch'};
 
   /// F-35: the types that open the Conversa.
   static const Set<String> _chat = {'chat_message'};
