@@ -420,6 +420,9 @@ void main() {
     // F-78: what unplanned_family_nudges_due() stores, word for word.
     ('plan_ending', '{"kind":"unplanned","date":"2026-10-04"}',
         'O calendário da família ainda não tem nenhum dia planejado. Comece pelo primeiro mês.'),
+    // F-80 PR 3: what referral_reward_notify() stores, word for word.
+    ('referral_reward', '{"kind":"granted"}',
+        'Uma família que vocês indicaram assinou o Premium: a sua família ganhou um mês de Premium.'),
     // F-77: what trial_end_reminders_due() stores, word for word.
     ('premium_trial', '{"kind":"ending","date":"2026-10-09"}',
         'A avaliação Premium da família vai até 09/10/2026. Para continuar com o Premium depois dessa data, veja o plano.'),
@@ -510,6 +513,7 @@ void main() {
       ('plan_ending', '{"kind":"ended","date":"2026-09-22"}'),
       ('premium_trial', '{"kind":"ending","date":"2026-10-09"}'),
       ('premium_trial', '{"kind":"ended","date":"2026-10-09"}'),
+      ('referral_reward', '{"kind":"granted"}'),
       ('plan_ending', '{"kind":"unplanned","date":"2026-10-04"}'),
       ('agenda_notice',
           '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia","name":"Ana"}'),
@@ -653,6 +657,25 @@ void main() {
       expect(NotificationRenderer.withChild('Título', null), 'Título');
       expect(NotificationRenderer.withChild('Título', '  '), 'Título');
       expect(NotificationRenderer.withChild('Título', ' Theo '), 'Título · Theo');
+    });
+  });
+
+  // F-80 PR 3: the referral reward names no family and states no day; a kind
+  // a future writer invents falls back to the stored sentence, never a guess.
+  group('the referral reward', () {
+    test('an unknown kind keeps the stored sentence and heading', () {
+      const json = '{"kind":"revoked"}';
+      expect(NotificationRenderer.message('referral_reward', json, sentinel, en),
+          sentinel);
+      expect(NotificationRenderer.title('referral_reward', json, sentinel, en),
+          sentinel);
+    });
+
+    test('the English sentence carries no number and no family', () {
+      final text = NotificationRenderer.message(
+          'referral_reward', '{"kind":"granted"}', sentinel, en);
+      expect(text, en[K.notifRenderReferralReward]);
+      expect(RegExp(r'\d').hasMatch(text), isFalse);
     });
   });
 }

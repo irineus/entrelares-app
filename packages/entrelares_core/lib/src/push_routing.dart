@@ -90,7 +90,8 @@ abstract final class PushRouting {
   static const Set<String> _chat = {'chat_message'};
 
   /// F-77: the types that open the plan page.
-  static const Set<String> planTypes = {'premium_trial'};
+  /// F-80 PR 3: the referral reward too — the new end shows there.
+  static const Set<String> planTypes = {'premium_trial', 'referral_reward'};
   static const Set<String> _plan = planTypes;
 
   static NotificationLanding _landingForNotice(String? type, {String? kind}) =>

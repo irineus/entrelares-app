@@ -94,6 +94,11 @@ export const PUSH_TYPES: readonly string[] = [
 	// anything: the trial runs out under the family, and only its admins
 	// can subscribe, so only they are written to. Lands on the plan page.
 	"premium_trial",
+	// F-80 PR 3. A family the reader's family referred paid and stayed paid, and
+	// the free month was delivered. Nobody in the family did anything today.
+	// States no day and names no family (params carries the kind alone),
+	// so it is rendered before the date guard. Lands on the plan page.
+	"referral_reward",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -201,6 +206,8 @@ const K = {
 	trialEnding: "notifRender.trialEnding",
 	planUnplanned: "notifRender.planUnplanned",
 	trialEnded: "notifRender.trialEnded",
+	titleReferralReward: "notifRender.title.referralReward",
+	referralReward: "notifRender.referralReward",
 
 	titleMemberJoined: "notifRender.title.memberJoined",
 	titleMemberReturned: "notifRender.title.memberReturned",
@@ -281,6 +288,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.trialEnded": "A avaliação Premium terminou",
 		"notifRender.trialEnding": "A avaliação Premium da família vai até {0}. Para continuar com o Premium depois dessa data, veja o plano.",
 		"notifRender.trialEnded": "A avaliação Premium da família terminou em {0}. A família segue no plano gratuito, e o Premium pode ser assinado a qualquer momento.",
+		"notifRender.title.referralReward": "Um mês de Premium pela indicação",
+		"notifRender.referralReward": "Uma família que vocês indicaram assinou o Premium: a sua família ganhou um mês de Premium.",
 		"notifRender.title.expenseAdded": "Despesa lançada",
 		"notifRender.title.expenseUpdated": "Despesa alterada",
 		"notifRender.title.expenseDeleted": "Despesa apagada",
@@ -390,6 +399,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.trialEnded": "Your Premium trial has ended",
 		"notifRender.trialEnding": "Your family's Premium trial runs until {0}. To keep Premium after that date, see the plan.",
 		"notifRender.trialEnded": "Your family's Premium trial ended on {0}. The family stays on the free plan, and Premium can be subscribed at any time.",
+		"notifRender.title.referralReward": "A month of Premium for your referral",
+		"notifRender.referralReward": "A family you referred subscribed to Premium: your family got one month of Premium.",
 		"notifRender.title.expenseAdded": "Expense added",
 		"notifRender.title.expenseUpdated": "Expense changed",
 		"notifRender.title.expenseDeleted": "Expense deleted",
@@ -561,6 +572,13 @@ export function renderPush(
 
 	// F-59: the membership notices name a person, not a day of the plan.
 	if (MEMBERSHIP_TYPES.includes(type)) return renderMembership(lang, type, params);
+
+	// F-80 PR 3: the referral reward states no day and names no one. An
+	// unknown kind is a future writer's shape — no push, never a guess.
+	if (type === "referral_reward") {
+		if (params["kind"] !== "granted") return null;
+		return { title: fmt(lang, K.titleReferralReward), body: fmt(lang, K.referralReward) };
+	}
 
 	const isoDate = params["date"];
 	const date = isoDate ? formatDateIn(lang, isoDate) : null;

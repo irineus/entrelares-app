@@ -185,10 +185,12 @@ abstract final class AnalyticsCatalog {
   /// the F-55 agenda notice and reminder (from 24/09/2026), the F-59
   /// membership notices (from 02/10/2026, when they stopped being e-mail), the
   /// F-77 Premium trial's end (from 02/10/2026 — its opens are the first step
-  /// of that item's funnel) and the three things a row in *Para você* opens.
+  /// of that item's funnel), the F-80 referral reward (counts once the module
+  /// is on) and the three things a row in *Para você* opens.
   static const notificationTypes = {
     'plan_ending',
     'premium_trial',
+    'referral_reward',
     'agenda_notice',
     'agenda_reminder',
     'expense_changed',

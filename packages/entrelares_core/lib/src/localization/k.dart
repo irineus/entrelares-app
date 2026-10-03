@@ -915,6 +915,10 @@ abstract final class K {
   static const String notifRenderTrialEnded = 'notifRender.trialEnded';
   static const String notifTrialAction = 'notif.trialAction';
 
+  // ── Referral reward (F-80 PR 3) ──
+  static const String notifRenderTitleReferralReward = 'notifRender.title.referralReward';
+  static const String notifRenderReferralReward = 'notifRender.referralReward';
+
   // ── Shared expenses (F-34) ──
   static const String notifRenderTitleExpenseAdded = 'notifRender.title.expenseAdded';
   static const String notifRenderTitleExpenseUpdated = 'notifRender.title.expenseUpdated';
@@ -2067,6 +2071,8 @@ abstract final class K {
     notifRenderTrialEnding,
     notifRenderTrialEnded,
     notifTrialAction,
+    notifRenderTitleReferralReward,
+    notifRenderReferralReward,
     notifRenderTitleExpenseAdded,
     notifRenderTitleExpenseUpdated,
     notifRenderTitleExpenseDeleted,
