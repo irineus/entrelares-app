@@ -1560,24 +1560,62 @@ class _CalendarScreenState extends State<CalendarScreen>
     unawaited(widget.pushTodayPrefs?.dismiss(now));
   }
 
-  Widget _pushToday(Localization l) => Padding(
-        key: CalendarScreen.pushTodayKey,
-        padding: const EdgeInsets.fromLTRB(
-            Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
-        child: AppBanner(
-          tone: context.tokens.info,
-          icon: Icons.notifications_outlined,
-          message: l[KApp.pushTodayMessage],
-          // F-09: Notificações is the ONE door to the OS dialog; this strip
-          // only points to it.
-          actionLabel: widget.onOpenNotifications == null
-              ? null
-              : l[KApp.pushTodayAction],
-          onAction: widget.onOpenNotifications,
-          onClose: _dismissPushToday,
-          closeTooltip: l[KApp.pushTodayDismiss],
+  /// A STATE line like F-70's, not an alert (03/10/2026): as an AppBanner it
+  /// took 146 dp between the Hoje card and the month on a Pixel 6 — the
+  /// month kept 228 dp of 729, and with the editor's keyboard up the column
+  /// overflowed (the Android E2E lane, run 37124944050). One tinted row: the
+  /// mark, a short sentence, a one-word action and the ✕ at its full 48 dp
+  /// target, which is also the row's height.
+  Widget _pushToday(Localization l) {
+    final tone = context.tokens.info;
+    return Padding(
+      key: CalendarScreen.pushTodayKey,
+      padding: const EdgeInsets.fromLTRB(
+          Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 36),
+        padding: const EdgeInsetsDirectional.only(start: Spacing.sm),
+        decoration: BoxDecoration(
+          color: tone.container,
+          borderRadius: BorderRadius.circular(Radii.md),
         ),
-      );
+        child: Row(
+          children: [
+            Icon(Icons.notifications_outlined,
+                size: 18, color: tone.onContainer),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                l[KApp.pushTodayMessage],
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: tone.onContainer),
+              ),
+            ),
+            // F-09: Notificações is the ONE door to the OS dialog; this strip
+            // only points to it.
+            if (widget.onOpenNotifications != null)
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: tone.onContainer,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                ),
+                onPressed: widget.onOpenNotifications,
+                child: Text(l[KApp.pushTodayAction]),
+              ),
+            IconButton(
+              onPressed: _dismissPushToday,
+              tooltip: l[KApp.pushTodayDismiss],
+              color: tone.onContainer,
+              icon: const Icon(Icons.close, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // ── F-70: the plan is running out ─────────────────────────────────────────
 

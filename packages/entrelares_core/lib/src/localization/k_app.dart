@@ -1602,8 +1602,7 @@ abstract final class StringsAppPtBr {
             'vendo tudo nesta tela e por e-mail.',
     KApp.pushEnable: 'Ativar notificações',
     KApp.pushTodayMessage:
-        'Ative as notificações neste aparelho: pedidos de troca e mudanças na '
-            'família chegam por elas, não por e-mail.',
+        'Ative as notificações: trocas não vêm por e-mail.',
     KApp.pushTodayAction: 'Ativar',
     KApp.pushTodayDismiss: 'Agora não',
     KApp.pushDisable: 'Desativar',
@@ -2374,8 +2373,7 @@ abstract final class StringsAppEn {
             'see everything on this screen and by e-mail.',
     KApp.pushEnable: 'Turn notifications on',
     KApp.pushTodayMessage:
-        'Turn notifications on for this device: swap requests and family '
-            'changes arrive that way, not by e-mail.',
+        'Turn notifications on: no more swap e-mails.',
     KApp.pushTodayAction: 'Turn on',
     KApp.pushTodayDismiss: 'Not now',
     KApp.pushDisable: 'Turn off',
