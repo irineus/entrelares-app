@@ -179,10 +179,16 @@ void weeklyBulletinTests(GateFixture fx) {
         isoDate(addDays(thisMonday, -14)),
         isoDate(addDays(thisMonday, -7)),
       ]);
-      // F-80: a key with no value while `feature.referral` is off (the
-      // referral suite covers the count with the module on).
+      // F-80: the key is always there; its value is a count only while
+      // `feature.referral` is on (F-82 turned it on in production) and NULL
+      // while it is off. The referral suite pins both states with the flag
+      // held; here it is whatever the stack's migrations left.
       expect(b.containsKey('referrals'), isTrue);
-      expect(b['referrals'], isNull);
+      if (await readFlag(fx, 'feature.referral') == 'true') {
+        expect(b['referrals'], isA<num>());
+      } else {
+        expect(b['referrals'], isNull);
+      }
     });
 
     test('closed keys, and nothing a person typed comes back', () async {

@@ -391,7 +391,11 @@ select public.admin_weekly_sales_bulletin(current_date); -- the week in progress
 ### 4.6-quinquies The referral reward crons (F-80 PR 3) — two owner/operator steps
 
 Created by `20261002210000_f80_referral_rewards.sql`. Both do nothing while
-`feature.referral` is off.
+`feature.referral` is off — and it is **ON in production since 03/10/2026**
+(F-82, `20261003150000_f82_referral_live.sql`, with privacy policy 2.1 and Terms
+1.4). The Terms state the two numbers the jobs read — 30 days without a refund
+(`referral.hold_days`) and 12 months a calendar year (`referral.yearly_cap`) —
+so a console edit of either needs the Terms updated in the same delivery.
 
 - **`referral-rewards-daily`**, `0 12 * * *`: `SELECT public.referral_rewards_due();`
   — the whole state machine in SQL. The referred family's first PAID payment
