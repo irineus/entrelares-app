@@ -813,6 +813,10 @@ abstract final class StringsPtBr {
     K.notifRenderTrialEnding: 'A avaliação Premium da família vai até {0}. Para continuar com o Premium depois dessa data, veja o plano.',
     K.notifRenderTrialEnded: 'A avaliação Premium da família terminou em {0}. A família segue no plano gratuito, e o Premium pode ser assinado a qualquer momento.',
     K.notifTrialAction: 'Ver o plano',
+    // F-80 PR 3: byte-identical to what referral_reward_notify() stores
+    // (U-13). Names no family; "um mês" is the reward's unit, not a setting.
+    K.notifRenderTitleReferralReward: 'Um mês de Premium pela indicação',
+    K.notifRenderReferralReward: 'Uma família que vocês indicaram assinou o Premium: a sua família ganhou um mês de Premium.',
     // F-34: byte-identical to what expense_notify()/settlement_notify() store.
     K.notifRenderTitleExpenseAdded: 'Despesa lançada',
     K.notifRenderTitleExpenseUpdated: 'Despesa alterada',

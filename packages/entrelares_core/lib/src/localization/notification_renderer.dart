@@ -295,6 +295,11 @@ abstract final class NotificationRenderer {
       case 'premium_trial' when kind == 'ended' && date != null:
         return l.format(K.notifRenderTrialEnded, [date]);
 
+      // ── A referral earned the family a free month (F-80 PR 3) ──
+      // No day and no name: the referred family is never identified.
+      case 'referral_reward' when kind == 'granted':
+        return l[K.notifRenderReferralReward];
+
       // ── Shared expenses (F-34) ──
       // The amount travels in cents and is printed in the reader's money
       // format; the category is a closed key; the description stays as typed.
@@ -552,6 +557,9 @@ abstract final class NotificationRenderer {
               'ended' => K.notifRenderTitleTrialEnded,
               _ => null,
             },
+      // F-80 PR 3: the heading only for the kind the body rebuilds.
+      'referral_reward' =>
+        kind == 'granted' ? K.notifRenderTitleReferralReward : null,
       // F-55: the heading only where the body is rebuilt too.
       'agenda_notice' => p['date'] != null && _agendaKind(kind) != null
           ? K.notifRenderTitleAgendaNotice

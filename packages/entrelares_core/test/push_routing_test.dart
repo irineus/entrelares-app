@@ -71,6 +71,11 @@ void main() {
           NotificationLanding.history);
     });
 
+    test('the referral reward opens the plan page (F-80 PR 3)', () {
+      expect(PushRouting.landingFor('referral_reward', kind: 'granted'),
+          NotificationLanding.plan);
+    });
+
     test("the Premium trial's end opens the plan page (F-77)", () {
       expect(PushRouting.landingFor('premium_trial', kind: 'ending'),
           NotificationLanding.plan);

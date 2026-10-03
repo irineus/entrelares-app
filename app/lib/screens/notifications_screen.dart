@@ -158,6 +158,7 @@ IconData notifIcon(String type) => switch (type) {
       'billing' => Icons.credit_card,
       'plan_ending' => Icons.event_note_outlined,
       'premium_trial' => Icons.workspace_premium_outlined,
+      'referral_reward' => Icons.card_giftcard_outlined,
       _ => Icons.notifications_none,
     };
 
@@ -1055,6 +1056,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   /// F-77: a Premium-trial row opens the plan page, where the subscribe
   /// button is. Any member may see the page; the row only reaches admins.
+  /// F-80 PR 3: a referral-reward row opens it too, where the new end shows.
   Widget? _trialAction(AppNotification notif, Localization l) {
     final open = widget.onOpenPlan;
     if (open == null ||

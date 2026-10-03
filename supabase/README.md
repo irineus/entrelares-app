@@ -388,6 +388,43 @@ select public.admin_weekly_sales_bulletin();             -- the week that just e
 select public.admin_weekly_sales_bulletin(current_date); -- the week in progress
 ```
 
+### 4.6-quinquies The referral reward crons (F-80 PR 3) — two owner/operator steps
+
+Created by `20261002210000_f80_referral_rewards.sql`. Both do nothing while
+`feature.referral` is off.
+
+- **`referral-rewards-daily`**, `0 12 * * *`: `SELECT public.referral_rewards_due();`
+  — the whole state machine in SQL. The referred family's first PAID payment
+  (Asaas CONFIRMED/RECEIVED, a Play verification with `paymentState` 1, Play
+  RTDN 1/2) → `paid`; a refund, chargeback or Play revoke before `qualifies_at`
+  (`first_paid_at + referral.hold_days`) → `cancelled`; a clean window →
+  `qualified` → the referrer's free month: `trial` (+30 days on
+  `trial_ends_at`) or `paid_period` (+30 days on a canceled-with-time
+  `current_period_end`) are delivered and notified (`referral_reward`, push +
+  in-app); an Asaas subscriber → `pending_rail` / `asaas_manual`; a Play
+  subscriber → `pending_rail` / `play_queued`; over `referral.yearly_cap` this
+  calendar year (São Paulo) → `capped`, for good.
+- **`referral-rewards-play-daily`**, `15 12 * * *`: calls the `referral-rewards`
+  Edge Function with the 4.6 Vault secrets. It defers each queued Play
+  subscription by one month (`purchases.subscriptions.defer`), writes Play's new
+  expiry to `current_period_end` and settles the row. It needs the BILLING
+  service account (`PLAY_SERVICE_ACCOUNT`) to hold **Manage orders and
+  subscriptions** in the Play Console; without it the row reads
+  `play_permission_denied` and is retried every day.
+
+The Asaas rail is manual on purpose (no subscription-update call exists, and the
+gate has no Asaas mock): for each `asaas_manual` row, move the referrer's
+subscription next due date one month in the Asaas dashboard, then record it —
+this also moves our `current_period_end` one month and notifies the family:
+```sql
+select referred_family_id, referrer_family_id, reward_rail, reward_pending_reason, rewarded_at
+  from public.family_referrals where status = 'pending_rail' order by rewarded_at;
+select public.referral_reward_delivered(<referred_family_id>);
+select status, count(*) from public.family_referrals group by status;
+```
+A `play_in_flight` row is a deferral whose answer never arrived; the next run
+reconciles it against Play (never resends blind). `play_error` waits for a human.
+
 ### 4.7 The `public-settings` feed (T-81) — what the landing may read
 
 `GET /functions/v1/public-settings`, **no credential** (`verify_jwt = false`),

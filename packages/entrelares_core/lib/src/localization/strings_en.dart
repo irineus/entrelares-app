@@ -805,6 +805,8 @@ abstract final class StringsEn {
     K.notifRenderTrialEnding: "Your family's Premium trial runs until {0}. To keep Premium after that date, see the plan.",
     K.notifRenderTrialEnded: "Your family's Premium trial ended on {0}. The family stays on the free plan, and Premium can be subscribed at any time.",
     K.notifTrialAction: 'See the plan',
+    K.notifRenderTitleReferralReward: 'A month of Premium for your referral',
+    K.notifRenderReferralReward: 'A family you referred subscribed to Premium: your family got one month of Premium.',
     K.notifRenderTitleExpenseAdded: 'Expense added',
     K.notifRenderTitleExpenseUpdated: 'Expense changed',
     K.notifRenderTitleExpenseDeleted: 'Expense deleted',

@@ -66,6 +66,7 @@ import 'suites/profile_language.dart';
 import 'suites/profile_self_service.dart';
 import 'suites/push_subscriptions.dart';
 import 'suites/referral.dart';
+import 'suites/referral_reward.dart';
 import 'suites/reconsent_gate.dart';
 import 'suites/register_invitee.dart';
 import 'suites/resolution_log_link.dart';
@@ -212,6 +213,9 @@ void main() {
   // F-80: family referral — dark by flag, an opaque code, first touch wins,
   // and nothing a client can read.
   referralTests(fx);
+  // F-80 PR 3: qualification after the hold window and the free month on the
+  // referrer's rail — capped, idempotent, naming no family.
+  referralRewardTests(fx);
   billingHistoryTests(fx);
   billingReactivateTests(fx);
   billingAvulsoTests(fx);

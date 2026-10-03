@@ -121,7 +121,8 @@ const ACTIONABLE_KINDS = ['pickup', 'keep'];
 const CHAT_TYPES = ['chat_message'];
 // F-77: a notice about the Premium trial's end opens the plan page, where the
 // subscribe button is.
-const PLAN_TYPES = ['premium_trial'];
+// F-80 PR 3: so does the referral reward — the new end shows there.
+const PLAN_TYPES = ['premium_trial', 'referral_reward'];
 // F-78: a `plan_ending` that says the plan never started opens the calendar
 // with the wizard on today (`/?plan=first`, read by the app's `/` route).
 const PLAN_FIRST_KINDS = ['unplanned'];
