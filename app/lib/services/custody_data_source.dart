@@ -471,6 +471,10 @@ abstract class CustodyDataSource {
   /// the founder has no session until the e-mail is confirmed; the server
   /// strips it from the auth row and attributes it in the same transaction
   /// that creates the family.
+  ///
+  /// F-80 PR 2: [referralChannel] — where the code came from (`web` for a
+  /// `?ref=` link, `android` for the Install Referrer), the server's CHECK
+  /// vocabulary. Null derives it from the platform.
   Future<void> signUpFounder({
     required String email,
     required String password,
@@ -479,6 +483,7 @@ abstract class CustodyDataSource {
     required String familyName,
     required String languageCode,
     String? referralCode,
+    String? referralChannel,
   });
 
   // ── F-80: family referral (built dark) ────────────────────────────────────
@@ -494,6 +499,12 @@ abstract class CustodyDataSource {
   /// Never throws: attribution is fire-and-forget.
   Future<String?> attributeReferral(
       {required String code, required String channel});
+
+  /// F-80 PR 2 — `my_referral_code()`: the family's opaque code (created on
+  /// the first ask), for the Família card's link. Null when the module is off,
+  /// the caller is not an active full member, or the call failed — the card
+  /// then simply does not show. Never throws.
+  Future<String?> fetchMyReferralCode();
 
   /// The INVITEE branch (U-17), which is auto-confirmed and therefore cannot
   /// go through GoTrue sign-up: the `register-invitee` Edge Function creates

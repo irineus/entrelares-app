@@ -49,6 +49,59 @@ abstract final class ReferralRules {
     return parseCode(uri.queryParameters[queryKey]);
   }
 
+  // ── F-80 PR 2: the Android door (Install Referrer) and the shared link ──
+
+  /// The campaign the Play Console groups referral installs under. The
+  /// `utm_*` keys are what the Console reads into its acquisition report;
+  /// the code rides in [queryKey] (`ref`) and NOT in `utm_content` on
+  /// purpose — a `utm_*` value becomes a dimension in Google's report, and a
+  /// per-family code has no business being one there.
+  static const String installCampaign =
+      'utm_source=entrelares.app&utm_medium=referral'
+      '&utm_campaign=family-referral';
+
+  /// The value of the Play listing's `referrer` parameter for [code] — what
+  /// the landing's `/i/<code>` page will put on the listing link it sends an
+  /// Android reader to (`PlayInstallRules.listingUri(…, referrer: …)`). Play
+  /// hands this string back, verbatim, to the installed app through the
+  /// Install Referrer API, where [codeFromInstallReferrer] reads it.
+  static String installReferrer(String code) =>
+      '$installCampaign&$queryKey=$code';
+
+  /// The code an Install Referrer string carries, or null. The string is the
+  /// listing's `referrer` value as Play stored it: `key=value&…`, each part
+  /// URL-encoded. Only `ref` is read (see [installCampaign] for why not
+  /// `utm_content`); an organic install (`utm_source=google-play&
+  /// utm_medium=organic`) carries none. A referrer that arrives encoded once
+  /// more (`ref%3D…`, as some link builders double-encode) is unwrapped once.
+  /// Anything malformed is simply no code — this never throws.
+  static String? codeFromInstallReferrer(String? referrer) {
+    if (referrer == null) return null;
+    var raw = referrer.trim();
+    if (raw.isEmpty) return null;
+    try {
+      if (!raw.contains('=') && raw.toLowerCase().contains('%3d')) {
+        raw = Uri.decodeComponent(raw);
+      }
+      return parseCode(Uri.splitQueryString(raw)[queryKey]);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The origin of the family's shareable link — the LANDING, not the app:
+  /// one link for every reader, which the landing routes (web sign-up with
+  /// `?ref=`, or the Play listing with [installReferrer] for Android).
+  static const String shareOrigin = 'https://entrelares.app';
+
+  /// The path prefix of the shareable link.
+  static const String sharePathPrefix = '/i/';
+
+  /// The link the Família card shows and shares. NOTE (02/10/2026): the
+  /// landing serves `/i/<code>` only from the flip delivery on — while the
+  /// module is dark no card shows it, so nobody can follow it early.
+  static String shareLink(String code) => '$shareOrigin$sharePathPrefix$code';
+
   /// The `channel` the server records (its CHECK: `web` | `android`).
   static String channel({required bool isWeb}) => isWeb ? 'web' : 'android';
 

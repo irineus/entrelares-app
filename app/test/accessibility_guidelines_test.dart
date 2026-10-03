@@ -786,6 +786,31 @@ void main() {
       expect(find.byTooltip(pt[K.commonCancel]), findsOneWidget);
     });
 
+    // F-80 PR 2: the "Indique uma família" card, with the module on — the
+    // link line, the rule sentence and Compartilhar at 360 dp and 1,3×.
+    _scene('family referral card', (tester, dark) async {
+      final ds = fam.source(settings: const {'feature.referral': 'true'});
+      await tester.pumpWidget(
+        _host(
+          FamilyScreen(
+            dataSource: ds,
+            adminMode: AdminMode(),
+            sudo: SudoService(ds),
+            onOpenProfile: (_, _) {},
+            onOpenPlan: () {},
+          ),
+          dark: dark,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final card = find.byKey(const ValueKey('family-referral-card'));
+      await tester.scrollUntilVisible(card, 200,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+      expect(card, findsOne);
+      await _measure(tester, 'family referral card');
+    });
+
     _scene('notifications', (tester, dark) async {
       final ds =
           cal.FakeCustodyDataSource(members: [cal.ana, cal.bruno], days: [])

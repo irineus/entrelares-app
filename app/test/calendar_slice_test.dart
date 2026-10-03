@@ -760,6 +760,18 @@ class FakeCustodyDataSource implements CustodyDataSource {
     return attributeAnswer;
   }
 
+  /// F-80 PR 2: what `my_referral_code` answers, and how often it was asked.
+  /// The fake answers like the server: nothing while the flag is off.
+  String? myReferralCode = 'ABCDEFGH23';
+  int referralCodeFetches = 0;
+
+  @override
+  Future<String?> fetchMyReferralCode() async {
+    referralCodeFetches++;
+    if (publicSettings['feature.referral'] != 'true') return null;
+    return myReferralCode;
+  }
+
   @override
   Future<InviteInfo?> fetchInviteInfo(String token) async =>
       InviteFormRules.isTokenShaped(token) ? inviteInfo : null;
@@ -773,6 +785,7 @@ class FakeCustodyDataSource implements CustodyDataSource {
     required String familyName,
     required String languageCode,
     String? referralCode,
+    String? referralChannel,
   }) async {
     signUps.add({
       'email': email,
@@ -781,6 +794,7 @@ class FakeCustodyDataSource implements CustodyDataSource {
       'familyName': familyName,
       'language': languageCode,
       'referralCode': referralCode,
+      'referralChannel': referralChannel,
     });
     if (signUpFailureKey != null) throw SignUpFailure(signUpFailureKey!);
   }

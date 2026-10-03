@@ -36,6 +36,11 @@ abstract final class AnalyticsEvents {
   // RPC answered `attributed`. `family_referrals` is the exact count (T-99).
   // `channel` only — never the code.
   static const referralSignup = 'referral-signup';
+  // F-80 PR 2, 02/10/2026 — built dark: the Família card's share sheet was
+  // opened (the card exists only while `feature.referral` is on). Whether
+  // anything was actually sent is the share sheet's secret. `channel` only —
+  // never the code, never the link.
+  static const referralShare = 'referral-share';
 
   // ── Planning and the swap workflow ──────────────────────────────────────
   static const wizardStarted = 'wizard-started'; // T-78, 23/09/2026
@@ -98,6 +103,7 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.inviteNudgeShown: {'channel'},
     AnalyticsEvents.inviteNudgeClick: {'channel'},
     AnalyticsEvents.referralSignup: {'channel'},
+    AnalyticsEvents.referralShare: {'channel'},
     AnalyticsEvents.wizardStarted: {},
     AnalyticsEvents.wizardCompleted: {'created', 'replaced', 'handoff'},
     AnalyticsEvents.swapRequested: {'scenario'},

@@ -14,7 +14,7 @@ void main() {
       expect(AnalyticsCatalog.names, {
         'signup_started', 'signup_step', 'family_created', 'invitee_joined',
         'invite_sent', 'invite_nudge_shown', 'invite_nudge_click',
-        'referral-signup',
+        'referral-signup', 'referral-share',
         'wizard-started', 'wizard_completed', 'swap_requested', 'swap-answered',
         'day-note-saved', 'day-sheet-closed', 'day-notice-sent',
         'day-notice-answered',

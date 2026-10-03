@@ -58,6 +58,7 @@ import 'services/google_identity.dart';
 import 'services/handoff_nudge_prefs.dart';
 import 'services/push_today_prefs.dart';
 import 'services/install_hint.dart';
+import 'services/install_referrer.dart';
 import 'services/installed_app.dart';
 import 'services/notification_badge.dart';
 import 'services/offline_cache.dart';
@@ -325,6 +326,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           analytics: _analytics,
           inviteToken: InviteFormRules.inviteTokenFrom(state.uri),
           referralCode: _pendingReferralCode,
+          installReferrer: _installReferrer,
           onSignIn: _signIn,
           onInviteeJoined: _welcomeInvitee,
           onBackToLogin: () => _router.go('/login'),
@@ -1510,13 +1512,25 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// hands the code to the server inside the sign-up itself.
   String? _pendingReferralCode;
 
+  /// F-80 PR 2 — the Android door: the Install Referrer reader, null on the
+  /// web. Asked only where a founder is made and only with the flag on.
+  final InstallReferrer? _installReferrer = InstallReferrer.forThisPlatform();
+
   /// F-80 — a Google founder just created the family: attribute the pending
   /// code, if any, ONLY when `feature.referral` is on. Fire-and-forget — a
   /// referral never delays nor fails an onboarding — and used once.
+  ///
+  /// PR 2: on Android there is no `?ref=` link; the code is the one the Play
+  /// install carried, read from the Install Referrer API only AFTER the flag
+  /// answered "on" (dark, nothing is read). This is the first authenticated
+  /// moment that `attribute_referral` accepts (a family born in the last
+  /// 24 h, its founder calling) — the e-mail founder's code went in the
+  /// sign-up metadata instead (register screen).
   void _attributePendingReferral() {
-    final code = _pendingReferralCode;
-    if (code == null) return;
+    final linkCode = _pendingReferralCode;
     _pendingReferralCode = null;
+    final install = _installReferrer;
+    if (linkCode == null && install == null) return;
     unawaited(() async {
       Map<String, String> values;
       try {
@@ -1525,6 +1539,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         return;
       }
       if (!PublicSettings(values).referralEnabled) return;
+      final code = linkCode ?? await install?.code();
+      if (code == null) return;
       final channel = ReferralRules.channel(isWeb: kIsWeb);
       final answer =
           await _dataSource.attributeReferral(code: code, channel: channel);

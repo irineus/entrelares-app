@@ -161,4 +161,101 @@ void main() {
       contains("('feature.referral', 'false', 'bool', 'features',"),
     );
   });
+
+  group('F-80 PR 2 — ReferralRules.codeFromInstallReferrer', () {
+    test('reads ref from the referrer string Play hands back', () {
+      expect(
+        ReferralRules.codeFromInstallReferrer(
+          'utm_source=entrelares.app&utm_medium=referral'
+          '&utm_campaign=family-referral&ref=abcdefgh23',
+        ),
+        'ABCDEFGH23',
+      );
+      expect(ReferralRules.codeFromInstallReferrer('ref=ABCDEFGH23'),
+          'ABCDEFGH23');
+    });
+
+    test('an organic install and the shell banner carry no code', () {
+      expect(
+        ReferralRules.codeFromInstallReferrer(
+            'utm_source=google-play&utm_medium=organic'),
+        isNull,
+      );
+      expect(
+        ReferralRules.codeFromInstallReferrer(PlayInstallRules.referrer),
+        isNull,
+      );
+    });
+
+    test('the code is read from ref only — never from utm_content', () {
+      expect(
+        ReferralRules.codeFromInstallReferrer('utm_content=ABCDEFGH23'),
+        isNull,
+      );
+    });
+
+    test('a referrer encoded once more is unwrapped once', () {
+      expect(
+        ReferralRules.codeFromInstallReferrer(
+            'utm_source%3Dentrelares.app%26ref%3DABCDEFGH23'),
+        'ABCDEFGH23',
+      );
+    });
+
+    test('nothing, garbage and a mangled code are no code — and never throw',
+        () {
+      for (final raw in [
+        null,
+        '',
+        '   ',
+        'ref=',
+        'ref=ABC',
+        'ref=ABCDEFGH2O', // the letter O is not in the alphabet
+        '%%%',
+        'ref=%E0%A4%A',
+        'not a query at all',
+      ]) {
+        expect(ReferralRules.codeFromInstallReferrer(raw), isNull,
+            reason: '$raw');
+      }
+    });
+
+    test('what the builder writes, the reader reads — through the Play link',
+        () {
+      final listing = PlayInstallRules.listingUri('com.entrelares.app',
+          referrer: ReferralRules.installReferrer('ABCDEFGH23'));
+      // Play stores the DECODED `referrer` value and returns it as is.
+      final stored = listing.queryParameters['referrer'];
+      expect(ReferralRules.codeFromInstallReferrer(stored), 'ABCDEFGH23');
+      // The campaign keys stay what the Play Console reads, with no code.
+      final parts = Uri.splitQueryString(stored!);
+      expect(parts['utm_source'], 'entrelares.app');
+      expect(parts['utm_medium'], 'referral');
+      expect(parts['utm_campaign'], 'family-referral');
+      expect(
+        parts.entries
+            .where((e) => e.key.startsWith('utm_'))
+            .map((e) => e.value),
+        isNot(contains('ABCDEFGH23')),
+      );
+    });
+  });
+
+  test('F-80 PR 2 — the shared link is the landing page /i/<code>', () {
+    expect(ReferralRules.shareLink('ABCDEFGH23'),
+        'https://entrelares.app/i/ABCDEFGH23');
+  });
+
+  test('F-80 PR 2 — the share event carries the channel and never the code',
+      () {
+    expect(AnalyticsCatalog.props[AnalyticsEvents.referralShare], {'channel'});
+    expect(
+      AnalyticsCatalog.filterProps(AnalyticsEvents.referralShare, {
+        'channel': 'android',
+        'code': 'ABCDEFGH23',
+        'link': 'https://entrelares.app/i/ABCDEFGH23',
+      }),
+      {'channel': 'android'},
+    );
+  });
 }
