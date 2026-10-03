@@ -1,0 +1,1 @@
+Visual fix: the reminder to turn notifications on, at the top of the calendar, is now more compact and no longer pushes the month down on smaller phones.
