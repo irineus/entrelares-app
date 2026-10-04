@@ -1,0 +1,10 @@
+"app guarda compartilhada"
+[app guarda compartilhada]
+"aplicativo guarda compartilhada"
+[aplicativo guarda compartilhada]
+"calendário guarda compartilhada"
+[calendário guarda compartilhada]
+"app para pais separados"
+[app para pais separados]
+"app coparentalidade"
+[app coparentalidade]

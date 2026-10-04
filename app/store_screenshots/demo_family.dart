@@ -159,7 +159,10 @@ List<DateTime> get pastSwaps => [day(-23), day(-51), day(-86), day(-120)];
 /// From the 1st of January (December, in January) to four months ahead: the
 /// Resumo's year is a whole year of history, no "the plan ends" strip
 /// appears, and every month the calendar can show is painted.
-List<CareSchedule> plan() {
+///
+/// [carerOf] replaces [plannedCarer] for the days it answers (the T-102 ad
+/// kit's holiday scene); the transitions and their times follow from it.
+List<CareSchedule> plan({int? Function(DateTime d)? carerOf}) {
   final start = DateTime(today.year, today.month == 1 ? 0 : 1, 1);
   final end = DateTime(today.year, today.month + 4, 1);
   final rows = <CareSchedule>[];
@@ -170,7 +173,7 @@ List<CareSchedule> plan() {
     d.isBefore(end);
     d = DateTime(d.year, d.month, d.day + 1)
   ) {
-    final carer = plannedCarer(d);
+    final carer = carerOf?.call(d) ?? plannedCarer(d);
     final other = carer == ana.id ? bruno.id : ana.id;
     final swappedTo = d == swappedDay
         ? bruno.id
@@ -351,7 +354,8 @@ FakeCustodyDataSource familySource({
   required bool premium,
   List<Member> members = const [ana, bruno],
   List<Child> children = const [lia],
-}) => FakeCustodyDataSource(members: members, days: plan())
+  int? Function(DateTime d)? carerOf,
+}) => FakeCustodyDataSource(members: members, days: plan(carerOf: carerOf))
   ..family = Family(
     id: 7,
     name: 'Martins Costa',

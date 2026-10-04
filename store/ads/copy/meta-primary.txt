@@ -1,0 +1,6 @@
+hoje-1|Com quem as crianças estão hoje? No Entrelares, o calendário da guarda compartilhada mostra cada dia. Comece grátis.
+hoje-2|Duas casas, um calendário só: os responsáveis veem o mesmo mês e o horário de cada troca de casa. Comece grátis.
+troca-1|Precisa trocar um dia? Peça no app; o outro responsável aprova ou recusa, e a mudança fica registrada no histórico.
+troca-2|Troca de dia combinada pelo app: o pedido vai com uma mensagem e a resposta fica registrada. O essencial é gratuito.
+festas-1|Natal e Ano-Novo em duas casas? Organize as festas no calendário da família e cada um sabe onde as crianças estão.
+festas-2|As festas de fim de ano combinadas com antecedência, num calendário que os responsáveis veem juntos. Comece grátis.
