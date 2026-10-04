@@ -799,6 +799,7 @@ abstract final class KApp {
   static const String chatSearch = 'app.chat.search';
   static const String chatSearchClose = 'app.chat.searchClose';
   static const String chatSearchEmpty = 'app.chat.searchEmpty';
+  static const String chatLoadOlder = 'app.chat.loadOlder';
   static const String chatMute = 'app.chat.mute';
   static const String chatMuteLead = 'app.chat.muteLead';
   static const String chatMuted = 'app.chat.muted';
@@ -1424,6 +1425,7 @@ abstract final class KApp {
     chatSearch,
     chatSearchClose,
     chatSearchEmpty,
+    chatLoadOlder,
     chatMute,
     chatMuteLead,
     chatMuted,
@@ -2199,6 +2201,7 @@ abstract final class StringsAppPtBr {
     KApp.chatSearch: 'Buscar na conversa',
     KApp.chatSearchClose: 'Fechar a busca',
     KApp.chatSearchEmpty: 'Nada encontrado para "{0}".',
+    KApp.chatLoadOlder: 'Mostrar mensagens anteriores',
     KApp.chatMute: 'Silenciar o push da Conversa',
     KApp.chatMuteLead: 'A notificação continua no app; só o celular deixa de tocar.',
     KApp.chatMuted: 'Push da Conversa silenciado.',
@@ -2968,6 +2971,7 @@ abstract final class StringsAppEn {
     KApp.chatSearch: 'Search the chat',
     KApp.chatSearchClose: 'Close the search',
     KApp.chatSearchEmpty: 'Nothing found for "{0}".',
+    KApp.chatLoadOlder: 'Show earlier messages',
     KApp.chatMute: 'Silence the chat\'s push',
     KApp.chatMuteLead: 'The notification stays in the app; only the phone stops ringing.',
     KApp.chatMuted: 'Chat push silenced.',

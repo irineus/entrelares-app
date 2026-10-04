@@ -286,9 +286,13 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       return l[KApp.chatFormerMember];
     }
 
-    final all = await widget.dataSource.fetchChatMessages();
-    final byId = {for (final m in all) m.id: m};
     final endExclusive = DateTime(end.year, end.month, end.day + 1);
+    // T-104: the period's texts, paged in on the server side of the filter —
+    // the whole table in one request was cut at the newest end, and a PDF of
+    // last month said nothing was written. The quoted texts come along.
+    final all = await widget.dataSource
+        .fetchChatMessagesForPeriod(start.toUtc(), endExclusive.toUtc());
+    final byId = {for (final m in all) m.id: m};
     return [
       for (final m in all)
         if (!m.createdAt.toLocal().isBefore(start) &&
