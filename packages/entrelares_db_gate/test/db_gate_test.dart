@@ -5,6 +5,7 @@ import 'package:entrelares_db_gate/entrelares_db_gate.dart';
 import 'package:test/test.dart';
 
 import 'suites/account_deletion.dart';
+import 'suites/acquisition_source.dart';
 import 'suites/admin_change_notice.dart';
 import 'suites/admin_override_tier.dart';
 import 'suites/admin_rpc.dart';
@@ -214,6 +215,7 @@ void main() {
   // T-99: the operator's weekly bulletin — counts only, closed keys, no
   // client, and a week sent once.
   weeklyBulletinTests(fx);
+  acquisitionSourceTests(fx);
   // F-80: family referral — dark by flag, an opaque code, first touch wins,
   // and nothing a client can read.
   referralTests(fx);

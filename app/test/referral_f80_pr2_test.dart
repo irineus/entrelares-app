@@ -166,7 +166,8 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('dark: the referrer is never read and nothing is sent', (
+    testWidgets('dark: no code is sent — the referrer is read once, for the '
+        'source only (T-101)', (
       tester,
     ) async {
       final calls = _fakeChannel((_) async => _referrer);
@@ -181,7 +182,10 @@ void main() {
       await signUpFounder(tester);
 
       expect(ds.referralEnabledFetches, 1);
-      expect(calls, isEmpty, reason: 'dark: the Install Referrer is not read');
+      // T-101: every Android founder's install says where it came from; the
+      // referral CODE still stays home while the module is dark.
+      expect(calls, hasLength(1));
+      expect(ds.signUps.single['acquisition'], Acquisition.referral);
       expect(ds.signUps.single['referralCode'], isNull);
       expect(ds.signUps.single['referralChannel'], isNull);
       expect(a.payloads.where((p) => p['name'] == 'referral-signup'), isEmpty);
@@ -225,6 +229,28 @@ void main() {
       expect(ds.signUps.single['referralChannel'], isNull);
     });
 
+    testWidgets('T-101: an ad install says where it came from, dark or on', (
+      tester,
+    ) async {
+      final calls = _fakeChannel(
+        (_) async => 'utm_source=meta&utm_campaign=Primeira-Turma',
+      );
+      final ds = source(); // referral dark
+      await pumpRegister(
+        tester,
+        dataSource: ds,
+        installReferrer: InstallReferrer(),
+      );
+      await signUpFounder(tester);
+
+      expect(calls, hasLength(1));
+      expect(
+        ds.signUps.single['acquisition'],
+        const Acquisition(AcquisitionRules.meta, 'primeira-turma'),
+      );
+      expect(ds.signUps.single['referralCode'], isNull);
+    });
+
     testWidgets('a ?ref= link wins and the referrer is not read', (
       tester,
     ) async {
@@ -240,6 +266,8 @@ void main() {
 
       expect(calls, isEmpty);
       expect(ds.signUps.single['referralCode'], _code);
+      // T-101: the link's code is the source too — Play is not asked.
+      expect(ds.signUps.single['acquisition'], Acquisition.referral);
     });
   });
 

@@ -786,8 +786,10 @@ class FakeCustodyDataSource implements CustodyDataSource {
     required String languageCode,
     String? referralCode,
     String? referralChannel,
+    Acquisition? acquisition,
   }) async {
     signUps.add({
+      'acquisition': acquisition,
       'email': email,
       'fullName': fullName,
       'role': role,
@@ -849,8 +851,10 @@ class FakeCustodyDataSource implements CustodyDataSource {
     required String fullName,
     required String role,
     required String familyName,
+    Acquisition? acquisition,
   }) async {
     onboardings.add({
+      'acquisition': acquisition,
       'fullName': fullName,
       'role': role,
       'familyName': familyName,

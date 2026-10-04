@@ -1368,6 +1368,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     required String languageCode,
     String? referralCode,
     String? referralChannel,
+    Acquisition? acquisition,
   }) async {
     final AuthResponse response;
     try {
@@ -1391,6 +1392,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
             'referral_code': code,
             'referral_channel':
                 referralChannel ?? ReferralRules.channel(isWeb: kIsWeb),
+          },
+          // T-101: the family's source, recorded once by the server; both
+          // keys are removed before the auth row is stored.
+          if (acquisition != null) ...{
+            AcquisitionRules.sourceMetadataKey: acquisition.source,
+            AcquisitionRules.campaignMetadataKey: ?acquisition.campaign,
           },
         },
       );
@@ -1476,6 +1483,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     required String fullName,
     required String role,
     required String familyName,
+    Acquisition? acquisition,
   }) async {
     try {
       await _client.rpc<void>('complete_oauth_onboarding', params: {
@@ -1486,6 +1494,11 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         // refuses a mismatch, so a stale client can never stamp a consent it
         // did not display.
         'p_policy_version': PolicyVersions.current,
+        // T-101: the family's source (null → the server reads `organic`).
+        if (acquisition != null) ...{
+          'p_acquisition_source': acquisition.source,
+          'p_acquisition_campaign': acquisition.campaign,
+        },
       });
     } on PostgrestException catch (e) {
       // The RPC's refusals are PT-BR user text by design — propagate the

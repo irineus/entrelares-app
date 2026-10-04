@@ -52,10 +52,17 @@ class OauthOnboardingScreen extends StatefulWidget {
   /// Called before [onCompleted], and not awaited.
   final VoidCallback? onFamilyFounded;
 
+  /// T-101 — where the family about to be founded came from (`main.dart`:
+  /// the web boot URL's verdict, or the Android install's). Asked only on the
+  /// founder branch, bounded to 3 s; null or a slow answer is `organic` on
+  /// the server.
+  final Future<Acquisition?> Function()? acquisition;
+
   const OauthOnboardingScreen({
     super.key,
     this.onInviteeJoined,
     this.onFamilyFounded,
+    this.acquisition,
     required this.dataSource,
     this.analytics,
     required this.prefs,
@@ -186,11 +193,19 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
   }
 
   Future<void> _submitFounder() async {
+    Acquisition? acquisition;
+    try {
+      acquisition =
+          await widget.acquisition?.call().timeout(const Duration(seconds: 3));
+    } catch (_) {
+      acquisition = null;
+    }
     try {
       await widget.dataSource.completeOauthOnboarding(
         fullName: _fullName.text.trim(),
         role: _role!,
         familyName: _familyName.text.trim(),
+        acquisition: acquisition,
       );
       if (!mounted) return;
       // T-37: same funnel event the register form emits — the channel is in

@@ -6,6 +6,7 @@
 library;
 
 export 'src/account_rules.dart';
+export 'src/acquisition_rules.dart';
 export 'src/activity_rules.dart';
 export 'src/admin_change_rules.dart';
 export 'src/admin_mode_offer.dart';

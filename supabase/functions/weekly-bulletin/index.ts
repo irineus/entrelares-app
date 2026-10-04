@@ -104,6 +104,54 @@ interface Bulletin {
   // F-80: families attributed to a referral in the week; null while
   // `feature.referral` is off (the module is dark until policy 2.1).
   referrals: number | null;
+  // T-101: the real cohort per acquisition source, cumulative since its
+  // start, and the testers apart. Absent only on a stack older than T-101.
+  real_cohort?: RealCohort;
+}
+
+interface CohortStats {
+  families: number;
+  planned_7d: number;
+  invited: number;
+  invitee_joined: number;
+  paid: number;
+  referred_others: number;
+}
+
+interface RealCohort {
+  start: string;
+  by_source: Record<string, CohortStats & { created_week: number }>;
+  test_cohort: CohortStats;
+}
+
+/** The closed vocabulary of `families.acquisition_source`, in reading order. */
+const SOURCES: Array<{ key: string; label: string }> = [
+  { key: "google_app", label: "Google — campanha de app" },
+  { key: "google_search", label: "Google — busca" },
+  { key: "meta", label: "Meta (Instagram)" },
+  { key: "referral", label: "Indicação" },
+  { key: "organic", label: "Orgânico (sem anúncio)" },
+  { key: "unknown", label: "Origem não reconhecida" },
+];
+
+/** "N famílias · planejaram em 7 dias X · …" — every rate with its sample. */
+function cohortLine(c: CohortStats): string {
+  return `<strong>${c.families}</strong> famílias · planejaram em 7 dias ${c.planned_7d}` +
+    ` · convidaram ${c.invited} · convidado entrou ${c.invitee_joined}` +
+    ` · pagaram ${c.paid} · indicaram ${c.referred_others}`;
+}
+
+export function cohortHtml(r: RealCohort | undefined): string {
+  if (!r) return "";
+  const lines = SOURCES.map(({ key, label }) => {
+    const c = r.by_source?.[key];
+    if (!c) return `${label}: sem dados`;
+    return `${label}: ${cohortLine(c)} (criadas nesta semana: ${c.created_week})`;
+  });
+  return `${paragraph(`<strong>Turma real, por origem</strong> (famílias criadas desde ${ddmmyyyy(r.start)}, acumulado até agora)`)}
+      ${list(lines)}
+      ${paragraph("<strong>Turma de teste</strong> (criadas antes dessa data — testadores internos)")}
+      ${list([cohortLine(r.test_cohort)])}`;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -193,6 +241,7 @@ export function htmlOf(b: Bulletin): string {
         `Semana de segunda ${ddmmyyyy(b.week_start)} a domingo ${ddmmyyyy(b.week_end)}, no horário de Brasília,` +
           " comparada à semana anterior. Só contagens: nenhum nome, e-mail ou identificador de família.",
       )}
+      ${cohortHtml(b.real_cohort)}
       ${paragraph("<strong>Aquisição</strong>")}
       ${acquisition}
       ${paragraph("<strong>Uso</strong>")}
@@ -206,7 +255,8 @@ export function htmlOf(b: Bulletin): string {
       ${paragraph("<strong>Leituras manuais</strong> (sem API; abrir e anotar)")}
       ${readings}
       ${small("As famílias ativas contam quem abriu o app em qualquer canal. O primeiro pagamento é o primeiro" +
-        " registro pago da família no histórico de cobrança, em qualquer trilho.", true)}`,
+        " registro pago da família no histórico de cobrança, em qualquer trilho. A origem de cada família é" +
+        " registrada uma vez, na criação, pelo link ou pela instalação que a trouxe (sem pixel).", true)}`,
     footer: [
       "Enviado toda segunda-feira às 09:00 ao operador do Entrelares.",
       `Para parar: chave ${SWITCH_KEY} no console de operação.`,
