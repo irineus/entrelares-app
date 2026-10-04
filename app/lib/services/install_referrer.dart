@@ -12,8 +12,12 @@ import 'package:flutter/services.dart';
 /// `com.android.installreferrer:installreferrer`) — no pub.dev plugin, because
 /// the old ones apply `kotlin-android` and break on the pinned AGP 9.
 ///
-/// Read only where a founder is being made, and only after the caller saw
-/// `feature.referral` on — dark, this class is never asked:
+/// T-101 (04/10/2026): the same string also says where the install came from
+/// ([acquisition]) — read at every founder sign-up on Android, flag or not,
+/// for the family's acquisition source.
+///
+/// For the referral code, read only where a founder is being made, and only
+/// after the caller saw `feature.referral` on:
 ///   * the register screen, BEFORE the e-mail sign-up, so the code rides in
 ///     the sign-up metadata (an e-mail founder has no session until the
 ///     address is confirmed, often after `attribute_referral`'s 24 h);
@@ -40,7 +44,7 @@ class InstallReferrer {
   static const Duration timeout = Duration(seconds: 3);
 
   final MethodChannel _channel;
-  Future<String?>? _code;
+  Future<String?>? _raw;
 
   /// The reader for this build, or null where the API does not exist (the
   /// web, and any platform that is not Android).
@@ -53,14 +57,24 @@ class InstallReferrer {
   /// [ReferralRules.codeFromInstallReferrer], or null — for an organic
   /// install, a sideload, a missing Play Store, a slow service or any error.
   /// Never throws.
-  Future<String?> code() => _code ??= _read();
+  Future<String?> code() async =>
+      ReferralRules.codeFromInstallReferrer(await _rawOnce());
+
+  /// T-101 — where this install came from (`AcquisitionRules`): a referral
+  /// code, a Google Ads click (`gclid`/`gbraid`), one of our ads' `utm_source`
+  /// words, or organic. Read only where a family is being founded; only the
+  /// verdict and the campaign token leave the device — the string itself is
+  /// never sent nor stored. Never throws: a sideload, a missing Play Store or
+  /// a slow service is `organic`.
+  Future<Acquisition> acquisition() async =>
+      AcquisitionRules.fromInstallReferrer(await _rawOnce());
+
+  /// The raw string, asked once per process (both readers share it).
+  Future<String?> _rawOnce() => _raw ??= _read();
 
   Future<String?> _read() async {
     try {
-      final raw = await _channel
-          .invokeMethod<String>(readMethod)
-          .timeout(timeout);
-      return ReferralRules.codeFromInstallReferrer(raw);
+      return await _channel.invokeMethod<String>(readMethod).timeout(timeout);
     } catch (_) {
       return null;
     }

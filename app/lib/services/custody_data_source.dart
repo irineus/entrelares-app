@@ -1,5 +1,6 @@
 import 'package:entrelares_core/entrelares_core.dart'
     show
+        Acquisition,
         AgendaNotify,
         AppLanguage,
         HandoffRangeResult,
@@ -475,6 +476,10 @@ abstract class CustodyDataSource {
   /// F-80 PR 2: [referralChannel] — where the code came from (`web` for a
   /// `?ref=` link, `android` for the Install Referrer), the server's CHECK
   /// vocabulary. Null derives it from the platform.
+  ///
+  /// T-101: [acquisition] — where the new family came from, decided by
+  /// `AcquisitionRules`; it rides the sign-up metadata (stripped by the server
+  /// before the auth row is stored) and is recorded once on the family.
   Future<void> signUpFounder({
     required String email,
     required String password,
@@ -484,6 +489,7 @@ abstract class CustodyDataSource {
     required String languageCode,
     String? referralCode,
     String? referralChannel,
+    Acquisition? acquisition,
   });
 
   // ── F-80: family referral (built dark) ────────────────────────────────────
@@ -523,10 +529,15 @@ abstract class CustodyDataSource {
   /// `handle_new_user` deferred, stamping the S-13 consent after validating
   /// the policy version server-side (S-15 posture). Throws with the server's
   /// PT-BR message on refusal.
+  ///
+  /// T-101: [acquisition] — where the new family came from
+  /// (`AcquisitionRules`), recorded once by the server at creation; null is
+  /// an older caller and reads `organic`.
   Future<void> completeOauthOnboarding({
     required String fullName,
     required String role,
     required String familyName,
+    Acquisition? acquisition,
   });
 
   /// The INVITEE half: the `claim-invitation` Edge Function attaches the

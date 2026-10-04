@@ -81,6 +81,13 @@ class RegisterScreen extends StatefulWidget {
   /// `referral_channel: 'android'`, which the PR 1 triggers accept.
   final InstallReferrer? installReferrer;
 
+  /// T-101 — where a WEB founder came from, read by `main.dart` from the boot
+  /// URL (`/register?src=…&cmp=…`, or `?ref=`) through
+  /// [AcquisitionRules.fromUri]. Null on Android — there the source is the
+  /// Install Referrer's ([installReferrer]) — and on a web boot that did not
+  /// open `/register`, which is `organic`.
+  final Acquisition? acquisition;
+
   const RegisterScreen({
     this.analytics,
     this.onInviteeJoined,
@@ -94,6 +101,7 @@ class RegisterScreen extends StatefulWidget {
     this.inviteToken,
     this.referralCode,
     this.installReferrer,
+    this.acquisition,
   });
 
   @override
@@ -153,6 +161,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool get _onFamilyStep => !_isInvited && _step == 1;
 
+  /// T-101 — where this founder came from, resolved once at mount: the web
+  /// link's verdict, or the Android install's. Null where there is nothing to
+  /// say (an invitee, a host with neither door).
+  Future<Acquisition?>? _acquisition;
+
   @override
   void initState() {
     super.initState();
@@ -162,7 +175,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _loadingInvite = true;
       _resolveInvite(token.trim());
     }
-    if (!invited) _referralCode = _resolveReferral();
+    if (!invited) {
+      _referralCode = _resolveReferral();
+      _acquisition = _resolveAcquisition();
+    }
+  }
+
+  /// T-101 — on the web the boot URL decided ([RegisterScreen.acquisition];
+  /// none is `organic`); on Android the Install Referrer decides, read for
+  /// every founder whatever `feature.referral` says. Never throws.
+  Future<Acquisition?>? _resolveAcquisition() {
+    if (kIsWeb) return Future.value(widget.acquisition ?? Acquisition.organic);
+    // A referral code in hand wins without asking Play (the precedence).
+    if (widget.referralCode != null) return Future.value(Acquisition.referral);
+    final link = widget.acquisition;
+    if (link != null) return Future.value(link);
+    final install = widget.installReferrer;
+    if (install == null) return null;
+    return install.acquisition();
+  }
+
+  /// The source to send with the sign-up — a slow answer is no answer (the
+  /// server then records `organic`); a sign-up never waits on it.
+  Future<Acquisition?> _acquisitionToSend() async {
+    final pending = _acquisition;
+    if (pending == null) return null;
+    try {
+      return await pending.timeout(const Duration(seconds: 3));
+    } catch (_) {
+      return null;
+    }
   }
 
   /// F-80 — null when there is nothing to ask (no `?ref=` code and no
@@ -271,6 +313,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _submitFounder(Localization l) async {
     try {
       final referral = await _referralToSend();
+      final acquisition = await _acquisitionToSend();
       await widget.dataSource.signUpFounder(
         email: _email.text.trim(),
         password: _password.text,
@@ -280,6 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         languageCode: l.current.code,
         referralCode: referral,
         referralChannel: referral == null ? null : _referralChannel,
+        acquisition: acquisition,
       );
       if (!mounted) return;
       // T-37: a founder created a new family (activation funnel).

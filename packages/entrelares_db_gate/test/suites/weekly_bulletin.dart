@@ -28,6 +28,11 @@ const _bulletinKeys = {
   'conversions_total',
   // the snapshot
   'families_total', 'paying_families', 'trials_ending_7d', 'dunning',
+  // T-101: the real cohort per acquisition source (a closed vocabulary — the
+  // campaign token is free-ish text and stays OUT), and the testers apart
+  'real_cohort', 'start', 'by_source', 'google_app', 'google_search', 'meta',
+  'referral', 'organic', 'families', 'created_week', 'planned_7d', 'invited',
+  'invitee_joined', 'paid', 'referred_others', 'test_cohort',
 };
 
 Set<String> _keysOf(Object? node) => switch (node) {
@@ -193,7 +198,11 @@ void weeklyBulletinTests(GateFixture fx) {
 
     test('closed keys, and nothing a person typed comes back', () async {
       const marker = 'zzt99leak';
-      final fam = await fx.createFamily('t99leak');
+      // T-101: the campaign token is a valid token and still never comes back.
+      final fam = await fx.createFamily('t99leak', founderMetadata: {
+        'acquisition_source': 'meta',
+        'acquisition_campaign': marker,
+      });
 
       // The E2E prefix stays: `purge_e2e_family` refuses a family whose name
       // lost its signature.

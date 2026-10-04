@@ -327,6 +327,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           inviteToken: InviteFormRules.inviteTokenFrom(state.uri),
           referralCode: _pendingReferralCode,
           installReferrer: _installReferrer,
+          acquisition: _pendingAcquisition,
           onSignIn: _signIn,
           onInviteeJoined: _welcomeInvitee,
           onBackToLogin: () => _router.go('/login'),
@@ -353,6 +354,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           initialInviteToken: _pendingInviteToken,
           onInviteeJoined: _welcomeInvitee,
           onFamilyFounded: _attributePendingReferral,
+          acquisition: _founderAcquisition,
           onSignOut: _signOut,
           onCompleted: () async {
             _pendingInviteToken = null;
@@ -948,6 +950,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     // kept in memory only. The pageview path drops the query anyway
     // (`sanitizeAnalyticsPath`); the code is never a prop of any event.
     _pendingReferralCode = kIsWeb ? ReferralRules.codeFromUri(Uri.base) : null;
+    // T-101: where a web founder came from (`/register?src=…`), read from the
+    // same boot address, memory only, never a prop of any event.
+    _pendingAcquisition = kIsWeb ? AcquisitionRules.fromUri(Uri.base) : null;
     _dataSource = SupabaseCustodyDataSource(_client,
         environmentPrefix:
             environmentTitlePrefix(isProduction: Env.current.isProduction),
@@ -1561,6 +1566,17 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// the Google door (F-71) never leaves the page, and the e-mail sign-up
   /// hands the code to the server inside the sign-up itself.
   String? _pendingReferralCode;
+
+  /// T-101 — the source a web boot on `/register` carried (null elsewhere —
+  /// `organic` — and on Android, where the Install Referrer answers).
+  Acquisition? _pendingAcquisition;
+
+  /// T-101 — where a Google founder's family came from: the web boot URL's
+  /// verdict, or the Android install's. Never throws.
+  Future<Acquisition?> _founderAcquisition() async {
+    if (kIsWeb) return _pendingAcquisition ?? Acquisition.organic;
+    return _installReferrer?.acquisition();
+  }
 
   /// F-80 PR 2 — the Android door: the Install Referrer reader, null on the
   /// web. Asked only where a founder is made and only with the flag on.

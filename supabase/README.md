@@ -380,12 +380,22 @@ semana de DD/MM a DD/MM` (`[Dev] ` outside production). One send per week: the
 week is claimed in `weekly_bulletin_sends` before the send and released if Resend
 refuses. Kill switch: `ops.weekly_bulletin.enabled` (operator console). On the
 dev project the numbers include the E2E families — switch it off there if the
-`[Dev]` copy is noise. Check a run, or read the numbers without sending:
+`[Dev]` copy is noise. Since **T-101** (04/10/2026) the bulletin opens with the
+`real_cohort` block: every family created on or after `acquisition.real_cohort_start`
+(São Paulo; L-31 moves it to the launch day by migration) counted under its
+`families.acquisition_source` — written once at creation, from the Play Install
+Referrer or `/register?src=` — and the internal test cohort apart. The campaign
+token stays out of the e-mail; read it here when needed. Check a run, or read the
+numbers without sending:
 ```sql
 select jobname, schedule from cron.job where jobname = 'weekly-bulletin';
 select * from public.weekly_bulletin_sends order by week_start desc limit 5;
 select public.admin_weekly_sales_bulletin();             -- the week that just ended
 select public.admin_weekly_sales_bulletin(current_date); -- the week in progress
+-- T-101: the real cohort by source and campaign (the e-mail shows no campaign)
+select acquisition_source, acquisition_campaign, count(*) from public.families
+ where created_at >= (public.acquisition_real_cohort_start()::timestamp at time zone 'America/Sao_Paulo')
+ group by 1, 2 order by 3 desc;
 ```
 
 ### 4.6-quinquies The referral reward crons (F-80 PR 3) — two owner/operator steps
