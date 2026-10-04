@@ -59,5 +59,89 @@ void billingCheckoutTests(GateFixture fx) {
           reason: 'expected 404 (no subscription) or 409 (billing disabled), '
               'got $status');
     });
+
+    // F-84: a subscription bought through Google Play is Google's. Our
+    // cancel used to flip only our row — Google kept charging while the app
+    // said "Assinatura cancelada". The refusal comes BEFORE the master switch
+    // and the gateway key, so it is asserted the same way in every state.
+    for (final action in const ['cancel', 'reactivate', 'overdue_invoice']) {
+      test('F-84: $action on a Play subscription is refused and changes nothing',
+          () async {
+        final fam = await fx.createFamily('f84${action.substring(0, 3)}');
+        final seeded = await billing.seed(fam.familyId, 'f84$action',
+            status: action == 'reactivate' ? 'canceled' : 'active',
+            periodEnd: DateTime.now().toUtc().add(const Duration(days: 20)));
+        await fx.service
+            .from('subscriptions')
+            .update({'gateway': 'play'}).eq('id', seeded.id);
+
+        final token = fam.admin.auth.currentSession!.accessToken;
+        final (status, body) =
+            await billing.checkout({'action': action}, token);
+        expect(status, 409);
+        expect(body, contains('Google Play'));
+
+        final after = await billing.reload(seeded.id);
+        expect(after.status, seeded.status);
+        expect(after.canceledAt, isNull);
+      });
+    }
+
+    test('F-84: overdue_invoice answers the open invoice from the ledger',
+        () async {
+      final fam = await fx.createFamily('f84inv');
+      await billing.seed(fam.familyId, 'f84inv',
+          status: 'overdue', overdueSince: DateTime.now().toUtc());
+      // An older charge that WAS paid afterwards, then the one still open.
+      await billing.seedEvent(fam.familyId, 'PAYMENT_OVERDUE',
+          paymentId: 'pay_f84_old',
+          value: 5.49,
+          invoiceUrl: 'https://sandbox.asaas.com/i/f84-old');
+      await billing.seedEvent(fam.familyId, 'PAYMENT_RECEIVED',
+          paymentId: 'pay_f84_old', value: 5.49);
+      await billing.seedEvent(fam.familyId, 'PAYMENT_OVERDUE',
+          paymentId: 'pay_f84_open',
+          value: 5.49,
+          invoiceUrl: 'https://sandbox.asaas.com/i/f84-open');
+
+      final token = fam.admin.auth.currentSession!.accessToken;
+      final (status, body) =
+          await billing.checkout({'action': 'overdue_invoice'}, token);
+      expect(status, 200, reason: body);
+      expect(body, contains('https://sandbox.asaas.com/i/f84-open'));
+    });
+
+    test('F-84: overdue_invoice never hands back a charge already paid',
+        () async {
+      final fam = await fx.createFamily('f84paid');
+      await billing.seed(fam.familyId, 'f84paid',
+          status: 'overdue', overdueSince: DateTime.now().toUtc());
+      await billing.seedEvent(fam.familyId, 'PAYMENT_OVERDUE',
+          paymentId: 'pay_f84_paid',
+          value: 5.49,
+          invoiceUrl: 'https://sandbox.asaas.com/i/f84-paid');
+      await billing.seedEvent(fam.familyId, 'PAYMENT_CONFIRMED',
+          paymentId: 'pay_f84_paid', value: 5.49);
+
+      final token = fam.admin.auth.currentSession!.accessToken;
+      final (status, body) =
+          await billing.checkout({'action': 'overdue_invoice'}, token);
+      // The ledger has nothing open, so the gateway half runs — and in the
+      // gate it stops at the switch (409), the missing key (503) or a gateway
+      // that knows no such subscription (404). Never the paid invoice.
+      expect(status, isNot(200));
+      expect(body, isNot(contains('f84-paid')));
+    });
+
+    test('F-84: overdue_invoice refuses a subscription that is not overdue',
+        () async {
+      final fam = await fx.createFamily('f84act');
+      await billing.seed(fam.familyId, 'f84act', status: 'active');
+      final token = fam.admin.auth.currentSession!.accessToken;
+      final (status, body) =
+          await billing.checkout({'action': 'overdue_invoice'}, token);
+      expect(status, 409);
+      expect(body, contains('cobrança pendente'));
+    });
   });
 }

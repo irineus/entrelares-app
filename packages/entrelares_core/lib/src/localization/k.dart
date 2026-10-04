@@ -541,6 +541,13 @@ abstract final class K {
   static const String premStorePaidUntilPeriod = 'prem.store.paidUntilPeriod';
   static const String premStoreTrialUntil = 'prem.store.trialUntil';
   static const String premStoreNote = 'prem.store.note';
+  static const String premPlayManaged = 'prem.play.managed';
+  static const String premPlayNotRenewing = 'prem.play.notRenewing';
+  static const String premPlayOverdueGraceEnded = 'prem.play.overdue.graceEnded';
+  static const String premPlayOverdueInGrace = 'prem.play.overdue.inGrace';
+  static const String premPlayOverdueInGraceNoDate =
+      'prem.play.overdue.inGraceNoDate';
+  static const String premOverduePay = 'prem.overdue.pay';
   static const String premPaidUntilAvulso = 'prem.paidUntil.avulso';
   static const String premPaidUntilPeriod = 'prem.paidUntil.period';
   static const String premExpiringSoonOne = 'prem.expiringSoon.one';
@@ -1750,6 +1757,12 @@ abstract final class K {
     premStorePaidUntilPeriod,
     premStoreTrialUntil,
     premStoreNote,
+    premPlayManaged,
+    premPlayNotRenewing,
+    premPlayOverdueGraceEnded,
+    premPlayOverdueInGrace,
+    premPlayOverdueInGraceNoDate,
+    premOverduePay,
     premPaidUntilAvulso,
     premPaidUntilPeriod,
     premExpiringSoonOne,

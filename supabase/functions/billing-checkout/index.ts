@@ -16,6 +16,19 @@
 //       the grace cron (PR3) flips it on lapse; a mere click can't nuke an
 //       already-paid period.
 //
+//   { action: "overdue_invoice" }                                     [F-84]
+//     → for an Asaas subscription in 'overdue': the URL of the invoice that is
+//       still open, so the family pays it instead of hunting for the billing
+//       e-mail. The ledger answers first (the PAYMENT_OVERDUE event carries
+//       the invoiceUrl, and a payment received afterwards closes it); only
+//       when it has none is the gateway asked. Returns { url }.
+//
+//   A subscription bought through GOOGLE PLAY (`gateway = 'play'`) is not
+//   ours to cancel or reactivate: Play owns it, and cancelling our row alone
+//   would leave Google charging while the screen said "cancelada" (F-84).
+//   Those actions are refused before anything else, with a sentence that
+//   points to Play — whatever the master switch says.
+//
 //   { action: "reactivate" }                                          [F-42]
 //     → for a family that CANCELED but still has paid time: recreates the
 //       gateway subscription with NO charge today, the first invoice falling
@@ -59,7 +72,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 interface CheckoutPayload {
   // "avulso" (F-48): a single NON-RECURRING Pix charge for one period — no
   // card on file, no auto-renew. Same price settings as the subscription.
-  action?: "checkout" | "avulso" | "cancel" | "reactivate";
+  action?: "checkout" | "avulso" | "cancel" | "reactivate" | "overdue_invoice";
   cycle?: "monthly" | "annual";
 }
 
@@ -70,6 +83,34 @@ const RESCHEDULABLE_METHODS = new Set(["PIX", "BOLETO"]);
 
 // Asaas subscription cycles, by ours.
 const ASAAS_CYCLE: Record<string, string> = { monthly: "MONTHLY", annual: "YEARLY" };
+
+// F-84: the invoice of the NEWEST overdue charge that no later payment closed.
+// The ledger is the webhook's own record — `PAYMENT_OVERDUE` carries the
+// `invoiceUrl` Asaas still accepts payment on, and a `PAYMENT_RECEIVED` /
+// `PAYMENT_CONFIRMED` for the same payment id means it is no longer open.
+// deno-lint-ignore no-explicit-any
+async function openInvoiceFromLedger(service: any, familyId: number): Promise<string | null> {
+  const { data } = await service
+    .from("billing_events")
+    .select("event_type, payload, received_at")
+    .eq("family_id", familyId)
+    .in("event_type", ["PAYMENT_OVERDUE", "PAYMENT_RECEIVED", "PAYMENT_CONFIRMED"])
+    .order("received_at", { ascending: false })
+    .limit(100);
+  const settled = new Set<string>();
+  for (const row of (data ?? []) as { event_type: string; payload: any }[]) {
+    const payment = row.payload?.payment;
+    const id = typeof payment?.id === "string" ? payment.id : null;
+    if (row.event_type !== "PAYMENT_OVERDUE") {
+      if (id) settled.add(id);
+      continue;
+    }
+    if (id && settled.has(id)) continue;
+    const url = typeof payment?.invoiceUrl === "string" ? payment.invoiceUrl.trim() : "";
+    if (url) return url;
+  }
+  return null;
+}
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -105,6 +146,41 @@ serve(async (req: Request) => {
 
     const { action, cycle }: CheckoutPayload = await req.json();
 
+    const { data: existing } = await service
+      .from("subscriptions")
+      .select("*")
+      .eq("family_id", me.family_id)
+      .maybeSingle();
+
+    // ── F-84: a Play subscription is managed on Play, never here ─────────────
+    // Before the master switch on purpose: the refusal is true whatever the
+    // web rail's state, and nothing below may touch a row the store owns.
+    if ((action === "cancel" || action === "reactivate" || action === "overdue_invoice")
+      && existing?.gateway === "play") {
+      return jsonResponse(
+        {
+          error: "Esta assinatura foi feita pelo Google Play. " +
+            "Para cancelar, retomar ou pagar, use o Google Play, na conta Google de quem assinou.",
+        },
+        409);
+    }
+
+    // ── action: overdue_invoice (F-84), ledger half ──────────────────────────
+    // Also before the master switch: an invoice already issued stays payable
+    // even if the rail closed for NEW sales afterwards.
+    if (action === "overdue_invoice") {
+      if (!existing || existing.status !== "overdue") {
+        return jsonResponse({ error: "Não há cobrança pendente para pagar." }, 409);
+      }
+      const ledgerUrl = await openInvoiceFromLedger(service, me.family_id);
+      if (ledgerUrl) return jsonResponse({ ok: true, url: ledgerUrl });
+      if (!existing.external_subscription_id) {
+        return jsonResponse(
+          { error: "Não encontramos a cobrança pendente. Verifique o e-mail de cobrança (remetente Asaas)." },
+          404);
+      }
+    }
+
     // ── Master switch (same row the UI mirrors) ──────────────────────────────
     const { data: enabled } = await service.rpc("setting_bool", {
       p_key: "billing.enabled",
@@ -135,13 +211,27 @@ serve(async (req: Request) => {
         },
       });
 
-    const { data: existing } = await service
-      .from("subscriptions")
-      .select("*")
-      .eq("family_id", me.family_id)
-      .maybeSingle();
-
     const nowUtc = new Date().toISOString();
+
+    // ── action: overdue_invoice (F-84), gateway half ─────────────────────────
+    // The ledger had no open invoice URL: ask Asaas for the subscription's
+    // overdue charge. A failure is a plain refusal — the billing e-mail still
+    // carries the same link.
+    if (action === "overdue_invoice") {
+      const listed = await asaas(
+        `/payments?subscription=${encodeURIComponent(existing!.external_subscription_id)}` +
+          "&status=OVERDUE&limit=1",
+      );
+      const page = listed.ok ? await listed.json() as { data?: { invoiceUrl?: string }[] } : null;
+      const url = page?.data?.[0]?.invoiceUrl?.trim();
+      if (!url) {
+        if (!listed.ok) console.error("Asaas overdue lookup failed:", listed.status);
+        return jsonResponse(
+          { error: "Não encontramos a cobrança pendente. Verifique o e-mail de cobrança (remetente Asaas)." },
+          404);
+      }
+      return jsonResponse({ ok: true, url });
+    }
 
     // ── action: cancel ───────────────────────────────────────────────────────
     if (action === "cancel") {
