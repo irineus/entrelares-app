@@ -802,6 +802,7 @@ abstract final class KApp {
   static const String chatSearchClose = 'app.chat.searchClose';
   static const String chatSearchEmpty = 'app.chat.searchEmpty';
   static const String chatLoadOlder = 'app.chat.loadOlder';
+  static const String viewerDeletionNoVote = 'app.viewer.deletionNoVote';
   static const String leavingLoadFailed = 'app.leaving.loadFailed';
   static const String profLeaveBilling = 'app.profile.leaveBilling';
   static const String profLeaveCancelFirst = 'app.profile.leaveCancelFirst';
@@ -1458,6 +1459,7 @@ abstract final class KApp {
     chatSearchClose,
     chatSearchEmpty,
     chatLoadOlder,
+    viewerDeletionNoVote,
     leavingLoadFailed,
     profLeaveBilling,
     profLeaveCancelFirst,
@@ -2264,6 +2266,7 @@ abstract final class StringsAppPtBr {
     KApp.chatSearchClose: 'Fechar a busca',
     KApp.chatSearchEmpty: 'Nada encontrado para "{0}".',
     KApp.chatLoadOlder: 'Mostrar mensagens anteriores',
+    KApp.viewerDeletionNoVote: 'Você acompanha o plano como visualizador: a decisão de excluir a família é dos responsáveis.',
     KApp.leavingLoadFailed: 'Não conseguimos carregar sua saída agora. Confira a internet e tente de novo.',
     KApp.profLeaveBilling: 'A assinatura Premium da família continua cobrando depois que você sair. Se quiser interrompê-la, cancele antes.',
     KApp.profLeaveCancelFirst: 'Cancelar a assinatura antes de sair',
@@ -3064,6 +3067,7 @@ abstract final class StringsAppEn {
     KApp.chatSearchClose: 'Close the search',
     KApp.chatSearchEmpty: 'Nothing found for "{0}".',
     KApp.chatLoadOlder: 'Show earlier messages',
+    KApp.viewerDeletionNoVote: 'You follow the plan as a viewer: deleting the family is for the caregivers to decide.',
     KApp.leavingLoadFailed: 'We could not load your departure right now. Check your internet and try again.',
     KApp.profLeaveBilling: 'The family Premium subscription keeps charging after you leave. If you want it to stop, cancel it first.',
     KApp.profLeaveCancelFirst: 'Cancel the subscription before leaving',

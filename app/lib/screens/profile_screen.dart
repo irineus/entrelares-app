@@ -243,15 +243,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (target == null) return;
     final granting = !target.isAdmin;
     try {
-      await runWithSudo(
+      final ran = await runWithSudo(
         context: context,
         sudo: widget.sudo,
         action: () => widget.dataSource
             .setMemberAdmin(profileId: target.id, isAdmin: granting),
       );
-      if (!mounted) return;
-      showAppSnack(context,
-          l[granting ? K.profToastNowAdmin : K.profToastNoLongerAdmin]);
+      // F-91: a closed password prompt changed nothing — and the toast said
+      // "agora é admin" over a literal {0}.
+      if (!mounted || !ran) return;
+      showAppSnack(
+          context,
+          l.format(granting ? K.profToastNowAdmin : K.profToastNoLongerAdmin,
+              [target.fullName]));
       await _reload();
     } catch (e) {
       if (!mounted) return;
@@ -268,11 +272,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // the mailbox is the proof.
         await widget.dataSource.sendPasswordReset(email, l.current);
       } else {
-        await runWithSudo(
+        final ran = await runWithSudo(
           context: context,
           sudo: widget.sudo,
           action: () => widget.dataSource.sendPasswordReset(email, l.current),
         );
+        // F-91: nothing was sent when the prompt was closed.
+        if (!ran) return;
       }
       if (!mounted) return;
       if (own) {
