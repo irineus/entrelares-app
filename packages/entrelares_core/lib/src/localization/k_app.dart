@@ -805,6 +805,9 @@ abstract final class KApp {
   static const String leavingLoadFailed = 'app.leaving.loadFailed';
   static const String profLeaveBilling = 'app.profile.leaveBilling';
   static const String profLeaveCancelFirst = 'app.profile.leaveCancelFirst';
+  static const String chatUnmute = 'app.chat.unmute';
+  static const String chatNewOne = 'app.chat.newOne';
+  static const String chatNewMany = 'app.chat.newMany';
   static const String authResendConfirmation = 'app.auth.resendConfirmation';
   static const String authResendSent = 'app.auth.resendSent';
   static const String authResendWait = 'app.auth.resendWait';
@@ -1458,6 +1461,9 @@ abstract final class KApp {
     leavingLoadFailed,
     profLeaveBilling,
     profLeaveCancelFirst,
+    chatUnmute,
+    chatNewOne,
+    chatNewMany,
     authResendConfirmation,
     authResendSent,
     authResendWait,
@@ -2261,6 +2267,9 @@ abstract final class StringsAppPtBr {
     KApp.leavingLoadFailed: 'Não conseguimos carregar sua saída agora. Confira a internet e tente de novo.',
     KApp.profLeaveBilling: 'A assinatura Premium da família continua cobrando depois que você sair. Se quiser interrompê-la, cancele antes.',
     KApp.profLeaveCancelFirst: 'Cancelar a assinatura antes de sair',
+    KApp.chatUnmute: 'Ligar o push da Conversa',
+    KApp.chatNewOne: '1 mensagem nova',
+    KApp.chatNewMany: '{0} mensagens novas',
     KApp.authResendConfirmation: 'Reenviar e-mail de confirmação',
     KApp.authResendSent: 'Enviamos de novo. Confira também a caixa de spam e a de promoções.',
     KApp.authResendWait: 'Reenviar em {0} s',
@@ -3058,6 +3067,9 @@ abstract final class StringsAppEn {
     KApp.leavingLoadFailed: 'We could not load your departure right now. Check your internet and try again.',
     KApp.profLeaveBilling: 'The family Premium subscription keeps charging after you leave. If you want it to stop, cancel it first.',
     KApp.profLeaveCancelFirst: 'Cancel the subscription before leaving',
+    KApp.chatUnmute: 'Turn the chat push back on',
+    KApp.chatNewOne: '1 new message',
+    KApp.chatNewMany: '{0} new messages',
     KApp.authResendConfirmation: 'Resend the confirmation e-mail',
     KApp.authResendSent: 'Sent again. Check your spam and promotions folders too.',
     KApp.authResendWait: 'Resend in {0} s',

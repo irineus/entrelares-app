@@ -92,7 +92,6 @@ const _appHasItsOwnPhrase = <String>{
   'K.homeTapToDefine',
   'K.loginPasswordPlaceholder',
   'K.loginSubmitting',
-  'K.navNotifications',
   'K.rolesBackToFamily',
   'K.updatePwdConfirmPlaceholder',
   'K.updatePwdNewPasswordPlaceholder',

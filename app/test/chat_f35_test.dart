@@ -355,4 +355,57 @@ void main() {
             matching: find.textContaining('O primeiro de todos.')),
         findsOne);
   });
+
+  // F-90: "Lida por" is evidence and goes to the PDF — a text counts as read
+  // only when the reader can see it.
+  testWidgets('F-90: while searching, a new text is not read until the chip '
+      'takes the reader to it', (tester) async {
+    final ds = source()..chatMessages = [text(1, 2, 'Busco às 18h.')];
+    await pumpChat(tester, ds);
+    expect(ds.chatWrites, ['read:1']);
+
+    await tester.tap(find.byKey(const ValueKey('chat-search')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('chat-search-field')), 'busco');
+    await tester.pumpAndSettle();
+
+    ds.chatMessages = [...ds.chatMessages, text(2, 2, 'Chegamos.')];
+    await deliver(tester, ds);
+    expect(ds.chatWrites, ['read:1'], reason: 'searching hides it — unread');
+    expect(find.byKey(const ValueKey('chat-new-below')), findsOne);
+
+    await tester.tap(find.byKey(const ValueKey('chat-new-below')));
+    await tester.pumpAndSettle();
+    expect(ds.chatWrites, ['read:1', 'read:2']);
+    expect(find.text('Chegamos.'), findsOne);
+  });
+
+  testWidgets('F-90: scrolled far up, a new text waits for the reader',
+      (tester) async {
+    final ds = source()
+      ..chatMessages = [
+        for (var i = 1; i <= 60; i++) text(i, 2, 'texto $i'),
+      ];
+    await pumpChat(tester, ds, size: const Size(420, 700));
+    expect(ds.chatWrites, ['read:60']);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 2000));
+    await tester.pumpAndSettle();
+    ds.chatMessages = [...ds.chatMessages, text(61, 2, 'Chegamos.')];
+    await deliver(tester, ds);
+    expect(ds.chatWrites, ['read:60']);
+    expect(find.byKey(const ValueKey('chat-new-below')), findsOne);
+  });
+
+  testWidgets('F-90: the mute button says what a tap DOES in both states',
+      (tester) async {
+    final ds = source()..chatMessages = [text(1, 2, 'Oi.')];
+    await pumpChat(tester, ds);
+    final button = find.byKey(const ValueKey('chat-mute'));
+    expect(tester.widget<IconButton>(button).tooltip, l[KApp.chatMute]);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(tester.widget<IconButton>(button).tooltip, l[KApp.chatUnmute]);
+  });
 }

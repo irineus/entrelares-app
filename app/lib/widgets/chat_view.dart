@@ -110,8 +110,27 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
 
   /// Near the top with older texts on the server: fetch the previous page.
   void _onScroll() {
-    if (!_scroll.hasClients || !_hasOlder || _loadingOlder) return;
+    if (!_scroll.hasClients) return;
+    // F-90: reaching the end is reading what arrived meanwhile.
+    if (_atEnd && _hasNewForMe) unawaited(_markRead());
+    if (!_hasOlder || _loadingOlder) return;
     if (_scroll.position.extentBefore < 300) unawaited(_loadOlder());
+  }
+
+  /// F-90: a text counts as READ only when the reader can see it — no search
+  /// filtering the list, and the list at its end. "Lida por" is evidence in a
+  /// separation and goes to the PDF: the mother looking for an old message,
+  /// or scrolled far up, used to "read" the father's new text at 14:02.
+  bool get _searching => (_query ?? '').trim().isNotEmpty;
+
+  bool get _hasNewForMe {
+    final me = _me;
+    return me != null && ChatRules.unreadFor(me.id, _lines, _marks) > 0;
+  }
+
+  int get _newForMe {
+    final me = _me;
+    return me == null ? 0 : ChatRules.unreadFor(me.id, _lines, _marks);
   }
 
   List<int> _ids(Iterable<ChatMessage> messages) =>
@@ -275,7 +294,7 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
         _quoted = quoted;
       });
       if (follow) _scrollToEnd();
-      if (_onScreen) await _markRead();
+      if (_onScreen && follow && !_searching) await _markRead();
     } catch (_) {/* what is on screen stays; the next change or poll retries */}
   }
 
@@ -353,6 +372,7 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
   bool _marking = false;
 
   Future<void> _markRead() async {
+    if (!_onScreen || _searching) return;
     final me = _me;
     final newest = ChatRules.newestId(_lines);
     if (me == null || newest == null || _marking) return;
@@ -542,7 +562,9 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
                 icon: Icon(_muted
                     ? Icons.notifications_off_outlined
                     : Icons.notifications_active_outlined),
-                tooltip: l[_muted ? KApp.chatUnmuted : KApp.chatMute],
+                // F-90: an ACTION, like the other state's — the tooltip
+                // used to read "Push da Conversa ligado." while it was off.
+                tooltip: l[_muted ? KApp.chatUnmute : KApp.chatMute],
                 onPressed: () => _toggleMute(l),
               ),
               // U-59: the door to the EXISTING PDF, pre-filled with the
@@ -586,6 +608,28 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
                 : _thread(shown, notice, l),
           ),
         ),
+        // F-90: what arrived while the reader searched or read further up —
+        // one tap goes to it, and only then is it read.
+        if (_onScreen && _newForMe > 0 && (_searching || !_atEnd))
+          Padding(
+            padding: const EdgeInsets.only(bottom: Spacing.xs),
+            child: ActionChip(
+              key: const ValueKey('chat-new-below'),
+              avatar: const Icon(Icons.arrow_downward, size: 18),
+              label: Text(_newForMe == 1
+                  ? l[KApp.chatNewOne]
+                  : l.format(KApp.chatNewMany, [_newForMe])),
+              onPressed: () {
+                setState(() {
+                  _query = null;
+                  _search.clear();
+                });
+                _scrollToEnd();
+                WidgetsBinding.instance
+                    .addPostFrameCallback((_) => unawaited(_markRead()));
+              },
+            ),
+          ),
         _composerArea(l),
       ],
     );
