@@ -43,6 +43,9 @@ class OauthOnboardingScreen extends StatefulWidget {
   /// F-88: the kept invitation turned out dead (expired, revoked, used).
   final VoidCallback? onInviteDead;
 
+  /// F-89: "Ajuda e contato".
+  final VoidCallback? onHelp;
+
   /// The profile now exists — `main.dart` re-resolves the phase and routes.
   final Future<void> Function() onCompleted;
 
@@ -72,6 +75,7 @@ class OauthOnboardingScreen extends StatefulWidget {
     this.initialInviteToken,
     required this.onSignOut,
     this.onInviteDead,
+    this.onHelp,
     required this.onCompleted,
   });
 
@@ -471,6 +475,16 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
             child: Text(l[KApp.onbSwitchAccount]),
           ),
         ),
+        // F-89: the onboarding is confined; Help is not.
+        if (widget.onHelp != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              key: const ValueKey('onboarding-help'),
+              onPressed: widget.onHelp,
+              child: Text(l[KApp.helpLoginLink]),
+            ),
+          ),
         if (invite == null) ...[
           const SizedBox(height: 12),
           AppTextField(
