@@ -49,6 +49,7 @@ import 'services/activity_tracker.dart';
 import 'services/admin_mode.dart';
 import 'services/analytics_service.dart';
 import 'services/auth_failed.dart';
+import 'services/invite_note.dart';
 import 'services/appearance.dart';
 import 'services/boot_handoff.dart';
 import 'services/connectivity_status.dart';
@@ -374,12 +375,13 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           // F-71: the native door never leaves the app, so the invitation
           // stays in memory instead of in the prefs stash.
           initialInviteToken: _pendingInviteToken,
+          onInviteDead: _forgetPendingInvite,
           onInviteeJoined: _welcomeInvitee,
           onFamilyFounded: _attributePendingReferral,
           acquisition: _founderAcquisition,
           onSignOut: _signOut,
           onCompleted: () async {
-            _pendingInviteToken = null;
+            _forgetPendingInvite();
             await _resolveAuthedPhase();
             if (mounted) _router.go('/');
           },
@@ -981,6 +983,14 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     // F-87: an expired or used e-mail link lands on the redirect with
     // `error_code` in the fragment — the login says so instead of nothing.
     _authLinkError = kIsWeb ? authLinkErrorCode(Uri.base) : null;
+    // F-88: an invitation opened on a signed-in device (offered once the
+    // session settles), and the one a previous visit kept.
+    _bootInviteToken = kIsWeb && Uri.base.path == '/register'
+        ? InviteFormRules.inviteTokenFrom(Uri.base)
+        : null;
+    unawaited(readInviteNote().then((token) {
+      if (token != null) _pendingInviteToken ??= token;
+    }));
     _dataSource = SupabaseCustodyDataSource(_client,
         environmentPrefix:
             environmentTitlePrefix(isProduction: Env.current.isProduction),
@@ -1217,6 +1227,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _resolveInstallHint();
       // T-78: the day this member used the app, on this channel.
       _touchActivity();
+      if (_bootInviteToken != null) {
+        WidgetsBinding.instance.addPostFrameCallback(
+            (_) => unawaited(_offerInviteForAnotherAccount()));
+      }
       _trackAuthedEntry();
     } else {
       _badge.stop();
@@ -1596,7 +1610,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   Future<void> _signInWithGoogleIdToken(String idToken,
       {String? inviteToken}) async {
     final token = inviteToken?.trim() ?? '';
-    _pendingInviteToken = token.isEmpty ? null : token;
+    // F-88: a sign-in WITHOUT an invitation (the login, or "Entrar com outra
+    // conta") keeps the one already kept; one with an invitation replaces it.
+    if (token.isNotEmpty) {
+      _pendingInviteToken = token;
+      unawaited(writeInviteNote(token));
+    }
     // T-78: named BEFORE the await — the auth listener sees the session
     // arrive while anonymous and must not call it an e-mail link.
     _signInMethod = 'google';
@@ -1618,6 +1637,63 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// F-71 — the invitation a native Google sign-in started from, kept until
   /// the onboarding screen claims it or the session ends.
   String? _pendingInviteToken;
+
+  /// F-88: the invitation was claimed, or is dead — nothing left to keep.
+  void _forgetPendingInvite() {
+    _pendingInviteToken = null;
+    unawaited(clearInviteNote());
+  }
+
+  /// F-88: `/register?invite=` opened on a device already signed in — the
+  /// router sends a session home, and the invitation used to vanish without
+  /// a word. Read from the boot address (web), offered once.
+  String? _bootInviteToken;
+
+  Future<void> _offerInviteForAnotherAccount() async {
+    final token = _bootInviteToken;
+    _bootInviteToken = null;
+    if (token == null) return;
+    InviteInfo? invite;
+    try {
+      invite = await _dataSource.fetchInviteInfo(token);
+    } catch (_) {
+      return;
+    }
+    final me = _client.auth.currentUser?.email ?? '';
+    if (invite == null ||
+        invite.invitedEmail.trim().toLowerCase() == me.trim().toLowerCase()) {
+      return;
+    }
+    final context = _router.routerDelegate.navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    final l = _l;
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('invite-other-account'),
+        title: Text(l[KApp.inviteSignedInTitle]),
+        content: Text(l.format(KApp.inviteSignedInBody, [
+          me,
+          invite!.inviterName,
+          invite.familyName,
+          invite.invitedEmail,
+        ])),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l[KApp.inviteNotNow]),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l[KApp.inviteSignOutContinue]),
+          ),
+        ],
+      ),
+    );
+    if (leave != true) return;
+    await _signOut();
+    if (mounted) _router.go('/register?invite=$token');
+  }
 
   /// F-80 — the code a `/register?ref=` link opened the web app with. Memory
   /// only: no prefs (Android Auto Backup copies them) and no browser storage —
@@ -1768,7 +1844,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     // Set BEFORE the call: the auth event may arrive before or after the
     // await returns, and only this flag makes that order irrelevant.
     _userSignOut = true;
-    _pendingInviteToken = null;
+    // F-88: the kept invitation survives a sign-out — "Entrar com outra
+    // conta" after picking the wrong Google account must not drop it.
     _onboarding.pendingInviteeWelcome = null;
     await _gate.signOutSafely();
     _identity.clear();

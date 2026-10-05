@@ -799,8 +799,18 @@ class FakeCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<InviteInfo?> fetchInviteInfo(String token) async =>
-      InviteFormRules.isTokenShaped(token) ? inviteInfo : null;
+  Future<InviteInfo?> fetchInviteInfo(String token) async {
+    inviteLookups++;
+    // F-88: a lookup the server never answered.
+    if (inviteUnreachableTimes > 0) {
+      inviteUnreachableTimes--;
+      throw const InviteUnreachable();
+    }
+    return InviteFormRules.isTokenShaped(token) ? inviteInfo : null;
+  }
+
+  int inviteLookups = 0;
+  int inviteUnreachableTimes = 0;
 
   @override
   Future<void> signUpFounder({

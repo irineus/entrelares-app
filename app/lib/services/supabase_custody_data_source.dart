@@ -1319,10 +1319,13 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       final row = data is List ? (data.isEmpty ? null : data.first) : data;
       if (row is! Map) return null;
       return InviteInfo.fromJson(Map<String, dynamic>.from(row));
-    } catch (_) {
-      // An unusable token must look identical to an unreachable server here:
-      // the screen shows "this invitation is not valid" either way.
+    } on PostgrestException {
+      // The server ANSWERED and refused: as unusable as an unknown token.
       return null;
+    } catch (_) {
+      // F-88: no answer at all (offline, timeout, the gateway unreachable) —
+      // never "convite inválido", which sends the reader back to the ex.
+      throw const InviteUnreachable();
     }
   }
 

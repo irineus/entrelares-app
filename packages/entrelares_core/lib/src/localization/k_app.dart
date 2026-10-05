@@ -810,6 +810,15 @@ abstract final class KApp {
   static const String registerFixEmail = 'app.register.fixEmail';
   static const String updatePwdRequestNew = 'app.updatePwd.requestNew';
   static const String authErrSamePassword = 'app.auth.errSamePassword';
+  static const String inviteUnreachableTitle = 'app.invite.unreachableTitle';
+  static const String inviteUnreachableBody = 'app.invite.unreachableBody';
+  static const String inviteRetry = 'app.invite.retry';
+  static const String inviteEmailMismatch = 'app.invite.emailMismatch';
+  static const String inviteSignedInTitle = 'app.invite.signedInTitle';
+  static const String inviteSignedInBody = 'app.invite.signedInBody';
+  static const String inviteSignOutContinue = 'app.invite.signOutContinue';
+  static const String inviteNotNow = 'app.invite.notNow';
+  static const String loginInvitedHint = 'app.login.invitedHint';
   static const String chatMute = 'app.chat.mute';
   static const String chatMuteLead = 'app.chat.muteLead';
   static const String chatMuted = 'app.chat.muted';
@@ -1446,6 +1455,15 @@ abstract final class KApp {
     registerFixEmail,
     updatePwdRequestNew,
     authErrSamePassword,
+    inviteUnreachableTitle,
+    inviteUnreachableBody,
+    inviteRetry,
+    inviteEmailMismatch,
+    inviteSignedInTitle,
+    inviteSignedInBody,
+    inviteSignOutContinue,
+    inviteNotNow,
+    loginInvitedHint,
     chatMute,
     chatMuteLead,
     chatMuted,
@@ -2232,6 +2250,15 @@ abstract final class StringsAppPtBr {
     KApp.registerFixEmail: 'Corrigir o e-mail',
     KApp.updatePwdRequestNew: 'Pedir novo link',
     KApp.authErrSamePassword: 'A nova senha precisa ser diferente da atual.',
+    KApp.inviteUnreachableTitle: 'Não conseguimos conferir o convite',
+    KApp.inviteUnreachableBody: 'Parece que a conexão caiu. O convite continua guardado — confira a internet e tente de novo.',
+    KApp.inviteRetry: 'Tentar de novo',
+    KApp.inviteEmailMismatch: 'Este convite foi enviado para {0}, e você entrou como {1}. Se o convite é seu, use "Entrar com outra conta" — ele fica guardado.',
+    KApp.inviteSignedInTitle: 'Este convite é para outra conta',
+    KApp.inviteSignedInBody: 'Este aparelho está conectado como {0}. O convite de {1} para a família {2} é para {3}. Para aceitá-lo, saia desta conta e continue.',
+    KApp.inviteSignOutContinue: 'Sair e continuar',
+    KApp.inviteNotNow: 'Agora não',
+    KApp.loginInvitedHint: 'Recebeu um convite? Abra o link do convite que chegou para você — é ele que liga a sua conta à família.',
     KApp.chatMute: 'Silenciar o push da Conversa',
     KApp.chatMuteLead: 'A notificação continua no app; só o celular deixa de tocar.',
     KApp.chatMuted: 'Push da Conversa silenciado.',
@@ -3012,6 +3039,15 @@ abstract final class StringsAppEn {
     KApp.registerFixEmail: 'Fix the e-mail address',
     KApp.updatePwdRequestNew: 'Ask for a new link',
     KApp.authErrSamePassword: 'The new password must be different from the current one.',
+    KApp.inviteUnreachableTitle: 'We could not check the invitation',
+    KApp.inviteUnreachableBody: 'The connection seems to have dropped. The invitation is still kept — check your internet and try again.',
+    KApp.inviteRetry: 'Try again',
+    KApp.inviteEmailMismatch: 'This invitation was sent to {0}, and you signed in as {1}. If the invitation is yours, use "Sign in with another account" — it stays kept.',
+    KApp.inviteSignedInTitle: 'This invitation is for another account',
+    KApp.inviteSignedInBody: 'This device is signed in as {0}. The invitation from {1} to the {2} family is for {3}. To accept it, sign out of this account and continue.',
+    KApp.inviteSignOutContinue: 'Sign out and continue',
+    KApp.inviteNotNow: 'Not now',
+    KApp.loginInvitedHint: 'Got an invitation? Open the invitation link you received — that is what joins your account to the family.',
     KApp.chatMute: 'Silence the chat\'s push',
     KApp.chatMuteLead: 'The notification stays in the app; only the phone stops ringing.',
     KApp.chatMuted: 'Chat push silenced.',

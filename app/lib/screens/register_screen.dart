@@ -126,6 +126,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _loadingInvite = false;
   bool _inviteInvalid = false;
+
+  /// F-88: the invitation could not be checked (no answer) — retry, never
+  /// "inválido".
+  bool _inviteUnreachable = false;
   InviteInfo? _invite;
 
   bool _busy = false;
@@ -242,10 +246,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _resolveInvite(String token) async {
-    final info = await widget.dataSource.fetchInviteInfo(token);
+    InviteInfo? info;
+    try {
+      info = await widget.dataSource.fetchInviteInfo(token);
+    } on InviteUnreachable {
+      if (!mounted) return;
+      setState(() {
+        _loadingInvite = false;
+        _inviteUnreachable = true;
+      });
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _loadingInvite = false;
+      _inviteUnreachable = false;
       if (info == null) {
         _inviteInvalid = true;
         return;
@@ -443,6 +458,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final l = AppL10n.of(context).l;
     final showsForm = !_loadingInvite &&
         !_inviteInvalid &&
+        !_inviteUnreachable &&
         !_signUpDone &&
         !_migrationWarning;
     // U-44: the system back on the family step returns to the account step
@@ -472,6 +488,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _body(Localization l) {
     if (_loadingInvite) return _loadingInviteState(l);
+    if (_inviteUnreachable) return _inviteUnreachableState(l);
     if (_inviteInvalid) return _inviteInvalidState(l);
     if (_signUpDone) return _confirmEmailState(l);
     if (_migrationWarning) return _migrationState(l);
@@ -484,6 +501,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const CircularProgressIndicator(),
           const SizedBox(height: 16),
           Text(l[K.registerCheckingInvite], textAlign: TextAlign.center),
+        ],
+      );
+
+  Widget _inviteUnreachableState(Localization l) => Column(
+        key: const ValueKey('invite-unreachable'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l[KApp.inviteUnreachableTitle],
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 12),
+          Text(l[KApp.inviteUnreachableBody], textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () {
+              final token = widget.inviteToken;
+              if (token == null) return;
+              setState(() {
+                _inviteUnreachable = false;
+                _loadingInvite = true;
+              });
+              _resolveInvite(token);
+            },
+            child: Text(l[KApp.inviteRetry]),
+          ),
         ],
       );
 

@@ -45,6 +45,7 @@ Future<void> pumpOnboarding(
   String? initialInviteToken,
   void Function(InviteInfo invite)? onInviteeJoined,
   VoidCallback? onFamilyFounded,
+  VoidCallback? onInviteDead,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 1600));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -54,6 +55,7 @@ Future<void> pumpOnboarding(
     initialInviteToken: initialInviteToken,
     onInviteeJoined: onInviteeJoined,
     onFamilyFounded: onFamilyFounded,
+    onInviteDead: onInviteDead,
     onSignOut: onSignOut ?? () async {},
     onCompleted: onCompleted ?? () async {},
   )));
@@ -671,5 +673,64 @@ void main() {
             reason: '$providers');
       }
     });
+  });
+
+  group('F-88 — the Google path keeps the invitation', () {
+    const token = '11111111-2222-3333-4444-555555555555';
+    InviteInfo inviteFor(String email) => InviteInfo.fromJson({
+          'family_name': 'Souza',
+          'inviter_name': 'Ana Souza',
+          'invited_email': email,
+          'role_name': 'father',
+          'member_type': 'full',
+        });
+
+    testWidgets('no answer waits for a retry instead of becoming the founder '
+        'form', (tester) async {
+      final ds = FakeCustodyDataSource(members: const [], days: const [])
+        ..inviteInfo = inviteFor('bruno@example.com')
+        ..sessionEmailValue = 'bruno@example.com'
+        ..inviteUnreachableTimes = 1;
+      await pumpOnboarding(tester, ds, await prefsWith({}),
+          initialInviteToken: token);
+
+      expect(find.byKey(const ValueKey('invite-unreachable')), findsOne);
+      expect(find.text(pt[KApp.onbFounderTitle]), findsNothing);
+      await tester.tap(find.text(pt[KApp.inviteRetry]));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[K.registerInvitedTitle]), findsOne);
+    });
+
+    testWidgets('a different Google account is told before the form',
+        (tester) async {
+      final ds = FakeCustodyDataSource(members: const [], days: const [])
+        ..inviteInfo = inviteFor('bruno@example.com')
+        ..sessionEmailValue = 'outra@example.com';
+      await pumpOnboarding(tester, ds, await prefsWith({}),
+          initialInviteToken: token);
+      expect(find.byKey(const ValueKey('invite-email-mismatch')), findsOne);
+    });
+
+    testWidgets('a dead invitation is forgotten', (tester) async {
+      var dead = 0;
+      final ds = FakeCustodyDataSource(members: const [], days: const [])
+        ..inviteInfo = null
+        ..sessionEmailValue = 'bruno@example.com';
+      await pumpOnboarding(tester, ds, await prefsWith({}),
+          initialInviteToken: token, onInviteDead: () => dead++);
+      expect(dead, 1);
+    });
+  });
+
+  testWidgets('F-88: the login says the invitation link is the door',
+      (tester) async {
+    await tester.pumpWidget(wrap(LoginScreen(
+      onSignIn: (_, _) async {},
+      onForgotPassword: () {},
+      onSignUp: () {},
+      prefs: await prefsWith({}),
+    )));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('login-invited-hint')), findsOne);
   });
 }

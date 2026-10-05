@@ -412,6 +412,22 @@ void main() {
       expect(find.textContaining('Pai'), findsOne);
     });
 
+    testWidgets('F-88: no answer is not "inválido" — retry, and the token '
+        'is still there', (tester) async {
+      final ds = source()
+        ..inviteInfo = invite
+        ..inviteUnreachableTimes = 1;
+      await pumpRegister(tester, dataSource: ds, inviteToken: validToken);
+
+      expect(find.byKey(const ValueKey('invite-unreachable')), findsOne);
+      expect(find.text(l[K.registerInviteInvalidTitle]), findsNothing);
+      await tapVisible(tester, find.text(l[KApp.inviteRetry]));
+      await tester.pumpAndSettle();
+
+      expect(ds.inviteLookups, 2);
+      expect(find.text(l[K.registerInvitedTitle]), findsOne);
+    });
+
     testWidgets('hides the family name and the role grid', (tester) async {
       final ds = source()..inviteInfo = invite;
       await pumpRegister(tester, dataSource: ds, inviteToken: validToken);

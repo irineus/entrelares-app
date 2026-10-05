@@ -463,6 +463,11 @@ abstract class CustodyDataSource {
   /// Resolves an invitation token for an anonymous visitor, or null when the
   /// invitation is not usable. Unknown, accepted, revoked and expired tokens
   /// are all null — the RPC does not distinguish them, and neither may the UI.
+  ///
+  /// F-88: a server that could not be REACHED is not an invalid invitation —
+  /// it throws [InviteUnreachable], and the screen offers "Tentar de novo".
+  /// 4G at the school gate used to read "Convite inválido ou expirado — peça
+  /// um novo", and its only button dropped the token.
   Future<InviteInfo?> fetchInviteInfo(String token);
 
   /// The FOUNDER branch. GoTrue creates the auth user carrying the metadata
@@ -1184,6 +1189,11 @@ class SwapAlreadyAnswered implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// F-88: the invitation could not be checked — no answer from the server.
+class InviteUnreachable implements Exception {
+  const InviteUnreachable();
 }
 
 class BillingRefused implements Exception {

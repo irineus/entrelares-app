@@ -370,6 +370,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
+                // F-88: "baixa o Entrelares, te convidei" — the invited parent
+                // opened the app, not the link, and founded a family of their
+                // own. The link is the door; say so where they would sign up.
+                Text(l[KApp.loginInvitedHint],
+                    key: const ValueKey('login-invited-hint'),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall),
                 if (widget.onHelp != null)
                   TextButton(
                     key: const ValueKey('login-help-link'),
