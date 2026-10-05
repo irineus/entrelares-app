@@ -348,13 +348,7 @@ class HomeShell extends StatelessWidget {
                         _bellIcon(const Icon(Icons.notifications_outlined), l),
                     selectedIcon:
                         _bellIcon(const Icon(Icons.notifications), l),
-                    tooltip: badge.count > 0
-                        ? l.format(
-                            badge.count == 1
-                                ? K.navNotificationsOnePending
-                                : K.navNotificationsManyPending,
-                            [badge.count])
-                        : null,
+                    tooltip: _bellLabel(l),
                     label: commLabel),
                 if (withExpenses)
                   NavigationDestination(
@@ -599,14 +593,29 @@ class HomeShell extends StatelessWidget {
   /// U-32 (TalkBack, 18/09/2026): the badge's text was its own node, so the
   /// reader heard "2" and then "Notificações". The count rides as the sentence the
   /// tooltip already carries, and the bare number leaves the tree.
+  /// F-90: the sentence names BOTH numbers the badge adds up — pending
+  /// requests and unread Conversa texts. It named only the first, so a
+  /// reader heard "nothing pending" over a badge showing 3.
+  String? _bellLabel(Localization l) {
+    final parts = <String>[
+      if (badge.count > 0)
+        l.format(
+            badge.count == 1
+                ? K.navNotificationsOnePending
+                : K.navNotificationsManyPending,
+            [badge.count])
+      else if (badge.chatUnread > 0)
+        l[K.navNotifications],
+      if (badge.chatUnread > 0)
+        badge.chatUnread == 1
+            ? l[KApp.chatNewOne]
+            : l.format(KApp.chatNewMany, [badge.chatUnread]),
+    ];
+    return parts.isEmpty ? null : parts.join(', ');
+  }
+
   Widget _bellIcon(Icon icon, Localization l) => Semantics(
-        label: badge.count > 0
-            ? l.format(
-                badge.count == 1
-                    ? K.navNotificationsOnePending
-                    : K.navNotificationsManyPending,
-                [badge.count])
-            : null,
+        label: _bellLabel(l),
         excludeSemantics: true,
         child: Badge(
           // F-35: requests waiting on me plus unread Conversa texts.

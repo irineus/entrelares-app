@@ -1236,6 +1236,69 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('F-90: the bell sentence names BOTH numbers the badge adds', (
+      tester,
+    ) async {
+      await _usePhone(tester);
+      final handle = tester.ensureSemantics();
+      final ds =
+          cal.FakeCustodyDataSource(members: [cal.ana, cal.bruno], days: [])
+            ..pendingForMe = [
+              frz.swapReq(10, cal.dayOfMonth(cal.today.day)),
+              frz.swapReq(11, cal.dayOfMonth(cal.today.day)),
+            ];
+      final badge = NotificationBadge(ds);
+      await badge.refresh();
+      expect(badge.count, 2);
+      // Unread Conversa texts ride on the same badge.
+      badge.chatUnread = 3;
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: [
+          StatefulShellRoute.indexedStack(
+            builder: (_, _, shell) => HomeShell(
+              shell: shell,
+              adminMode: AdminMode(),
+              identity: AccountIdentity(),
+              onSignOut: () async {},
+              onOpenProfile: () {},
+              badge: badge,
+            ),
+            branches: [
+              for (final path in ['/', '/family', '/notifications', '/reports'])
+                StatefulShellBranch(
+                  routes: [
+                    GoRoute(
+                      path: path,
+                      builder: (_, _) => const Scaffold(body: SizedBox()),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        AppL10n(
+          l: pt,
+          setLanguage: (_) async {},
+          child: MaterialApp.router(
+            theme: AppTheme.light,
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('5'), findsOneWidget, reason: 'the badge adds both');
+      expect(
+        find.bySemanticsLabel(RegExp(
+            '${pt.format(K.navNotificationsManyPending, [2])}, '
+            '${pt.format(KApp.chatNewMany, [3])}')),
+        findsWidgets,
+      );
+      handle.dispose();
+    });
+
     testWidgets('an audit diff says which side each value is', (tester) async {
       await _usePhone(tester);
       final handle = tester.ensureSemantics();
