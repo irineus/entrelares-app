@@ -139,6 +139,16 @@ serve(async (req) => {
 			const purchase = await fetchStorePurchase(packageName, productId, purchaseToken);
 			if (!purchase) return jsonResponse({ ok: true, ignored: true });
 
+			// F-107: the ledger row keeps the purchase it was answered with —
+			// the price and the Google order id are what `get_billing_history`
+			// shows, and what dedupes it against the verification of the same
+			// period.
+			const { error: ledgerUpdateError } = await admin
+				.from("billing_events")
+				.update({ payload: { ...notification, purchase } })
+				.eq("event_id", `play-rtdn:${messageId}`);
+			if (ledgerUpdateError) throw ledgerUpdateError;
+
 			const { error } = await admin
 				.from("subscriptions")
 				.update({
