@@ -545,4 +545,61 @@ void main() {
       expect(parseBoolSetting(null, 'billing.enabled', false), isFalse);
     });
   });
+
+  group('F-86 checkoutConfirmed', () {
+    final t0 = DateTime.utc(2026, 10, 5, 12);
+    CheckoutBaseline base({bool premium = false, DateTime? end}) =>
+        CheckoutBaseline(premium: premium, periodEndUtc: end, takenAtUtc: t0);
+
+    test('a free family that became Premium paid', () {
+      expect(
+          checkoutConfirmed(
+              before: base(), premiumNow: true, periodEndNowUtc: null),
+          isTrue);
+    });
+
+    test('an already-Premium family whose period did not move paid nothing',
+        () {
+      final end = DateTime.utc(2026, 10, 20);
+      expect(
+          checkoutConfirmed(
+              before: base(premium: true, end: end),
+              premiumNow: true,
+              periodEndNowUtc: end),
+          isFalse);
+      // A trial: Premium, no period at all, and still none.
+      expect(
+          checkoutConfirmed(
+              before: base(premium: true), premiumNow: true, periodEndNowUtc: null),
+          isFalse);
+    });
+
+    test('the paid period moving later is a payment', () {
+      final end = DateTime.utc(2026, 10, 20);
+      expect(
+          checkoutConfirmed(
+              before: base(premium: true, end: end),
+              premiumNow: true,
+              periodEndNowUtc: end.add(const Duration(days: 30))),
+          isTrue);
+      expect(
+          checkoutConfirmed(
+              before: base(premium: true),
+              premiumNow: true,
+              periodEndNowUtc: DateTime.utc(2026, 11, 5)),
+          isTrue,
+          reason: 'a trial family that paid now has a period');
+    });
+
+    test('the baseline round-trips and ages', () {
+      final b = base(premium: true, end: DateTime.utc(2026, 10, 20));
+      final back = CheckoutBaseline.fromJson(b.toJson())!;
+      expect(back.premium, isTrue);
+      expect(back.periodEndUtc, DateTime.utc(2026, 10, 20));
+      expect(back.isFresh(t0.add(const Duration(hours: 1))), isTrue);
+      expect(back.isFresh(t0.add(const Duration(days: 1))), isFalse);
+      expect(CheckoutBaseline.fromJson({'premium': 'x'}), isNull);
+      expect(CheckoutBaseline.fromJson(null), isNull);
+    });
+  });
 }

@@ -14,6 +14,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:entrelares_db_contracts/models/family.dart';
+import 'package:entrelares_db_contracts/models/subscription.dart';
 import 'package:entrelares_app/screens/premium_return_screen.dart';
 import 'package:entrelares_app/services/analytics_service.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
@@ -75,6 +76,7 @@ void main() {
     FakeCustodyDataSource ds, {
     AnalyticsService? tracker,
     int maxAttempts = 3,
+    CheckoutBaseline? baseline,
   }) async {
     await tester.pumpWidget(AppL10n(
       l: l,
@@ -85,6 +87,7 @@ void main() {
           analytics: tracker,
           maxAttempts: maxAttempts,
           pollDelay: const Duration(milliseconds: 10),
+          baseline: baseline,
         ),
       ),
     ));
@@ -136,7 +139,12 @@ void main() {
   testWidgets('a read that fails is not a failed payment — the poll goes on',
       (tester) async {
     final ds = _FlippingSource(flipsOnRead: 2)..throwOnce = Exception('offline');
-    await pump(tester, ds);
+    // The plan page wrote what the family had before leaving: free.
+    await pump(tester, ds,
+        baseline: CheckoutBaseline(
+            premium: false,
+            periodEndUtc: null,
+            takenAtUtc: DateTime.now().toUtc()));
     await tester.pumpAndSettle();
 
     // The first read threw; the second saw the flip.
@@ -154,4 +162,64 @@ void main() {
 
     expect(ds.reads, lessThanOrEqualTo(readsWhileMounted + 1));
   });
+
+  // F-86: the page polled `plan == 'premium'`, already true for a trial, a
+  // cancelled-but-paid family or one in grace — a parent who closed the Pix
+  // page without paying read "Pagamento confirmado" and let Premium lapse.
+  testWidgets('F-86: a family already Premium whose period did not move '
+      'never reads "confirmado"', (tester) async {
+    final end = DateTime.now().toUtc().add(const Duration(days: 12));
+    final ds = _FlippingSource(flipsOnRead: 1)
+      ..subscription = Subscription(
+          id: 1, familyId: 7, status: 'canceled', currentPeriodEnd: end);
+    final tracker = analytics();
+    await pump(tester, ds,
+        tracker: tracker,
+        baseline: CheckoutBaseline(
+            premium: true, periodEndUtc: end, takenAtUtc: DateTime.now().toUtc()));
+    await tester.pumpAndSettle();
+
+    expect(find.text(l[K.payActiveTitle]), findsNothing);
+    expect(find.text(l[K.payActiveBody]), findsNothing);
+    expect(find.text(l[K.payAlmostTitle]), findsOne);
+    expect(dataOf('premium-checkout-outcome'),
+        {'channel': 'store', 'outcome': 'timeout'});
+  });
+
+  testWidgets('F-86: the paid period moving later is the payment', (tester) async {
+    final end = DateTime.now().toUtc().add(const Duration(days: 12));
+    final ds = _PeriodMovingSource(
+        before: end, after: end.add(const Duration(days: 30)), movesOnRead: 2);
+    await pump(tester, ds,
+        baseline: CheckoutBaseline(
+            premium: true, periodEndUtc: end, takenAtUtc: DateTime.now().toUtc()));
+    await tester.pumpAndSettle();
+    expect(find.text(l[K.payActiveTitle]), findsOne);
+  });
+}
+
+/// An already-Premium family whose paid period the webhook extends on the
+/// [movesOnRead]-th read.
+class _PeriodMovingSource extends FakeCustodyDataSource {
+  final DateTime before;
+  final DateTime after;
+  final int movesOnRead;
+  int reads = 0;
+
+  _PeriodMovingSource(
+      {required this.before, required this.after, required this.movesOnRead})
+      : super(members: const [], days: const []);
+
+  @override
+  Future<Family?> fetchOwnFamily() async {
+    reads++;
+    return const Family(id: 7, name: 'Souza', plan: 'premium');
+  }
+
+  @override
+  Future<Subscription?> fetchSubscription() async => Subscription(
+      id: 1,
+      familyId: 7,
+      status: 'active',
+      currentPeriodEnd: reads >= movesOnRead ? after : before);
 }

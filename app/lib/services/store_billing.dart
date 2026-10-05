@@ -88,7 +88,13 @@ class StorePurchase {
 /// The real implementation, on `in_app_purchase`.
 class PlayStoreBilling implements StoreBilling {
   final InAppPurchase _iap;
-  final _controller = StreamController<StorePurchase>.broadcast();
+
+  /// F-86: updates that arrived with nobody listening, replayed to the first
+  /// listener — a broadcast stream drops them, and a purchase dropped here is
+  /// a purchase Play refunds three days later.
+  final List<StorePurchase> _backlog = [];
+  late final _controller =
+      StreamController<StorePurchase>.broadcast(onListen: _replayBacklog);
   StreamSubscription<List<PurchaseDetails>>? _subscription;
 
   /// The plugin's details for a product id, kept so [buy] can hand the plugin
@@ -97,7 +103,7 @@ class PlayStoreBilling implements StoreBilling {
 
   PlayStoreBilling({InAppPurchase? iap}) : _iap = iap ?? InAppPurchase.instance {
     _subscription = _iap.purchaseStream.listen(
-      (updates) => updates.map(_map).forEach(_controller.add),
+      (updates) => updates.map(_map).forEach(_deliver),
       onError: (_) {/* a dead stream is not a failed payment */},
     );
   }
@@ -164,6 +170,20 @@ class PlayStoreBilling implements StoreBilling {
       errorMessage: details.error?.message,
     );
   }
+
+  void _deliver(StorePurchase purchase) {
+    if (_controller.hasListener) {
+      _controller.add(purchase);
+    } else {
+      _backlog.add(purchase);
+    }
+  }
+
+  void _replayBacklog() => scheduleMicrotask(() {
+        final waiting = [..._backlog];
+        _backlog.clear();
+        waiting.forEach(_controller.add);
+      });
 
   @override
   void dispose() {

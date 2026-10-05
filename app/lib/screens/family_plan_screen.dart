@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'dart:async';
 
 import 'package:entrelares_core/entrelares_core.dart';
@@ -10,8 +12,10 @@ import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/subscription.dart';
 import '../env.dart';
 import '../services/analytics_service.dart';
+import '../services/checkout_note.dart';
 import '../services/custody_data_source.dart';
 import '../services/store_billing.dart';
+import '../services/store_purchases.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
@@ -55,6 +59,10 @@ class FamilyPlanScreen extends StatefulWidget {
   /// shows, so a missing service can never become a broken offer.
   final StoreBilling? storeBilling;
 
+  /// F-86: the app-level purchase listener. Null (tests, or a build without
+  /// one) makes the page run its own for as long as it is open.
+  final StorePurchaseCoordinator? purchases;
+
   /// Hands a URL to the system browser. Injectable for the same reason: WHERE
   /// the family is sent to pay is a money-critical fact worth asserting, and
   /// the plugin channel does not exist in a widget test.
@@ -67,6 +75,7 @@ class FamilyPlanScreen extends StatefulWidget {
     this.isStoreChannel = !kIsWeb,
     this.openExternal,
     this.storeBilling,
+    this.purchases,
   });
 
   @override
@@ -102,7 +111,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   // it. The choice is screen state only: nothing is charged until the CTA.
   String _offerCycle = 'annual';
   bool _storePurchasePending = false;
-  StreamSubscription<StorePurchase>? _storeSubscription;
+  StreamSubscription<StorePurchaseOutcome>? _outcomeSubscription;
+
+  /// F-86: the page's own coordinator, only when the app handed none.
+  StorePurchaseCoordinator? _ownPurchases;
 
   // F-43: payment history — lazy on first expand, cached afterwards.
   bool _historyOpen = false;
@@ -115,12 +127,22 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     super.initState();
     _load();
     final store = widget.storeBilling;
-    if (store != null) _storeSubscription = store.purchases.listen(_onPurchase);
+    var purchases = widget.purchases;
+    if (purchases == null && store != null) {
+      purchases = _ownPurchases = StorePurchaseCoordinator(
+          store: store, dataSource: widget.dataSource, analytics: widget.analytics);
+      unawaited(purchases.activate(restore: false));
+    }
+    if (purchases != null) {
+      _storePurchasePending = purchases.pending.value;
+      _outcomeSubscription = purchases.outcomes.listen(_onPurchaseOutcome);
+    }
   }
 
   @override
   void dispose() {
-    _storeSubscription?.cancel();
+    _outcomeSubscription?.cancel();
+    _ownPurchases?.dispose();
     super.dispose();
   }
 
@@ -369,6 +391,13 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
               channel: _channel,
               cycle: cycle,
               mode: avulso ? 'avulso' : 'recurring'));
+      // F-86: what the family has right now — the return page counts a
+      // payment only as a CHANGE against this.
+      writeCheckoutNote(jsonEncode(CheckoutBaseline(
+        premium: _planStatus.isPremium,
+        periodEndUtc: _subscription?.currentPeriodEnd?.toUtc(),
+        takenAtUtc: DateTime.now().toUtc(),
+      ).toJson()));
       await (widget.openExternal ?? _openExternal)(url);
       if (!mounted) return;
       // The payment happens outside the app and confirms ASYNCHRONOUSLY (the
@@ -470,54 +499,29 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     }
   }
 
-  /// A purchase update arrived. The client NEVER grants premium here: it hands
-  /// the token to the server, and only the reload that follows can show the
-  /// new plan.
-  Future<void> _onPurchase(StorePurchase purchase) async {
+  /// F-86: what the app-level listener did with a purchase update. The
+  /// verification and the acknowledgement already happened there — wherever
+  /// the reader was; this page only says so and reloads.
+  void _onPurchaseOutcome(StorePurchaseOutcome outcome) {
+    if (!mounted) return;
     final l = AppL10n.of(context).l;
-    if (purchase.status == StorePurchaseStatus.pending) {
-      setState(() => _storePurchasePending = true);
-      return;
-    }
-    if (!purchase.isOwned) {
-      setState(() => _storePurchasePending = false);
-      if (purchase.status == StorePurchaseStatus.failed) {
-        showAppSnack(context, purchase.errorMessage ?? l[KApp.storeErrPurchase],
+    switch (outcome.kind) {
+      case StorePurchaseOutcomeKind.pending:
+        setState(() => _storePurchasePending = true);
+      case StorePurchaseOutcomeKind.canceled:
+        setState(() => _storePurchasePending = false);
+      case StorePurchaseOutcomeKind.failed:
+        setState(() => _storePurchasePending = false);
+        showAppSnack(context, outcome.message ?? l[KApp.storeErrPurchase],
             type: AppSnackType.error);
-      }
-      return;
-    }
-
-    setState(() => _storePurchasePending = true);
-    try {
-      await widget.dataSource.verifyStorePurchase(
-        productId: purchase.productId,
-        purchaseToken: purchase.verificationToken ?? '',
-      );
-      // Acknowledge ONLY after the server accepted it — Play refunds an
-      // unacknowledged purchase after three days, and acknowledging one the
-      // server refused would strand the family without the entitlement.
-      await widget.storeBilling?.complete(purchase);
-      widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutOutcome,
-          props: analyticsFunnelProps(
-              channel: _channel,
-              cycle: cycleForStoreProduct(purchase.productId),
-              mode: 'store',
-              outcome: 'confirmed'));
-      if (!mounted) return;
-      showAppSnack(context, l[KApp.storeToastActive]);
-      setState(() => _storePurchasePending = false);
-      await _load();
-    } on BillingRefused catch (e) {
-      if (!mounted) return;
-      setState(() => _storePurchasePending = false);
-      showAppSnack(context, e.serverMessage ?? l[KApp.storeErrPurchase],
-          type: AppSnackType.error);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _storePurchasePending = false);
-      showAppSnack(context, l[KApp.storeErrPurchase],
-          type: AppSnackType.error);
+      case StorePurchaseOutcomeKind.refused:
+        setState(() => _storePurchasePending = false);
+        showAppSnack(context, outcome.message ?? l[KApp.storeErrPurchase],
+            type: AppSnackType.error);
+      case StorePurchaseOutcomeKind.verified:
+        setState(() => _storePurchasePending = false);
+        showAppSnack(context, l[KApp.storeToastActive]);
+        unawaited(_load());
     }
   }
 

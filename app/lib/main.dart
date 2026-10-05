@@ -69,6 +69,7 @@ import 'services/push_service.dart';
 import 'services/refresh_guard_client.dart';
 import 'services/session_gate.dart';
 import 'services/store_billing.dart';
+import 'services/store_purchases.dart';
 import 'services/sudo_service.dart';
 import 'services/support_service.dart';
 import 'services/supabase_custody_data_source.dart';
@@ -220,6 +221,14 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   // the master switch off produces, so one missing piece never yields a
   // half-drawn offer.
   final StoreBilling? _storeBilling = kIsWeb ? null : PlayStoreBilling();
+
+  /// F-86: the one purchase listener, alive with the app — a purchase that
+  /// settles while the reader is on the calendar is verified and
+  /// acknowledged all the same. Activated with the authenticated phase.
+  late final StorePurchaseCoordinator? _purchases = _storeBilling == null
+      ? null
+      : StorePurchaseCoordinator(
+          store: _storeBilling, dataSource: _dataSource, analytics: _analytics);
 
   // F-14: session-scoped, like the web's scoped AdminModeService — never
   // persisted; leaving the authenticated phase always deactivates it.
@@ -571,6 +580,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                     dataSource: _dataSource,
                     analytics: _analytics,
                     storeBilling: _storeBilling,
+                    purchases: _purchases,
                   ),
                 ),
                 GoRoute(
@@ -1104,6 +1114,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     }
     _inactivityTimer?.cancel();
     _adminMode.dispose();
+    _purchases?.dispose();
     _storeBilling?.dispose();
     _onboarding.dispose();
     _sudo.dispose();
@@ -1159,8 +1170,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _expensesTab.value = false;
       _chatTab.value = false;
       _badge.chatOn = false;
+      _purchases?.deactivate();
     }
     if (phase == _AuthPhase.authed) {
+      // F-86: verify what Play holds for this account — held purchases, and
+      // one restore per process.
+      unawaited(_purchases?.activate());
       _lastInteraction = DateTime.now();
       _inactivityTimer ??= Timer.periodic(
           InactivityPolicy.pollInterval, (_) => _checkInactivity());
