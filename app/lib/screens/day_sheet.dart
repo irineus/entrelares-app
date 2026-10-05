@@ -339,6 +339,19 @@ class _DaySheetState extends State<_DaySheet> {
 
   bool get _isPast => isDayInPast(widget.date, widget.today);
 
+  /// S-26: picking "Sem troca" on this day would open a revert the reader is
+  /// not a party to — a third caregiver on someone else's approved swap.
+  bool get _noSwapIsForeignRevert {
+    final day = widget.day;
+    if (day == null || _isPast) return false;
+    final actual = day.actualParentId;
+    if (actual == null || actual == day.scheduledParentId) return false;
+    return !mayRequestRevert(
+        requesterId: widget.ownProfileId,
+        scheduledParentId: day.scheduledParentId,
+        actualParentId: actual);
+  }
+
   /// F-67: an active member with an account, a day inside D-1 … D-30, and a
   /// connection. The RPC is the enforcement.
   bool get _canWriteAccount {
@@ -1904,6 +1917,9 @@ class _DaySheetState extends State<_DaySheet> {
         child: Wrap(
         spacing: 8,
         children: [
+          // S-26: on a swapped day, "Sem troca" IS the revert — offered
+          // only to the day's planned or actual carer.
+          if (!_noSwapIsForeignRevert)
           ChoiceChip(
             key: const ValueKey('actual-no-swap'),
             // The frame already asks "Responsável real": "Sem troca" is the

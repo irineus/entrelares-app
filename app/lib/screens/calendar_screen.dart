@@ -1378,6 +1378,7 @@ class _CalendarScreenState extends State<CalendarScreen>
             actualParentId: row.actualParentId,
             today: _today,
             frozenDates: frozenDates,
+            requesterId: _ownProfile?.id,
           )) {
         revertable++;
       }
