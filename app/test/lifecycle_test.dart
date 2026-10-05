@@ -229,6 +229,23 @@ void main() {
       expect(ds.deletionResponses, [true]);
     });
 
+    testWidgets('F-91: a viewer reads the panel and is offered no vote',
+        (tester) async {
+      const vo = Member(
+          id: 9,
+          fullName: 'Vó Cida',
+          userId: 'u9',
+          roleId: 1,
+          membershipType: 'viewer');
+      final ds = source(members: const [vo, ana, bruno], pending: deletion());
+      await pumpFamily(tester, ds);
+
+      expect(find.byKey(const ValueKey('deletion-viewer-readonly')), findsOne);
+      expect(find.text(l[K.famDelAgree]), findsNothing);
+      expect(find.text(l[K.famDelRefuseKeep]), findsNothing);
+      expect(find.text(l[K.famDelWithdraw]), findsNothing);
+    });
+
     testWidgets('refusing ends it, also without a password', (tester) async {
       final ds = source(members: const [bruno, ana], pending: deletion());
       await pumpFamily(tester, ds);

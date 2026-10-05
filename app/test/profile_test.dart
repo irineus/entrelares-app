@@ -258,6 +258,26 @@ void main() {
       expect(ds.adminUpdates, isEmpty);
     });
 
+    testWidgets('F-91: the toast names the member, and a closed prompt '
+        'shows none', (tester) async {
+      final ds = source();
+      await pumpProfile(tester, ds, profileId: 2);
+
+      await tester.tap(find.text(l[K.profMakeAdmin]));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.commonCancel]));
+      await tester.pumpAndSettle();
+      expect(find.text(l.format(K.profToastNowAdmin, ['Bruno Lima'])),
+          findsNothing);
+
+      await tester.tap(find.text(l[K.profMakeAdmin]));
+      await tester.pumpAndSettle();
+      await confirmSudo(tester);
+      expect(find.text(l.format(K.profToastNowAdmin, ['Bruno Lima'])),
+          findsOne);
+      expect(find.textContaining('{0}'), findsNothing);
+    });
+
     testWidgets('an already-elevated session acts without asking again',
         (tester) async {
       final ds = source();
@@ -424,6 +444,22 @@ void main() {
 
       expect(ds.passwordResets, ['bruno@example.com']);
     });
+  });
+
+  testWidgets('F-91: a closed prompt sends no reset and says no "sent"',
+      (tester) async {
+    final l = Localization(AppLanguage.ptBr);
+    final ds = source();
+    await pumpProfile(tester, ds, profileId: 2);
+
+    await tester.tap(find.text(l[K.profSendPasswordReset]));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l[K.commonCancel]));
+    await tester.pumpAndSettle();
+
+    expect(ds.passwordResets, isEmpty);
+    expect(find.text(l.format(K.profToastResetSentTo, ['bruno@example.com'])),
+        findsNothing);
   });
 
   group('F-17 export', () {

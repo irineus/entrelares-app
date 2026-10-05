@@ -274,9 +274,14 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       // deliberate, not a bug.
       // F-56: also fetched whenever a placeholder exists, at the cap or not —
       // its card needs to know whether an invitation is out.
-      final seated = members.where((m) => !m.hasLeft).length;
+      // F-91: CAREGIVER seats only — a viewer holds none (F-50). Counting
+      // them hid every invitation of a Premium family with two grandparents
+      // as viewers; and with viewers on, the viewer invitations need the
+      // list whatever the caregiver count.
+      final seated = members.where((m) => !m.hasLeft && !m.isViewer).length;
       final invitations = seated < settings.maxCaregivers ||
-              members.any((m) => m.isPendingMember)
+              members.any((m) => m.isPendingMember) ||
+              settings.viewersEnabled
           ? await widget.dataSource.fetchOpenInvitations()
           : <FamilyInvitation>[];
       final deletion = await widget.dataSource.fetchPendingFamilyDeletion();
@@ -1089,6 +1094,10 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     final now = DateTime.now().toUtc();
     final open =
         _invitations.where((i) => i.isViewer && !i.isExpired(now) && i.isPending(now));
+    // F-91: an expired viewer invitation was filtered out entirely — no
+    // "Reenviar", as if it had never been sent.
+    final expiredViewers =
+        _invitations.where((i) => i.isViewer && i.isExpired(now));
     final block = ViewerRules.inviteBlock(
       viewersTaken: _viewersTaken,
       isPremium: _isPremium,
@@ -1102,6 +1111,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       children: [
         _sectionTitle(l[KApp.viewerSection]),
         ...open.map((i) => _invitationCard(i, l, expired: false)),
+        ...expiredViewers.map((i) => _invitationCard(i, l, expired: true)),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1647,7 +1657,13 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             ),
           ),
         const SizedBox(height: 12),
-        if (iAmRequester)
+        // F-91: a viewer follows the plan and has no vote (F-50) — the server
+        // refuses it; the panel is read-only for them.
+        if (_me?.isViewer == true)
+          Text(l[KApp.viewerDeletionNoVote],
+              key: const ValueKey('deletion-viewer-readonly'),
+              style: theme.textTheme.bodySmall)
+        else if (iAmRequester)
           OutlinedButton(
             onPressed: _deletionBusy
                 ? null
