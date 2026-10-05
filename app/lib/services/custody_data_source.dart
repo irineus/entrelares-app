@@ -758,10 +758,28 @@ abstract class CustodyDataSource {
 
   /// Every text of the family's conversation, oldest first. A viewer reads
   /// them too (RLS).
-  Future<List<ChatMessage>> fetchChatMessages();
+  ///
+  /// T-104: one PAGE — the newest [chatPageSize] texts, or the newest older
+  /// than [beforeId] — oldest first. An unpaged read was cut by PostgREST's
+  /// `max_rows` at the OLD end of an ascending list: past ~1,000 texts the
+  /// newest stopped showing.
+  Future<List<ChatMessage>> fetchChatPage({int? beforeId});
 
-  /// "Lida por" — every read mark of the family's texts.
-  Future<List<ChatRead>> fetchChatReads();
+  /// T-104: every text newer than [afterId], oldest first — what a poll or a
+  /// change on the channel adds to a Conversa already on screen.
+  Future<List<ChatMessage>> fetchChatMessagesAfter(int afterId);
+
+  /// T-104: every text written in [fromUtc, toUtcExclusive) — the PDF's
+  /// section — plus the texts those replies quote from before the period.
+  Future<List<ChatMessage>> fetchChatMessagesForPeriod(
+      DateTime fromUtc, DateTime toUtcExclusive);
+
+  /// The texts with these ids (a quote older than the loaded pages).
+  Future<List<ChatMessage>> fetchChatMessagesByIds(List<int> ids);
+
+  /// "Lida por" — the read marks of THESE texts (T-104: of the loaded ones,
+  /// never the family's whole table, which a cap would cut).
+  Future<List<ChatRead>> fetchChatReads(List<int> messageIds);
 
   /// Server-enforced: flag on, a full seat, Premium, the length key and the
   /// hourly brake — the RPC's PT-BR sentence reaches the user verbatim.
@@ -1155,6 +1173,9 @@ class ElevationRefused implements Exception {
 /// client-side guess (pilot lesson 4: never collapse the server's error into a
 /// generic one) — its refusals are written to be read by the payer, e.g. why
 /// a card subscription cannot be resumed without paying today.
+/// T-104: how many texts one Conversa page carries.
+const int chatPageSize = 200;
+
 class BillingRefused implements Exception {
   final String? serverMessage;
 

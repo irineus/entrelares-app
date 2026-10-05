@@ -28,6 +28,12 @@ import 'ui/ui.dart';
 /// T-83 poll as the net while the socket is down — and what arrives while the
 /// Conversa is ON SCREEN is marked read at once. On screen = the shell branch
 /// is active (go_router's `TickerMode`) and the app is in the foreground.
+///
+/// T-104: the texts arrive in PAGES — the newest [chatPageSize] first, older
+/// ones as the reader scrolls up — and the read marks only for the texts on
+/// hand. The whole table in one request was cut by PostgREST's `max_rows`
+/// at the NEWEST end, so past ~1,000 texts new ones never showed, and past
+/// ~1,000 marks every new text read "Ainda não lida" for everyone.
 class ChatView extends StatefulWidget {
   final CustodyDataSource dataSource;
 
@@ -66,6 +72,18 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
   List<ChatRead> _reads = const [];
   bool _muted = false;
 
+  /// T-104: the first text of the page loaded at opening. Older pages grow
+  /// UPWARD from it (the sliver before the scroll view's center), so loading
+  /// them never moves what the reader is looking at. Null while the Conversa
+  /// opened empty: everything then sits after the center.
+  int? _anchorId;
+  bool _hasOlder = false;
+  bool _loadingOlder = false;
+
+  /// Quoted texts older than every loaded page, by id.
+  Map<int, ChatMessage> _quoted = const {};
+  final Key _center = UniqueKey();
+
   String? _query;
   final _search = TextEditingController();
   final _composer = TextEditingController();
@@ -85,8 +103,58 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scroll.addListener(_onScroll);
     _load();
     _watch();
+  }
+
+  /// Near the top with older texts on the server: fetch the previous page.
+  void _onScroll() {
+    if (!_scroll.hasClients || !_hasOlder || _loadingOlder) return;
+    if (_scroll.position.extentBefore < 300) unawaited(_loadOlder());
+  }
+
+  List<int> _ids(Iterable<ChatMessage> messages) =>
+      [for (final m in messages) m.id];
+
+  /// T-104: the texts quoted by [page] that no loaded page carries — a reply
+  /// to something said long ago still shows what it answers. Best effort:
+  /// a failure costs the quote box, never the text.
+  Future<Map<int, ChatMessage>> _quotesFor(
+      Iterable<ChatMessage> page, Iterable<ChatMessage> loaded) async {
+    final have = {..._ids(loaded), ..._quoted.keys};
+    final missing = {
+      for (final m in page)
+        if (m.quoteId != null && !have.contains(m.quoteId)) m.quoteId!
+    }.toList();
+    if (missing.isEmpty) return _quoted;
+    try {
+      final got = await widget.dataSource.fetchChatMessagesByIds(missing);
+      return {..._quoted, for (final m in got) m.id: m};
+    } catch (_) {
+      return _quoted;
+    }
+  }
+
+  Future<void> _loadOlder() async {
+    if (_loadingOlder || !_hasOlder || _messages.isEmpty) return;
+    setState(() => _loadingOlder = true);
+    try {
+      final older =
+          await widget.dataSource.fetchChatPage(beforeId: _messages.first.id);
+      final reads = await widget.dataSource.fetchChatReads(_ids(older));
+      final quoted = await _quotesFor(older, [...older, ..._messages]);
+      if (!mounted) return;
+      setState(() {
+        _messages = [...older, ..._messages];
+        _reads = [...reads, ..._reads];
+        _quoted = quoted;
+        _hasOlder = older.length >= chatPageSize;
+        _loadingOlder = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingOlder = false);
+    }
   }
 
   @override
@@ -108,6 +176,7 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _activeBranch?.removeListener(_onVisibilityChanged);
+    _scroll.removeListener(_onScroll);
     _unwatch?.call();
     _changeDebounce?.cancel();
     _pollTimer?.cancel();
@@ -184,15 +253,26 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
       return;
     }
     try {
-      final got = await Future.wait<Object?>([
-        widget.dataSource.fetchChatMessages(),
-        widget.dataSource.fetchChatReads(),
-      ]);
+      final newest = ChatRules.newestId(_lines);
+      final fresh = newest == null
+          ? await widget.dataSource.fetchChatPage()
+          : await widget.dataSource.fetchChatMessagesAfter(newest);
+      final messages = [
+        ..._messages,
+        for (final m in fresh)
+          if (newest == null || m.id > newest) m
+      ];
+      final reads = await widget.dataSource.fetchChatReads(_ids(messages));
+      final quoted = await _quotesFor(fresh, messages);
       if (!mounted) return;
       final follow = toEnd || _atEnd;
       setState(() {
-        _messages = got[0] as List<ChatMessage>;
-        _reads = got[1] as List<ChatRead>;
+        if (_messages.isEmpty && messages.isNotEmpty) {
+          _hasOlder = fresh.length >= chatPageSize;
+        }
+        _messages = messages;
+        _reads = reads;
+        _quoted = quoted;
       });
       if (follow) _scrollToEnd();
       if (_onScreen) await _markRead();
@@ -223,21 +303,27 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
       final rest = await Future.wait<Object?>([
         widget.dataSource.fetchMembers(),
         widget.dataSource.fetchOwnFamily(),
-        widget.dataSource.fetchChatMessages(),
-        widget.dataSource.fetchChatReads(),
+        widget.dataSource.fetchChatPage(),
         widget.dataSource
             .fetchChatPushMuted()
             .catchError((Object _) => false),
       ]);
+      final page = rest[2] as List<ChatMessage>;
+      final reads = await widget.dataSource.fetchChatReads(_ids(page));
+      _quoted = const {};
+      final quoted = await _quotesFor(page, page);
       if (!mounted) return;
       setState(() {
         _settings = settings;
         _me = me;
         _members = rest[0] as List<Member>;
         _family = rest[1] as Family?;
-        _messages = rest[2] as List<ChatMessage>;
-        _reads = rest[3] as List<ChatRead>;
-        _muted = rest[4] as bool;
+        _messages = page;
+        _anchorId = page.isEmpty ? null : page.first.id;
+        _hasOlder = page.length >= chatPageSize;
+        _quoted = quoted;
+        _reads = reads;
+        _muted = rest[3] as bool;
         _loading = false;
       });
       if (_onScreen) unawaited(_markRead());
@@ -274,7 +360,7 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
     _marking = true;
     try {
       await widget.dataSource.markChatRead(newest);
-      final reads = await widget.dataSource.fetchChatReads();
+      final reads = await widget.dataSource.fetchChatReads(_ids(_messages));
       if (mounted) setState(() => _reads = reads);
       widget.onRead?.call();
     } catch (_) {
@@ -284,11 +370,16 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
     }
   }
 
-  void _scrollToEnd() {
+  /// T-104: a lazy list only ESTIMATES its end until the last rows are laid
+  /// out — with a page of 200 texts one jump lands short — so it jumps again
+  /// until the end stops moving.
+  void _scrollToEnd([int tries = 6]) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
-        _scroll.jumpTo(_scroll.position.maxScrollExtent);
-      }
+      if (!_scroll.hasClients) return;
+      final end = _scroll.position.maxScrollExtent;
+      if (_scroll.position.pixels == end) return;
+      _scroll.jumpTo(end);
+      if (tries > 1) _scrollToEnd(tries - 1);
     });
   }
 
@@ -492,17 +583,90 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
                           : l.format(KApp.chatSearchEmpty, [query.trim()]),
                     ),
                   ])
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                    itemCount: shown.length + 1,
-                    itemBuilder: (context, i) =>
-                        i == 0 ? notice : _bubble(shown[i - 1], l),
-                  ),
+                : _thread(shown, notice, l),
           ),
         ),
         _composerArea(l),
       ],
+    );
+  }
+
+  /// T-104: the thread around a CENTER — the page loaded at opening (and
+  /// everything newer) after it, older pages before it growing upward, so a
+  /// page prepended while the reader is at the top lands above what they read
+  /// instead of pushing it down. The notice and the "older" row close the top.
+  Widget _thread(List<ChatMessage> shown, Widget notice, Localization l) {
+    final anchor = _anchorId;
+    final older = [
+      for (final m in shown)
+        if (anchor != null && m.id < anchor) m
+    ];
+    final newer = [
+      for (final m in shown)
+        if (anchor == null || m.id >= anchor) m
+    ];
+    return CustomScrollView(
+      controller: _scroll,
+      center: _center,
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        // Laid out upward from the center: index 0 is the text right above it.
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                final n = older.length;
+                if (i < n) return _bubble(older[n - 1 - i], l);
+                if (i == n) return _olderRow(l);
+                return notice;
+              },
+              childCount: older.isEmpty ? 0 : older.length + 2,
+            ),
+          ),
+        ),
+        // Until an older page is loaded the top rows open the center sliver:
+        // before it they would sit above the viewport even on a short thread.
+        SliverPadding(
+          key: _center,
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                if (older.isNotEmpty) return _bubble(newer[i], l);
+                if (i == 0) return notice;
+                if (i == 1) return _olderRow(l);
+                return _bubble(newer[i - 2], l);
+              },
+              childCount: newer.length + (older.isEmpty ? 2 : 0),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The top of the loaded thread: a spinner while the previous page comes,
+  /// a button when there is one (the scroll fetches it on its own; the button
+  /// is for a thread too short to scroll), nothing at the very beginning.
+  Widget _olderRow(Localization l) {
+    if (_loadingOlder) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: Spacing.sm),
+        child: Center(
+          child: SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+      );
+    }
+    if (!_hasOlder) return const SizedBox.shrink();
+    return Center(
+      child: TextButton(
+        key: const ValueKey('chat-load-older'),
+        onPressed: _loadOlder,
+        child: Text(l[KApp.chatLoadOlder]),
+      ),
     );
   }
 
@@ -512,7 +676,8 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
     final mine = m.authorProfileId == _me?.id;
     final quoted = m.quoteId == null
         ? null
-        : _messages.where((q) => q.id == m.quoteId).firstOrNull;
+        : _messages.where((q) => q.id == m.quoteId).firstOrNull ??
+            _quoted[m.quoteId];
     final readers =
         ChatRules.readersOf(m.id, m.authorProfileId, _marks);
     final readLine = readers.isEmpty

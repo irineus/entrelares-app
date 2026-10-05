@@ -305,4 +305,54 @@ void main() {
     expect(find.text('CHAT'), findsOne);
     expect(badge.total, 5);
   });
+  // T-104: the whole table in one request was cut by PostgREST's max_rows at
+  // the NEWEST end — new texts stopped showing and every new one read "Ainda
+  // não lida". The Conversa now opens on the newest page and fetches older
+  // pages as the reader scrolls up, with the marks of the loaded texts only.
+  testWidgets('T-104: a long Conversa opens on the newest page; older pages '
+      'come on scroll-up', (tester) async {
+    const total = 450;
+    final ds = source()
+      ..chatMessages = [
+        for (var i = 1; i <= total; i++) text(i, 2, 'texto $i')
+      ];
+    await pumpChat(tester, ds);
+
+    expect(find.byKey(const ValueKey('chat-message-$total')), findsOne);
+    expect(find.byKey(const ValueKey('chat-message-1')), findsNothing);
+    // Everything up to the newest is marked, and nothing is unread after:
+    // reopening writes no second mark.
+    expect(ds.chatWrites, ['read:$total']);
+    await pumpChat(tester, ds);
+    expect(ds.chatWrites, ['read:$total']);
+
+    // Scrolling up fetches the older pages until the first text.
+    for (var i = 0;
+        i < 30 && find.byKey(const ValueKey('chat-message-1')).evaluate().isEmpty;
+        i++) {
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 2000));
+      await tester.pumpAndSettle();
+    }
+    expect(find.byKey(const ValueKey('chat-message-1')), findsOne);
+    expect(find.byKey(const ValueKey('chat-notice')), findsOne);
+    // The beginning is reached: no "older" row any more.
+    expect(find.byKey(const ValueKey('chat-load-older')), findsNothing);
+  });
+
+  testWidgets('T-104: a reply to a text older than the loaded page still '
+      'shows what it answers', (tester) async {
+    final ds = source()
+      ..chatMessages = [
+        text(1, 1, 'O primeiro de todos.'),
+        for (var i = 2; i <= 260; i++) text(i, 2, 'texto $i'),
+        text(261, 2, 'Respondendo lá atrás.', quote: 1),
+      ];
+    await pumpChat(tester, ds);
+    expect(find.byKey(const ValueKey('chat-message-261')), findsOne);
+    expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('chat-message-261')),
+            matching: find.textContaining('O primeiro de todos.')),
+        findsOne);
+  });
 }

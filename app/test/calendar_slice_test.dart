@@ -1267,10 +1267,33 @@ class FakeCustodyDataSource implements CustodyDataSource {
   int chatActorId = 1;
 
   @override
-  Future<List<ChatMessage>> fetchChatMessages() async => chatMessages;
+  Future<List<ChatMessage>> fetchChatPage({int? beforeId}) async {
+    final older = [
+      for (final m in chatMessages)
+        if (beforeId == null || m.id < beforeId) m
+    ]..sort((a, b) => a.id.compareTo(b.id));
+    return older.length <= chatPageSize
+        ? older
+        : older.sublist(older.length - chatPageSize);
+  }
 
   @override
-  Future<List<ChatRead>> fetchChatReads() async => chatReads;
+  Future<List<ChatMessage>> fetchChatMessagesAfter(int afterId) async =>
+      [for (final m in chatMessages) if (m.id > afterId) m]
+        ..sort((a, b) => a.id.compareTo(b.id));
+
+  @override
+  Future<List<ChatMessage>> fetchChatMessagesForPeriod(
+          DateTime fromUtc, DateTime toUtcExclusive) async =>
+      chatMessages;
+
+  @override
+  Future<List<ChatMessage>> fetchChatMessagesByIds(List<int> ids) async =>
+      [for (final m in chatMessages) if (ids.contains(m.id)) m];
+
+  @override
+  Future<List<ChatRead>> fetchChatReads(List<int> messageIds) async =>
+      [for (final r in chatReads) if (messageIds.contains(r.messageId)) r];
 
   /// The chat channel's listener, so a test can deliver a change.
   void Function()? chatListener;

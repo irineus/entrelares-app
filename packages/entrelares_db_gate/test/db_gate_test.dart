@@ -32,6 +32,7 @@ import 'suites/viewer.dart';
 import 'suites/expenses.dart';
 import 'suites/report_attestation.dart';
 import 'suites/chat.dart';
+import 'suites/paged_reads.dart';
 import 'suites/children.dart';
 import 'suites/custom_role.dart';
 import 'suites/day_account.dart';
@@ -192,6 +193,7 @@ void main() {
   expenseTests(fx);
   // F-35: the family's Conversa — immutable, read by viewers, dark + Premium.
   chatTests(fx);
+  pagedReadsTests(fx);
   appSettingsTests(fx);
   publicSettingsTests(fx);
   serverParametersTests(fx);

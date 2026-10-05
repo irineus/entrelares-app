@@ -50,6 +50,35 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   SupabaseCustodyDataSource(this._client,
       {this.environmentPrefix = '', this.analytics});
 
+  /// T-104: every row of [query], however many. PostgREST cuts a response at
+  /// `max_rows` (1,000 locally, the hosted default) with a plain 200, so a
+  /// list read in ONE request silently loses whatever sorts last once a family
+  /// passes the cap — the newest texts, the end of a year. The first page
+  /// asks for the exact count and the loop advances by what each page really
+  /// returned, so it does not depend on the server's cap: a smaller cap means
+  /// more pages, never fewer rows. [query] must build a FRESH request each
+  /// call and order on a unique key (an `id` tie-breaker), or rows can slide
+  /// between pages.
+  Future<List<Map<String, dynamic>>> _allPages(
+      PostgrestTransformBuilder<PostgrestList> Function() query) async {
+    const page = 1000;
+    final first = await query().range(0, page - 1).count(CountOption.exact);
+    final rows = <Map<String, dynamic>>[...first.data];
+    while (rows.length < first.count) {
+      final next = await query().range(rows.length, rows.length + page - 1);
+      if (next.isEmpty) break;
+      rows.addAll(next);
+    }
+    return rows;
+  }
+
+  /// T-104: ids split so an `in.(...)` filter keeps the URL short.
+  static Iterable<List<int>> _chunks(List<int> ids, [int size = 150]) sync* {
+    for (var i = 0; i < ids.length; i += size) {
+      yield ids.sublist(i, i + size > ids.length ? ids.length : i + size);
+    }
+  }
+
   @override
   Future<List<Member>> fetchMembers() async {
     final rows = await _client.from('profiles').select();
@@ -985,13 +1014,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   @override
   Future<List<DayAccount>> fetchDayAccounts(
       DateTime start, DateTime end) async {
-    final rows = await _client
+    final rows = await _allPages(() => _client
         .from('day_accounts')
         .select()
         .gte('account_date', CareSchedule.isoDate(start))
         .lte('account_date', CareSchedule.isoDate(end))
         .order('account_date')
-        .order('created_at');
+        .order('created_at')
+        .order('id'));
     return rows.map(DayAccount.fromJson).toList();
   }
 
@@ -1018,12 +1048,18 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<List<DayAccountReply>> fetchDayAccountReplies(
       List<int> accountIds) async {
     if (accountIds.isEmpty) return const [];
-    final rows = await _client
-        .from('day_account_replies')
-        .select()
-        .inFilter('account_id', accountIds)
-        .order('created_at', ascending: true);
-    return rows.map(DayAccountReply.fromJson).toList();
+    final out = <DayAccountReply>[];
+    for (final chunk in _chunks(accountIds)) {
+      final rows = await _allPages(() => _client
+          .from('day_account_replies')
+          .select()
+          .inFilter('account_id', chunk)
+          .order('created_at', ascending: true)
+          .order('id', ascending: true));
+      out.addAll(rows.map(DayAccountReply.fromJson));
+    }
+    out.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return out;
   }
 
   @override
@@ -1812,9 +1848,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         .lte('event_date', _isoDay(to));
     if (!includeDeleted) query = query.isFilter('deleted_at', null);
     // postgrest-dart orders DESCENDING unless told otherwise.
-    final rows = await query
+    final rows = await _allPages(() => query
         .order('event_date', ascending: true)
-        .order('id', ascending: true);
+        .order('id', ascending: true));
     return rows.map(ChildEvent.fromJson).toList();
   }
 
@@ -1932,22 +1968,76 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
           'verify_report_attestation',
           params: {'p_id': id}) as Map);
 
+  static const _chatColumns =
+      'id, author_profile_id, body, quote_id, quoted_day, created_at';
+
   @override
-  Future<List<ChatMessage>> fetchChatMessages() async {
-    final rows = await _client
+  Future<List<ChatMessage>> fetchChatPage({int? beforeId}) async {
+    var query = _client.from('chat_messages').select(_chatColumns);
+    if (beforeId != null) query = query.lt('id', beforeId);
+    // Newest first so the LIMIT keeps the newest; the screen reads oldest
+    // first, hence the reverse.
+    final rows = await query.order('id', ascending: false).limit(chatPageSize);
+    return rows.map(ChatMessage.fromJson).toList().reversed.toList();
+  }
+
+  @override
+  Future<List<ChatMessage>> fetchChatMessagesAfter(int afterId) async {
+    final rows = await _allPages(() => _client
         .from('chat_messages')
-        .select('id, author_profile_id, body, quote_id, quoted_day, created_at')
-        .order('id', ascending: true);
+        .select(_chatColumns)
+        .gt('id', afterId)
+        .order('id', ascending: true));
     return rows.map(ChatMessage.fromJson).toList();
   }
 
   @override
-  Future<List<ChatRead>> fetchChatReads() async {
-    final rows = await _client
-        .from('chat_reads')
-        .select('message_id, profile_id, read_at')
-        .order('read_at', ascending: true);
-    return rows.map(ChatRead.fromJson).toList();
+  Future<List<ChatMessage>> fetchChatMessagesForPeriod(
+      DateTime fromUtc, DateTime toUtcExclusive) async {
+    final rows = await _allPages(() => _client
+        .from('chat_messages')
+        .select(_chatColumns)
+        .gte('created_at', fromUtc.toUtc().toIso8601String())
+        .lt('created_at', toUtcExclusive.toUtc().toIso8601String())
+        .order('id', ascending: true));
+    final inPeriod = rows.map(ChatMessage.fromJson).toList();
+    // A reply quotes by id, and the quoted text may predate the period.
+    final have = {for (final m in inPeriod) m.id};
+    final missing = {
+      for (final m in inPeriod)
+        if (m.quoteId != null && !have.contains(m.quoteId)) m.quoteId!
+    }.toList();
+    return [...await fetchChatMessagesByIds(missing), ...inPeriod];
+  }
+
+  @override
+  Future<List<ChatMessage>> fetchChatMessagesByIds(List<int> ids) async {
+    final out = <ChatMessage>[];
+    for (final chunk in _chunks(ids)) {
+      final rows = await _allPages(() => _client
+          .from('chat_messages')
+          .select(_chatColumns)
+          .inFilter('id', chunk)
+          .order('id', ascending: true));
+      out.addAll(rows.map(ChatMessage.fromJson));
+    }
+    return out;
+  }
+
+  @override
+  Future<List<ChatRead>> fetchChatReads(List<int> messageIds) async {
+    final out = <ChatRead>[];
+    for (final chunk in _chunks(messageIds)) {
+      final rows = await _allPages(() => _client
+          .from('chat_reads')
+          .select('message_id, profile_id, read_at')
+          .inFilter('message_id', chunk)
+          .order('read_at', ascending: true)
+          .order('message_id', ascending: true)
+          .order('profile_id', ascending: true));
+      out.addAll(rows.map(ChatRead.fromJson));
+    }
+    return out;
   }
 
   @override
@@ -2023,9 +2113,11 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     if (from != null) q = q.gte('spent_on', _isoDay(from));
     if (to != null) q = q.lte('spent_on', _isoDay(to));
     if (!includeDeleted) q = q.isFilter('deleted_at', null);
-    final rows = await q
+    // T-104: the balance is computed on the phone from EVERY row — a cut
+    // here is a wrong balance, so the whole list is paged in.
+    final rows = await _allPages(() => q
         .order('spent_on', ascending: false)
-        .order('id', ascending: false);
+        .order('id', ascending: false));
     return rows.map(Expense.fromJson).toList();
   }
 
@@ -2033,20 +2125,28 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<List<ExpenseHistoryEntry>> fetchExpenseHistory(
       List<int> expenseIds) async {
     if (expenseIds.isEmpty) return const [];
-    final rows = await _client
-        .from('expense_history')
-        .select()
-        .inFilter('expense_id', expenseIds)
-        .order('at', ascending: true);
-    return rows.map(ExpenseHistoryEntry.fromJson).toList();
+    final out = <ExpenseHistoryEntry>[];
+    for (final chunk in _chunks(expenseIds)) {
+      final rows = await _allPages(() => _client
+          .from('expense_history')
+          .select()
+          .inFilter('expense_id', chunk)
+          .order('at', ascending: true)
+          .order('id', ascending: true));
+      out.addAll(rows.map(ExpenseHistoryEntry.fromJson));
+    }
+    // Chunks interleave in time; the trail reads oldest first.
+    out.sort((a, b) => a.at.compareTo(b.at));
+    return out;
   }
 
   @override
   Future<List<ExpenseSettlement>> fetchSettlements() async {
-    final rows = await _client
+    final rows = await _allPages(() => _client
         .from('expense_settlements')
         .select()
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false)
+        .order('id', ascending: false));
     return rows.map(ExpenseSettlement.fromJson).toList();
   }
 
@@ -2287,15 +2387,24 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<ExportBundle> fetchExportData(int myProfileId) async {
     // All four reads are RLS-scoped: the export can only ever contain what
     // this member is already allowed to see in the app.
+    // T-104: a data export that stops at the first 1,000 rows is not the
+    // member's data — every list is paged in.
     final results = await Future.wait([
-      _client.from('care_schedules').select().order('schedule_date'),
-      _client.from('swap_requests').select().order('created_at'),
-      _client
+      _allPages(() => _client
+          .from('care_schedules')
+          .select()
+          .order('schedule_date')
+          .order('id')),
+      _allPages(() =>
+          _client.from('swap_requests').select().order('created_at').order('id')),
+      _allPages(() => _client
           .from('notifications')
           .select()
           .eq('recipient_profile_id', myProfileId)
-          .order('created_at'),
-      _client.from('activity_logs').select().order('created_at'),
+          .order('created_at')
+          .order('id')),
+      _allPages(() =>
+          _client.from('activity_logs').select().order('created_at').order('id')),
     ]);
     return ExportBundle(
       schedules: (results[0]).map(CareSchedule.fromJson).toList(),
@@ -2458,12 +2567,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   @override
   Future<List<CareSchedule>> fetchSchedulesForPeriod(
       DateTime start, DateTime end) async {
-    final rows = await _client
+    // T-104: a year is 365 rows per lane — three children pass the cap.
+    final rows = await _allPages(() => _client
         .from('care_schedules')
         .select()
         .gte('schedule_date', CareSchedule.isoDate(start))
         .lte('schedule_date', CareSchedule.isoDate(end))
-        .order('schedule_date');
+        .order('schedule_date')
+        .order('id'));
     return rows.map(CareSchedule.fromJson).toList();
   }
 
@@ -2483,12 +2594,13 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     // The web filters on `affected_date` — the DAY the change is about, not
     // when it was made — and orders newest-first for the timeline; the F-33
     // document re-sorts oldest-first in core.
-    final rows = await _client
+    final rows = await _allPages(() => _client
         .from('activity_logs')
         .select()
         .gte('affected_date', CareSchedule.isoDate(start))
         .lte('affected_date', CareSchedule.isoDate(end))
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false)
+        .order('id', ascending: false));
     return rows.map(ActivityLog.fromJson).toList();
   }
 
@@ -2496,11 +2608,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<List<AccountLog>> fetchAccountLogsByAction(
       List<String> actions) async {
     if (actions.isEmpty) return const [];
-    final rows = await _client
+    final rows = await _allPages(() => _client
         .from('account_logs')
         .select()
         .inFilter('action', actions)
-        .order('created_at', ascending: true);
+        .order('created_at', ascending: true)
+        .order('id', ascending: true));
     return rows.map(AccountLog.fromJson).toList();
   }
 
