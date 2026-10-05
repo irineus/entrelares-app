@@ -1504,6 +1504,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       context: context,
       dataSource: widget.dataSource,
       today: _today,
+      childId: _perChild ? _lane : null,
     );
     if (summary == null || !mounted) return;
     showAppSnack(context, summary);

@@ -348,6 +348,11 @@ class _ResolveSheetState extends State<_ResolveSheet> {
                       scheduledParentId: sched.scheduledParentId,
                       myProfile: _requireMyProfile(),
                       allProfiles: widget.allProfiles,
+                      // F-85: the day's lane — without it the request landed
+                      // in the family lane, the child's day never froze and
+                      // the approval restored nothing.
+                      childId: sched.childId,
+                      scheduleId: sched.id,
                     ),
                     K.sumRevertOne,
                     K.sumRevertMany,

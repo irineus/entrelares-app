@@ -296,6 +296,44 @@ void scheduleLaneTests(GateFixture fx) {
       expect(logs.single['action'], 'INSERT');
     });
 
+    // F-85: the sibling of a per-child swap now gets the SAME unchanged base
+    // write the main lane does before its request. The fix rests on this:
+    // that write logs the day as it stands in `old_data`, so the request's
+    // `pre_edit_log_id` (the lane's newest log) carries a snapshot — not the
+    // wizard's INSERT, whose `old_data` is null and made the revert DELETE
+    // the sibling's day.
+    test("F-85: an unchanged base write logs the lane's day as its snapshot",
+        () async {
+      final d = fx.nextFutureDate();
+      final inserted = await insertDay(fam.admin, d, child: childB);
+      final insertLog = (await fx.service
+              .from('activity_logs')
+              .select('id, action, old_data')
+              .eq('affected_date', isoDate(d))
+              .eq('child_id', childB)
+              .order('id', ascending: false)
+              .limit(1))
+          .single;
+      expect(insertLog['old_data'], isNull,
+          reason: 'the premise: a wizard day carries no snapshot');
+
+      await saveDay(fam.admin, await readDayById(fam.admin, inserted['id'] as int));
+
+      final newest = (await fx.service
+              .from('activity_logs')
+              .select('id, old_data')
+              .eq('affected_date', isoDate(d))
+              .eq('child_id', childB)
+              .order('id', ascending: false)
+              .limit(1))
+          .single;
+      expect(newest['id'], greaterThan(insertLog['id'] as int));
+      final snapshot = newest['old_data'] as Map<String, dynamic>;
+      expect(snapshot['id'], inserted['id']);
+      expect(snapshot['child_id'], childB);
+      expect(snapshot['scheduled_parent_id'], fam.adminProfile.id);
+    });
+
     test('a child whose lane holds a plan cannot be removed', () async {
       await expectRejected(
           () => fam.admin

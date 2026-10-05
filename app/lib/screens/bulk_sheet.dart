@@ -547,6 +547,9 @@ class _BulkSheetState extends State<_BulkSheet> {
               requestMessage: _swapMessage.text,
               myProfile: _requireMyProfile(),
               allProfiles: widget.allProfiles,
+              // F-85: the lane, as the day sheet passes it.
+              childId: existingRow!.childId,
+              scheduleId: existingRow.id,
             );
             revertCount++;
           } catch (e) {
