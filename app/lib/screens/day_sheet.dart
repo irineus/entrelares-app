@@ -975,17 +975,27 @@ class _DaySheetState extends State<_DaySheet> {
           // without this write that was whatever last touched the sibling's
           // day — for a wizard day never edited, the INSERT, whose old_data is
           // null — so the revert read "no snapshot" and deleted the day.
-          await widget.dataSource.updateDay(sibling.day);
-          final siblingDay = await widget.dataSource
-              .fetchDay(widget.date, childId: sibling.childId);
-          await widget.dataSource.createSwapRequest(
-            schedule: siblingDay ?? sibling.day,
-            proposedActualParentId: proposed,
-            proposedHandoffTime: handoffWire,
-            requestMessage: _swapMessage.text,
-            myProfile: _requireMyProfile(),
-            allProfiles: widget.allProfiles,
-          );
+          try {
+            await widget.dataSource.updateDay(sibling.day);
+            final siblingDay = await widget.dataSource
+                .fetchDay(widget.date, childId: sibling.childId);
+            await widget.dataSource.createSwapRequest(
+              schedule: siblingDay ?? sibling.day,
+              proposedActualParentId: proposed,
+              proposedHandoffTime: handoffWire,
+              requestMessage: _swapMessage.text,
+              myProfile: _requireMyProfile(),
+              allProfiles: widget.allProfiles,
+            );
+          } catch (e) {
+            // S-25: a sibling whose request is already open (a re-run after
+            // a partial failure) is done, not failed — the rest goes on.
+            final raw = e.toString();
+            if (!isFrozenDayRefusal(raw) &&
+                !raw.contains('swap_requests_one_pending_per_date')) {
+              rethrow;
+            }
+          }
         }
         if (mounted) _finish(DaySheetOutcome.swapRequested);
         return;

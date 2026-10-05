@@ -33,6 +33,17 @@ bool isStaleDayConflict(String raw) => raw.contains('salvou este dia primeiro');
 bool isDayConflict(String raw) =>
     isUniqueDayConflict(raw) || isStaleDayConflict(raw);
 
+/// S-25: the answer RPCs refuse a request that is no longer open (answered,
+/// cancelled or auto-approved meanwhile) with this sentence. A batch reads it
+/// as "already settled" and moves on instead of aborting.
+bool isSwapAlreadyAnswered(String raw) =>
+    raw.contains('não está mais pendente');
+
+/// S-25: a write refused because the day is frozen by an open request — on a
+/// batch re-run, the day whose request the previous attempt already opened.
+bool isFrozenDayRefusal(String raw) =>
+    raw.contains('tem uma solicitação pendente');
+
 /// T-35: true when the update was rejected for carrying NO concurrency echo —
 /// the signature of a client build older than T-35. It must NOT be treated as
 /// a day conflict: reloading the month cannot fix it, only reloading the APP

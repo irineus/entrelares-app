@@ -684,41 +684,44 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         Future<void>.value());
   }
 
+  /// S-25: every answer to a request is ONE server transaction —
+  /// `approve_swap_request` / `reject_swap_request` / `cancel_swap_request`
+  /// lock the request, move only an OPEN one, apply exactly the proposal (or
+  /// restore the pre-edit snapshot, for a revert) and insert the
+  /// notifications composed here, all or nothing. The client used to run the
+  /// day, the status and the notices as separate writes: two people answering
+  /// at once, or a dropped connection, left contradictory states behind.
+  /// Returns whether this call changed anything — a retry of an answer that
+  /// already landed is a no-op ([SwapAlreadyAnswered] when the request was
+  /// answered otherwise).
+  Future<bool> _answer(String rpc, Map<String, dynamic> params,
+      List<NotificationDraft> drafts) async {
+    try {
+      final result = await _client.rpc<dynamic>(rpc, params: {
+        ...params,
+        'p_notifications': [
+          for (final d in drafts)
+            {
+              'recipient_profile_id': d.recipientProfileId,
+              'type': d.type,
+              'title': d.title,
+              'message': d.message,
+              'params': d.params,
+            }
+        ],
+      });
+      return result is Map && result['changed'] == true;
+    } on PostgrestException catch (e) {
+      if (isSwapAlreadyAnswered(e.message)) throw SwapAlreadyAnswered(e.message);
+      rethrow;
+    }
+  }
+
   @override
   Future<void> approveSwap(int swapRequestId,
       {String? approvalNote, required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-
-    // Apply the change to care_schedules — full-row update so the T-33/T-35
-    // echo travels with it.
-    final scheduleId = request.scheduleId;
-    if (scheduleId != null) {
-      final row = await _client
-          .from('care_schedules')
-          .select()
-          .eq('id', scheduleId)
-          .maybeSingle();
-      if (row != null) {
-        final updated = CareSchedule.fromJson(row).copyWith(
-          actualParentId: request.proposedActualParentId,
-          handoffTime: request.proposedHandoffTime,
-        );
-        await _client
-            .from('care_schedules')
-            .update(updated.toUpdateJson())
-            .eq('id', scheduleId);
-      }
-    }
-
     final note = normalizeFreeText(approvalNote); // F-44
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'approved',
-      'approval_note': note,
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeSwapApproved(
       scheduleDate: request.scheduleDate,
       requestingProfileId: request.requestingProfileId,
@@ -728,7 +731,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    final changed = await _answer('approve_swap_request',
+        {'p_id': swapRequestId, 'p_note': note}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'approved');
     _trackAnswer('approved', 'swap');
   }
@@ -737,14 +742,6 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> rejectSwap(int swapRequestId,
       {String? reason, required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'rejected',
-      'rejection_reason': reason,
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeSwapRejected(
       scheduleDate: request.scheduleDate,
       requestingProfileId: request.requestingProfileId,
@@ -753,7 +750,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    final changed = await _answer('reject_swap_request',
+        {'p_id': swapRequestId, 'p_reason': reason}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'rejected');
     _trackAnswer('rejected', 'swap');
   }
@@ -762,20 +761,15 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> cancelSwap(int swapRequestId,
       {required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'cancelled',
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeSwapCancelled(
       scheduleDate: request.scheduleDate,
       targetProfileId: request.targetProfileId,
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    final changed =
+        await _answer('cancel_swap_request', {'p_id': swapRequestId}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'cancelled');
     _trackAnswer('cancelled', 'swap');
   }
@@ -861,71 +855,11 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     await _sendSwapEmail(requestId, 'revert_requested');
   }
 
-  /// Restores the day to the full snapshot captured before the swap edit
-  /// (F-26). The branching is the pure [revertRestorePlan]; this only
-  /// executes it.
-  Future<void> _restorePreEditState(SwapRequest request) async {
-    final scheduleId = request.scheduleId;
-    if (scheduleId == null) return;
-    final row = await _client
-        .from('care_schedules')
-        .select()
-        .eq('id', scheduleId)
-        .maybeSingle();
-    if (row == null) return;
-    final schedule = CareSchedule.fromJson(row);
-
-    final preEditLogId = request.preEditLogId;
-    final oldData =
-        preEditLogId == null ? null : await _fetchOldData(preEditLogId);
-    final plan = revertRestorePlan(
-      hasPreEditLogId: preEditLogId != null,
-      oldData: oldData,
-      revertNotes: request.revertNotes,
-    );
-
-    switch (plan) {
-      case RevertClearActualOnly():
-        final updated = schedule.copyWith(actualParentId: null);
-        await _client
-            .from('care_schedules')
-            .update(updated.toUpdateJson())
-            .eq('id', scheduleId);
-      case RevertDeleteDay():
-        await _client.from('care_schedules').delete().eq('id', scheduleId);
-      case RevertRestoreFields():
-        final updated = schedule.copyWith(
-          scheduledParentId:
-              plan.scheduledParentId ?? schedule.scheduledParentId,
-          actualParentId: plan.actualParentId,
-          handoffTime: plan.handoffTime,
-          notes: plan.restoreNotes ? plan.notes : schedule.notes,
-        );
-        await _client
-            .from('care_schedules')
-            .update(updated.toUpdateJson())
-            .eq('id', scheduleId);
-    }
-  }
-
   @override
   Future<void> approveRevert(int swapRequestId,
       {String? approvalNote, required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-
-    if (request.scheduleId != null) {
-      await _restorePreEditState(request);
-    }
-
     final note = normalizeFreeText(approvalNote); // F-44
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'revert_approved',
-      'approval_note': note,
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeRevertApproved(
       scheduleDate: request.scheduleDate,
       requestingProfileId: request.requestingProfileId,
@@ -935,7 +869,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    // S-25: the restore (F-26/F-47) runs on the server, in the same
+    // transaction — `restore_pre_edit_state`, the function the auto-approval
+    // already used.
+    final changed = await _answer('approve_swap_request',
+        {'p_id': swapRequestId, 'p_note': note}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'revert_approved');
     _trackAnswer('approved', 'revert');
   }
@@ -944,14 +883,6 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> rejectRevert(int swapRequestId,
       {String? reason, required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'revert_rejected',
-      'rejection_reason': reason,
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeRevertRejected(
       scheduleDate: request.scheduleDate,
       requestingProfileId: request.requestingProfileId,
@@ -960,7 +891,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    final changed = await _answer('reject_swap_request',
+        {'p_id': swapRequestId, 'p_reason': reason}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'revert_rejected');
     _trackAnswer('rejected', 'revert');
   }
@@ -969,20 +902,15 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> cancelRevert(int swapRequestId,
       {required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'revert_cancelled',
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeRevertCancelled(
       scheduleDate: request.scheduleDate,
       targetProfileId: request.targetProfileId,
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    final changed =
+        await _answer('cancel_swap_request', {'p_id': swapRequestId}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'revert_cancelled');
     _trackAnswer('cancelled', 'revert');
   }

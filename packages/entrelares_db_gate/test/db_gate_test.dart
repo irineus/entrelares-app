@@ -82,6 +82,7 @@ import 'suites/session_has_password.dart';
 import 'suites/sudo_elevation.dart';
 import 'suites/support_request.dart';
 import 'suites/swap_message.dart';
+import 'suites/swap_answer.dart';
 import 'suites/test_recipient_suppression.dart';
 
 /// **The single entrypoint of the database gate, and why it is single.**
@@ -140,6 +141,7 @@ void main() {
   optimisticConcurrencyTests(fx);
   autoApprovalTests(fx);
   swapMessageTests(fx);
+  swapAnswerTests(fx);
   revertNotesTests(fx);
   // F-52: the aviso de imprevisto — who may send one, who may offer the DAY,
   // the daily cap, and the append-only shape the record rests on.

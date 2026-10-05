@@ -114,6 +114,9 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
       final requests = widget.plan.requests;
       var swapCount = 0;
       var conflictCount = 0;
+      // S-25: a re-run after a partial failure meets the days whose request
+      // the first attempt already opened — frozen now. Settled, not failed.
+      var alreadyCount = 0;
       var processed = 0;
       for (final r in requests) {
         processed++;
@@ -156,7 +159,9 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
           );
           swapCount++;
         } catch (e) {
-          if (isWorkflowConflict(e.toString())) {
+          if (isFrozenDayRefusal(e.toString())) {
+            alreadyCount++;
+          } else if (isWorkflowConflict(e.toString())) {
             conflictCount++;
           } else {
             rethrow;
@@ -175,6 +180,13 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
                 ? K.bulkConflictSuffixOne
                 : K.bulkConflictSuffixMany,
             [conflictCount]);
+      }
+      if (alreadyCount > 0) {
+        summary += l.format(
+            alreadyCount == 1
+                ? KApp.quickSwapAlreadyOne
+                : KApp.quickSwapAlreadyMany,
+            [alreadyCount]);
       }
       if (mounted) Navigator.of(context).pop(summary);
     } catch (e) {
