@@ -818,6 +818,11 @@ abstract final class KApp {
   static const String inviteSignedInBody = 'app.invite.signedInBody';
   static const String inviteSignOutContinue = 'app.invite.signOutContinue';
   static const String inviteNotNow = 'app.invite.notNow';
+  static const String inviteAcceptedTitle = 'app.invite.acceptedTitle';
+  static const String inviteAcceptedBody = 'app.invite.acceptedBody';
+  static const String inviteOfferTitle = 'app.invite.offerTitle';
+  static const String inviteOfferBody = 'app.invite.offerBody';
+  static const String inviteOfferJoin = 'app.invite.offerJoin';
   static const String loginInvitedHint = 'app.login.invitedHint';
   static const String chatMute = 'app.chat.mute';
   static const String chatMuteLead = 'app.chat.muteLead';
@@ -1463,6 +1468,11 @@ abstract final class KApp {
     inviteSignedInBody,
     inviteSignOutContinue,
     inviteNotNow,
+    inviteAcceptedTitle,
+    inviteAcceptedBody,
+    inviteOfferTitle,
+    inviteOfferBody,
+    inviteOfferJoin,
     loginInvitedHint,
     chatMute,
     chatMuteLead,
@@ -2258,6 +2268,11 @@ abstract final class StringsAppPtBr {
     KApp.inviteSignedInBody: 'Este aparelho está conectado como {0}. O convite de {1} para a família {2} é para {3}. Para aceitá-lo, saia desta conta e continue.',
     KApp.inviteSignOutContinue: 'Sair e continuar',
     KApp.inviteNotNow: 'Agora não',
+    KApp.inviteAcceptedTitle: 'Este convite já foi aceito',
+    KApp.inviteAcceptedBody: 'É só entrar com a conta que aceitou o convite.',
+    KApp.inviteOfferTitle: 'Você tem um convite',
+    KApp.inviteOfferBody: '{0} convidou você para a família {1} — entrar nela? A família que você criou ainda está vazia (sem outros membros nem dias planejados) e será descartada.',
+    KApp.inviteOfferJoin: 'Entrar na família',
     KApp.loginInvitedHint: 'Recebeu um convite? Abra o link do convite que chegou para você — é ele que liga a sua conta à família.',
     KApp.chatMute: 'Silenciar o push da Conversa',
     KApp.chatMuteLead: 'A notificação continua no app; só o celular deixa de tocar.',
@@ -3047,6 +3062,11 @@ abstract final class StringsAppEn {
     KApp.inviteSignedInBody: 'This device is signed in as {0}. The invitation from {1} to the {2} family is for {3}. To accept it, sign out of this account and continue.',
     KApp.inviteSignOutContinue: 'Sign out and continue',
     KApp.inviteNotNow: 'Not now',
+    KApp.inviteAcceptedTitle: 'This invitation was already accepted',
+    KApp.inviteAcceptedBody: 'Just sign in with the account that accepted it.',
+    KApp.inviteOfferTitle: 'You have an invitation',
+    KApp.inviteOfferBody: '{0} invited you to the {1} family — join it? The family you created is still empty (no other members, no planned days) and will be discarded.',
+    KApp.inviteOfferJoin: 'Join the family',
     KApp.loginInvitedHint: 'Got an invitation? Open the invitation link you received — that is what joins your account to the family.',
     KApp.chatMute: 'Silence the chat\'s push',
     KApp.chatMuteLead: 'The notification stays in the app; only the phone stops ringing.',

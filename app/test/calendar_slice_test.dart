@@ -812,6 +812,25 @@ class FakeCustodyDataSource implements CustodyDataSource {
   int inviteLookups = 0;
   int inviteUnreachableTimes = 0;
 
+  /// F-88: what `invite_token_status` answers, and the founder's offer.
+  String inviteTokenStatus = 'unusable';
+  PendingInvitationOffer? pendingInvitation;
+  final List<String> joinedFromEmptyFamily = [];
+
+  @override
+  Future<String> fetchInviteTokenStatus(String token) async =>
+      inviteTokenStatus;
+
+  @override
+  Future<PendingInvitationOffer?> fetchMyPendingInvitation() async =>
+      pendingInvitation;
+
+  @override
+  Future<void> joinInvitationFromEmptyFamily(String token) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    joinedFromEmptyFamily.add(token);
+  }
+
   @override
   Future<void> signUpFounder({
     required String email,

@@ -130,6 +130,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   /// F-88: the invitation could not be checked (no answer) — retry, never
   /// "inválido".
   bool _inviteUnreachable = false;
+
+  /// F-88: the invitation was already accepted — "é só entrar".
+  bool _inviteAccepted = false;
   InviteInfo? _invite;
 
   bool _busy = false;
@@ -257,10 +260,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
       return;
     }
+    // F-88: an unusable token is told apart only when it was ACCEPTED.
+    final accepted = info == null &&
+        await widget.dataSource.fetchInviteTokenStatus(token) == 'accepted';
     if (!mounted) return;
     setState(() {
       _loadingInvite = false;
       _inviteUnreachable = false;
+      _inviteAccepted = accepted;
       if (info == null) {
         _inviteInvalid = true;
         return;
@@ -489,6 +496,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _body(Localization l) {
     if (_loadingInvite) return _loadingInviteState(l);
     if (_inviteUnreachable) return _inviteUnreachableState(l);
+    if (_inviteInvalid && _inviteAccepted) return _inviteAcceptedState(l);
     if (_inviteInvalid) return _inviteInvalidState(l);
     if (_signUpDone) return _confirmEmailState(l);
     if (_migrationWarning) return _migrationState(l);
@@ -526,6 +534,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
               _resolveInvite(token);
             },
             child: Text(l[KApp.inviteRetry]),
+          ),
+        ],
+      );
+
+  Widget _inviteAcceptedState(Localization l) => Column(
+        key: const ValueKey('invite-accepted'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l[KApp.inviteAcceptedTitle],
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 12),
+          Text(l[KApp.inviteAcceptedBody], textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: widget.onBackToLogin,
+            child: Text(l[K.registerGoToLogin]),
           ),
         ],
       );

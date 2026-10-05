@@ -77,6 +77,7 @@ import 'services/support_service.dart';
 import 'services/supabase_custody_data_source.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_l10n.dart';
+import 'widgets/app_snack.dart';
 import 'widgets/chat_view.dart';
 import 'widgets/app_width_cap.dart';
 import 'widgets/app_splash.dart';
@@ -1227,10 +1228,13 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _resolveInstallHint();
       // T-78: the day this member used the app, on this channel.
       _touchActivity();
-      if (_bootInviteToken != null) {
-        WidgetsBinding.instance.addPostFrameCallback(
-            (_) => unawaited(_offerInviteForAnotherAccount()));
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (_bootInviteToken != null) {
+          await _offerInviteForAnotherAccount();
+        } else {
+          await _offerPendingInvitation();
+        }
+      });
       _trackAuthedEntry();
     } else {
       _badge.stop();
@@ -1642,6 +1646,62 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   void _forgetPendingInvite() {
     _pendingInviteToken = null;
     unawaited(clearInviteNote());
+  }
+
+  /// F-88: offered once per process — "Agora não" is an answer.
+  bool _pendingInvitationAsked = false;
+
+  /// F-88: a founder alone in an empty family, whose verified e-mail was
+  /// invited elsewhere ("baixa o Entrelares, te convidei" — and they opened
+  /// the app and founded their own). The server decides who qualifies.
+  Future<void> _offerPendingInvitation() async {
+    if (_pendingInvitationAsked) return;
+    _pendingInvitationAsked = true;
+    PendingInvitationOffer? offer;
+    try {
+      offer = await _dataSource.fetchMyPendingInvitation();
+    } catch (_) {
+      return;
+    }
+    if (offer == null) return;
+    final context = _router.routerDelegate.navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    final l = _l;
+    final join = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('invite-offer'),
+        title: Text(l[KApp.inviteOfferTitle]),
+        content: Text(l.format(
+            KApp.inviteOfferBody, [offer!.inviterName, offer.familyName])),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l[KApp.inviteNotNow]),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l[KApp.inviteOfferJoin]),
+          ),
+        ],
+      ),
+    );
+    if (join != true) return;
+    try {
+      await _dataSource.joinInvitationFromEmptyFamily(offer.token);
+    } catch (e) {
+      final messenger = _router.routerDelegate.navigatorKey.currentContext;
+      if (messenger != null && messenger.mounted) {
+        showAppSnack(messenger,
+            translateSaveError(e.toString(), l[K.errSaveFailed], l),
+            type: AppSnackType.error);
+      }
+      return;
+    }
+    _onboarding.pendingInviteeWelcome = InviteeWelcome(
+        familyName: offer.familyName, inviterName: offer.inviterName);
+    await _resolveAuthedPhase();
+    if (mounted) _router.go('/');
   }
 
   /// F-88: `/register?invite=` opened on a device already signed in — the

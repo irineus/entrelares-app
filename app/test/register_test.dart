@@ -428,6 +428,16 @@ void main() {
       expect(find.text(l[K.registerInvitedTitle]), findsOne);
     });
 
+    testWidgets('F-88: an invitation already accepted says "é só entrar"',
+        (tester) async {
+      final ds = source()
+        ..inviteInfo = null
+        ..inviteTokenStatus = 'accepted';
+      await pumpRegister(tester, dataSource: ds, inviteToken: validToken);
+      expect(find.byKey(const ValueKey('invite-accepted')), findsOne);
+      expect(find.text(l[K.registerInviteInvalidTitle]), findsNothing);
+    });
+
     testWidgets('hides the family name and the role grid', (tester) async {
       final ds = source()..inviteInfo = invite;
       await pumpRegister(tester, dataSource: ds, inviteToken: validToken);

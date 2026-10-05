@@ -1330,6 +1330,38 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<String> fetchInviteTokenStatus(String token) async {
+    if (!InviteFormRules.isTokenShaped(token)) return 'unusable';
+    try {
+      final status = await _client
+          .rpc<dynamic>('invite_token_status', params: {'p_token': token});
+      return status is String ? status : 'unusable';
+    } catch (_) {
+      return 'unusable';
+    }
+  }
+
+  @override
+  Future<PendingInvitationOffer?> fetchMyPendingInvitation() async {
+    final data = await _client.rpc<dynamic>('my_pending_invitation');
+    final row = data is List ? (data.isEmpty ? null : data.first) : data;
+    if (row is! Map || row['token'] == null) return null;
+    return PendingInvitationOffer(
+      token: '${row['token']}',
+      familyName: '${row['family_name'] ?? ''}',
+      inviterName: '${row['inviter_name'] ?? ''}',
+    );
+  }
+
+  @override
+  Future<void> joinInvitationFromEmptyFamily(String token) async {
+    await _client.rpc<dynamic>('join_invitation_from_empty_family', params: {
+      'p_token': token,
+      'p_policy_version': PolicyVersions.current,
+    });
+  }
+
+  @override
   Future<void> signUpFounder({
     required String email,
     required String password,

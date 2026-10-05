@@ -489,6 +489,24 @@ class GateFixture {
     );
   }
 
+  /// F-88: a founder ALONE in a family of their own — no member, nothing
+  /// planned: the shape the pending-invitation offer is for.
+  Future<({SupabaseClient client, Member profile, String email})>
+      createSoloFounder(String tag) async {
+    final email = testEmail('$tag-solo');
+    _userIds.add(await _admin.createConfirmedUser(email, password, {
+      'full_name': 'E2E $tag Solo',
+      'role': 'mother',
+      'family_name': '${TestEnv.e2eFamilyPrefix}$runId-$tag-solo',
+      'policy_version': PolicyVersions.current,
+    }));
+    final client = await signIn(email);
+    final profile = (await _profilesOf(client)).single;
+    _extraFamilyIds.add(profile.familyId!);
+    await _markOnboarded([profile.id]);
+    return (client: client, profile: profile, email: email);
+  }
+
   // ── Seeding helpers ──────────────────────────────────────────────────────
 
   /// S-10: sudo elevations seeded straight into `auth_elevations` with the
