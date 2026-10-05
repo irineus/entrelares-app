@@ -467,6 +467,40 @@ void main() {
     expect({for (final a in ds.approvedSwaps) a.id}, {1, 2});
   });
 
+  testWidgets('S-25: approving all skips a request already answered and '
+      'finishes the rest', (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    SwapRequest pending(int id, int child) => SwapRequest.fromJson({
+          'id': id,
+          'schedule_date': CareSchedule.isoDate(dayOfMonth(day)),
+          'schedule_id': id,
+          'child_id': child,
+          'requesting_profile_id': bruno.id,
+          'target_profile_id': ana.id,
+          'proposed_actual_parent_id': bruno.id,
+          'status': 'pending',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        });
+    final ds = FakeCustodyDataSource(members: const [ana, bruno], days: [
+      laneRow(1, dayOfMonth(day), ana.id, lia.id),
+      laneRow(2, dayOfMonth(day), ana.id, theo.id),
+    ])
+      ..family = const Family(
+          id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+      ..children = [lia, theo]
+      ..frozenRequests = [pending(1, lia.id), pending(2, theo.id)]
+      // Lia's was settled meanwhile (a first attempt, or a cancel).
+      ..alreadyAnswered = {1};
+    await pump(tester, ds);
+    await selectLane(tester, lia.id);
+    await openDay(tester, day);
+    await tapVisible(tester, find.byKey(const ValueKey('frozen-approve-all')));
+    expect({for (final a in ds.approvedSwaps) a.id}, {2});
+    expect(find.byKey(const ValueKey('frozen-approve-all')), findsNothing,
+        reason: 'the sheet closed: nothing left to answer');
+  });
+
   // ── F-07 (PR 5c): the aviso, per lane ──
 
   testWidgets("holding ONE child's day today is enough to send an aviso",

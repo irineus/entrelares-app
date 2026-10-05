@@ -384,10 +384,18 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
             onPressed: _acting
                 ? null
                 : () => _run('approve-all', K.errApproveFailed, () async {
+                      // S-25: each answer is atomic on the server, and one
+                      // already settled (approved on a first attempt, or
+                      // cancelled meanwhile) is skipped — so a failure half
+                      // way can simply be tapped again.
                       for (final r in all) {
-                        await widget.dataSource.approveSwap(r.id,
-                            approvalNote: _note,
-                            allProfiles: widget.allProfiles);
+                        try {
+                          await widget.dataSource.approveSwap(r.id,
+                              approvalNote: _note,
+                              allProfiles: widget.allProfiles);
+                        } on SwapAlreadyAnswered {
+                          continue;
+                        }
                       }
                       return FrozenDayOutcome.approved;
                     }),

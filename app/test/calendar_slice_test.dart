@@ -418,8 +418,15 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Future<void> approveSwap(int swapRequestId,
       {String? approvalNote, required List<Member> allProfiles}) async {
     if (throwOnWrite != null) throw throwOnWrite!;
+    if (alreadyAnswered.contains(swapRequestId)) {
+      throw const SwapAlreadyAnswered(
+          'Esta solicitação já foi respondida e não está mais pendente.');
+    }
     approvedSwaps.add((id: swapRequestId, note: approvalNote));
   }
+
+  /// S-25: requests the server reports as answered another way.
+  Set<int> alreadyAnswered = {};
 
   @override
   Future<void> rejectSwap(int swapRequestId,

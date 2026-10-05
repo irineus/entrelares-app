@@ -548,6 +548,8 @@ abstract final class KApp {
   static const String calLaneWith = 'app.cal.laneWith';
   static const String editorAlsoFor = 'app.editor.alsoFor';
   static const String frozenApproveAll = 'app.frozen.approveAll';
+  static const String quickSwapAlreadyOne = 'app.quickSwap.alreadyOne';
+  static const String quickSwapAlreadyMany = 'app.quickSwap.alreadyMany';
 
   // ── F-55 the day agenda (PR 2). Every key lives under `app.agenda.` — the
   //    ADDRESS vocabulary_test pins the words "agenda" and "nota" to. ──
@@ -1184,6 +1186,8 @@ abstract final class KApp {
     calLaneWith,
     editorAlsoFor,
     frozenApproveAll,
+    quickSwapAlreadyOne,
+    quickSwapAlreadyMany,
     agendaSection,
     agendaKindSchool,
     agendaKindHealth,
@@ -1959,6 +1963,8 @@ abstract final class StringsAppPtBr {
     KApp.calLaneWith: '{0} com {1}',
     KApp.editorAlsoFor: 'Também para',
     KApp.frozenApproveAll: 'Aprovar os {0} pedidos deste dia',
+    KApp.quickSwapAlreadyOne: ' · {0} dia já tinha pedido em aberto',
+    KApp.quickSwapAlreadyMany: ' · {0} dias já tinham pedido em aberto',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'Escola',
@@ -2729,6 +2735,8 @@ abstract final class StringsAppEn {
     KApp.calLaneWith: '{0} with {1}',
     KApp.editorAlsoFor: 'Also for',
     KApp.frozenApproveAll: 'Approve the {0} requests for this day',
+    KApp.quickSwapAlreadyOne: ' · {0} day already had an open request',
+    KApp.quickSwapAlreadyMany: ' · {0} days already had an open request',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'School',

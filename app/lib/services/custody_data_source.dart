@@ -1176,6 +1176,16 @@ class ElevationRefused implements Exception {
 /// T-104: how many texts one Conversa page carries.
 const int chatPageSize = 200;
 
+/// S-25: the request was already answered another way (cancelled, rejected,
+/// auto-approved) — nothing changed. A batch counts it and goes on.
+class SwapAlreadyAnswered implements Exception {
+  final String message;
+  const SwapAlreadyAnswered(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class BillingRefused implements Exception {
   final String? serverMessage;
 
