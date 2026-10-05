@@ -802,6 +802,14 @@ abstract final class KApp {
   static const String chatSearchClose = 'app.chat.searchClose';
   static const String chatSearchEmpty = 'app.chat.searchEmpty';
   static const String chatLoadOlder = 'app.chat.loadOlder';
+  static const String authResendConfirmation = 'app.auth.resendConfirmation';
+  static const String authResendSent = 'app.auth.resendSent';
+  static const String authResendWait = 'app.auth.resendWait';
+  static const String authLinkExpired = 'app.auth.linkExpired';
+  static const String registerCheckSpam = 'app.register.checkSpam';
+  static const String registerFixEmail = 'app.register.fixEmail';
+  static const String updatePwdRequestNew = 'app.updatePwd.requestNew';
+  static const String authErrSamePassword = 'app.auth.errSamePassword';
   static const String chatMute = 'app.chat.mute';
   static const String chatMuteLead = 'app.chat.muteLead';
   static const String chatMuted = 'app.chat.muted';
@@ -1430,6 +1438,14 @@ abstract final class KApp {
     chatSearchClose,
     chatSearchEmpty,
     chatLoadOlder,
+    authResendConfirmation,
+    authResendSent,
+    authResendWait,
+    authLinkExpired,
+    registerCheckSpam,
+    registerFixEmail,
+    updatePwdRequestNew,
+    authErrSamePassword,
     chatMute,
     chatMuteLead,
     chatMuted,
@@ -2208,6 +2224,14 @@ abstract final class StringsAppPtBr {
     KApp.chatSearchClose: 'Fechar a busca',
     KApp.chatSearchEmpty: 'Nada encontrado para "{0}".',
     KApp.chatLoadOlder: 'Mostrar mensagens anteriores',
+    KApp.authResendConfirmation: 'Reenviar e-mail de confirmação',
+    KApp.authResendSent: 'Enviamos de novo. Confira também a caixa de spam e a de promoções.',
+    KApp.authResendWait: 'Reenviar em {0} s',
+    KApp.authLinkExpired: 'Este link expirou ou já foi usado. Entre com seu e-mail e senha — se o e-mail ainda não foi confirmado, você poderá pedir um novo link aqui.',
+    KApp.registerCheckSpam: 'Não chegou? Confira a caixa de spam e a de promoções.',
+    KApp.registerFixEmail: 'Corrigir o e-mail',
+    KApp.updatePwdRequestNew: 'Pedir novo link',
+    KApp.authErrSamePassword: 'A nova senha precisa ser diferente da atual.',
     KApp.chatMute: 'Silenciar o push da Conversa',
     KApp.chatMuteLead: 'A notificação continua no app; só o celular deixa de tocar.',
     KApp.chatMuted: 'Push da Conversa silenciado.',
@@ -2980,6 +3004,14 @@ abstract final class StringsAppEn {
     KApp.chatSearchClose: 'Close the search',
     KApp.chatSearchEmpty: 'Nothing found for "{0}".',
     KApp.chatLoadOlder: 'Show earlier messages',
+    KApp.authResendConfirmation: 'Resend the confirmation e-mail',
+    KApp.authResendSent: 'Sent again. Check your spam and promotions folders too.',
+    KApp.authResendWait: 'Resend in {0} s',
+    KApp.authLinkExpired: 'This link has expired or was already used. Sign in with your e-mail and password — if the e-mail is not confirmed yet, you can ask for a new link here.',
+    KApp.registerCheckSpam: 'Nothing yet? Check your spam and promotions folders.',
+    KApp.registerFixEmail: 'Fix the e-mail address',
+    KApp.updatePwdRequestNew: 'Ask for a new link',
+    KApp.authErrSamePassword: 'The new password must be different from the current one.',
     KApp.chatMute: 'Silence the chat\'s push',
     KApp.chatMuteLead: 'The notification stays in the app; only the phone stops ringing.',
     KApp.chatMuted: 'Chat push silenced.',

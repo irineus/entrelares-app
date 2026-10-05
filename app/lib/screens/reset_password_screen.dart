@@ -2,6 +2,7 @@ import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
 
+import '../services/auth_failed.dart';
 import '../widgets/app_l10n.dart';
 
 /// "Esqueci minha senha" — the port of ResetPassword.razor. Sends the
@@ -13,31 +14,45 @@ class ResetPasswordScreen extends StatefulWidget {
   final Future<void> Function(String email) onSendReset;
   final VoidCallback onBackToLogin;
 
+  /// F-87: the e-mail the reader had typed on the login.
+  final String? initialEmail;
+
   const ResetPasswordScreen(
-      {super.key, required this.onSendReset, required this.onBackToLogin});
+      {super.key,
+      required this.onSendReset,
+      required this.onBackToLogin,
+      this.initialEmail});
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
-  final _email = TextEditingController();
+  late final _email = TextEditingController(text: widget.initialEmail ?? '');
   bool _busy = false;
   bool _sent = false;
-  bool _failed = false;
+
+  /// F-87: which failure — a 429 has its own sentence.
+  String? _failedKey;
 
   Future<void> _submit() async {
     final email = _email.text.trim();
     if (_busy || email.isEmpty) return;
     setState(() {
       _busy = true;
-      _failed = false;
+      _failedKey = null;
     });
     try {
       await widget.onSendReset(email);
       if (mounted) setState(() => _sent = true);
-    } catch (_) {
-      if (mounted) setState(() => _failed = true);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _failedKey = switch (AuthFailed.of(e)) {
+              AuthFailure.rateLimited => K.authErrRateLimitedReset,
+              AuthFailure.network => K.authErrConnection,
+              _ => K.authErrResetSend,
+            });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -90,9 +105,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2))
                         : Text(l[K.resetSubmit]),
                   ),
-                  if (_failed) ...[
+                  if (_failedKey != null) ...[
                     const SizedBox(height: 12),
-                    Text(l[K.authErrResetSend],
+                    Text(l[_failedKey!],
                         textAlign: TextAlign.center,
                         style: TextStyle(
                             color: Theme.of(context).colorScheme.error)),

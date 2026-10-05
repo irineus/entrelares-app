@@ -100,7 +100,7 @@ abstract final class StringsEn {
     K.updatePwdConfirmPlaceholder: 'Repeat the new password',
     K.updatePwdSubmit: 'Save new password',
     K.updatePwdErrorSession: 'Session invalid or expired. Request a new recovery link.',
-    K.updatePwdErrorShort: 'The password must be at least 6 characters long.',
+    K.updatePwdErrorShort: 'The password must be at least 8 characters long.',
     K.updatePwdErrorMismatch: 'The passwords do not match.',
     // ── Navigation chrome ──
     K.navCalendar: 'Calendar',
