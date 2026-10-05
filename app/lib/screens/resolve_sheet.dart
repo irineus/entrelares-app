@@ -126,6 +126,7 @@ class _ResolveSheetState extends State<_ResolveSheet> {
             actualParentId: row.actualParentId,
             today: widget.today,
             frozenDates: frozenDates,
+            requesterId: widget.ownProfileId,
           ))
             row,
     ];

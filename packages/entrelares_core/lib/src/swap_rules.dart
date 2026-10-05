@@ -305,17 +305,36 @@ String? swapStatusLabelKey(String status) => switch (status) {
       _ => null,
     };
 
+/// S-26: only a PARTY to the day may ask to undo its swap — its planned
+/// carer or its actual one. F-28 forbade scenario C on swaps and nothing
+/// forbade it on reverts: a third caregiver's "Sem troca" made the planned
+/// parent the approver, and the actual carer lost the day without being
+/// asked. Mirror of the database's `enforce_revert_party`.
+bool mayRequestRevert({
+  required int? requesterId,
+  required int scheduledParentId,
+  int? actualParentId,
+}) =>
+    requesterId != null &&
+    (requesterId == scheduledParentId || requesterId == actualParentId);
+
 /// Whether a selected day qualifies for the bulk "request revert" section
 /// (`SelectedRevertable`): today or future, carrying an approved swap (actual
-/// set and ≠ scheduled), and not already frozen by an open request.
+/// set and ≠ scheduled), not already frozen by an open request — and, since
+/// S-26, the reader is the day's planned or actual carer.
 bool isRevertCandidate({
   required DateTime scheduleDate,
   required int scheduledParentId,
   int? actualParentId,
   required DateTime today,
   required Iterable<DateTime> frozenDates,
+  required int? requesterId,
 }) =>
     !isDayInPast(scheduleDate, today) &&
     actualParentId != null &&
     actualParentId != scheduledParentId &&
-    !isDayFrozen(scheduleDate, frozenDates);
+    !isDayFrozen(scheduleDate, frozenDates) &&
+    mayRequestRevert(
+        requesterId: requesterId,
+        scheduledParentId: scheduledParentId,
+        actualParentId: actualParentId);

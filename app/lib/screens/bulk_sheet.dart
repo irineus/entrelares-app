@@ -539,6 +539,16 @@ class _BulkSheetState extends State<_BulkSheet> {
           scheduledParentId: dayScheduled,
           today: widget.today,
         )) {
+          // S-26: only the day's planned or actual carer may undo its swap;
+          // other days are skipped (not failed), like F-28's.
+          if (!mayRequestRevert(
+            requesterId: widget.myProfile?.id,
+            scheduledParentId: dayScheduled,
+            actualParentId: existing?.actualParentId,
+          )) {
+            skipped++;
+            continue;
+          }
           try {
             await widget.dataSource.requestRevert(
               scheduleDate: date,

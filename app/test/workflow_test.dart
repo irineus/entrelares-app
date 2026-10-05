@@ -216,6 +216,62 @@ void main() {
     expect(ds.revertRequests.single['restoreNotes'], false);
   });
 
+  testWidgets('S-26: a third caregiver is not offered "Sem troca" on a '
+      'swap between two other people', (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    // Planned Bruno, swapped (approved) to Carla; Ana (me) is neither.
+    final ds = FakeCustodyDataSource(
+        members: [ana, bruno, carla],
+        days: [row(1, dayOfMonth(day), 2, actual: 3)]);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openDayEditor(tester, day);
+
+    expect(find.byKey(const ValueKey('actual-no-swap')), findsNothing);
+  });
+
+  testWidgets('S-26: the planned carer still is', (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    final ds = FakeCustodyDataSource(
+        members: [ana, bruno, carla],
+        days: [row(1, dayOfMonth(day), 1, actual: 3)]);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openDayEditor(tester, day);
+
+    expect(find.byKey(const ValueKey('actual-no-swap')), findsOneWidget);
+  });
+
+  testWidgets('S-26: bulk "Limpar" skips a swap I am no party to',
+      (tester) async {
+    final days = twoFutureDays;
+    if (days == null) return;
+    final ds = FakeCustodyDataSource(members: [ana, bruno, carla], days: [
+      row(1, dayOfMonth(days.$1), 2, actual: 3), // Bruno -> Carla, not mine
+    ]);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    await longPressDay(tester, days.$1);
+    await tester.tap(find.text(pt.format(K.selectionEdit, [1])));
+    await tester.pumpAndSettle();
+
+    await tapSheet(tester, find.byKey(const Key('bulkActual')));
+    await tester.tap(find.text(pt[K.editorSameAsPlanned]).last);
+    await tester.pumpAndSettle();
+    final clearBoxes = find.byType(Checkbox);
+    await tapSheet(tester, clearBoxes.first);
+    await tapSheet(tester, find.widgetWithText(FilledButton, pt[K.commonSave]));
+
+    expect(ds.revertRequests, isEmpty);
+    expect(
+        find.textContaining(
+            bulkPluralize(pt, 1, K.sumSkippedOne, K.sumSkippedMany)),
+        findsOneWidget);
+  });
+
   testWidgets('Resolver: the bar counts actionable days and the sheet '
       'batches the approval', (tester) async {
     final days = twoFutureDays;
