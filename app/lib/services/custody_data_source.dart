@@ -463,7 +463,25 @@ abstract class CustodyDataSource {
   /// Resolves an invitation token for an anonymous visitor, or null when the
   /// invitation is not usable. Unknown, accepted, revoked and expired tokens
   /// are all null — the RPC does not distinguish them, and neither may the UI.
+  ///
+  /// F-88: a server that could not be REACHED is not an invalid invitation —
+  /// it throws [InviteUnreachable], and the screen offers "Tentar de novo".
+  /// 4G at the school gate used to read "Convite inválido ou expirado — peça
+  /// um novo", and its only button dropped the token.
   Future<InviteInfo?> fetchInviteInfo(String token);
+
+  /// F-88: `pending` / `accepted` / `unusable` — so an invitation already
+  /// accepted reads "é só entrar" instead of "peça um novo".
+  Future<String> fetchInviteTokenStatus(String token);
+
+  /// F-88: the open invitation to the caller's VERIFIED e-mail from another
+  /// family, offered only while the caller's own family is empty (nobody
+  /// else, nothing planned). Null otherwise.
+  Future<PendingInvitationOffer?> fetchMyPendingInvitation();
+
+  /// F-88: accepts [token] and discards the caller's empty family — the
+  /// server re-checks both and refuses with a PT-BR sentence.
+  Future<void> joinInvitationFromEmptyFamily(String token);
 
   /// The FOUNDER branch. GoTrue creates the auth user carrying the metadata
   /// `handle_new_user` reads; the trigger is what creates family + profile
@@ -1184,6 +1202,24 @@ class SwapAlreadyAnswered implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// F-88: an invitation to a founder whose own family is still empty.
+class PendingInvitationOffer {
+  final String token;
+  final String familyName;
+  final String inviterName;
+
+  const PendingInvitationOffer({
+    required this.token,
+    required this.familyName,
+    required this.inviterName,
+  });
+}
+
+/// F-88: the invitation could not be checked — no answer from the server.
+class InviteUnreachable implements Exception {
+  const InviteUnreachable();
 }
 
 class BillingRefused implements Exception {

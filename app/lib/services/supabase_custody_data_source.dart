@@ -1319,11 +1319,46 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       final row = data is List ? (data.isEmpty ? null : data.first) : data;
       if (row is! Map) return null;
       return InviteInfo.fromJson(Map<String, dynamic>.from(row));
-    } catch (_) {
-      // An unusable token must look identical to an unreachable server here:
-      // the screen shows "this invitation is not valid" either way.
+    } on PostgrestException {
+      // The server ANSWERED and refused: as unusable as an unknown token.
       return null;
+    } catch (_) {
+      // F-88: no answer at all (offline, timeout, the gateway unreachable) —
+      // never "convite inválido", which sends the reader back to the ex.
+      throw const InviteUnreachable();
     }
+  }
+
+  @override
+  Future<String> fetchInviteTokenStatus(String token) async {
+    if (!InviteFormRules.isTokenShaped(token)) return 'unusable';
+    try {
+      final status = await _client
+          .rpc<dynamic>('invite_token_status', params: {'p_token': token});
+      return status is String ? status : 'unusable';
+    } catch (_) {
+      return 'unusable';
+    }
+  }
+
+  @override
+  Future<PendingInvitationOffer?> fetchMyPendingInvitation() async {
+    final data = await _client.rpc<dynamic>('my_pending_invitation');
+    final row = data is List ? (data.isEmpty ? null : data.first) : data;
+    if (row is! Map || row['token'] == null) return null;
+    return PendingInvitationOffer(
+      token: '${row['token']}',
+      familyName: '${row['family_name'] ?? ''}',
+      inviterName: '${row['inviter_name'] ?? ''}',
+    );
+  }
+
+  @override
+  Future<void> joinInvitationFromEmptyFamily(String token) async {
+    await _client.rpc<dynamic>('join_invitation_from_empty_family', params: {
+      'p_token': token,
+      'p_policy_version': PolicyVersions.current,
+    });
   }
 
   @override

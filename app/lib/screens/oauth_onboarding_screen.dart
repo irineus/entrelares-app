@@ -40,6 +40,9 @@ class OauthOnboardingScreen extends StatefulWidget {
   /// is the only other door.
   final Future<void> Function() onSignOut;
 
+  /// F-88: the kept invitation turned out dead (expired, revoked, used).
+  final VoidCallback? onInviteDead;
+
   /// The profile now exists — `main.dart` re-resolves the phase and routes.
   final Future<void> Function() onCompleted;
 
@@ -68,6 +71,7 @@ class OauthOnboardingScreen extends StatefulWidget {
     required this.prefs,
     this.initialInviteToken,
     required this.onSignOut,
+    this.onInviteDead,
     required this.onCompleted,
   });
 
@@ -126,12 +130,30 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
     super.dispose();
   }
 
+  /// F-88: the invitation could not be checked — the form waits for a retry
+  /// instead of becoming the FOUNDER form, which made a second family.
+  bool _inviteUnreachable = false;
+
   Future<void> _resolveInvite(String token) async {
-    final info = await widget.dataSource.fetchInviteInfo(token);
+    InviteInfo? info;
+    try {
+      info = await widget.dataSource.fetchInviteInfo(token);
+    } on InviteUnreachable {
+      if (!mounted) return;
+      setState(() {
+        _loadingInvite = false;
+        _inviteUnreachable = true;
+      });
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _loadingInvite = false;
+      _inviteUnreachable = false;
       if (info == null) {
+        // F-88: a dead token is forgotten, so the next sign-up on this
+        // device is not told about it.
+        widget.onInviteDead?.call();
         // The stash outlived the invitation (expired, revoked, already used).
         // The founder form stays available below — being locked out of the
         // whole product over a dead token would be worse.
@@ -292,6 +314,33 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
         ],
       );
     }
+    if (_inviteUnreachable) {
+      return Column(
+        key: const ValueKey('invite-unreachable'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l[KApp.inviteUnreachableTitle],
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 12),
+          Text(l[KApp.inviteUnreachableBody], textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () {
+              final token = _inviteToken;
+              if (token == null) return;
+              setState(() {
+                _inviteUnreachable = false;
+                _loadingInvite = true;
+              });
+              _resolveInvite(token);
+            },
+            child: Text(l[KApp.inviteRetry]),
+          ),
+        ],
+      );
+    }
     if (_migrationWarning) return _migrationState(l);
     return _form(l);
   }
@@ -358,6 +407,21 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
                   ]),
             textAlign: TextAlign.center,
           ),
+          // F-88: the invitation names an address, and the claim refuses any
+          // other — say so BEFORE the form, while switching accounts still
+          // costs nothing (the invitation stays kept).
+          if (_sessionEmail != null &&
+              invite.invitedEmail.trim().toLowerCase() !=
+                  _sessionEmail!.trim().toLowerCase()) ...[
+            const SizedBox(height: 12),
+            AppBanner(
+              key: const ValueKey('invite-email-mismatch'),
+              tone: context.tokens.warning,
+              icon: Icons.alternate_email,
+              message: l.format(KApp.inviteEmailMismatch,
+                  [invite.invitedEmail, _sessionEmail!]),
+            ),
+          ],
         ] else ...[
           Text(l[KApp.onbFounderTitle],
               textAlign: TextAlign.center,
