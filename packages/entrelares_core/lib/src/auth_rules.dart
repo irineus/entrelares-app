@@ -135,6 +135,13 @@ abstract final class InactivityPolicy {
   /// How often the shell re-checks — same 30 s cadence as the web's poll.
   static const Duration pollInterval = Duration(seconds: 30);
 
+  /// F-92 (owner, 04/10/2026): the idle sign-out exists for the WEB channel
+  /// only — a browser on a shared computer. On Android the device lock
+  /// protects the session (T-18's spirit), and signing out on a warm resume
+  /// wiped the offline copy and dropped the tapped push: the parent opening
+  /// the app at pickup could not see who had the child.
+  static bool appliesTo({required bool isWeb}) => isWeb;
+
   static bool expired(DateTime lastInteraction, DateTime now,
           [Duration limit = timeout]) =>
       !now.difference(lastInteraction).isNegative &&

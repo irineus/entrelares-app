@@ -267,7 +267,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   // S-04 — inactivity timeout (mirror in InactivityPolicy). The web resets on
   // click/touch/key/scroll; every one of those starts as a pointer-down here.
   // Background time counts, same as the web's timer running in a hidden tab:
-  // the resume hook re-checks immediately.
+  // the resume hook re-checks immediately. F-92: WEB ONLY — on Android the
+  // device lock protects the session (InactivityPolicy.appliesTo).
   DateTime _lastInteraction = DateTime.now();
   Timer? _inactivityTimer;
 
@@ -1210,8 +1211,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       // one restore per process.
       unawaited(_purchases?.activate());
       _lastInteraction = DateTime.now();
-      _inactivityTimer ??= Timer.periodic(
-          InactivityPolicy.pollInterval, (_) => _checkInactivity());
+      // F-92: web only — Android has no idle sign-out.
+      if (InactivityPolicy.appliesTo(isWeb: kIsWeb)) {
+        _inactivityTimer ??= Timer.periodic(
+            InactivityPolicy.pollInterval, (_) => _checkInactivity());
+      }
       unawaited(_loadIdleTimeout());
       unawaited(_loadExpensesTab());
       unawaited(_loadChatTab());
@@ -1517,6 +1521,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   }
 
   void _checkInactivity() {
+    if (!InactivityPolicy.appliesTo(isWeb: kIsWeb)) return;
     if (_phase != _AuthPhase.authed) return;
     if (!InactivityPolicy.expired(
         _lastInteraction, DateTime.now(), _idleTimeout)) {
