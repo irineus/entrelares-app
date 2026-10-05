@@ -12,6 +12,7 @@
 library;
 
 import 'localization/k.dart';
+import 'localization/k_app.dart';
 
 /// Which block the Premium section shows. Pure input → output so the free/paid
 /// UI line is unit-tested without a DB.
@@ -319,5 +320,7 @@ String? billingTypeKey(String? billingType) => switch (billingType) {
       'PIX' => K.premMethodPix,
       'CREDIT_CARD' => K.premMethodCard,
       'BOLETO' => K.premMethodBoleto,
+      // F-107: the store rail's rows in the payment history.
+      'PLAY' => KApp.premMethodPlay,
       _ => null,
     };

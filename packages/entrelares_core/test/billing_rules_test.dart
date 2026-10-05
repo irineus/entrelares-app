@@ -353,6 +353,8 @@ void main() {
 
   group('F-43 label keys', () {
     test('every timeline category maps to a key, unknown falls back', () {
+      expect(billingTypeKey('PLAY'), KApp.premMethodPlay,
+          reason: 'F-107: the store rail has its own label');
       expect(historyCategoryKey('payment'), K.premHistoryPayment);
       expect(historyCategoryKey('refund'), K.premHistoryRefund);
       expect(historyCategoryKey('overdue'), K.premHistoryOverdue);
