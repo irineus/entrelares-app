@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 
 import 'package:entrelares_db_contracts/models/family.dart';
 import '../services/analytics_service.dart';
+import '../services/checkout_note.dart';
 import '../services/custody_data_source.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
@@ -31,6 +34,11 @@ class PremiumReturnScreen extends StatefulWidget {
   final int maxAttempts;
   final Duration pollDelay;
 
+  /// F-86: what the family had before the checkout. Null reads the note the
+  /// plan page wrote before the redirect; with none (storage blocked, page
+  /// opened by hand), the first successful read is the line.
+  final CheckoutBaseline? baseline;
+
   const PremiumReturnScreen({
     super.key,
     required this.dataSource,
@@ -38,6 +46,7 @@ class PremiumReturnScreen extends StatefulWidget {
     this.onBackToFamily,
     this.maxAttempts = 20,
     this.pollDelay = const Duration(seconds: 3),
+    this.baseline,
   });
 
   @override
@@ -70,30 +79,60 @@ class _PremiumReturnScreenState extends State<PremiumReturnScreen> {
     widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutReturn,
         props: analyticsFunnelProps(channel: widget.analytics!.channel));
 
+    // F-86: a payment is a CHANGE against what the family had before the
+    // checkout — never "the plan reads premium", which a trial, a cancelled-
+    // but-paid family or one in grace already did.
+    var baseline = widget.baseline ?? _storedBaseline();
     for (var attempt = 0; attempt < widget.maxAttempts; attempt++) {
       Family? family;
+      DateTime? periodEnd;
       try {
         family = await widget.dataSource.fetchOwnFamily();
+        periodEnd = (await widget.dataSource.fetchSubscription())
+            ?.currentPeriodEnd
+            ?.toUtc();
       } catch (_) {
         // A failed read is not a failed payment: keep polling and let the
         // timeout copy (which promises nothing) be the honest ending.
+        family = null;
       }
       if (_abandoned) return;
-      if (family?.plan.toLowerCase() == 'premium') {
-        setState(() => _confirmed = true);
-        widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutOutcome,
-            props: analyticsFunnelProps(
-                channel: widget.analytics!.channel, outcome: 'confirmed'));
-        return;
+      if (family != null) {
+        final premium = Family.isPremiumFamily(family, DateTime.now().toUtc());
+        baseline ??= CheckoutBaseline(
+            premium: premium,
+            periodEndUtc: periodEnd,
+            takenAtUtc: DateTime.now().toUtc());
+        if (checkoutConfirmed(
+            before: baseline, premiumNow: premium, periodEndNowUtc: periodEnd)) {
+          clearCheckoutNote();
+          setState(() => _confirmed = true);
+          widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutOutcome,
+              props: analyticsFunnelProps(
+                  channel: widget.analytics!.channel, outcome: 'confirmed'));
+          return;
+        }
       }
       await Future<void>.delayed(widget.pollDelay);
       if (_abandoned) return;
     }
 
+    clearCheckoutNote();
     setState(() => _timedOut = true);
     widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutOutcome,
         props: analyticsFunnelProps(
             channel: widget.analytics!.channel, outcome: 'timeout'));
+  }
+
+  static CheckoutBaseline? _storedBaseline() {
+    final raw = readCheckoutNote();
+    if (raw == null) return null;
+    try {
+      final note = CheckoutBaseline.fromJson(jsonDecode(raw));
+      return note != null && note.isFresh(DateTime.now().toUtc()) ? note : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
