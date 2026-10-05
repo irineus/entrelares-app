@@ -970,8 +970,16 @@ class _DaySheetState extends State<_DaySheet> {
         // two-party workflow, and the approver sees them together.
         for (final sibling in widget.siblings) {
           if (!_alsoFor.contains(sibling.childId)) continue;
+          // F-85: the SAME base write the main lane does, unchanged. The
+          // request's `pre_edit_log_id` is the newest log of the lane, and
+          // without this write that was whatever last touched the sibling's
+          // day — for a wizard day never edited, the INSERT, whose old_data is
+          // null — so the revert read "no snapshot" and deleted the day.
+          await widget.dataSource.updateDay(sibling.day);
+          final siblingDay = await widget.dataSource
+              .fetchDay(widget.date, childId: sibling.childId);
           await widget.dataSource.createSwapRequest(
-            schedule: sibling.day,
+            schedule: siblingDay ?? sibling.day,
             proposedActualParentId: proposed,
             proposedHandoffTime: handoffWire,
             requestMessage: _swapMessage.text,

@@ -262,6 +262,7 @@ class FakeCustodyDataSource implements CustodyDataSource {
 
   /// U-55: every call to the range handoff write, in order.
   final handoffRanges = <({DateTime from, DateTime? to, String time})>[];
+  final handoffRangeChildren = <int?>[];
 
   /// U-55: the server's rule, played on the fake's rows — transition days
   /// from [from] on (never before today) that have no time get it.
@@ -273,6 +274,7 @@ class FakeCustodyDataSource implements CustodyDataSource {
     final wire = '${time.hour.toString().padLeft(2, '0')}:'
         '${time.minute.toString().padLeft(2, '0')}:00';
     handoffRanges.add((from: from, to: to, time: wire));
+    handoffRangeChildren.add(childId);
     final floor = from.isBefore(dateOnly(today)) ? dateOnly(today) : from;
     final byIso = {for (final d in days) CareSchedule.isoDate(d.scheduleDate): d};
     var updated = 0, existing = 0;
@@ -404,6 +406,11 @@ class FakeCustodyDataSource implements CustodyDataSource {
       'handoff': proposedHandoffTime,
       'message': requestMessage,
       'requester': myProfile.id,
+      'scheduleId': schedule.id,
+      'childId': schedule.childId,
+      // F-85: the snapshot the revert replays is the log of a base write made
+      // just before the request.
+      'baseWritten': updated.any((u) => u.id == schedule.id),
     });
   }
 
@@ -448,6 +455,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
       'message': requestMessage,
       'restoreNotes': restoreNotes,
       'requester': myProfile.id,
+      'childId': childId,
+      'scheduleId': scheduleId,
     });
   }
 

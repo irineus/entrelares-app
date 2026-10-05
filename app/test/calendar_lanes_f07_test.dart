@@ -423,6 +423,15 @@ void main() {
     expect(ds.createdSwapRequests, hasLength(2),
         reason: "one request per child — Lia's and Theo's");
     expect({for (final r in ds.createdSwapRequests) r['proposed']}, {bruno.id});
+    // F-85: each request — the sibling's too — follows a base write of its
+    // OWN day, so its pre-edit log carries that day's snapshot. Without it
+    // Theo's request pointed at the wizard's INSERT (old_data null) and the
+    // revert deleted his day.
+    expect({for (final r in ds.createdSwapRequests) r['childId']},
+        {lia.id, theo.id});
+    for (final r in ds.createdSwapRequests) {
+      expect(r['baseWritten'], isTrue, reason: 'child ${r['childId']}');
+    }
   });
 
   testWidgets("the approver approves every child's request of the day at once",
@@ -537,5 +546,111 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('agenda-child')), findsNothing);
     expect(find.text('Theo'), findsWidgets);
+  });
+  // ── F-85: the batch paths carry the lane ──
+
+  testWidgets("F-85: the Resolver's batch revert asks in the day's own lane",
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    final swapped = CareSchedule.fromJson({
+      'id': 1,
+      'schedule_date': CareSchedule.isoDate(dayOfMonth(day)),
+      'scheduled_parent_id': ana.id,
+      'actual_parent_id': bruno.id,
+      'revision': 1,
+      'revision_token': 'tok-1',
+      'child_id': lia.id,
+    });
+    final ds = FakeCustodyDataSource(
+        members: const [ana, bruno],
+        days: [swapped, laneRow(2, dayOfMonth(day), ana.id, theo.id)])
+      ..family = const Family(
+          id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+      ..children = [lia, theo];
+    await pump(tester, ds);
+    await selectLane(tester, lia.id);
+    final cell = find.text('$day').last;
+    await tester.ensureVisible(cell);
+    await tester.pumpAndSettle();
+    await tester.longPress(cell);
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.text(l.format(K.selectionResolve, [1])));
+    await tapVisible(tester, find.text(l.format(K.wfRequestRevert, [1])));
+
+    final request = ds.revertRequests.single;
+    expect(request['childId'], lia.id,
+        reason: 'in the family lane the child day never froze');
+    expect(request['scheduleId'], 1);
+  });
+
+  testWidgets("F-85: the handoff-range sheet writes only the chosen child's "
+      'lane', (tester) async {
+    const admin = Member(
+        id: 1,
+        fullName: 'Ana Souza',
+        colorSlot: 1,
+        userId: 'u1',
+        isAdmin: true,
+        familyId: 7);
+    final start = DateTime(today.year, today.month, today.day);
+    final ds = FakeCustodyDataSource(members: const [admin, bruno], days: [
+      for (var i = 0; i < 14; i++) ...[
+        laneRow(100 + i, start.add(Duration(days: i)),
+            i < 7 ? admin.id : bruno.id, lia.id),
+        laneRow(200 + i, start.add(Duration(days: i)),
+            i < 7 ? admin.id : bruno.id, theo.id),
+      ],
+    ])
+      ..family = const Family(
+          id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+      ..children = [lia, theo];
+    await pump(tester, ds);
+    await selectLane(tester, lia.id);
+
+    await tapSheet(tester, find.text(l[K.handoffNudgeAction]));
+    await pickTime(tester, find.byKey(const Key('handoffRangeTime')),
+        hour: 18, minute: 0);
+    await tapSheet(tester, find.text(l[K.handoffRangeApply]));
+
+    expect(ds.handoffRangeChildren, [lia.id],
+        reason: 'a null child is EVERY lane for the RPC');
+  });
+  testWidgets("F-85: the bulk editor's revert asks in the day's own lane",
+      (tester) async {
+    final day = futureDay;
+    if (day == null) return;
+    final swapped = CareSchedule.fromJson({
+      'id': 1,
+      'schedule_date': CareSchedule.isoDate(dayOfMonth(day)),
+      'scheduled_parent_id': ana.id,
+      'actual_parent_id': bruno.id,
+      'revision': 1,
+      'revision_token': 'tok-1',
+      'child_id': lia.id,
+    });
+    final ds = FakeCustodyDataSource(
+        members: const [ana, bruno],
+        days: [swapped, laneRow(2, dayOfMonth(day), ana.id, theo.id)])
+      ..family = const Family(
+          id: 7, name: 'Souza', plan: 'premium', scheduleMode: 'per_child')
+      ..children = [lia, theo];
+    await pump(tester, ds);
+    await selectLane(tester, lia.id);
+    final cell = find.text('$day').last;
+    await tester.ensureVisible(cell);
+    await tester.pumpAndSettle();
+    await tester.longPress(cell);
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.text(l.format(K.selectionEdit, [1])));
+    // The real carer back to the planned one (Ana) = a revert.
+    await tapSheet(tester, find.byKey(const Key('bulkActual')));
+    await tester.tap(find.text('Ana Souza').last);
+    await tester.pumpAndSettle();
+    await tapSheet(tester, find.text(l[K.commonSave]));
+
+    final request = ds.revertRequests.single;
+    expect(request['childId'], lia.id);
+    expect(request['scheduleId'], 1);
   });
 }
