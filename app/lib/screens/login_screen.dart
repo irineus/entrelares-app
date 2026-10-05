@@ -7,11 +7,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../deep_link_urls.dart';
+import '../services/auth_failed.dart';
 import '../env.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_splash.dart';
 import '../widgets/google_sign_in_button.dart';
+import '../widgets/resend_confirmation_button.dart';
 
 /// Why the visitor was sent back here, so the banner reads the right message
 /// (the web's `session_expired` sessionStorage flag).
@@ -42,6 +44,17 @@ class LoginScreen extends StatefulWidget {
 
   final VoidCallback onForgotPassword;
 
+  /// F-87: the e-mail typed here travels to the recovery form. Null keeps
+  /// [onForgotPassword] alone.
+  final ValueChanged<String>? onForgotPasswordFor;
+
+  /// F-87: re-sends the sign-up confirmation (GoTrue `resend`). Offered when
+  /// the sign-in answers `email_not_confirmed`.
+  final Future<void> Function(String email)? onResendConfirmation;
+
+  /// F-87: the `error_code` an expired or used e-mail link landed with.
+  final String? linkErrorCode;
+
   /// Opens `/register` — live since lote 4.
   final VoidCallback onSignUp;
 
@@ -67,6 +80,9 @@ class LoginScreen extends StatefulWidget {
       {super.key,
       required this.onSignIn,
       required this.onForgotPassword,
+      this.onForgotPasswordFor,
+      this.onResendConfirmation,
+      this.linkErrorCode,
       required this.onSignUp,
       required this.prefs,
       this.googleEnabled,
@@ -83,6 +99,10 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Same store names as the web's sessionStorage keys.
   static const _failsKey = 'login_fails';
   static const _lockoutUntilKey = 'login_lockout_until';
+  static const _lastFailKey = 'login_last_fail';
+
+  /// F-87: the sign-in answered "e-mail not confirmed" — the resend shows.
+  bool _notConfirmed = false;
 
   final _email = TextEditingController();
   final _password = TextEditingController();
@@ -105,7 +125,14 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _failedAttempts = widget.prefs.getInt(_failsKey) ?? 0;
+    // F-87: failures forget themselves after LoginThrottle.decay.
+    final lastFail = widget.prefs.getInt(_lastFailKey);
+    _failedAttempts = LoginThrottle.countAfterDecay(
+        widget.prefs.getInt(_failsKey) ?? 0,
+        lastFail == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(lastFail * 1000, isUtc: true),
+        DateTime.now().toUtc());
     final untilSeconds = widget.prefs.getInt(_lockoutUntilKey);
     if (untilSeconds != null) {
       final remaining = LoginThrottle.remainingSeconds(
@@ -126,23 +153,37 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _busy = true;
       _errorKey = null;
+      _notConfirmed = false;
     });
     try {
       await widget.onSignIn(_email.text.trim(), _password.text);
       // Success routes away from this screen (auth listener in main).
       await widget.prefs.remove(_failsKey);
       await widget.prefs.remove(_lockoutUntilKey);
+      await widget.prefs.remove(_lastFailKey);
     } catch (e) {
-      final raw = e.toString();
-      _failedAttempts++;
-      await widget.prefs.setInt(_failsKey, _failedAttempts);
-      final lockout = LoginThrottle.lockoutSecondsFor(_failedAttempts);
-      if (lockout > 0) _startLockout(lockout);
+      // F-87: the sentence follows GoTrue's code — an unconfirmed e-mail or a
+      // 429 used to read "check your internet" — and only a wrong password
+      // feeds the throttle.
+      final failure = AuthFailed.of(e);
+      if (LoginThrottle.counts(failure)) {
+        _failedAttempts++;
+        await widget.prefs.setInt(_failsKey, _failedAttempts);
+        await widget.prefs.setInt(_lastFailKey,
+            DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000);
+        final lockout = LoginThrottle.lockoutSecondsFor(_failedAttempts);
+        if (lockout > 0) _startLockout(lockout);
+      }
       if (mounted) {
         setState(() {
-          _errorKey = raw.contains('Invalid login credentials')
-              ? K.authErrInvalidCredentials
-              : K.authErrConnection;
+          _notConfirmed = failure == AuthFailure.emailNotConfirmed;
+          _errorKey = switch (failure) {
+            AuthFailure.invalidCredentials => K.authErrInvalidCredentials,
+            AuthFailure.emailNotConfirmed => K.authErrEmailNotConfirmed,
+            AuthFailure.rateLimited => K.authErrRateLimited,
+            AuthFailure.network => K.authErrConnection,
+            _ => K.authErrGeneric,
+          };
         });
       }
     } finally {
@@ -232,6 +273,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 24),
+                if (widget.linkErrorCode != null) ...[
+                  AppBanner(
+                    key: const ValueKey('login-link-expired'),
+                    tone: context.tokens.warning,
+                    icon: Icons.link_off,
+                    message: l[KApp.authLinkExpired],
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 if (expiredText != null) ...[
                   Text(expiredText,
                       textAlign: TextAlign.center,
@@ -280,9 +330,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                           color: Theme.of(context).colorScheme.error)),
                 ],
+                if (_notConfirmed && widget.onResendConfirmation != null) ...[
+                  const SizedBox(height: 8),
+                  ResendConfirmationButton(
+                    email: _email.text,
+                    onResend: widget.onResendConfirmation!,
+                  ),
+                ],
                 const SizedBox(height: 8),
                 TextButton(
-                  onPressed: widget.onForgotPassword,
+                  onPressed: widget.onForgotPasswordFor == null
+                      ? widget.onForgotPassword
+                      : () => widget.onForgotPasswordFor!(_email.text.trim()),
                   child: Text(l[K.loginForgot]),
                 ),
                 // F-57: below the password flow, above the U-28 rule — still

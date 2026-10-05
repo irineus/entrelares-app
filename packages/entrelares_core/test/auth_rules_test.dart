@@ -101,17 +101,77 @@ void main() {
     });
 
     test('mismatch is refused', () {
-      expect(UpdatePasswordRules.validationErrorKey('123456', '123457'),
+      expect(UpdatePasswordRules.validationErrorKey('12345678', '12345679'),
           K.updatePwdErrorMismatch);
     });
 
     test('valid pair passes', () {
-      expect(UpdatePasswordRules.validationErrorKey('123456', '123456'),
+      expect(UpdatePasswordRules.validationErrorKey('12345678', '12345678'),
           isNull);
       expect(
           UpdatePasswordRules.validationErrorKey(
               'senha-longa', 'senha-longa'),
           isNull);
+    });
+  });
+
+  group('F-87', () {
+    test('one password minimum everywhere', () {
+      expect(PasswordRules.minLength, 8);
+      expect(UpdatePasswordRules.minLength, PasswordRules.minLength);
+      expect(RegisterRules.minPasswordLength, PasswordRules.minLength);
+      expect(UpdatePasswordRules.validationErrorKey('1234567', '1234567'),
+          K.updatePwdErrorShort);
+      expect(UpdatePasswordRules.validationErrorKey('12345678', '12345678'),
+          isNull);
+    });
+
+    test('the failure is read from the code and the status', () {
+      expect(classifyAuthFailure(code: 'invalid_credentials', status: 400),
+          AuthFailure.invalidCredentials);
+      expect(classifyAuthFailure(code: 'email_not_confirmed', status: 400),
+          AuthFailure.emailNotConfirmed);
+      expect(classifyAuthFailure(message: 'Email not confirmed', status: 400),
+          AuthFailure.emailNotConfirmed);
+      expect(classifyAuthFailure(code: 'over_request_rate_limit', status: 429),
+          AuthFailure.rateLimited);
+      expect(classifyAuthFailure(status: 429), AuthFailure.rateLimited);
+      expect(classifyAuthFailure(code: 'same_password', status: 422),
+          AuthFailure.samePassword);
+      expect(classifyAuthFailure(code: 'weak_password', status: 422),
+          AuthFailure.weakPassword);
+      expect(classifyAuthFailure(code: 'otp_expired'), AuthFailure.expiredLink);
+      expect(
+          classifyAuthFailure(
+              message: 'ClientException: XMLHttpRequest error.'),
+          AuthFailure.network);
+      expect(classifyAuthFailure(code: 'unexpected_failure', status: 500),
+          AuthFailure.other);
+    });
+
+    test('only a wrong password feeds the throttle, and it forgets', () {
+      expect(LoginThrottle.counts(AuthFailure.invalidCredentials), isTrue);
+      expect(LoginThrottle.counts(AuthFailure.network), isFalse);
+      expect(LoginThrottle.counts(AuthFailure.emailNotConfirmed), isFalse);
+      final t = DateTime.utc(2026, 10, 5, 12);
+      expect(LoginThrottle.countAfterDecay(4, t, t.add(const Duration(minutes: 14))),
+          4);
+      expect(LoginThrottle.countAfterDecay(4, t, t.add(const Duration(minutes: 15))),
+          0);
+      expect(LoginThrottle.countAfterDecay(2, null, t), 2);
+    });
+
+    test('an expired link announces itself in the fragment', () {
+      expect(
+          authLinkErrorCode(Uri.parse(
+              'https://web.entrelares.app/login#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired')),
+          'otp_expired');
+      expect(authLinkErrorCode(Uri.parse('https://web.entrelares.app/login')),
+          isNull);
+      expect(
+          authLinkErrorCode(
+              Uri.parse('https://web.entrelares.app/login?error=access_denied')),
+          'access_denied');
     });
   });
 }

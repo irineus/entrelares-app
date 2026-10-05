@@ -100,7 +100,7 @@ abstract final class StringsPtBr {
     K.updatePwdConfirmPlaceholder: 'Repita a nova senha',
     K.updatePwdSubmit: 'Salvar nova senha',
     K.updatePwdErrorSession: 'Sessão inválida ou expirada. Solicite um novo link de recuperação.',
-    K.updatePwdErrorShort: 'A senha deve ter no mínimo 6 caracteres.',
+    K.updatePwdErrorShort: 'A senha precisa ter pelo menos 8 caracteres.',
     K.updatePwdErrorMismatch: 'As senhas não coincidem.',
     // ── Navigation chrome ──
     K.navCalendar: 'Calendário',

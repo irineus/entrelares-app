@@ -48,6 +48,7 @@ import 'services/account_identity.dart';
 import 'services/activity_tracker.dart';
 import 'services/admin_mode.dart';
 import 'services/analytics_service.dart';
+import 'services/auth_failed.dart';
 import 'services/appearance.dart';
 import 'services/boot_handoff.dart';
 import 'services/connectivity_status.dart';
@@ -237,6 +238,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   final _refresh = _RouterRefresh();
   _AuthPhase _phase = _AuthPhase.gate;
 
+  /// F-87: the `error_code` the boot address carried (web), and the e-mail
+  /// typed on the login, handed to the recovery form — memory only.
+  String? _authLinkError;
+  String? _pendingResetEmail;
+
   /// F-68: the screen "Ajuda e contato" was opened from, for its diagnostics —
   /// the route is sanitized in core before it can leave the device.
   String? _helpFrom;
@@ -308,6 +314,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         builder: (_, _) => LoginScreen(
           onSignIn: _signIn,
           onForgotPassword: () => _router.go('/reset-password'),
+          onForgotPasswordFor: (email) {
+            _pendingResetEmail = email.isEmpty ? null : email;
+            _router.go('/reset-password');
+          },
+          onResendConfirmation: _resendConfirmation,
+          linkErrorCode: _authLinkError,
           onSignUp: () => _router.go('/register'),
           onHelp: () => _openHelp(from: '/login'),
           prefs: widget.prefs,
@@ -340,6 +352,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           onSignIn: _signIn,
           onInviteeJoined: _welcomeInvitee,
           onBackToLogin: () => _router.go('/login'),
+          onResendConfirmation: _resendConfirmation,
           googleEnabled: AuthProviders.googleEnabled(),
           // F-57: the invite branch hands its token over, and the stash has
           // to happen HERE — the OAuth redirect leaves the widget tree behind.
@@ -375,8 +388,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       GoRoute(
         path: '/reset-password',
         builder: (_, _) => ResetPasswordScreen(
-          onSendReset: (email) => _client.auth.resetPasswordForEmail(email,
-              redirectTo: DeepLinkUrls.updatePasswordFor(_l.current)),
+          initialEmail: _pendingResetEmail,
+          onSendReset: (email) => _auth(() => _client.auth.resetPasswordForEmail(
+              email,
+              redirectTo: DeepLinkUrls.updatePasswordFor(_l.current))),
           onBackToLogin: () => _router.go('/login'),
         ),
       ),
@@ -423,11 +438,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         path: '/update-password',
         builder: (_, _) => UpdatePasswordScreen(
           hasSession: _client.auth.currentSession != null,
-          onUpdatePassword: (newPassword) async {
-            await _client.auth
-                .updateUser(UserAttributes(password: newPassword));
-          },
+          onUpdatePassword: (newPassword) => _auth(() => _client.auth
+              .updateUser(UserAttributes(password: newPassword))),
           onDone: () => _router.go('/'),
+          onRequestNewLink: () => _router.go('/reset-password'),
+          onBackToLogin: () => _router.go('/login'),
         ),
       ),
       // S-11: outside the shell on purpose — a member on their way out has no
@@ -963,6 +978,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     // T-101: where a web founder came from (`/register?src=…`), read from the
     // same boot address, memory only, never a prop of any event.
     _pendingAcquisition = kIsWeb ? AcquisitionRules.fromUri(Uri.base) : null;
+    // F-87: an expired or used e-mail link lands on the redirect with
+    // `error_code` in the fragment — the login says so instead of nothing.
+    _authLinkError = kIsWeb ? authLinkErrorCode(Uri.base) : null;
     _dataSource = SupabaseCustodyDataSource(_client,
         environmentPrefix:
             environmentTitlePrefix(isProduction: Env.current.isProduction),
@@ -1518,16 +1536,41 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     }
   }
 
+  /// F-87: an auth call, its failure classified from GoTrue's `code` and
+  /// HTTP status — the screens choose the sentence from a closed kind and
+  /// never match English text.
+  Future<void> _auth(Future<Object?> Function() call) async {
+    try {
+      await call();
+    } on AuthException catch (e) {
+      throw AuthFailed(
+          classifyAuthFailure(
+              code: e.code,
+              status: int.tryParse(e.statusCode ?? ''),
+              message: e.message),
+          e.code ?? e.message);
+    } catch (e) {
+      throw AuthFailed(classifyAuthFailure(message: e.toString()), '$e');
+    }
+  }
+
+  /// F-87: the sign-up confirmation, again — to the same redirect the
+  /// sign-up used, so the link lands on the login like the first one.
+  Future<void> _resendConfirmation(String email) => _auth(() => _client.auth
+      .resend(type: OtpType.signup, email: email, emailRedirectTo: DeepLinkUrls.login));
+
   Future<void> _signIn(String email, String password) async {
     // T-78: named BEFORE the await — the auth listener sees the same session
     // arrive while anonymous and must not call it an e-mail link.
     _signInMethod = 'password';
     try {
-      await _client.auth.signInWithPassword(email: email, password: password);
+      await _auth(() =>
+          _client.auth.signInWithPassword(email: email, password: password));
     } catch (_) {
       _signInMethod = null;
       rethrow;
     }
+    _authLinkError = null;
     _expiredReason = SessionExpiredReason.none;
     await _resolveAuthedPhase();
   }

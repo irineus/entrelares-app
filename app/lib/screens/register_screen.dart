@@ -9,6 +9,7 @@ import 'package:entrelares_db_contracts/models/invite_info.dart';
 import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
 import '../services/install_referrer.dart';
+import '../widgets/resend_confirmation_button.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/google_sign_in_button.dart';
 import '../widgets/role_picker.dart';
@@ -47,6 +48,9 @@ class RegisterScreen extends StatefulWidget {
   final Future<void> Function(String email, String password) onSignIn;
 
   final VoidCallback onBackToLogin;
+
+  /// F-87: re-sends the confirmation e-mail from the sign-up's last screen.
+  final Future<void> Function(String email)? onResendConfirmation;
 
   /// F-57 — the Google door on BOTH branches. Consent is NOT collected here
   /// for that path: the redirect leaves this form behind, and the onboarding
@@ -95,6 +99,7 @@ class RegisterScreen extends StatefulWidget {
     required this.dataSource,
     required this.onSignIn,
     required this.onBackToLogin,
+    this.onResendConfirmation,
     this.googleEnabled,
     this.onSignInWithGoogle,
     this.onGoogleIdToken,
@@ -516,10 +521,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
               style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           Text(l[K.registerConfirmEmailBody], textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          // F-87: the e-mail that never arrives is usually in spam.
+          Text(l[KApp.registerCheckSpam],
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: widget.onBackToLogin,
             child: Text(l[K.registerGoToLogin]),
+          ),
+          if (widget.onResendConfirmation != null) ...[
+            const SizedBox(height: 12),
+            ResendConfirmationButton(
+              email: _email.text,
+              onResend: widget.onResendConfirmation!,
+            ),
+          ],
+          // F-87: a mistyped address is a dead end without this — back to
+          // the account step with everything typed kept.
+          TextButton(
+            key: const ValueKey('register-fix-email'),
+            onPressed: () => setState(() {
+              _signUpDone = false;
+              _step = 0;
+              _errorKey = null;
+              _errorText = null;
+            }),
+            child: Text(l[KApp.registerFixEmail]),
           ),
         ],
       );

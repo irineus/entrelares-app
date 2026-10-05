@@ -8,13 +8,14 @@
 /// learn that a field is blank.
 library;
 
+import 'auth_rules.dart';
 import 'localization/k.dart';
 import 'localization/k_app.dart';
 
 abstract final class RegisterRules {
   /// GoTrue's own minimum is configured server-side; 8 is what the web refuses
   /// upfront, and the `register-invitee` Edge Function repeats it.
-  static const int minPasswordLength = 8;
+  static const int minPasswordLength = PasswordRules.minLength;
 
   /// The web's `maxlength` on both free-text fields.
   static const int maxNameLength = 80;

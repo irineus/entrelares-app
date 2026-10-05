@@ -283,6 +283,26 @@ void main() {
       expect(find.textContaining('ana@example.com'), findsOne);
     });
 
+    testWidgets('F-87: the confirm screen tells about spam and lets a '
+        'mistyped address be fixed, everything typed kept', (tester) async {
+      final ds = source();
+      await pumpRegister(tester, dataSource: ds);
+      await goToFamilyStep(tester);
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
+      await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
+      await acceptTerms(tester);
+      await tapVisible(tester, submitButton(l));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[KApp.registerCheckSpam]), findsOne);
+      await tapVisible(tester, find.byKey(const ValueKey('register-fix-email')));
+      await tester.pumpAndSettle();
+      expect(find.text(l[K.registerConfirmEmailTitle]), findsNothing);
+      // Back on the account step, the address is there to be corrected.
+      expect(find.text('ana@example.com'), findsOne);
+    });
+
     testWidgets('a role behind "Outro…" is two taps and stays on screen',
         (tester) async {
       final ds = source();
