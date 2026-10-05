@@ -205,6 +205,10 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> reactivateSubscription() =>
       _invokeBilling({'action': 'reactivate'});
 
+  @override
+  Future<String> overdueInvoiceUrl() =>
+      _invokeBillingForUrl({'action': 'overdue_invoice'});
+
   /// The `billing-checkout` function, which owns every money action. Calls
   /// stay OUTSIDE any retry by construction (the web says it plainly: starting
   /// a checkout twice on a retry would create two payment links, and a retried

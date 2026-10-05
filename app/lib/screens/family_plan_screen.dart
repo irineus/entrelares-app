@@ -700,9 +700,29 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       if (renews != null)
         RichLabel.of(l, K.premActiveRenews,
             args: [l.formatDate(renews.toLocal())]),
-      if (_isAdmin) ..._cancelControls(l, isScheduled: false),
+      if (_isAdmin)
+        if (_isPlaySubscription)
+          ..._playManagedControls(l)
+        else
+          ..._cancelControls(l, isScheduled: false),
     ];
   }
+
+  /// F-84: whether the family's subscription row was written by the STORE
+  /// rail. Every managed panel branches on it: a Play subscription is Google's
+  /// to cancel, so our cancel and our Asaas dunning copy never reach it —
+  /// cancelling our row alone left Google charging while the snack said
+  /// "Assinatura cancelada".
+  bool get _isPlaySubscription => isStoreGateway(_subscription?.gateway);
+
+  /// F-84: what an admin sees instead of our cancel controls when Play owns
+  /// the subscription — on BOTH channels, since the web reader of a family
+  /// that bought on Android was offered the same false cancel.
+  List<Widget> _playManagedControls(Localization l) => [
+        const SizedBox(height: 8),
+        RichLabel.of(l, K.premPlayManaged),
+        _manageOnPlay(l),
+      ];
 
   List<Widget> _overduePanel(Localization l) {
     // U-22: the one state with a hard deadline — show it. Before
@@ -712,24 +732,68 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     // would lie.
     final deadline =
         graceDeadline(_subscription?.overdueSince, _settings.graceDays);
-    if (deadline != null && !deadline.isAfter(DateTime.now().toUtc())) {
-      return [
-        _marked(
+    // F-84: the Asaas copy sends the reader to "o e-mail de cobrança
+    // (remetente Asaas)", which a Play subscriber never receives — Play
+    // retries the charge itself and the fix is the payment method there.
+    final play = _isPlaySubscription;
+    final ended = deadline != null && !deadline.isAfter(DateTime.now().toUtc());
+    final status = ended
+        ? _marked(
             Icons.warning_amber_rounded,
             context.tokens.danger.solid,
-            RichLabel.of(l, K.premOverdueGraceEnded,
+            RichLabel.of(
+                l, play ? K.premPlayOverdueGraceEnded : K.premOverdueGraceEnded,
                 args: [l.formatDate(deadline.toLocal())]))
-      ];
-    }
+        : _marked(
+            Icons.warning_amber_rounded,
+            context.tokens.warning.solid,
+            deadline == null
+                ? RichLabel.of(l,
+                    play ? K.premPlayOverdueInGraceNoDate : K.premOverdueInGraceNoDate)
+                : RichLabel.of(
+                    l, play ? K.premPlayOverdueInGrace : K.premOverdueInGrace,
+                    args: [l.formatDate(deadline.toLocal())]));
     return [
-      _marked(
-          Icons.warning_amber_rounded,
-          context.tokens.warning.solid,
-          deadline == null
-              ? RichLabel.of(l, K.premOverdueInGraceNoDate)
-              : RichLabel.of(l, K.premOverdueInGrace,
-                  args: [l.formatDate(deadline.toLocal())])),
+      status,
+      if (_isAdmin && play)
+        _manageOnPlay(l)
+      // F-84: the open invoice, one tap away. Web only: on the store channel
+      // a link to pay outside Play is exactly what Play's payments policy
+      // forbids inside the app, so Android keeps the e-mail guidance.
+      else if (_isAdmin && !_isStoreChannel) ...[
+        const SizedBox(height: 8),
+        FilledButton(
+          key: const ValueKey('premium-pay-overdue'),
+          onPressed: _billingBusy ? null : () => _payOverdue(l),
+          child: Text(l[K.premOverduePay]),
+        ),
+      ],
     ];
+  }
+
+  /// F-84: opens the invoice still open on the gateway — the server reads it
+  /// from the ledger, or asks Asaas when the ledger has none. Nothing is paid
+  /// here; the payment confirms through the webhook like any other.
+  Future<void> _payOverdue(Localization l) async {
+    if (_billingBusy) return;
+    setState(() => _billingBusy = true);
+    try {
+      final url = await widget.dataSource.overdueInvoiceUrl();
+      await (widget.openExternal ?? _openExternal)(url);
+      if (!mounted) return;
+      setState(() => _billingBusy = false);
+    } on BillingRefused catch (e) {
+      if (!mounted) return;
+      setState(() => _billingBusy = false);
+      showAppSnack(context, e.serverMessage ?? l[K.errSaveFailed],
+          type: AppSnackType.error);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _billingBusy = false);
+      showAppSnack(
+          context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
   }
 
   List<Widget> _scheduledPanel(Localization l) {
@@ -757,7 +821,11 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
             if (methodKey != null) l[methodKey],
           ],
         ),
-      if (_isAdmin) ..._cancelControls(l, isScheduled: true),
+      if (_isAdmin)
+        if (_isPlaySubscription)
+          ..._playManagedControls(l)
+        else
+          ..._cancelControls(l, isScheduled: true),
     ];
   }
 
@@ -1011,7 +1079,16 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         storeAvailable: _storeAvailable,
         hasProducts: _storeProducts.isNotEmpty,
         purchasePending: _storePurchasePending,
-        premiumThroughStore: isStoreGateway(_subscription?.gateway),
+        // F-84: only while the Play subscription still pays — an expired
+        // one left the family free, and "managed" would hide the offer from
+        // a family that can buy again.
+        premiumThroughStore: _isPlaySubscription &&
+            paidUntil(
+                  subscriptionStatus: _subscription?.status,
+                  currentPeriodEndUtc: _subscription?.currentPeriodEnd,
+                  nowUtc: DateTime.now().toUtc(),
+                ) !=
+                null,
       );
 
   /// The cycles Play answered for, in the picker's order.
@@ -1024,8 +1101,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     return switch (_storeOfferState) {
       StoreOffer.neutralNote => [RichLabel.of(l, K.premStoreNote)],
       StoreOffer.pendingVerification => [Text(l[KApp.storePending])],
+      // F-84: its own sentence. It used to print the neutral note ("managed
+      // on the website, not in this app") right above Play's own link.
       StoreOffer.managed => [
-          RichLabel.of(l, K.premStoreNote),
+          RichLabel.of(l, K.premPlayNotRenewing),
           _manageOnPlay(l),
         ],
       StoreOffer.offer => _storeOffer(l),

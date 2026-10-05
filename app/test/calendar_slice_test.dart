@@ -190,6 +190,16 @@ class FakeCustodyDataSource implements CustodyDataSource {
     reactivateCalls++;
   }
 
+  int overdueInvoiceCalls = 0;
+  String overdueInvoice = 'https://sandbox.asaas.com/i/overdue';
+
+  @override
+  Future<String> overdueInvoiceUrl() async {
+    if (throwOnBillingAction != null) throw throwOnBillingAction!;
+    overdueInvoiceCalls++;
+    return overdueInvoice;
+  }
+
   @override
   Future<void> updateOwnLanguage(int profileId, String languageCode) async {}
 

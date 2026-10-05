@@ -137,6 +137,12 @@ abstract class CustodyDataSource {
   /// they travel verbatim in [BillingRefused].
   Future<void> reactivateSubscription();
 
+  /// F-84: the URL of the Asaas invoice still open for an `overdue`
+  /// subscription (from the ledger, or the gateway when the ledger has none).
+  /// Refuses with the function's own text — a Play subscription, nothing
+  /// overdue, or no invoice found.
+  Future<String> overdueInvoiceUrl();
+
   /// One day's row, or null when unassigned — mirror of the web's
   /// `GetScheduleForDateAsync` (the T-27 transition check on the 1st of the
   /// month needs the previous month's last day).

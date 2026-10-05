@@ -97,6 +97,7 @@ Future<void> _pump(
   FakeCustodyDataSource ds,
   _FakeStore store, {
   List<String>? opened,
+  bool isStoreChannel = true,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 3000));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -107,7 +108,7 @@ Future<void> _pump(
     child: MaterialApp(
       home: FamilyPlanScreen(
         dataSource: ds,
-        isStoreChannel: true,
+        isStoreChannel: isStoreChannel,
         storeBilling: store,
         openExternal: opened == null ? (_) async {} : (url) async => opened.add(url),
       ),
@@ -360,6 +361,10 @@ void main() {
 
       expect(subscribe, findsNothing);
       expect(text(l.format(K.premPriceAnnual, ['R\$ 69,00'])), findsNothing);
+      // F-84: its own sentence — not the neutral note ("managed on the
+      // website, not in this app") printed right above Play's own link.
+      expect(text(l[K.premPlayNotRenewing]), findsOne);
+      expect(text(l[K.premStoreNote]), findsNothing);
 
       await tester.tap(text(l[KApp.storeManage]));
       await tester.pumpAndSettle();
@@ -367,6 +372,152 @@ void main() {
       // the honest route rather than a button we cannot honor.
       expect(opened.single, contains('play.google.com/store/account/subscriptions'));
       expect(opened.single, contains('sku=premium_annual'));
+    });
+
+    testWidgets('whose Play subscription EXPIRED is offered Premium again',
+        (tester) async {
+      // F-84: "managed" hid the offer from every family with a play row,
+      // including one Play had already let lapse — free, and unable to buy.
+      await _pump(
+        tester,
+        _source(
+          subscription: Subscription(
+            id: 1,
+            familyId: 7,
+            gateway: 'play',
+            status: 'canceled',
+            cycle: 'monthly',
+            currentPeriodEnd:
+                DateTime.now().toUtc().subtract(const Duration(days: 3)),
+          ),
+        ),
+        _FakeStore(),
+      );
+
+      expect(subscribe, findsOne);
+      expect(text(l[KApp.storeManage]), findsNothing);
+    });
+  });
+
+  // F-84: a Play subscription is Google's to cancel. Our "Cancelar assinatura"
+  // only flipped our row while Google kept charging, and the overdue copy sent
+  // the reader to an Asaas e-mail that never comes. Every managed panel, on
+  // BOTH channels, branches on the gateway.
+  group('a Play subscription in a managed state (F-84)', () {
+    Subscription play(String status) => Subscription(
+          id: 1,
+          familyId: 7,
+          gateway: 'play',
+          status: status,
+          cycle: 'monthly',
+          priceCents: 690,
+          currentPeriodEnd:
+              DateTime.now().toUtc().add(const Duration(days: 20)),
+        );
+
+    for (final channel in const [true, false]) {
+      final name = channel ? 'store' : 'web';
+      for (final status in const ['active', 'scheduled', 'overdue']) {
+        testWidgets('$status on the $name channel: Play link, no cancel',
+            (tester) async {
+          final opened = <String>[];
+          final ds = _source(plan: 'premium', subscription: play(status));
+          await _pump(tester, ds, _FakeStore(),
+              opened: opened, isStoreChannel: channel);
+
+          expect(text(l[K.premCancelButton]), findsNothing);
+          expect(text(l[K.premScheduledCancelButton]), findsNothing);
+          expect(find.byKey(const ValueKey('premium-pay-overdue')),
+              findsNothing);
+          if (status == 'overdue') {
+            expect(text(l[K.premPlayOverdueInGraceNoDate]), findsOne);
+            expect(text(l[K.premOverdueInGraceNoDate]), findsNothing);
+          } else {
+            expect(text(l[K.premPlayManaged]), findsOne);
+          }
+
+          await tester.tap(text(l[KApp.storeManage]));
+          await tester.pumpAndSettle();
+          expect(opened.single,
+              contains('play.google.com/store/account/subscriptions'));
+          expect(ds.cancelCalls, 0);
+        });
+      }
+    }
+
+    testWidgets('an Asaas subscription keeps its cancel controls',
+        (tester) async {
+      await _pump(
+        tester,
+        _source(
+          plan: 'premium',
+          subscription: Subscription(
+            id: 1,
+            familyId: 7,
+            gateway: 'asaas',
+            status: 'active',
+            cycle: 'monthly',
+            priceCents: 549,
+            currentPeriodEnd:
+                DateTime.now().toUtc().add(const Duration(days: 20)),
+          ),
+        ),
+        _FakeStore(),
+        isStoreChannel: false,
+      );
+
+      expect(text(l[K.premCancelButton]), findsOne);
+      expect(text(l[KApp.storeManage]), findsNothing);
+    });
+  });
+
+  group('an Asaas subscription overdue (F-84)', () {
+    Subscription overdue() => const Subscription(
+          id: 1,
+          familyId: 7,
+          gateway: 'asaas',
+          status: 'overdue',
+          cycle: 'monthly',
+          priceCents: 549,
+        );
+
+    testWidgets('the web offers the open invoice in one tap', (tester) async {
+      final opened = <String>[];
+      final ds = _source(plan: 'premium', subscription: overdue());
+      await _pump(tester, ds, _FakeStore(),
+          opened: opened, isStoreChannel: false);
+
+      expect(text(l[K.premOverdueInGraceNoDate]), findsOne);
+      await tester.tap(find.byKey(const ValueKey('premium-pay-overdue')));
+      await tester.pumpAndSettle();
+
+      expect(ds.overdueInvoiceCalls, 1);
+      expect(opened, [ds.overdueInvoice]);
+    });
+
+    testWidgets('a refusal is said in the words of the server',
+        (tester) async {
+      final opened = <String>[];
+      final ds = _source(plan: 'premium', subscription: overdue())
+        ..throwOnBillingAction =
+            const BillingRefused('Não há cobrança pendente para pagar.');
+      await _pump(tester, ds, _FakeStore(),
+          opened: opened, isStoreChannel: false);
+
+      await tester.tap(find.byKey(const ValueKey('premium-pay-overdue')));
+      await tester.pumpAndSettle();
+
+      expect(opened, isEmpty);
+      expect(find.text('Não há cobrança pendente para pagar.'), findsOne);
+    });
+
+    testWidgets('the store channel links no payment outside Play',
+        (tester) async {
+      await _pump(tester, _source(plan: 'premium', subscription: overdue()),
+          _FakeStore());
+
+      expect(text(l[K.premOverdueInGraceNoDate]), findsOne);
+      expect(find.byKey(const ValueKey('premium-pay-overdue')), findsNothing);
     });
   });
 }
