@@ -336,6 +336,9 @@ Bilíngue por leitor (PT-BR / EN), portado do app web:
 - **S-04 inatividade:** espelho `InactivityPolicy` (30 min, poll de 30 s) — pointer-down
   em qualquer lugar reseta; o resume do lifecycle reavalia na hora (tempo em background
   conta, como a aba escondida no web). Expirou → signOut local + banner no login.
+  **Desde o F-92 (05/10/2026), só no canal web** (`InactivityPolicy.appliesTo`): no
+  Android a trava do aparelho protege a sessão, e o logout no resume apagava a cópia
+  offline do T-18 e o push tocado.
 
 ## Espelhos e Today at a Glance (lote 1 — PR3)
 

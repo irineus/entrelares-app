@@ -49,6 +49,11 @@ void main() {
   group('InactivityPolicy (S-04)', () {
     final now = DateTime.utc(2026, 8, 19, 12, 0, 0);
 
+    test('F-92: the idle sign-out is a web rule — Android is exempt', () {
+      expect(InactivityPolicy.appliesTo(isWeb: true), isTrue);
+      expect(InactivityPolicy.appliesTo(isWeb: false), isFalse);
+    });
+
     test('the threshold is 30 minutes, inclusive', () {
       expect(InactivityPolicy.timeout, const Duration(minutes: 30));
       expect(
