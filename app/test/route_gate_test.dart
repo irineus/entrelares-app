@@ -276,4 +276,22 @@ void main() {
               'can see the typo');
     });
   });
+
+  test('F-89: the consent block and the exit let Help through', () {
+    final blocked = AppRouteGate(
+      phase: () => AuthPhase.authed,
+      isLeaving: () => false,
+      consentState: () => ConsentGateState.blocked,
+    );
+    expect(blocked.redirect('/help'), isNull);
+    expect(blocked.redirect('/family'), FamilyLifecycleRules.policyUpdateRoute);
+
+    final leaving = AppRouteGate(
+      phase: () => AuthPhase.authed,
+      isLeaving: () => true,
+      consentState: () => ConsentGateState.upToDate,
+    );
+    expect(leaving.redirect('/help'), isNull);
+    expect(leaving.redirect('/family'), FamilyLifecycleRules.leavingRoute);
+  });
 }

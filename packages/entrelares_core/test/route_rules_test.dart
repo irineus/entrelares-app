@@ -143,4 +143,13 @@ void main() {
       expect(RouteRules.isPublic(RouteRules.splash), isFalse);
     });
   });
+
+  test('F-89: the onboarding confinement lets Help through', () {
+    expect(
+        RouteRules.redirect(phase: AuthPhase.onboarding, location: '/help'),
+        isNull);
+    expect(
+        RouteRules.redirect(phase: AuthPhase.onboarding, location: '/family'),
+        RouteRules.onboarding);
+  });
 }

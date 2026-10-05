@@ -23,6 +23,9 @@ class LeavingScreen extends StatefulWidget {
   final SudoService sudo;
 
   /// Signs out and returns to the login screen.
+  /// F-89: "Ajuda e contato" — the exit is confined, Help is not.
+  final VoidCallback? onHelp;
+
   final Future<void> Function() onSignOut;
 
   /// Called after a successful cancellation — the member is staying, so the
@@ -34,6 +37,7 @@ class LeavingScreen extends StatefulWidget {
     required this.dataSource,
     required this.sudo,
     required this.onSignOut,
+    this.onHelp,
     required this.onReturned,
   });
 
@@ -44,6 +48,10 @@ class LeavingScreen extends StatefulWidget {
 class _LeavingScreenState extends State<LeavingScreen> {
   bool _loading = true;
   bool _busy = false;
+
+  /// F-89: the load failed (weak signal) — a way to retry, never a spinner
+  /// with no exit on a screen the router confines the person to.
+  bool _loadFailed = false;
   Member? _me;
 
   /// True when nobody live stays behind — leaving takes the whole family with
@@ -57,17 +65,35 @@ class _LeavingScreenState extends State<LeavingScreen> {
   }
 
   Future<void> _load() async {
-    final results = await Future.wait([
-      widget.dataSource.fetchOwnProfile(),
-      widget.dataSource.fetchMembers(),
-    ]);
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
+    final List<Object?> results;
+    try {
+      results = await Future.wait<Object?>([
+        widget.dataSource.fetchOwnProfile(),
+        widget.dataSource.fetchMembers(),
+      ]);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadFailed = true;
+        });
+      }
+      return;
+    }
     if (!mounted) return;
     final me = results[0] as Member?;
     final members = results[1] as List<Member>;
     setState(() {
       _me = me;
       _isFamilyRemoval = me != null &&
-          !members.any((m) => m.id != me.id && m.isActiveMember);
+          FamilyLifecycleRules.isFamilyRemoval(myId: me.id, members: [
+            for (final m in members)
+              (id: m.id, isActiveMember: m.isActiveMember, isViewer: m.isViewer)
+          ]);
       _loading = false;
     });
   }
@@ -122,16 +148,54 @@ class _LeavingScreenState extends State<LeavingScreen> {
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : (me == null || me.leftAt == null)
-                    ? _nothingPending(l)
-                    : _pending(l),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_loading)
+                  const Center(child: CircularProgressIndicator())
+                else if (_loadFailed)
+                  _failed(l)
+                else if (me == null || me.leftAt == null)
+                  _nothingPending(l)
+                else
+                  _pending(l),
+                // F-89: the two doors out of a confined screen, in every
+                // state — signing out (also while loading) and Help.
+                if (_loading || _loadFailed) ...[
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => widget.onSignOut(),
+                    child: Text(l[K.leaveSignOut]),
+                  ),
+                ],
+                if (widget.onHelp != null)
+                  TextButton(
+                    key: const ValueKey('leaving-help'),
+                    onPressed: widget.onHelp,
+                    child: Text(l[KApp.helpLoginLink]),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  Widget _failed(Localization l) => Column(
+        key: const ValueKey('leaving-load-failed'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l[KApp.leavingLoadFailed], textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _load,
+            child: Text(l[K.layoutErrorReload]),
+          ),
+        ],
+      );
 
   /// Reached by a stale link or a cancellation on another device — not an
   /// error, just nothing to do here.

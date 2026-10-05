@@ -8,6 +8,7 @@ import '../theme/tokens.dart';
 import '../env.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
+import 'package:entrelares_db_contracts/models/subscription.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
 import '../services/appearance.dart';
 import '../services/custody_data_source.dart';
@@ -61,6 +62,10 @@ class ProfileScreen extends StatefulWidget {
   /// Opens the Família page, where a pending family deletion is resolved.
   final VoidCallback? onOpenFamily;
 
+  /// F-89: the plan page — an admin leaving a paying family is offered to
+  /// cancel the subscription first.
+  final VoidCallback? onOpenPlan;
+
   /// U-23 — reopening the first-run checklist / replaying the tour. Both land
   /// on the calendar, which owns those surfaces.
   final Future<void> Function({required bool replayTour})? onReopenOnboarding;
@@ -84,6 +89,7 @@ class ProfileScreen extends StatefulWidget {
     this.onLeaving,
     this.onViewerErased,
     this.onOpenFamily,
+    this.onOpenPlan,
     this.onReopenOnboarding,
     this.appearance,
     this.onOpenHelp,
@@ -116,6 +122,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // S-11 — leaving the family
   PendingFamilyDeletion? _pendingDeletion;
   bool _confirmingLeave = false;
+
+  /// F-89: the family subscription's status, for the exit's billing line.
+  String? _subscriptionStatus;
   bool _leaving = false;
   int? _successorId;
 
@@ -160,6 +169,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // U-50: asked alongside the rest, so the skeleton covers it and the
       // password card never pops in after the page is up (owner, 18/09/2026).
       widget.dataSource.sessionHasPassword(),
+      // F-89: whether leaving leaves a subscription charging (fails closed to
+      // "no subscription" inside the data source).
+      widget.dataSource.fetchSubscription(),
     ]);
     if (!mounted) return;
     final members = results[0] as List<Member>;
@@ -181,6 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _family = results[3] as Family?;
       _pendingDeletion = results[4] as PendingFamilyDeletion?;
       _hasPassword = results[5] as bool?;
+      _subscriptionStatus = (results[6] as Subscription?)?.status;
       _loading = false;
     });
   }
@@ -1016,6 +1029,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // the reader's own account (or the whole family, when they are the last
     // one), and it was rendered as loose paragraphs under an OutlinedButton —
     // less visual weight than "Salvar dados" two sections above it.
+    // F-89: a paying admin who left was never told the subscription keeps
+    // charging — and from the exit screen the plan page is unreachable.
+    final billing = FamilyLifecycleRules.leavesAPayingSubscription(
+        isAdmin: _me?.isAdmin == true, subscriptionStatus: _subscriptionStatus);
+    final billingNotice = !billing
+        ? null
+        : Column(
+            key: const ValueKey('leave-billing'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 8),
+              AppBanner(
+                tone: context.tokens.warning,
+                icon: Icons.payments_outlined,
+                message: l[KApp.profLeaveBilling],
+                actionLabel:
+                    widget.onOpenPlan == null ? null : l[KApp.profLeaveCancelFirst],
+                onAction: widget.onOpenPlan,
+              ),
+            ],
+          );
+
     if (!_confirmingLeave) {
       return AppDangerZone(
         title: l[last ? K.profLeaveTitleLast : K.profLeaveTitle],
@@ -1037,7 +1072,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
         actionLabel: l[last ? K.profLeaveOpenLast : K.profLeaveOpen],
         onAction: () => setState(() => _confirmingLeave = true),
-        child: successorPicker,
+        child: successorPicker == null && billingNotice == null
+            ? null
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ?billingNotice,
+                  ?successorPicker,
+                ],
+              ),
       );
     }
 
@@ -1048,6 +1091,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ...[
           Text(l[last ? K.profLeaveConfirmTextLast : K.profLeaveConfirmText],
               style: TextStyle(color: theme.colorScheme.error)),
+          ?billingNotice,
           if (successorPicker != null) ...[
             const SizedBox(height: 12),
             successorPicker,

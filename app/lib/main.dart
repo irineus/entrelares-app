@@ -381,6 +381,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           onFamilyFounded: _attributePendingReferral,
           acquisition: _founderAcquisition,
           onSignOut: _signOut,
+          onHelp: () => _openHelp(from: '/onboarding'),
           onCompleted: () async {
             _forgetPendingInvite();
             await _resolveAuthedPhase();
@@ -456,6 +457,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           dataSource: _dataSource,
           sudo: _sudo,
           onSignOut: _signOut,
+          onHelp: () => _openHelp(from: '/leaving'),
           onReturned: () {
             _isLeaving = false;
             _router.go('/');
@@ -482,6 +484,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         builder: (_, _) => PolicyUpdateScreen(
           dataSource: _dataSource,
           onSignOut: _signOut,
+          onHelp: () => _openHelp(from: '/policy-update'),
           onAccepted: () {
             _consentState = ConsentGateState.upToDate;
             _router.go('/');
@@ -634,6 +637,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                     dataSource: _dataSource,
                     sudo: _sudo,
                     onOpenFamily: () => _router.go('/family'),
+                    onOpenPlan: () => _router.go('/family/plan'),
                     onReopenOnboarding: ({required bool replayTour}) async {
                       // U-29: "Ver o tour de novo" asks for the TOUR — it no
                       // longer reopens the checklist banner as a side effect,

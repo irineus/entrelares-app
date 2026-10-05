@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/family_deletion.dart';
+import 'package:entrelares_db_contracts/models/subscription.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
 import 'package:entrelares_app/screens/family_delete_screen.dart';
@@ -335,6 +336,21 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    testWidgets('F-89: an admin leaving a paying family is told, with the '
+        'way to cancel first', (tester) async {
+      final ds = source()
+        ..subscription = const Subscription(
+            id: 1, familyId: 7, status: 'active', cycle: 'monthly');
+      await pumpProfile(tester, ds);
+      expect(find.byKey(const ValueKey('leave-billing')), findsOne);
+      expect(find.text(l[KApp.profLeaveBilling]), findsOne);
+    });
+
+    testWidgets('F-89: no subscription, no billing line', (tester) async {
+      await pumpProfile(tester, source());
+      expect(find.byKey(const ValueKey('leave-billing')), findsNothing);
+    });
+
     testWidgets('the only admin must name a successor before the button works',
         (tester) async {
       final ds = source();
@@ -417,6 +433,41 @@ void main() {
       ));
       await tester.pumpAndSettle();
     }
+
+    testWidgets('F-89: a failed load is an error with a retry, sign-out and '
+        'Help — never a spinner with no exit', (tester) async {
+      var signedOut = 0;
+      var help = 0;
+      final ds = FakeCustodyDataSource(members: const [leaving], days: [])
+        ..throwOnMembers = Exception('offline');
+      await tester.pumpWidget(AppL10n(
+        l: Localization(AppLanguage.ptBr),
+        setLanguage: (_) async {},
+        child: MaterialApp(
+          home: LeavingScreen(
+            dataSource: ds,
+            sudo: SudoService(ds),
+            onSignOut: () async => signedOut++,
+            onHelp: () => help++,
+            onReturned: () {},
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      final pt = Localization(AppLanguage.ptBr);
+
+      expect(find.byKey(const ValueKey('leaving-load-failed')), findsOne);
+      await tester.tap(find.text(pt[K.leaveSignOut]));
+      await tester.tap(find.byKey(const ValueKey('leaving-help')));
+      expect(signedOut, 1);
+      expect(help, 1);
+
+      // The signal comes back: the retry loads the exit.
+      ds.throwOnMembers = null;
+      await tester.tap(find.text(pt[K.layoutErrorReload]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('leaving-load-failed')), findsNothing);
+    });
 
     testWidgets('the account variant names the deadline', (tester) async {
       const withDeadline = Member(
