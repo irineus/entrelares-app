@@ -1321,9 +1321,17 @@ class FakeCustodyDataSource implements CustodyDataSource {
     attestWrites.add('revoke:$id');
   }
 
+  /// F-96: the verify page's read fails this many times, then answers.
+  int verifyFailures = 0;
+
   @override
-  Future<Map<String, dynamic>> verifyReportAttestation(String id) async =>
-      verifyAnswer;
+  Future<Map<String, dynamic>> verifyReportAttestation(String id) async {
+    if (verifyFailures > 0) {
+      verifyFailures--;
+      throw Exception('offline');
+    }
+    return verifyAnswer;
+  }
 
   // ── F-35: the family's Conversa ──
   List<ChatMessage> chatMessages = [];

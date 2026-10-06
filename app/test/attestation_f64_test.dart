@@ -186,5 +186,23 @@ void main() {
       await pumpVerify(tester, ds, 'not-an-id');
       expect(find.byKey(const ValueKey('verify-state-unknown')), findsOne);
     });
+
+    // F-96: a failed read is not the end of the page.
+    testWidgets('a failed read offers "Tentar de novo", and the retry answers',
+        (tester) async {
+      final ds = source()
+        ..verifyFailures = 1
+        ..verifyAnswer = {
+          'state': 'revoked',
+          'issued_at': '2026-08-19T12:00:00Z',
+          'revoked_at': '2026-08-25T12:00:00Z',
+        };
+      await pumpVerify(tester, ds, id);
+      expect(find.byKey(const ValueKey('verify-failed')), findsOne);
+      await tester.tap(find.text(l[KApp.attestRetry]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('verify-failed')), findsNothing);
+      expect(find.byKey(const ValueKey('verify-state-revoked')), findsOne);
+    });
   });
 }

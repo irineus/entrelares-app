@@ -578,12 +578,19 @@ class ReportExpenseLine {
   final int amountCents;
   final String paidByName;
 
+  /// F-96: whose expense it is (null = the family's own group) and the
+  /// split per person, already in words ("Ana R$ 360,00; Bruno R$ 840,00").
+  final String? childName;
+  final String splitText;
+
   const ReportExpenseLine({
     required this.date,
     required this.description,
     required this.categoryLabel,
     required this.amountCents,
     required this.paidByName,
+    this.childName,
+    this.splitText = '',
   });
 }
 
@@ -691,12 +698,17 @@ class ReportChatLine {
   final String? replyTo;
   final DateTime? citedDay;
 
+  /// F-96: "Lida por Ana (03/10 09:12)" or "Não lida até a emissão" — the
+  /// read marks the product sells, on paper.
+  final String? readLine;
+
   const ReportChatLine({
     required this.atLocal,
     required this.authorName,
     required this.body,
     this.replyTo,
     this.citedDay,
+    this.readLine,
   });
 }
 
