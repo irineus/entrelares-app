@@ -232,7 +232,10 @@ void main() {
     await settleSnack(tester);
   });
 
-  testWidgets('month paging while selecting asks before discarding',
+  // F-100 (owner, 05/10/2026): a selection survives the month change — a
+  // school vacation runs from December into January. (The web-era guard that
+  // asked before discarding it is gone.)
+  testWidgets('month paging while selecting keeps the selection',
       (tester) async {
     final days = twoFutureDays;
     if (days == null) return;
@@ -243,23 +246,31 @@ void main() {
     await longPressDay(tester, days.$1);
     await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
     await tester.pumpAndSettle();
-
-    expect(find.text(pt[K.navGuardBody]), findsOneWidget);
-    // "Não, ficar aqui": the month stays and the selection survives.
-    await tester.tap(find.text(pt[K.navGuardNo]));
-    await tester.pumpAndSettle();
-    expect(find.text(pt.format(K.selectionEdit, [1])), findsOneWidget);
-    expect(
-        find.text(monthHeading(pt, today)), findsOneWidget);
-
-    // Same swipe, "Sim, continuar": month advances, selection discarded.
-    await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(pt[K.navGuardYes]));
-    await tester.pumpAndSettle();
     final next = DateTime(today.year, today.month + 1, 1);
-    expect(find.text(monthHeading(pt, next)),
-        findsOneWidget);
-    expect(find.byIcon(Icons.edit_outlined), findsNothing);
+    expect(find.text(monthHeading(pt, next)), findsOneWidget);
+    expect(find.text(pt.format(K.selectionEdit, [1])), findsOneWidget,
+        reason: 'the day picked last month is still selected');
+  });
+
+  // F-100: press the first day, tap the last — the range is selected.
+  testWidgets('a long press then a tap selects the whole range',
+      (tester) async {
+    final lastDay = DateTime(today.year, today.month + 1, 0).day;
+    if (today.day + 4 > lastDay) return;
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    await longPressDay(tester, today.day + 1);
+    final cell = find.text('${today.day + 4}').last;
+    await tester.ensureVisible(cell);
+    await tester.pumpAndSettle();
+    await tester.tap(cell);
+    await tester.pumpAndSettle();
+    expect(find.text(pt.format(K.selectionEdit, [4])), findsOneWidget);
+    // After the range, a tap toggles again.
+    await tester.tap(cell);
+    await tester.pumpAndSettle();
+    expect(find.text(pt.format(K.selectionEdit, [3])), findsOneWidget);
   });
 }

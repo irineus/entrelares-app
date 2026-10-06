@@ -186,9 +186,6 @@ abstract final class StringsEn {
     K.quickSwapConfirm: 'Confirm swap',
     K.navGuardSelectedOne: '{0} day selected',
     K.navGuardSelectedMany: '{0} days selected',
-    K.navGuardBody: 'Leaving this screen will discard the selection. Continue?',
-    K.navGuardYes: 'Yes, continue',
-    K.navGuardNo: 'No, stay here',
     // ── Today card ──
     K.cardBackToCurrentMonth: 'Back to the current month',
     K.cardGreeting: 'Hi, {0}!',
