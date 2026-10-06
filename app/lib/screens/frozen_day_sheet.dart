@@ -43,6 +43,7 @@ Future<FrozenDayOutcome?> showFrozenDaySheet({
   bool offline = false,
   String? childName,
   List<SwapRequest> siblings = const [],
+  VoidCallback? onViewDay,
 }) {
   return showAppSheet<FrozenDayOutcome>(
     context: context,
@@ -54,6 +55,7 @@ Future<FrozenDayOutcome?> showFrozenDaySheet({
       offline: offline,
       childName: childName,
       siblings: siblings,
+      onViewDay: onViewDay,
     ),
   );
 }
@@ -78,6 +80,11 @@ class _FrozenDaySheet extends StatefulWidget {
   /// this date, one per child — approved together from here.
   final List<SwapRequest> siblings;
 
+  /// F-95: "Ver o dia" — the day this request froze, read-only (its agenda,
+  /// note and relatos were unreachable while the request waited). Null where
+  /// the caller has no day to show.
+  final VoidCallback? onViewDay;
+
   const _FrozenDaySheet({
     required this.request,
     required this.allProfiles,
@@ -86,6 +93,7 @@ class _FrozenDaySheet extends StatefulWidget {
     this.offline = false,
     this.childName,
     this.siblings = const [],
+    this.onViewDay,
   });
 
   @override
@@ -102,10 +110,28 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
   String? _pendingAction;
   String? _error;
 
+  /// F-95: the request is no longer open — answered, cancelled or
+  /// auto-approved since the push or the list was read. The panel says so
+  /// and offers nothing to act on.
+  bool _resolved = false;
+
   @override
   void initState() {
     super.initState();
     _approverNote = TextEditingController();
+    _refresh();
+  }
+
+  /// F-95: read the request again on open — a push from yesterday must not
+  /// offer "Aprovar" on a request the 48 h cron already approved.
+  Future<void> _refresh() async {
+    try {
+      final fresh = await widget.dataSource.fetchSwapRequest(widget.request.id);
+      if (!mounted || fresh == null) return;
+      if (fresh.status != 'pending' && fresh.status != 'revert_pending') {
+        setState(() => _resolved = true);
+      }
+    } catch (_) {/* the server still refuses a stale answer */}
   }
 
   @override
@@ -146,9 +172,17 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
       setState(() {
         _acting = false;
         _pendingAction = null;
-        _error = isSessionExpired(e.toString())
-            ? sessionExpiredMessage(l)
-            : l.format(errorKey, [e.toString()]);
+        final raw = e.toString();
+        // F-95: a request settled meanwhile is a state, not a failure; and no
+        // raw `PostgrestException(... P0001 ...)` ever reaches the reader.
+        if (isSwapAlreadyAnswered(raw)) {
+          _resolved = true;
+          _error = null;
+        } else {
+          _error = isSessionExpired(raw)
+              ? sessionExpiredMessage(l)
+              : translateSaveError(raw, l[errorKey], l);
+        }
       });
     }
   }
@@ -269,7 +303,7 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                 ],
               ),
             ),
-      extraAction: widget.offline
+      extraAction: widget.offline || _resolved
           ? null
           : _actionRow(context, l,
           request: request,
@@ -279,10 +313,34 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
           targetName: targetName,
           actionButton: actionButton),
       children: [
+              // F-95: settled since this panel's data was read.
+              if (_resolved) ...[
+                AppBanner(
+                  key: const ValueKey('frozen-resolved'),
+                  tone: context.tokens.info,
+                  icon: Icons.task_alt,
+                  message: l[KApp.frozenAlreadyResolved],
+                ),
+                const SizedBox(height: Spacing.sm),
+              ],
               Text(
                   l.format(
                       K.frozenDay, [l.formatDate(request.scheduleDate)]),
                   style: Theme.of(context).textTheme.bodyMedium),
+              // F-95: the day itself — its agenda, note and relatos — read-only.
+              if (widget.onViewDay != null)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    key: const ValueKey('frozen-view-day'),
+                    icon: const Icon(Icons.event_note_outlined),
+                    label: Text(l[KApp.frozenViewDay]),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      widget.onViewDay!();
+                    },
+                  ),
+                ),
               const SizedBox(height: Spacing.sm),
               // U-28 QA: the request's facts in their own panel. Loose on the
               // sheet, a label on the left and its value on the right had

@@ -127,6 +127,9 @@ class CalendarScreen extends StatefulWidget {
   /// F-55: the agenda's "add the child" door (`/family/children`).
   final VoidCallback? onOpenChildren;
 
+  /// F-95: Relatórios → Histórico, from a swapped day's story line.
+  final VoidCallback? onOpenHistory;
+
   /// F-07 (owner's QA, 29/09/2026): a carer's legend chip leads to the
   /// person — my profile, anyone's for an admin, the Família otherwise.
   final void Function(MemberLinkTarget target, int memberId)? onOpenMember;
@@ -188,6 +191,7 @@ class CalendarScreen extends StatefulWidget {
       this.onOpenNotifications,
       this.onOpenPlan,
       this.onOpenChildren,
+      this.onOpenHistory,
       this.onOpenMember,
       this.handoffNudgePrefs,
       this.push,
@@ -1351,6 +1355,13 @@ class _CalendarScreenState extends State<CalendarScreen>
       ownProfileId: _ownProfile?.id,
       dataSource: widget.dataSource,
       offline: _offline,
+      // F-95: the frozen day's own content, read-only (the sheet knows the
+      // day is frozen and offers no plan write; a past day keeps its relato).
+      // Only for a day this screen holds (a request from another month,
+      // reached from the Hoje strip, would open an empty day).
+      onViewDay: _daysByIso.containsKey(iso)
+          ? () => _openDay(request.scheduleDate)
+          : null,
       childName: _perChild ? _childName(request.childId) : null,
       // F-07 (PR 4b): the other children's requests of this day, from the
       // same requester to the same approver — approved together.
@@ -1969,6 +1980,8 @@ class _CalendarScreenState extends State<CalendarScreen>
       childName: _perChild ? _childName(_lane) : null,
       siblings: _daySiblings(date),
       askSwap: askSwap,
+      onOpenHistory: widget.onOpenHistory,
+      onCalendarStale: () => _load(silent: true),
     );
     if (outcome != null) {
       _load(silent: true);

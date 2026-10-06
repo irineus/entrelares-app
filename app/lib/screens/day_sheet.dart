@@ -10,6 +10,7 @@ import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_account_reply.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
+import 'package:entrelares_db_contracts/models/swap_request.dart';
 import '../services/admin_mode.dart';
 import '../services/custody_data_source.dart';
 import '../widgets/admin_mode_offer.dart';
@@ -139,6 +140,8 @@ Future<DaySheetOutcome?> showDaySheet({
   List<DaySheetLane> allLanes = const [],
   void Function(int childId)? onEditLane,
   bool askSwap = false,
+  VoidCallback? onOpenHistory,
+  VoidCallback? onCalendarStale,
 }) {
   return showAppSheet<DaySheetOutcome>(
     context: context,
@@ -167,6 +170,8 @@ Future<DaySheetOutcome?> showDaySheet({
       allLanes: allLanes,
       onEditLane: onEditLane,
       askSwap: askSwap,
+      onOpenHistory: onOpenHistory,
+      onCalendarStale: onCalendarStale,
     ),
   );
 }
@@ -232,6 +237,14 @@ class _DaySheet extends StatefulWidget {
   /// been tapped.
   final bool askSwap;
 
+  /// F-95: Relatórios → Histórico, where a swap's whole record lives.
+  final VoidCallback? onOpenHistory;
+
+  /// F-95: the calendar re-reads the month — after a conflict or a request
+  /// opened meanwhile, so what the sheet says ("o calendário foi atualizado")
+  /// is true.
+  final VoidCallback? onCalendarStale;
+
   const _DaySheet({
     required this.date,
     required this.day,
@@ -257,6 +270,8 @@ class _DaySheet extends StatefulWidget {
     this.allLanes = const [],
     this.onEditLane,
     this.askSwap = false,
+    this.onOpenHistory,
+    this.onCalendarStale,
   });
 
   @override
@@ -264,6 +279,16 @@ class _DaySheet extends StatefulWidget {
 }
 
 class _DaySheetState extends State<_DaySheet> {
+  /// F-95: the day as last read — the one the sheet opened with, until a T-33
+  /// conflict re-reads it IN PLACE (the next save then carries the winner's
+  /// revision instead of failing forever on the old one).
+  CareSchedule? _freshDay;
+  CareSchedule? get _day => _freshDay ?? widget.day;
+
+  /// F-95: the approved request behind a swapped day (null while loading or
+  /// when there is none) — its story goes under the pills.
+  SwapRequest? _origin;
+
   int? _scheduledParentId;
   int _actualParentId = 0; // 0 = same as planned (web sentinel)
   late final TextEditingController _notes;
@@ -359,7 +384,7 @@ class _DaySheetState extends State<_DaySheet> {
   /// S-26: picking "Sem troca" on this day would open a revert the reader is
   /// not a party to — a third caregiver on someone else's approved swap.
   bool get _noSwapIsForeignRevert {
-    final day = widget.day;
+    final day = _day;
     if (day == null || _isPast) return false;
     final actual = day.actualParentId;
     if (actual == null || actual == day.scheduledParentId) return false;
@@ -413,7 +438,7 @@ class _DaySheetState extends State<_DaySheet> {
 
   /// Nothing planned: no row, or a row that names nobody.
   bool get _isEmptyDay {
-    final day = widget.day;
+    final day = _day;
     return day == null ||
         (day.scheduledParentId == 0 && day.actualParentId == null);
   }
@@ -432,7 +457,7 @@ class _DaySheetState extends State<_DaySheet> {
   bool get _isFrozen => isDayFrozen(widget.date, widget.frozenDates);
 
   DayAssignment? get _assignment {
-    final day = widget.day;
+    final day = _day;
     return day == null
         ? null
         : DayAssignment(
@@ -459,7 +484,7 @@ class _DaySheetState extends State<_DaySheet> {
 
   /// S-09: the planned parent of an assigned day is locked for non-admins.
   bool get _scheduledLocked =>
-      widget.day != null && widget.day!.scheduledParentId != 0 &&
+      _day != null && _day!.scheduledParentId != 0 &&
       !_bypass;
 
   /// F-44: mirrors the save's workflow detection so the message field only
@@ -471,7 +496,7 @@ class _DaySheetState extends State<_DaySheet> {
     // F-56: no counterpart, no workflow — the actual-parent controls are not
     // even rendered on that day.
     if (_swapUnavailableForPending) return false;
-    final currentActual = widget.day?.actualParentId;
+    final currentActual = _day?.actualParentId;
     final proposed = _actualParentId == 0 ? null : _actualParentId;
     if (shouldRequestRevert(
       scheduleDate: widget.date,
@@ -502,6 +527,7 @@ class _DaySheetState extends State<_DaySheet> {
     _resetDraft();
     _notes.addListener(_onNotesChanged);
     if (_isPast) _loadAccounts();
+    _loadOrigin();
     _opening = daySheetOpening(
         canSave: !_readOnly, isEmptyDay: _isEmptyDay, isPast: _isPast);
     _editing = _opening.opensEditor;
@@ -526,10 +552,26 @@ class _DaySheetState extends State<_DaySheet> {
     }
   }
 
+  /// F-95: a swapped day tells who asked and who approved, without a trip to
+  /// Relatórios. Best-effort: no story is better than a sheet that fails.
+  Future<void> _loadOrigin() async {
+    final day = _day;
+    if (day == null ||
+        day.actualParentId == null ||
+        day.actualParentId == day.scheduledParentId) {
+      return;
+    }
+    try {
+      final origin = await widget.dataSource
+          .fetchDaySwapOrigin(widget.date, childId: widget.childId);
+      if (mounted && origin != null) setState(() => _origin = origin);
+    } catch (_) {/* the pills still say Trocado */}
+  }
+
   /// The editor's fields as the stored day has them — on open, and again when
   /// "Cancelar" returns to the summary, so a draft never survives a cancel.
   void _resetDraft() {
-    final day = widget.day;
+    final day = _day;
     _scheduledParentId =
         (day != null && day.scheduledParentId != 0) ? day.scheduledParentId : null;
     _actualParentId = day?.actualParentId ?? 0;
@@ -552,7 +594,7 @@ class _DaySheetState extends State<_DaySheet> {
   /// U-56: the draft differs from the stored day — the only time "Salvar"
   /// has something to write.
   bool get _draftChanged {
-    final day = widget.day;
+    final day = _day;
     final handoff = _handoff;
     return dayDraftChanged(
       storedScheduledParentId: day?.scheduledParentId,
@@ -891,7 +933,7 @@ class _DaySheetState extends State<_DaySheet> {
 
     // S-09: rewriting the planned parent of an assigned day asks first.
     if (needsAdminScheduleChangeConfirm(
-      existingScheduledParentId: widget.day?.scheduledParentId,
+      existingScheduledParentId: _day?.scheduledParentId,
       editingScheduledParentId: scheduled,
       alreadyConfirmed: _adminConfirmed,
     )) {
@@ -922,7 +964,7 @@ class _DaySheetState extends State<_DaySheet> {
       }
 
       final notesText = _notes.text.trim();
-      final existing = widget.day;
+      final existing = _day;
       final currentActual = existing?.actualParentId;
       final proposed = _actualParentId == 0 ? null : _actualParentId;
 
@@ -955,7 +997,7 @@ class _DaySheetState extends State<_DaySheet> {
           myProfile: _requireMyProfile(),
           allProfiles: widget.allProfiles,
           childId: widget.childId,
-          scheduleId: widget.day?.id,
+          scheduleId: _day?.id,
         );
         if (mounted) _finish(DaySheetOutcome.revertRequested);
         return;
@@ -1089,7 +1131,7 @@ class _DaySheetState extends State<_DaySheet> {
         await widget.dataSource
             .fetchPreEditNotes(widget.date, childId: widget.childId);
     if (snapshot == null) return false;
-    final current = widget.day?.notes;
+    final current = _day?.notes;
     if (!notesDifferForRevert(current, snapshot.notes)) return false;
     _revertSnapshotText = snapshot.notes;
     _revertCurrentText = current;
@@ -1102,7 +1144,7 @@ class _DaySheetState extends State<_DaySheet> {
       });
 
   Future<void> _clearDay() async {
-    final existing = widget.day;
+    final existing = _day;
     if (existing == null ||
         isClearDayBlocked(adminBypass: _bypass) ||
         _saving ||
@@ -1125,6 +1167,15 @@ class _DaySheetState extends State<_DaySheet> {
   void _fail(String raw, String fallback) {
     if (!mounted) return;
     final l = AppL10n.of(context).l;
+    if (!isStaleClientBuild(raw) && isDayConflict(raw)) {
+      _reloadAfterConflict();
+      return;
+    }
+    // A request opened on this day meanwhile: the message says the calendar
+    // was updated — F-95 makes that true.
+    if (translateSaveError(raw, fallback, l) == l[KApp.errSwapPendingExists]) {
+      widget.onCalendarStale?.call();
+    }
     setState(() {
       _saving = false;
       _deleting = false;
@@ -1137,6 +1188,30 @@ class _DaySheetState extends State<_DaySheet> {
               : isDayConflict(raw)
                   ? l[KApp.errConcurrentSaveRetry]
                   : translateSaveError(raw, fallback, l);
+    });
+  }
+
+  /// F-95: someone saved this day first (T-33). Re-read it here, keep the
+  /// reader's draft, and say so — the old revision made every retry fail.
+  Future<void> _reloadAfterConflict() async {
+    final l = AppL10n.of(context).l;
+    CareSchedule? fresh;
+    try {
+      fresh = await widget.dataSource
+          .fetchDay(widget.date, childId: widget.childId);
+    } catch (_) {
+      fresh = null;
+    }
+    widget.onCalendarStale?.call();
+    if (!mounted) return;
+    setState(() {
+      if (fresh != null) _freshDay = fresh;
+      _saving = false;
+      _deleting = false;
+      _confirmingClear = false;
+      _error = fresh == null
+          ? l[KApp.errConcurrentSaveRetry]
+          : l[KApp.errConflictReloaded];
     });
   }
 
@@ -1162,7 +1237,7 @@ class _DaySheetState extends State<_DaySheet> {
         candidateId: m.id,
         userProfileId: widget.ownProfileId,
         editingScheduledParentId: scheduled,
-        existingActualParentId: widget.day?.actualParentId,
+        existingActualParentId: _day?.actualParentId,
       )) {
         return m.id;
       }
@@ -1178,9 +1253,9 @@ class _DaySheetState extends State<_DaySheet> {
       !_isPast &&
       !_isFrozen &&
       _scheduledParentId != null &&
-      widget.day != null &&
-      widget.day!.scheduledParentId != 0 &&
-      widget.day!.actualParentId == null &&
+      _day != null &&
+      _day!.scheduledParentId != 0 &&
+      _day!.actualParentId == null &&
       _actualParentId == 0 &&
       !_swapUnavailableForPending &&
       _askSwapCandidate != null;
@@ -1236,7 +1311,7 @@ class _DaySheetState extends State<_DaySheet> {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
-    final day = widget.day;
+    final day = _day;
     final assignment = _assignment;
 
     // F-67: the guards are about the PLAN; while a relato is being written
@@ -1354,7 +1429,7 @@ class _DaySheetState extends State<_DaySheet> {
           ? null
           : !editing
           ? (_allChildren ? null : _correctPlanAction(l))
-          : widget.day == null ||
+          : _day == null ||
                   (isClearDayBlocked(adminBypass: _bypass) &&
                       !_canOffer(AdminModeAction.clearDay))
               ? null
@@ -1827,7 +1902,47 @@ class _DaySheetState extends State<_DaySheet> {
               style: textTheme.bodySmall?.copyWith(color: tokens.textMuted),
             ),
           ),
+        // F-95: the swap's story — who asked, who approved, when, the note —
+        // where the dispute starts ("eu nunca concordei com esse sábado").
+        if (swapped && _origin != null) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: Spacing.xs),
+            child: Text(
+              _storyLine(l, _origin!),
+              key: const ValueKey('day-swap-story'),
+              style: textTheme.bodySmall?.copyWith(color: tokens.textMuted),
+            ),
+          ),
+          if (widget.onOpenHistory != null)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                key: const ValueKey('day-swap-history'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  widget.onOpenHistory!();
+                },
+                child: Text(l[KApp.swapStorySeeHistory]),
+              ),
+            ),
+        ],
       ],
+    );
+  }
+
+  String _storyLine(Localization l, SwapRequest r) {
+    final note = (r.approvalNote ?? '').trim().isNotEmpty
+        ? r.approvalNote
+        : r.requestMessage;
+    return swapStorySentence(
+      l: l,
+      requesterName: _nameOf(r.requestingProfileId),
+      askedAtLocal:
+          r.createdAt == null ? null : DateTime.tryParse(r.createdAt!)?.toLocal(),
+      approverName: _nameOf(r.targetProfileId),
+      approvedAtLocal: r.resolvedAtLocal,
+      automatic: r.resolvedBy == 'system',
+      note: note,
     );
   }
 
@@ -2014,7 +2129,7 @@ class _DaySheetState extends State<_DaySheet> {
               candidateId: m.id,
               userProfileId: widget.ownProfileId,
               editingScheduledParentId: _scheduledParentId ?? 0,
-              existingActualParentId: widget.day?.actualParentId,
+              existingActualParentId: _day?.actualParentId,
             ))
               _memberChip(m.id, m.fullName.split(' ').first,
                   selected: _actualParentId == m.id,
@@ -2110,7 +2225,7 @@ class _DaySheetState extends State<_DaySheet> {
               // is in the same state — never for a revert, which undoes one
               // child's approved swap.
               if (widget.siblings.isNotEmpty &&
-                  widget.day?.actualParentId == null) ...[
+                  _day?.actualParentId == null) ...[
                 const SizedBox(height: Spacing.sm),
                 AppFieldLabel(l[KApp.editorAlsoFor]),
                 Wrap(

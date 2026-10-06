@@ -2594,6 +2594,28 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<SwapRequest?> fetchDaySwapOrigin(DateTime date, {int? childId}) async {
+    final query = _client
+        .from('swap_requests')
+        .select()
+        .eq('schedule_date', CareSchedule.isoDate(date))
+        .eq('status', 'approved');
+    final rows = await (childId == null
+            ? query.isFilter('child_id', null)
+            : query.eq('child_id', childId))
+        .order('resolved_at', ascending: false)
+        .limit(1);
+    return rows.isEmpty ? null : SwapRequest.fromJson(rows.first);
+  }
+
+  @override
+  Future<SwapRequest?> fetchSwapRequest(int id) async {
+    final row =
+        await _client.from('swap_requests').select().eq('id', id).maybeSingle();
+    return row == null ? null : SwapRequest.fromJson(row);
+  }
+
+  @override
   Future<Map<int, SwapOrigin>> fetchResolutionOrigins(List<int> logIds) async {
     if (logIds.isEmpty) return const {};
     final rows = await _client
