@@ -403,7 +403,7 @@ List<pw.Widget> _historySection(CustodyReport report, Localization l) => [
                   pw.Padding(
                     padding: const pw.EdgeInsets.only(left: 10, top: 1),
                     child: pw.Text(
-                      '${change.label}: ${_changeValue(change)}',
+                      '${change.label}: ${_changeValue(change, l)}',
                       style: const pw.TextStyle(fontSize: 8.5),
                     ),
                   ),
@@ -545,34 +545,7 @@ List<pw.Widget> _expensesSection(
     if (e.isEmpty)
       _paragraph(l[KApp.expensePdfEmpty])
     else ...[
-      if (e.lines.isNotEmpty)
-        pw.Table(
-          border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-          columnWidths: const {
-            0: pw.FlexColumnWidth(1.2),
-            1: pw.FlexColumnWidth(3),
-            2: pw.FlexColumnWidth(1.4),
-            3: pw.FlexColumnWidth(1.4),
-            4: pw.FlexColumnWidth(1.6),
-          },
-          children: [
-            pw.TableRow(children: [
-              _cell(l[KApp.expenseDate], bold: true),
-              _cell(l[KApp.expenseDesc], bold: true),
-              _cell(l[KApp.expenseCategory], bold: true),
-              _cell(l[KApp.expenseAmount], bold: true),
-              _cell(l[KApp.expensePaidBy], bold: true),
-            ]),
-            for (final line in e.lines)
-              pw.TableRow(children: [
-                _cell(l.formatDate(line.date)),
-                _cell(line.description),
-                _cell(line.categoryLabel),
-                _cell(money(line.amountCents)),
-                _cell(line.paidByName),
-              ]),
-          ],
-        ),
+      if (e.lines.isNotEmpty) _expenseTable(e, l, money),
       if (e.totals.isNotEmpty) ...[
         pw.SizedBox(height: 6),
         for (final t in e.totals)
@@ -656,6 +629,46 @@ String _withPaymentFacts(String line, Localization l,
       if (note != null) l.format(KApp.expenseNoteLine, [noteBy, note]),
     ].join(' · ');
 
+/// F-96: the expense lines with the split per person and, when any line has
+/// one, the child — the two facts a lawyer asks first.
+pw.Widget _expenseTable(
+    ReportExpenses e, Localization l, String Function(int) money) {
+  final withChild = e.lines.any((x) => x.childName != null);
+  return pw.Table(
+    border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+    columnWidths: {
+      0: const pw.FlexColumnWidth(1.2),
+      1: const pw.FlexColumnWidth(2.4),
+      if (withChild) 2: const pw.FlexColumnWidth(1.1),
+      (withChild ? 3 : 2): const pw.FlexColumnWidth(1.2),
+      (withChild ? 4 : 3): const pw.FlexColumnWidth(1.3),
+      (withChild ? 5 : 4): const pw.FlexColumnWidth(1.4),
+      (withChild ? 6 : 5): const pw.FlexColumnWidth(2.4),
+    },
+    children: [
+      pw.TableRow(children: [
+        _cell(l[KApp.expenseDate], bold: true),
+        _cell(l[KApp.expenseDesc], bold: true),
+        if (withChild) _cell(l[KApp.expensePdfChild], bold: true),
+        _cell(l[KApp.expenseCategory], bold: true),
+        _cell(l[KApp.expenseAmount], bold: true),
+        _cell(l[KApp.expensePaidBy], bold: true),
+        _cell(l[KApp.expenseDetailSplit], bold: true),
+      ]),
+      for (final line in e.lines)
+        pw.TableRow(children: [
+          _cell(l.formatDate(line.date)),
+          _cell(line.description),
+          if (withChild) _cell(line.childName ?? '—'),
+          _cell(line.categoryLabel),
+          _cell(money(line.amountCents)),
+          _cell(line.paidByName),
+          _cell(line.splitText),
+        ]),
+    ],
+  );
+}
+
 /// F-35: the Conversa of the period, in order, as written — immutable on the
 /// server, so the PDF says exactly what the family said.
 List<pw.Widget> _chatSection(
@@ -684,17 +697,22 @@ List<pw.Widget> _chatSection(
                   style: pw.TextStyle(
                       fontSize: 8.5, fontWeight: pw.FontWeight.bold)),
               pw.Text(c.body, style: const pw.TextStyle(fontSize: 8.5)),
+              if (c.readLine != null)
+                pw.Text(c.readLine!,
+                    style: const pw.TextStyle(
+                        fontSize: 7.5, color: PdfColors.grey700)),
             ],
           ),
         ),
   ];
 }
 
-/// Mirror of the web's document markup: a two-sided change reads `de → para`,
-/// a one-sided one prints whichever value exists.
-String _changeValue(AuditFieldChange change) =>
+/// Mirror of the web's document markup: a two-sided change reads "de X para
+/// Y", a one-sided one prints whichever value exists. F-96: in WORDS — the
+/// embedded Roboto has no "→", so the arrow never reached the paper.
+String _changeValue(AuditFieldChange change, Localization l) =>
     change.from != null && change.to != null
-        ? '${change.from} → ${change.to}'
+        ? l.format(KApp.pdfChangeFromTo, [change.from, change.to])
         : (change.to ?? change.from ?? '');
 
 pw.Widget _detail(String label, String value) => pw.Padding(

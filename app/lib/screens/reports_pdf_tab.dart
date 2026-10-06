@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import '../widgets/ui/ui.dart';
 import '../theme/tokens.dart';
 import 'package:printing/printing.dart';
@@ -109,6 +110,13 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   /// F-07 (PR 5c): child id → first name, in order, for the per-lane tables.
   Map<int, String> _childNamesById = const {};
 
+  /// F-96: the registered children the header names — a picker in place of
+  /// the free text (all chosen until the reader says otherwise).
+  Set<int> _pickedChildren = {};
+
+  /// F-96: where the ready card is, so a generation scrolls to it.
+  final GlobalKey _readyKey = GlobalKey();
+
   /// F-55: the agenda is on for this build — the PDF prints section 5.
   bool _agendaOn = false;
 
@@ -178,11 +186,13 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       _chatOn = settings.chatEnabled;
       _attestOn = settings.reportAttestationEnabled;
       if (_attestOn) unawaited(_loadAttestations());
-      if (!settings.childAgendaEnabled) return null;
+      // F-96: the children registered (F-55/F-07) are offered whatever the
+      // agenda flag says — the free text only when there is none.
       final children = await widget.dataSource.fetchChildren();
-      if (!mounted) return null;
-      _registeredChildCount = children.isEmpty ? 1 : children.length;
+      if (!mounted || children.isEmpty) return null;
+      _registeredChildCount = children.length;
       _childNamesById = {for (final c in children) c.id: c.firstName};
+      _pickedChildren = {for (final c in children) c.id};
       return ChildRules.joinNames([for (final c in children) c.firstName],
           and: AppL10n.of(context).l[KApp.childAnd]);
     } catch (_) {
@@ -235,6 +245,12 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
                     .labelKey],
             amountCents: e.amountCents,
             paidByName: name(e.paidBy),
+            // F-96: whose expense, and each person's part.
+            childName: e.childId == null ? null : _childNamesById[e.childId],
+            splitText: [
+              for (final s in e.shares)
+                '${name(s.profileId).split(' ').first} ${money(s.shareCents)}'
+            ].join('; '),
           ),
       ],
       totals: [
@@ -326,6 +342,29 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
     final all = await widget.dataSource
         .fetchChatMessagesForPeriod(start.toUtc(), endExclusive.toUtc());
     final byId = {for (final m in all) m.id: m};
+    // F-96: the read marks, as of the emission. Best-effort: without them the
+    // texts still print, and no line claims a reading it could not check.
+    List<ChatMark>? marks;
+    try {
+      marks = [
+        for (final r in await widget.dataSource
+            .fetchChatReads([for (final m in all) m.id]))
+          (messageId: r.messageId, profileId: r.profileId, readAt: r.readAt)
+      ];
+    } catch (_) {
+      marks = null;
+    }
+    String? readLine(int id, int author) {
+      if (marks == null) return null;
+      final readers = ChatRules.readersOf(id, author, marks);
+      if (readers.isEmpty) return l[KApp.chatPdfNotRead];
+      return l.format(KApp.chatReadBy, [
+        readers
+            .map((r) => l.format(KApp.chatReadEntry,
+                [name(r.profileId), l.formatDateTimeShort(r.readAt.toLocal())]))
+            .join(', ')
+      ]);
+    }
     return [
       for (final m in all)
         if (!m.createdAt.toLocal().isBefore(start) &&
@@ -339,6 +378,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
                 : '${name(byId[m.quoteId]!.authorProfileId)}, '
                     '${l.formatDateTimeShort(byId[m.quoteId]!.createdAt.toLocal())}',
             citedDay: m.quotedDay,
+            readLine: readLine(m.id, m.authorProfileId),
           ),
     ];
   }
@@ -475,9 +515,11 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
 
       final report = buildCustodyReport(
         familyName: family?.name ?? l[K.pdfDocFallbackFamily],
-        childName: _registeredChildNames ?? _childName.text,
+        childName: _registeredChildNames == null
+            ? _childName.text
+            : _pickedNames(l),
         childCount:
-            _registeredChildNames == null ? 1 : _registeredChildCount,
+            _registeredChildNames == null ? 1 : _pickedChildren.length,
         // F-07 (PR 5c): the lane sections' labels, in the family's order.
         childNames: _childNamesById,
         allChildrenLabel: l[KApp.calLaneAll],
@@ -604,11 +646,22 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         _report = report;
         _bytes = bytes;
       });
+      // F-96: the result is shown — the ready card lands below the fold, so
+      // the tab scrolls to it and a screen reader hears that it exists.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _readyKey.currentContext;
+        if (ctx != null && ctx.mounted) {
+          unawaited(Scrollable.ensureVisible(ctx,
+              duration: const Duration(milliseconds: 300)));
+        }
+      });
+      unawaited(SemanticsService.sendAnnouncement(
+          View.of(context), l[KApp.pdfReadyAnnounce], TextDirection.ltr));
     } catch (e) {
       if (!mounted) return;
       setState(() => _errorText = isSessionExpired(e.toString())
           ? sessionExpiredMessage(l)
-          : l.format(K.pdfErrGenerate, [e.toString()]));
+          : translateSaveError(e.toString(), l[K.pdfErrGenerate], l));
     } finally {
       if (mounted) setState(() => _generating = false);
     }
@@ -659,14 +712,14 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         else if (_loadErrorRaw != null)
           _banner(isSessionExpired(_loadErrorRaw!)
               ? sessionExpiredMessage(l)
-              : l.format(K.pdfErrLoad, [_loadErrorRaw!]))
+              : translateSaveError(_loadErrorRaw!, l[K.pdfErrLoad], l))
         else if (!_isPremium)
           _upsell(l)
         else ...[
           _filterCard(l),
           if (_report != null && _bytes != null) ...[
             const SizedBox(height: 12),
-            _readyCard(l),
+            KeyedSubtree(key: _readyKey, child: _readyCard(l)),
           ],
           if (_attestOn && _attestations.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -828,14 +881,31 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
                   controller: _childName,
                   maxLength: 80,
                 )
-              else
+              else if (_registeredChildCount == 1)
                 AppListRow(
                   key: const ValueKey('pdf-registered-child'),
-                  label: _registeredChildCount > 1
-                      ? l[K.pdfDocChildren]
-                      : l[K.pdfChildName],
+                  label: l[K.pdfChildName],
                   value: _registeredChildNames,
+                )
+              else ...[
+                // F-96: the registered children, picked — never typed again.
+                AppFieldLabel(l[KApp.pdfChildrenPick]),
+                Wrap(
+                  key: const ValueKey('pdf-children-picker'),
+                  spacing: Spacing.sm,
+                  children: [
+                    for (final e in _childNamesById.entries)
+                      FilterChip(
+                        key: ValueKey('pdf-child-${e.key}'),
+                        label: Text(e.value),
+                        selected: _pickedChildren.contains(e.key),
+                        onSelected: (on) => setState(() => on
+                            ? _pickedChildren.add(e.key)
+                            : _pickedChildren.remove(e.key)),
+                      ),
+                  ],
                 ),
+              ],
               // U-20: the same option as the on-screen Resumo — the numbers of
               // the two must agree.
               SwitchListTile(
@@ -989,6 +1059,18 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
           context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
           type: AppSnackType.error);
     }
+  }
+
+  /// F-96: the picked children's names, joined the way the header joins
+  /// them; null when none is picked (the header then names no child).
+  String? _pickedNames(Localization l) {
+    final names = [
+      for (final e in _childNamesById.entries)
+        if (_pickedChildren.contains(e.key)) e.value
+    ];
+    return names.isEmpty
+        ? null
+        : ChildRules.joinNames(names, and: l[KApp.childAnd]);
   }
 
   Widget _readyCard(Localization l) {

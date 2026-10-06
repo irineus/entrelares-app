@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'package:entrelares_db_contracts/models/activity_log.dart';
+import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
@@ -192,6 +193,24 @@ void main() {
       expect(String.fromCharCodes(printed!.take(5)), '%PDF-');
     });
 
+    // F-96: the registered children are picked, never typed again.
+    testWidgets('registered children are a picker, and the header follows it',
+        (tester) async {
+      final ds = source()
+        ..children = [
+          Child(id: 1, familyId: 7, firstName: 'Lia', sortOrder: 0),
+          Child(id: 2, familyId: 7, firstName: 'Theo', sortOrder: 1),
+        ];
+      await pumpPdf(tester, ds);
+      expect(find.byKey(const ValueKey('pdf-children-picker')), findsOne);
+      expect(find.text(l[K.pdfChildPlaceholder]), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('pdf-child-2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.pdfGenerate]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pdf-children-picker')), findsOne);
+    });
+
     testWidgets('a custom period ending before it starts is refused',
         (tester) async {
       final ds = source();
@@ -215,14 +234,22 @@ void main() {
       expect(ds.periodReads.length, readsBefore);
     });
 
-    testWidgets('a failure propagates the server text', (tester) async {
-      final ds = source()..throwOnMembers = 'boom';
+    // F-96: errors are catalogued — a server sentence (PT-BR, accented)
+    // reaches the reader; anything else is the catalog's, never raw text.
+    testWidgets('a server sentence reaches the reader, raw text never does',
+        (tester) async {
+      final ds = source()..throwOnMembers = 'PostgrestException(boom P0001)';
       await pumpPdf(tester, ds);
-
       await tester.tap(find.text(l[K.pdfGenerate]));
       await tester.pumpAndSettle();
+      expect(find.textContaining('boom'), findsNothing);
+      expect(find.text(l[K.pdfErrGenerate]), findsOne);
 
-      expect(find.textContaining('boom'), findsOne);
+      ds.throwOnMembers =
+          '{"code":"P0001","message":"Você não pode gerar este relatório agora."}';
+      await tester.tap(find.text(l[K.pdfGenerate]));
+      await tester.pumpAndSettle();
+      expect(find.text('Você não pode gerar este relatório agora.'), findsOne);
     });
   });
 
@@ -252,6 +279,7 @@ void main() {
       Localization? localization,
       List<ReportDayAccount> dayAccounts = const [],
       ReportExpenses? expenses,
+      List<ReportChatLine>? chat,
     }) {
       final loc = localization ?? l;
       return buildCustodyReport(
@@ -289,6 +317,7 @@ void main() {
         includeAcceptedFutureSwaps: future,
         dayAccounts: dayAccounts,
         expenses: expenses,
+        chat: chat,
       );
     }
 
@@ -296,6 +325,48 @@ void main() {
     // from the confirmed ones, with the receiver's comment and the payer's
     // reference; an edited split prints the parts, not just the amount.
     // English, because the test faces drop accents.
+    // F-96: the read marks the product sells, the split and the child of
+    // each expense — as real text on the page.
+    test('F-96: read marks, split and child columns reach the page', () async {
+      final en = Localization(AppLanguage.en);
+      final text = await render(
+          report(
+            localization: en,
+            expenses: ReportExpenses(lines: [
+              ReportExpenseLine(
+                  date: DateTime(2026, 8, 10),
+                  description: 'School fee',
+                  categoryLabel: 'School',
+                  amountCents: 120000,
+                  paidByName: 'Ana Souza',
+                  childName: 'Lia',
+                  splitText: 'Ana R\$360.00; Bruno R\$840.00'),
+            ]),
+            chat: [
+              ReportChatLine(
+                  atLocal: DateTime(2026, 8, 11, 9),
+                  authorName: 'Ana Souza',
+                  body: 'Combinado',
+                  readLine: 'Read by Bruno Lima (11 Aug 9:30 AM)'),
+              ReportChatLine(
+                  atLocal: DateTime(2026, 8, 12, 9),
+                  authorName: 'Bruno Lima',
+                  body: 'Ok',
+                  readLine: en[KApp.chatPdfNotRead]),
+            ],
+          ),
+          en);
+      final page = RegExp(r'\(((?:[^()\\]|\\.)*)\)')
+          .allMatches(text)
+          .map((m) => m.group(1))
+          .join(' ');
+      expect(page, contains('Child'));
+      expect(page, contains('Lia'));
+      expect(page, contains('Ana R\$360.00; Bruno R\$840.00'));
+      expect(page, contains('Read by Bruno Lima'));
+      expect(page, contains('Not read before this report was issued'));
+    });
+
     test('F-93: a refused payment and an edited split reach the page',
         () async {
       final en = Localization(AppLanguage.en);

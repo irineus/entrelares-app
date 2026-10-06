@@ -638,8 +638,8 @@ abstract final class StringsPtBr {
     K.pdfPrintButton: 'Salvar como PDF / Imprimir',
     K.pdfPrintHint: 'Na janela de impressão, escolha <strong>“Salvar como PDF”</strong> como destino.',
     K.pdfErrEndBeforeStart: 'A data final não pode ser anterior à data inicial.',
-    K.pdfErrLoad: 'Falha ao carregar: {0}',
-    K.pdfErrGenerate: 'Erro ao gerar o relatório: {0}',
+    K.pdfErrLoad: 'Não foi possível carregar.',
+    K.pdfErrGenerate: 'Não foi possível gerar o relatório.',
     K.pdfErrPrint: 'Não foi possível abrir a impressão. Tente pelo menu do navegador (Imprimir).',
     // ── O documento impresso ──
     K.pdfDocTitle: 'Relatório de Guarda Compartilhada',

@@ -636,8 +636,8 @@ abstract final class StringsEn {
     K.pdfPrintButton: 'Save as PDF / Print',
     K.pdfPrintHint: 'In the print dialog, choose <strong>“Save as PDF”</strong> as the destination.',
     K.pdfErrEndBeforeStart: 'The end date cannot be earlier than the start date.',
-    K.pdfErrLoad: 'Could not load: {0}',
-    K.pdfErrGenerate: 'Error generating the report: {0}',
+    K.pdfErrLoad: 'Could not load.',
+    K.pdfErrGenerate: 'Could not generate the report.',
     K.pdfErrPrint: 'Could not open the print dialog. Try your browser\'s menu (Print).',
     // ── The printed document ──
     K.pdfDocTitle: 'Shared Custody Report',

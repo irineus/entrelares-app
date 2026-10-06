@@ -812,6 +812,12 @@ abstract final class KApp {
   static const String sumPlannedToDate = 'app.report.sumPlannedToDate';
   static const String sumPlannedRemaining = 'app.report.sumPlannedRemaining';
   static const String sumFutureAccepted = 'app.report.sumFutureAccepted';
+  static const String chatPdfNotRead = 'app.report.chatPdfNotRead';
+  static const String expensePdfChild = 'app.report.expensePdfChild';
+  static const String pdfChangeFromTo = 'app.report.pdfChangeFromTo';
+  static const String pdfReadyAnnounce = 'app.report.pdfReadyAnnounce';
+  static const String pdfChildrenPick = 'app.report.pdfChildrenPick';
+  static const String attestRetry = 'app.report.attestRetry';
   static const String swapStoryAsked = 'app.swap.storyAsked';
   static const String swapStoryApproved = 'app.swap.storyApproved';
   static const String swapStoryAuto = 'app.swap.storyAuto';
@@ -1532,6 +1538,12 @@ abstract final class KApp {
     sumPlannedToDate,
     sumPlannedRemaining,
     sumFutureAccepted,
+    chatPdfNotRead,
+    expensePdfChild,
+    pdfChangeFromTo,
+    pdfReadyAnnounce,
+    pdfChildrenPick,
+    attestRetry,
     swapStoryAsked,
     swapStoryApproved,
     swapStoryAuto,
@@ -2401,6 +2413,12 @@ abstract final class StringsAppPtBr {
     KApp.sumPlannedToDate: 'Planejado até hoje',
     KApp.sumPlannedRemaining: 'Planejado restante',
     KApp.sumFutureAccepted: 'Trocas futuras já aceitas: {0}',
+    KApp.chatPdfNotRead: 'Não lida até a emissão',
+    KApp.expensePdfChild: 'Criança',
+    KApp.pdfChangeFromTo: 'de {0} para {1}',
+    KApp.pdfReadyAnnounce: 'Relatório gerado.',
+    KApp.pdfChildrenPick: 'Crianças no cabeçalho',
+    KApp.attestRetry: 'Tentar de novo',
     KApp.swapStoryAsked: 'Pedida por {0} em {1}',
     KApp.swapStoryApproved: 'aprovada por {0} em {1}',
     KApp.swapStoryAuto: 'aprovada automaticamente em {0}',
@@ -3264,6 +3282,12 @@ abstract final class StringsAppEn {
     KApp.sumPlannedToDate: 'Planned to date',
     KApp.sumPlannedRemaining: 'Planned ahead',
     KApp.sumFutureAccepted: 'Future swaps already accepted: {0}',
+    KApp.chatPdfNotRead: 'Not read before this report was issued',
+    KApp.expensePdfChild: 'Child',
+    KApp.pdfChangeFromTo: 'from {0} to {1}',
+    KApp.pdfReadyAnnounce: 'Report generated.',
+    KApp.pdfChildrenPick: 'Children in the header',
+    KApp.attestRetry: 'Try again',
     KApp.swapStoryAsked: 'Asked by {0} on {1}',
     KApp.swapStoryApproved: 'approved by {0} on {1}',
     KApp.swapStoryAuto: 'approved automatically on {0}',
