@@ -22,11 +22,22 @@ final pt = Localization(AppLanguage.ptBr);
 
 /// U-36: the wizard is an item of the calendar's ⋮ menu — two taps, both by
 /// the text a person reads, never by the icon.
-Future<void> openWizard(WidgetTester tester) async {
+Future<void> openWizard(WidgetTester tester, {bool free = true}) async {
   await tester.tap(find.byTooltip(pt[K.calActionsMenu]));
   await tester.pumpAndSettle();
   await tester.tap(find.text(pt[K.calWizard]));
   await tester.pumpAndSettle();
+  // Owner's QA of 3.1.14: the wizard opens on the alternating weekends
+  // (anchored on a Friday). These tests were written against a FREE start —
+  // they pick 7/7 first, as a reader would.
+  if (free) {
+    await tester.ensureVisible(find.byKey(const Key('wizPreset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('wizPreset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(pt[K.wizPreset77]).last);
+    await tester.pumpAndSettle();
+  }
 }
 
 /// U-55: "Gerar" needs an answer about the handoff time. The flows that are
@@ -437,5 +448,42 @@ void f51ReplaceTests() {
     await tester.enterText(days.first, '4');
     await tester.pumpAndSettle();
     expect(find.text(pt[K.wizPresetCustom]), findsOneWidget);
+  });
+
+  testWidgets('the wizard opens on the alternating weekends, first in the '
+      'list, and 7/7 gives the asked-for start back', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester, free: false);
+    expect(find.text(pt[KApp.wizPreset311]), findsOneWidget);
+    expect(shownDays(tester), ['3', '11']);
+    final friday = snapToWeekday(dateOnly(today), DateTime.friday);
+    expect(find.text(pt.formatDate(friday)), findsOneWidget);
+
+    await pickPreset(tester, pt[K.wizPreset77]);
+    expect(find.text(pt.formatDate(dateOnly(today))), findsOneWidget,
+        reason: 'a free model starts on the day asked for, not the Friday');
+  });
+
+  // Owner's QA of 3.1.14: 2-2-5-5 only gives each parent fixed weekdays and
+  // alternating weekends when its first five-day block starts on a Wednesday;
+  // 2/2/3 is Mon-Tue / Wed-Thu / Fri-Sun from a Monday.
+  testWidgets('5/2/2/5 starts on a Wednesday and 2/2/3 on a Monday',
+      (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester);
+    await pickPreset(tester, pt[K.wizPreset5225]);
+    expect(
+        find.text(pt.formatDate(
+            snapToWeekday(dateOnly(today), DateTime.wednesday))),
+        findsOneWidget);
+    await pickPreset(tester, pt[K.wizPreset223]);
+    expect(
+        find.text(
+            pt.formatDate(snapToWeekday(dateOnly(today), DateTime.monday))),
+        findsOneWidget);
   });
 }

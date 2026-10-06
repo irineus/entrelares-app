@@ -344,4 +344,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(pt.format(K.selectionEdit, [4])), findsOneWidget);
   });
+
+  // Owner's QA of 3.1.14: the same gesture takes days OUT when it starts on
+  // a day already selected.
+  testWidgets('a press and drag that starts on a selected day unmarks the run',
+      (tester) async {
+    final lastDay = DateTime(today.year, today.month + 1, 0).day;
+    if (today.day + 5 > lastDay) return;
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    var gesture = await pressOn(tester, today.day + 1);
+    await gesture.moveTo(tester.getCenter(find.text('${today.day + 5}').last));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text(pt.format(K.selectionEdit, [5])), findsOneWidget);
+
+    gesture = await pressOn(tester, today.day + 2);
+    await gesture.moveTo(tester.getCenter(find.text('${today.day + 4}').last));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text(pt.format(K.selectionEdit, [2])), findsOneWidget,
+        reason: 'the run from the 2nd to the 4th day came out');
+  });
 }

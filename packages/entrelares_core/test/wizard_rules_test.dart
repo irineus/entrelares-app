@@ -30,6 +30,39 @@ void main() {
       expect(wizardPresetAnchor('7-7'), isNull);
     });
 
+    // Owner's QA of 3.1.14.
+    test('the weekends come first, and the wizard opens on them', () {
+      expect(wizardPresetIds.take(2), ['3-11', '3-2-1-6-1-1']);
+      expect(wizardPresetIds.skip(2),
+          ['7-7', '14-14', '1-1', '5-2-2-5', '2-2-3']);
+      expect(wizardDefaultPreset, '3-11');
+    });
+
+    test('2-2-5-5 from a Wednesday gives each parent two fixed weekdays and '
+        'alternate weekends; 2/2/3 starts on a Monday', () {
+      expect(wizardPresetAnchor('5-2-2-5'), DateTime.wednesday);
+      expect(wizardPresetAnchor('2-2-3'), DateTime.monday);
+      for (final p in ['7-7', '14-14', '1-1']) {
+        expect(wizardPresetAnchor(p), isNull, reason: p);
+      }
+      final wednesday = DateTime(2026, 10, 7);
+      final days = generateRotation(
+          start: wednesday,
+          end: DateTime(2026, 10, 28),
+          blocks: wizardPresetBlocks('5-2-2-5', const [1, 2]));
+      int on(int y, int m, int d) => days
+          .firstWhere((x) => x.date == DateTime(y, m, d))
+          .scheduledParentId;
+      // Wed/Thu are always parent 1, Mon/Tue always parent 2.
+      expect([on(2026, 10, 7), on(2026, 10, 8), on(2026, 10, 14),
+          on(2026, 10, 15)], [1, 1, 1, 1]);
+      expect([on(2026, 10, 12), on(2026, 10, 13), on(2026, 10, 19),
+          on(2026, 10, 20)], [2, 2, 2, 2]);
+      // The weekends alternate.
+      expect(on(2026, 10, 10), 1);
+      expect(on(2026, 10, 17), 2);
+    });
+
     test('the weekend falls on Fri–Sun, and the overnight on a Wednesday', () {
       final friday = DateTime(2026, 10, 9);
       final days = generateRotation(
@@ -44,6 +77,51 @@ void main() {
       expect([for (var i = 16; i <= 18; i++) who(DateTime(2026, 10, i))],
           ['1', '1', '1'], reason: 'the next weekend is the other parent');
       expect(who(DateTime(2026, 10, 21)), '2', reason: 'Wednesday again');
+    });
+
+    // Owner's QA of 3.1.14: continuing a plan never leaves a gap.
+    group('phaseAnchoredCycle', () {
+      String run(List<CycleBlock> b) =>
+          [for (final x in b) '${x.profileId}x${x.days}'].join(' ');
+      test('from a Wednesday the alternating weekends come in step: the '
+          'weekday parent keeps Wed–Thu, the weekend still opens on Friday',
+          () {
+        final b = phaseAnchoredCycle(wizardPresetBlocks('3-11', const [1, 2]),
+            start: DateTime(2026, 10, 7), anchorWeekday: DateTime.friday);
+        expect(run(b), '1x2 2x3 1x9');
+        final days = generateRotation(
+            start: DateTime(2026, 10, 7), end: DateTime(2026, 10, 27),
+            blocks: b);
+        String who(int d) => '${days.firstWhere((g) => g.date == DateTime(2026, 10, d)).scheduledParentId}';
+        expect([for (var d = 7; d <= 11; d++) who(d)],
+            ['1', '1', '2', '2', '2']);
+        expect([for (var d = 23; d <= 25; d++) who(d)], ['2', '2', '2'],
+            reason: 'every other weekend, from the same Friday');
+      });
+      test('D-1 picks which weekend comes first when only one phase follows it',
+          () {
+        // 3-2-1-6-1-1 from a Thursday: D-1 (Wednesday) is the overnight —
+        // parent 2 in both phases, so the default stands; from a Tuesday,
+        // D-1 Monday is parent 1 in both too. A Saturday start tells them
+        // apart: D-1 Friday is parent 2 in one phase and parent 1 in the
+        // other.
+        final blocks = wizardPresetBlocks('3-2-1-6-1-1', const [1, 2]);
+        final p2 = phaseAnchoredCycle(blocks,
+            start: DateTime(2026, 10, 10), anchorWeekday: DateTime.friday,
+            previousParentId: 2);
+        final p1 = phaseAnchoredCycle(blocks,
+            start: DateTime(2026, 10, 10), anchorWeekday: DateTime.friday,
+            previousParentId: 1);
+        expect(p2.first.profileId, 2, reason: "D-1 was 2's Friday");
+        expect(p1.first.profileId, 1, reason: "D-1 was 1's Friday");
+      });
+      test('a start ON the anchor day is the snapped cycle itself', () {
+        final blocks = wizardPresetBlocks('3-11', const [1, 2]);
+        expect(
+            run(phaseAnchoredCycle(blocks,
+                start: DateTime(2026, 10, 9), anchorWeekday: DateTime.friday)),
+            run(blocks));
+      });
     });
 
     test('snapToWeekday moves forward to Friday, or keeps a Friday', () {

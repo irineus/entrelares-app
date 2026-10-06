@@ -27,6 +27,17 @@ Future<void> openWizard(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Owner's QA of 3.1.14: the wizard opens on the alternating weekends,
+/// anchored on a Friday. The tests about a FREE start pick 7/7 first.
+Future<void> pickFreePreset(WidgetTester tester) async {
+  await tester.ensureVisible(find.byKey(const Key('wizPreset')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('wizPreset')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(Localization(AppLanguage.ptBr)[K.wizPreset77]).last);
+  await tester.pumpAndSettle();
+}
+
 /// The dropdown paints the chosen label twice once open (field + menu item);
 /// the menu's is the last in the tree.
 Future<void> pickPreset(WidgetTester tester, String label) async {
@@ -275,6 +286,7 @@ void main() {
       await tester.pumpWidget(app(ds));
       await tester.pumpAndSettle();
       await openWizard(tester);
+      await pickFreePreset(tester);
 
       expect(blanksRendered(tester), today.weekday % 7);
 
@@ -299,6 +311,7 @@ void main() {
       await tester.pumpWidget(app(ds));
       await tester.pumpAndSettle();
       await openWizard(tester);
+      await pickFreePreset(tester);
 
       final tokens = tokensOf(tester);
       bool edgeOn(int i) => find

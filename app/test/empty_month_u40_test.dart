@@ -69,6 +69,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(_pt[K.wizTitle]), findsOneWidget);
     expect(_wizardStart(dateOnly(today)), findsOneWidget);
+    // Owner's QA of 3.1.14: the wizard opens on the alternating weekends,
+    // and filling the month starts on the day asked for — in step, no empty
+    // days before the Friday.
+    expect(find.text(_pt[KApp.wizPreset311]), findsOneWidget);
+    expect(find.byKey(const Key('wizAnchoredStart')), findsNothing);
+    if (today.weekday != DateTime.friday) {
+      expect(find.byKey(const Key('wizPhasedStart')), findsOneWidget);
+    }
   });
 
   testWidgets('a future empty month names itself and opens the wizard on '

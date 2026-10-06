@@ -121,7 +121,7 @@ class _MutableBlock {
 }
 
 class _WizardSheetState extends State<_WizardSheet> {
-  String _preset = '7-7';
+  String _preset = wizardDefaultPreset;
   List<_MutableBlock> _blocks = [];
 
   /// Owner's QA of 3.1.10: the two people a quick model alternates, once the
@@ -129,6 +129,13 @@ class _WizardSheetState extends State<_WizardSheet> {
   /// start, a new D-1) keeps them. Null: the roster's first two.
   List<int>? _presetPeople;
   late DateTime _startDate;
+
+  /// Owner's QA of 3.1.14: the day the reader ASKED for (today, the month's
+  /// 1st, or a day picked on the calendar). An anchored model moves the start
+  /// from here to its weekday; a free one gives this day back — opening on
+  /// the alternating weekends and switching to 7/7 used to leave the start on
+  /// the Friday for no reason.
+  late DateTime _requestedStart;
   int _durationMonths = 3;
   /// U-37: one value, picked by the platform; null is "no handoff time".
   TimeOfDay? _handoff;
@@ -170,6 +177,14 @@ class _WizardSheetState extends State<_WizardSheet> {
   /// says so, next to the date.
   bool _startSnapped = false;
 
+  /// Owner's QA of 3.1.14: the wizard was opened to CONTINUE a plan or fill a
+  /// month ([_WizardSheet.initialStart]) — an anchored model then starts on
+  /// that very day, in step ([phaseAnchoredCycle]), instead of jumping to its
+  /// weekday and leaving the days in between empty. Picking a date by hand
+  /// is a fresh start again (snapped).
+  late bool _continuing;
+  bool _startPhased = false;
+
   /// F-97: planned days the range already holds (null = not read yet). The
   /// "substituir" box has nothing to replace on an empty range and hides.
   int? _plannedInRange;
@@ -197,9 +212,11 @@ class _WizardSheetState extends State<_WizardSheet> {
         Future<void>.value());
     final floor = dateOnly(widget.today);
     final wanted = widget.initialStart;
-    _startDate =
+    _requestedStart =
         wanted == null || wanted.isBefore(floor) ? floor : dateOnly(wanted);
-    _applyPreset('7-7');
+    _continuing = wanted != null;
+    _startDate = _requestedStart;
+    _applyPreset(wizardDefaultPreset);
     unawaited(_readContext());
   }
 
@@ -207,18 +224,42 @@ class _WizardSheetState extends State<_WizardSheet> {
   /// when the start follows planned days — turned so the cycle continues.
   void _applyPreset(String preset) {
     final anchor = wizardPresetAnchor(preset);
+    final base = wizardPresetBlocks(preset, _presetPeople ?? _profileIds);
+    _startPhased = false;
+    if (anchor != null && _continuing) {
+      _startSnapped = false;
+      _startDate = _requestedStart;
+      _startPhased = _startDate.weekday != anchor;
+      final phased = phaseAnchoredCycle(base,
+          start: _startDate,
+          anchorWeekday: anchor,
+          previousParentId: _prevParent);
+      _blocks = [for (final b in phased) _MutableBlock(b.profileId, b.days)];
+      return;
+    }
     if (anchor != null) {
-      final snapped = snapToWeekday(_startDate, anchor);
-      _startSnapped = snapped != _startDate;
+      final snapped = snapToWeekday(_requestedStart, anchor);
+      _startSnapped = snapped != _requestedStart;
       _startDate = snapped;
     } else {
       _startSnapped = false;
+      _startDate = _requestedStart;
     }
-    final blocks = continueCycle(
-        wizardPresetBlocks(preset, _presetPeople ?? _profileIds),
+    final blocks = continueCycle(base,
         previousParentId: _prevParent, anchored: anchor != null);
     _blocks = [for (final b in blocks) _MutableBlock(b.profileId, b.days)];
   }
+
+  static String _presetLabel(String id) => switch (id) {
+        '3-11' => KApp.wizPreset311,
+        '3-2-1-6-1-1' => KApp.wizPreset321611,
+        '7-7' => K.wizPreset77,
+        '14-14' => K.wizPreset1414,
+        '1-1' => K.wizPreset11,
+        '5-2-2-5' => K.wizPreset5225,
+        '2-2-3' => K.wizPreset223,
+        _ => K.wizPresetCustom,
+      };
 
   /// F-97: D-1's carer by first name ("—" for one the roster no longer has).
   String get _prevName =>
@@ -569,29 +610,38 @@ class _WizardSheetState extends State<_WizardSheet> {
       DropdownButtonFormField<String>(
         key: const Key('wizPreset'),
         isExpanded: true,
-        decoration: InputDecoration(
-          labelText: l[K.wizPreset],
-          suffixText: l[K.commonOptional],
-        ),
+        // Owner's QA of 3.1.14: the chosen model's NAME is the point of the
+        // field — "Fins de semana alternados (sex–dom)" was cut to "Fins de
+        // semana" by an "opcional" suffix (the "— Personalizado —" item says
+        // the model is optional), and it may take two lines when closed.
+        decoration: InputDecoration(labelText: l[K.wizPreset]),
+        itemHeight: null,
+        isDense: false,
+        selectedItemBuilder: (context) => [
+          Text(l[K.wizPresetCustom], maxLines: 2),
+          for (final id in wizardPresetIds)
+            Text(l[_presetLabel(id)],
+                maxLines: 2, overflow: TextOverflow.ellipsis),
+        ],
         initialValue: _preset,
+        // The menu follows [wizardPresetIds] — one order, in core.
         items: [
           DropdownMenuItem(value: '', child: Text(l[K.wizPresetCustom])),
-          DropdownMenuItem(value: '7-7', child: Text(l[K.wizPreset77])),
-          DropdownMenuItem(value: '14-14', child: Text(l[K.wizPreset1414])),
-          DropdownMenuItem(value: '1-1', child: Text(l[K.wizPreset11])),
-          DropdownMenuItem(
-              value: '5-2-2-5', child: Text(l[K.wizPreset5225])),
-          DropdownMenuItem(value: '2-2-3', child: Text(l[K.wizPreset223])),
-          DropdownMenuItem(value: '3-11', child: Text(l[KApp.wizPreset311])),
-          DropdownMenuItem(
-              value: '3-2-1-6-1-1', child: Text(l[KApp.wizPreset321611])),
+          for (final id in wizardPresetIds)
+            DropdownMenuItem(value: id, child: Text(l[_presetLabel(id)])),
         ],
         onChanged: _generating
             ? null
-            : (v) => setState(() {
+            : (v) {
+                final before = _startDate;
+                setState(() {
                   _preset = v ?? '';
                   if (_preset.isNotEmpty) _applyPreset(_preset);
-                }),
+                });
+                // A model with another anchor moved the start: D-1 and the
+                // planned days are read again for the new one.
+                if (_startDate != before) unawaited(_readContext());
+              },
       ),
           ],
         ),
@@ -709,7 +759,10 @@ class _WizardSheetState extends State<_WizardSheet> {
                 );
                 if (picked != null) {
                   setState(() {
-                    _startDate = dateOnly(picked);
+                    _requestedStart = dateOnly(picked);
+                    _continuing = false;
+                    _startPhased = false;
+                    _startDate = _requestedStart;
                     _startSnapped = false;
                     // F-97: an anchored cycle keeps its weekday.
                     final anchor = wizardPresetAnchor(_preset);
@@ -723,6 +776,15 @@ class _WizardSheetState extends State<_WizardSheet> {
                 }
               },
       ),
+      if (_startPhased)
+        Padding(
+          padding: const EdgeInsets.only(top: Spacing.xs),
+          child: Text(
+            l.format(KApp.wizPhasedStart, [formatHandoffDate(_startDate, l)]),
+            key: const Key('wizPhasedStart'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
       if (_startSnapped)
         Padding(
           padding: const EdgeInsets.only(top: Spacing.xs),
