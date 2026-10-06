@@ -8,6 +8,8 @@
 // the ⋮ entry. The row itself is pinned in `notifications_test.dart`, the
 // "Limpar dia" question in `day_editor_test.dart`.
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:entrelares_db_contracts/models/member.dart';
+import 'package:entrelares_db_contracts/models/role.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -42,6 +44,78 @@ void main() {
     expect(ds.createdSwapRequests, hasLength(1));
     expect(ds.createdSwapRequests.single['proposed'], bruno.id);
     expect(find.text(pt[K.toastSwapRequested]), findsOneWidget);
+  });
+
+  // Owner's QA of 3.1.10 (06/10/2026): with three or more carers the first
+  // of the roster read as a guess. Father and mother swap between themselves;
+  // anyone else gets whoever has the child around the day.
+  group('who the swap entry pre-selects among three carers', () {
+    const roles = [
+      Role(id: 1, roleName: 'father'),
+      Role(id: 2, roleName: 'mother'),
+      Role(id: 3, roleName: 'grandmother'),
+    ];
+    const pai = Member(
+        id: 1, fullName: 'Ana Souza', colorSlot: 1, userId: 'u1', roleId: 1);
+    const avo = Member(
+        id: 2, fullName: 'Bruno Lima', colorSlot: 2, userId: 'u2', roleId: 3);
+    const mae = Member(
+        id: 3, fullName: 'Carla Dias', colorSlot: 3, userId: 'u3', roleId: 2);
+
+    Future<void> armOn(WidgetTester tester, FakeCustodyDataSource ds,
+        int day) async {
+      ds.roles = roles;
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+      await openDayEditor(tester, day);
+      await tapSheet(tester, find.byKey(daySheetAskSwapKey));
+    }
+
+    testWidgets("the father's day goes to the mother, even with the "
+        'grandmother on the next day', (tester) async {
+      final day = futureDay;
+      if (day == null ||
+          day + 1 > DateUtils.getDaysInMonth(today.year, today.month)) {
+        return;
+      }
+      final ds = FakeCustodyDataSource(members: [
+        pai,
+        avo,
+        mae
+      ], days: [
+        row(7, dayOfMonth(day), pai.id),
+        row(8, dayOfMonth(day + 1), avo.id),
+      ]);
+      await armOn(tester, ds, day);
+      expect(tester.widget<ChoiceChip>(memberChip('Carla').last).selected,
+          isTrue);
+    });
+
+    testWidgets('without the pair, whoever has the child the next day',
+        (tester) async {
+      final day = futureDay;
+      if (day == null ||
+          day + 1 > DateUtils.getDaysInMonth(today.year, today.month)) {
+        return;
+      }
+      // No mother in this family: Ana (father) asks; Bruno is first in the
+      // roster, Carla (no role) has the next day.
+      const carla = Member(
+          id: 3, fullName: 'Carla Dias', colorSlot: 3, userId: 'u3');
+      final ds = FakeCustodyDataSource(members: [
+        pai,
+        avo,
+        carla
+      ], days: [
+        row(7, dayOfMonth(day), pai.id),
+        row(8, dayOfMonth(day + 1), carla.id),
+      ]);
+      await armOn(tester, ds, day);
+      expect(tester.widget<ChoiceChip>(memberChip('Carla').last).selected,
+          isTrue);
+      expect(tester.widget<ChoiceChip>(memberChip('Bruno').last).selected,
+          isFalse);
+    });
   });
 
   testWidgets('a day already swapped offers no new request entry',

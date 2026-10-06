@@ -150,3 +150,47 @@ bool mayChangeHandoff({
       me == actualParentId ||
       me == previousEffectiveParentId;
 }
+
+/// Owner's QA of 3.1.10 (06/10/2026) — who "Pedir para outra pessoa ficar com
+/// este dia" pre-selects. With two carers it is obvious; with three or more the
+/// first of the roster read as a guess. In order:
+///
+/// 1. the day is the father's and the mother can take it, or the other way
+///    round — they swap between themselves (built-in roles only, by their
+///    canonical name; step-parents follow rule 2, there is no kinship guess);
+/// 2. whoever has the child the day before or the day after (same lane) — the
+///    other side of the routine at that point;
+/// 3. a tie, or nobody around: the one with more days this month; still tied,
+///    the roster order of [candidates].
+///
+/// [candidates] are the carers who may take the day (F-28's filter), already
+/// without the day's planned one. [canonicalRoleOf] answers a built-in role's
+/// canonical name (`father`, `mother`, …) or null. A pre-selection only — the
+/// asker can pick any other chip.
+int? suggestSwapCandidate({
+  required int scheduledParentId,
+  required List<int> candidates,
+  required String? Function(int profileId) canonicalRoleOf,
+  int? previousCarerId,
+  int? nextCarerId,
+  Map<int, int> daysInMonth = const {},
+}) {
+  if (candidates.isEmpty) return null;
+  final partner = const {'father': 'mother', 'mother': 'father'}[
+      canonicalRoleOf(scheduledParentId)];
+  if (partner != null) {
+    for (final c in candidates) {
+      if (canonicalRoleOf(c) == partner) return c;
+    }
+  }
+  final around = [
+    for (final c in candidates)
+      if (c == previousCarerId || c == nextCarerId) c
+  ];
+  final pool = around.isNotEmpty ? around : candidates;
+  var best = pool.first;
+  for (final c in pool.skip(1)) {
+    if ((daysInMonth[c] ?? 0) > (daysInMonth[best] ?? 0)) best = c;
+  }
+  return best;
+}

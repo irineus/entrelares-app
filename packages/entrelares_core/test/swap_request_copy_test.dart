@@ -127,7 +127,7 @@ void main() {
             approvedAtLocal: DateTime(2026, 10, 4, 18, 12),
             automatic: false,
             note: ' combinado '),
-        'Pedida por Ana em 03/10 09:12, aprovada por Bruno em 04/10 18:12 · '
+        'Troca pedida por Ana em 03/10 09:12, aprovada por Bruno em 04/10 18:12 · '
         '"combinado"');
     expect(
         swapStorySentence(
@@ -137,7 +137,7 @@ void main() {
             approverName: 'Bruno',
             approvedAtLocal: DateTime(2026, 10, 10),
             automatic: true),
-        'Pedida por Ana em 03/10 09:12, aprovada automaticamente em 10/10 00:00');
+        'Troca pedida por Ana em 03/10 09:12, aprovada automaticamente em 10/10 00:00');
   });
 
   // F-98: the author of an aviso reads herself in the second person.
@@ -183,6 +183,40 @@ void main() {
     expect(may(2), isTrue, reason: 'who hands over (D-1)');
     expect(may(3), isFalse, reason: 'a third caregiver');
     expect(may(3, admin: true), isTrue);
+  });
+
+  // Owner's QA of 3.1.10: who "Pedir para outra pessoa ficar com este dia"
+  // pre-selects when three or more carers could take the day.
+  group('suggestSwapCandidate', () {
+    // 1 father, 2 mother, 3 grandmother, 4 stepmother, 5 a custom role.
+    const roles = {1: 'father', 2: 'mother', 3: 'grandmother', 4: 'stepmother'};
+    int? pick(int day, List<int> c,
+            {int? prev, int? next, Map<int, int> month = const {}}) =>
+        suggestSwapCandidate(
+            scheduledParentId: day,
+            candidates: c,
+            canonicalRoleOf: (id) => roles[id],
+            previousCarerId: prev,
+            nextCarerId: next,
+            daysInMonth: month);
+
+    test('father and mother always swap between themselves', () {
+      expect(pick(1, [3, 4, 2], prev: 3, next: 4), 2);
+      expect(pick(2, [3, 1], prev: 3), 1);
+    });
+    test('without the pair: whoever has the child around the day', () {
+      expect(pick(3, [1, 2, 5], next: 5), 5);
+      expect(pick(4, [1, 2, 3], prev: 3), 3,
+          reason: 'a step-parent has no fixed rule');
+      expect(pick(1, [3, 5], prev: 5), 5, reason: 'no mother in the family');
+    });
+    test('a tie or nobody around: more days this month, then roster order',
+        () {
+      expect(pick(3, [4, 5], prev: 4, next: 5, month: {4: 3, 5: 9}), 5);
+      expect(pick(3, [4, 5], month: {5: 2}), 5);
+      expect(pick(3, [4, 5]), 4);
+      expect(pick(3, const []), isNull);
+    });
   });
 
   test('the HANDOFF_PARTY marker is said in the reader language', () {

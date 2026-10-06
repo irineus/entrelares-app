@@ -361,4 +361,81 @@ void f51ReplaceTests() {
     expect(first.scheduledParentId, bruno.id,
         reason: 'p2 has the first weekend');
   });
+
+  // Owner's QA of 3.1.10 (06/10/2026).
+  Future<void> pickPreset(WidgetTester tester, String label) async {
+    await tester.ensureVisible(find.byKey(const Key('wizPreset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('wizPreset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(label).last);
+    await tester.pumpAndSettle();
+  }
+
+  List<String> shownDays(WidgetTester tester) => [
+        for (final f in tester.widgetList<TextField>(find.byWidgetPredicate(
+            (w) => w is TextField && w.decoration?.labelText == pt[K.wizDays])))
+          f.controller!.text
+      ];
+
+  testWidgets('a quick model SHOWS its own numbers in the blocks — the 7 and '
+      '7 of the default never stay on screen under another model',
+      (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester);
+    expect(shownDays(tester), ['7', '7']);
+    await pickPreset(tester, pt[KApp.wizPreset311]);
+    expect(shownDays(tester), ['3', '11']);
+    await pickPreset(tester, pt[K.wizPreset1414]);
+    expect(shownDays(tester), ['14', '14']);
+  });
+
+  testWidgets('changing WHO is in a block keeps the quick model; the person '
+      'moves in every block of theirs', (tester) async {
+    const carla =
+        Member(id: 3, fullName: 'Carla Dias', colorSlot: 3, userId: 'u3');
+    final ds = FakeCustodyDataSource(members: [ana, bruno, carla], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester);
+    await pickPreset(tester, pt[KApp.wizPreset311]);
+
+    // Block 1 is Bruno's weekend: Carla takes it.
+    final parent = find.byType(DropdownButtonFormField<int>).first;
+    await tester.ensureVisible(parent);
+    await tester.pumpAndSettle();
+    await tester.tap(parent);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Carla').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text(pt[KApp.wizPreset311]), findsOneWidget,
+        reason: 'the model keeps its name');
+    expect(find.text(pt[K.wizPresetCustom]), findsNothing);
+    expect(shownDays(tester), ['3', '11']);
+
+    await generate(tester);
+    expect(ds.inserted.map((d) => d.scheduledParentId).toSet(),
+        {ana.id, carla.id});
+    final first = ds.inserted
+        .reduce((a, b) => a.scheduleDate.isBefore(b.scheduleDate) ? a : b);
+    expect(first.scheduledParentId, carla.id);
+  });
+
+  testWidgets('changing the days still makes the model "Personalizado"',
+      (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester);
+    await pickPreset(tester, pt[KApp.wizPreset311]);
+    final days = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == pt[K.wizDays]);
+    await tester.ensureVisible(days.first);
+    await tester.enterText(days.first, '4');
+    await tester.pumpAndSettle();
+    expect(find.text(pt[K.wizPresetCustom]), findsOneWidget);
+  });
 }
