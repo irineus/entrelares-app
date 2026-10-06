@@ -2168,17 +2168,49 @@ class _DaySheetState extends State<_DaySheet> {
       // U-37: one field, the platform's picker. The hour + minute dropdown
       // pair was the Blazor `<select>` pair ported literally — on a phone the
       // minute list was a three-screen scroll to reach "30".
-      AppTimeField(
-        fieldKey: const Key('handoff'),
-        labelOnFrame: true,
-        label: l[K.editorHandoffTime],
-        info: l[K.editorHandoffHint],
-        optionalLabel: l[K.commonOptional],
-        value: _handoff,
-        emptyText: l[K.editorHandoffEmpty],
-        clearLabel: l[K.editorHandoffClear],
-        formatValue: (t) => l.formatTime(DateTime(2000, 1, 1, t.hour, t.minute)),
-        onChanged: (t) => setState(() => _handoff = t),
+      // F-99 (owner, 05/10/2026): the time is the two ends' — the day's carer
+      // and whoever hands the child over (D-1) — or an admin's. Everyone else
+      // reads it, and is pointed at the aviso. The database refuses the rest.
+      FutureBuilder<int?>(
+        future: _prevEffective,
+        builder: (context, snapshot) {
+          final day = _day;
+          final mayChange = day == null ||
+              day.scheduledParentId == 0 ||
+              mayChangeHandoff(
+                me: widget.ownProfileId,
+                isAdmin: widget.myProfile?.isAdmin == true,
+                scheduledParentId: day.scheduledParentId,
+                actualParentId: day.actualParentId,
+                previousEffectiveParentId: snapshot.data,
+              );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppTimeField(
+                fieldKey: const Key('handoff'),
+                labelOnFrame: true,
+                label: l[K.editorHandoffTime],
+                info: l[K.editorHandoffHint],
+                optionalLabel: l[K.commonOptional],
+                value: _handoff,
+                enabled: mayChange,
+                emptyText: l[K.editorHandoffEmpty],
+                clearLabel: l[K.editorHandoffClear],
+                formatValue: (t) =>
+                    l.formatTime(DateTime(2000, 1, 1, t.hour, t.minute)),
+                onChanged: (t) => setState(() => _handoff = t),
+              ),
+              if (!mayChange)
+                Padding(
+                  key: const ValueKey('handoff-party-only'),
+                  padding: const EdgeInsets.only(top: Spacing.xs),
+                  child: Text(l[KApp.noticeHandoffPartyOnly],
+                      style: Theme.of(context).textTheme.bodySmall),
+                ),
+            ],
+          );
+        },
       ),
       if (_handoff != null && _scheduledParentId != null)
         FutureBuilder<int?>(

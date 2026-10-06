@@ -822,6 +822,8 @@ abstract final class KApp {
   static const String wizPreset321611 = 'app.wizard.preset321611';
   static const String wizAnchoredStart = 'app.wizard.anchoredStart';
   static const String wizContinues = 'app.wizard.continues';
+  static const String errHandoffParty = 'app.save.errHandoffParty';
+  static const String noticeHandoffPartyOnly = 'app.notice.handoffPartyOnly';
   static const String swapStoryAsked = 'app.swap.storyAsked';
   static const String swapStoryApproved = 'app.swap.storyApproved';
   static const String swapStoryAuto = 'app.swap.storyAuto';
@@ -1552,6 +1554,8 @@ abstract final class KApp {
     wizPreset321611,
     wizAnchoredStart,
     wizContinues,
+    errHandoffParty,
+    noticeHandoffPartyOnly,
     swapStoryAsked,
     swapStoryApproved,
     swapStoryAuto,
@@ -2431,6 +2435,8 @@ abstract final class StringsAppPtBr {
     KApp.wizPreset321611: 'Fins de semana alternados + pernoite de quarta',
     KApp.wizAnchoredStart: 'Este modelo começa numa sexta: o início passou para {0}.',
     KApp.wizContinues: 'Continua o plano: no dia anterior a criança estava com {0}.',
+    KApp.errHandoffParty: 'Só quem entrega ou recebe a criança neste dia pode mudar o horário da entrega.',
+    KApp.noticeHandoffPartyOnly: 'O horário é de quem entrega e de quem recebe a criança. Para avisar de um imprevisto, envie um aviso.',
     KApp.swapStoryAsked: 'Pedida por {0} em {1}',
     KApp.swapStoryApproved: 'aprovada por {0} em {1}',
     KApp.swapStoryAuto: 'aprovada automaticamente em {0}',
@@ -3304,6 +3310,8 @@ abstract final class StringsAppEn {
     KApp.wizPreset321611: 'Alternating weekends + Wednesday overnight',
     KApp.wizAnchoredStart: 'This pattern starts on a Friday: the start moved to {0}.',
     KApp.wizContinues: 'Continues the plan: the day before, the child was with {0}.',
+    KApp.errHandoffParty: 'Only who hands the child over or receives them on this day can change the handoff time.',
+    KApp.noticeHandoffPartyOnly: 'The time belongs to who hands the child over and who receives them. To tell about a change of plans, send a notice.',
     KApp.swapStoryAsked: 'Asked by {0} on {1}',
     KApp.swapStoryApproved: 'approved by {0} on {1}',
     KApp.swapStoryAuto: 'approved automatically on {0}',

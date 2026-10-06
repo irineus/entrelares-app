@@ -86,6 +86,7 @@ import 'suites/swap_message.dart';
 import 'suites/swap_answer.dart';
 import 'suites/swap_eve_reminder.dart';
 import 'suites/revert_party.dart';
+import 'suites/handoff_party.dart';
 import 'suites/test_recipient_suppression.dart';
 
 /// **The single entrypoint of the database gate, and why it is single.**
@@ -148,6 +149,8 @@ void main() {
   // F-94: the eve reminder at 19:00 São Paulo, once per request.
   swapEveReminderTests(fx);
   revertPartyTests(fx);
+  // F-99: only the two ends of a handoff (or an admin) change its time.
+  handoffPartyTests(fx);
   revertNotesTests(fx);
   // F-52: the aviso de imprevisto — who may send one, who may offer the DAY,
   // the daily cap, and the append-only shape the record rests on.
