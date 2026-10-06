@@ -64,6 +64,16 @@ void dayNoticeTests(GateFixture fx) {
     });
   }
 
+  /// Owner, 06/10/2026: who hands the child over TODAY is yesterday's carer
+  /// — one of the two ends of an aviso.
+  Future<void> planYesterday(int familyId, int carerId) async {
+    await fx.service.from('care_schedules').insert({
+      'family_id': familyId,
+      'schedule_date': isoDate(addDays(saoPauloToday(), -1)),
+      'scheduled_parent_id': carerId,
+    });
+  }
+
   Future<void> planTomorrow(int familyId, int carerId) async {
     await fx.service.from('care_schedules').insert({
       'family_id': familyId,
@@ -109,17 +119,24 @@ void dayNoticeTests(GateFixture fx) {
       expect(row['request'], 'info');
     });
 
-    // The member is nobody's end here: today is the admin's, there is no
-    // yesterday row and no future day with a different carer.
+    // The member is nobody's end here: today is the admin's and there is no
+    // yesterday row.
     test('a carer with no part in the day may not', () async {
       await expectRejected(() => send(fam.member),
-          contains: 'no meio da troca do dia');
+          contains: 'quem a entrega hoje');
     });
 
-    // The end the card's own file list would have missed: the member appears
-    // nowhere in today's row, and is still the person COLLECTING next.
-    test('the carer of the next handoff may', () async {
+    // Owner, 06/10/2026 (QA of 3.1.10): F-52's third end is gone. On his
+    // test family a parent whose next day was ahead sent "atraso, alguém pode
+    // buscar?" about a day wholly the other parent's.
+    test('whoever receives at the NEXT handoff may not any more', () async {
       await planTomorrow(fam.familyId, fam.memberProfile.id);
+      await expectRejected(() => send(fam.member, request: 'pickup'),
+          contains: 'quem a entrega hoje');
+    });
+
+    test('who hands the child over today may', () async {
+      await planYesterday(fam.familyId, fam.memberProfile.id);
       final id = await send(fam.member, request: 'pickup');
       expect(id, isPositive);
     });
@@ -131,7 +148,7 @@ void dayNoticeTests(GateFixture fx) {
     setUpAll(() async {
       fam = await fx.createFamily('f52keep');
       await planToday(fam.familyId, fam.adminProfile.id);
-      await planTomorrow(fam.familyId, fam.memberProfile.id);
+      await planYesterday(fam.familyId, fam.memberProfile.id);
     });
 
     // The CHECK constraint's half: a delay with a deadline is not a reason to
@@ -326,11 +343,11 @@ void dayNoticeTests(GateFixture fx) {
     setUpAll(() async {
       fam = await fx.createFamily('f52ans');
       await planToday(fam.familyId, fam.adminProfile.id);
-      // The member carries the next handoff, so BOTH ends may send. This group
-      // needs FOUR avisos and the cap is two per sender per day — the first
-      // run of this suite spent the admin's two on the refusal tests and then
-      // failed the next two on the cap, which is the cap working.
-      await planTomorrow(fam.familyId, fam.memberProfile.id);
+      // The member hands the child over today, so BOTH ends may send. This
+      // group needs FOUR avisos and the cap is two per sender per day — the
+      // first run of this suite spent the admin's two on the refusal tests
+      // and then failed the next two on the cap, which is the cap working.
+      await planYesterday(fam.familyId, fam.memberProfile.id);
     });
 
     test('nobody answers their own aviso', () async {

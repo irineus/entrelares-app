@@ -130,6 +130,9 @@ class CalendarScreen extends StatefulWidget {
   /// F-95: Relatórios → Histórico, from a swapped day's story line.
   final VoidCallback? onOpenHistory;
 
+  /// Owner's QA of 3.1.10: the Conversa, from the day sheet's read-only time.
+  final VoidCallback? onOpenChat;
+
   /// F-07 (owner's QA, 29/09/2026): a carer's legend chip leads to the
   /// person — my profile, anyone's for an admin, the Família otherwise.
   final void Function(MemberLinkTarget target, int memberId)? onOpenMember;
@@ -195,6 +198,7 @@ class CalendarScreen extends StatefulWidget {
       this.onOpenPlan,
       this.onOpenChildren,
       this.onOpenHistory,
+      this.onOpenChat,
       this.onOpenMember,
       this.handoffNudgePrefs,
       this.push,
@@ -2007,6 +2011,11 @@ class _CalendarScreenState extends State<CalendarScreen>
       askSwap: askSwap,
       onOpenHistory: widget.onOpenHistory,
       onCalendarStale: () => _load(silent: true),
+      onSendNotice:
+          dateOnly(date) == dateOnly(_today) && _canOfferNotice
+              ? _openNoticeFromMenu
+              : null,
+      onOpenChat: widget.onOpenChat,
     );
     if (outcome != null) {
       _load(silent: true);
@@ -2363,29 +2372,18 @@ class _CalendarScreenState extends State<CalendarScreen>
     return null;
   }
 
-  /// Whether I am one of the day's three ends (`noticeSenderIds`). The server
+  /// Whether I am one of the day's two ends (`noticeSenderIds`). The server
   /// decides for real; this only chooses whether to OFFER the action, because
   /// an action that always ends in a refusal is worse than no action at all.
-  bool _canSendNotice(CareSchedule? todayRow, DateTime? nextHandoff) {
+  bool _canSendNotice(CareSchedule? todayRow) {
     final me = _ownProfile?.id;
     if (me == null) return false;
     // F-07 (PR 5c): per child, the ends of the day in ANY lane — the server's
     // own rule since PR 5a.
     if (_perChild) return _laneNoticeSenders().contains(me);
-    CareSchedule? nextRow;
-    if (nextHandoff != null) {
-      final iso = CareSchedule.isoDate(nextHandoff);
-      for (final d in _upcoming) {
-        if (CareSchedule.isoDate(d.scheduleDate) == iso) {
-          nextRow = d;
-          break;
-        }
-      }
-    }
     return noticeSenderIds(
       dayParentId: todayRow?.effectiveParentId,
       previousParentId: _yesterdayRow?.effectiveParentId,
-      nextHandoffParentId: nextRow?.effectiveParentId,
     ).contains(me);
   }
 
@@ -2403,28 +2401,9 @@ class _CalendarScreenState extends State<CalendarScreen>
           .firstOrNull;
       final yesterday =
           _yesterdayRows.where((d) => d.childId == c.id).firstOrNull;
-      final next = today == null
-          ? null
-          : nextHandoffDate(today.effectiveParentId, [
-              for (final d in lane)
-                if (CareSchedule.isoDate(d.scheduleDate) != todayIso)
-                  (
-                    date: d.scheduleDate,
-                    scheduledParentId: d.scheduledParentId,
-                    actualParentId: d.actualParentId,
-                  ),
-            ]);
-      final nextRow = next == null
-          ? null
-          : lane
-              .where((d) =>
-                  CareSchedule.isoDate(d.scheduleDate) ==
-                  CareSchedule.isoDate(next))
-              .firstOrNull;
       senders.addAll(noticeSenderIds(
         dayParentId: today?.effectiveParentId,
         previousParentId: yesterday?.effectiveParentId,
-        nextHandoffParentId: nextRow?.effectiveParentId,
       ));
     }
     return senders;
@@ -2744,7 +2723,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     // An aviso already open is withdrawn on the card's strip, not sent twice.
     if (_myOpenNotice != null) return false;
     final todayRow = _rowForToday();
-    return _canSendNotice(todayRow, _nextHandoffFrom(todayRow));
+    return _canSendNotice(todayRow);
   }
 
   void _openNoticeFromMenu() {
@@ -2773,22 +2752,6 @@ class _CalendarScreenState extends State<CalendarScreen>
       if (CareSchedule.isoDate(d.scheduleDate) == todayIso) return d;
     }
     return null;
-  }
-
-  /// The next day whose effective carer differs from today's — null on a day
-  /// with no row, because the scan needs a carer to differ FROM.
-  DateTime? _nextHandoffFrom(CareSchedule? todayRow) {
-    if (todayRow == null) return null;
-    final todayIso = CareSchedule.isoDate(_today);
-    return nextHandoffDate(todayRow.effectiveParentId, [
-      for (final d in _upcoming)
-        if (CareSchedule.isoDate(d.scheduleDate) != todayIso)
-          (
-            date: d.scheduleDate,
-            scheduledParentId: d.scheduledParentId,
-            actualParentId: d.actualParentId,
-          ),
-    ]);
   }
 
   /// U-28 QA — the way back to today, as a chip that says which WAY it goes.

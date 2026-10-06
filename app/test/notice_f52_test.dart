@@ -91,11 +91,24 @@ void main() {
       expect(find.text(_pt[KApp.noticeAction]), findsNothing);
     });
 
-    // Today is Bruno's; the next different day is Ana's. Ana is the one
-    // COLLECTING at the next handover, and that is an end — this is the case
-    // the card's own file list would have missed, because Ana appears nowhere
-    // in today's row.
-    testWidgets('the carer of the next handoff is', (tester) async {
+    // Today is Bruno's and yesterday was Ana's: Ana hands the child over
+    // today, and that is an end even though she appears nowhere in today's row.
+    testWidgets('who hands the child over today is', (tester) async {
+      final ds = FakeCustodyDataSource(members: [ana, bruno], days: [
+        row(1, dayOfMonth(today.day - 1), 1),
+        row(2, dayOfMonth(today.day), 2),
+      ]);
+      await tester.pumpWidget(app(ds));
+      await tester.pumpAndSettle();
+      await _openMenu(tester);
+      expect(find.text(_pt[KApp.noticeAction]), findsOneWidget);
+    });
+
+    // Owner, 06/10/2026 (QA of 3.1.10): F-52 also offered it to whoever
+    // collects at the NEXT handoff — on his test family the mother, two days
+    // ahead, sent "atraso, alguém pode buscar?" about a day wholly the
+    // father's. Today is Bruno's, tomorrow Ana's: Ana is not an end of TODAY.
+    testWidgets('whoever collects at a later handoff is not', (tester) async {
       final tomorrow = today.day + 1 >
               DateTime(today.year, today.month + 1, 0).day
           ? null
@@ -108,7 +121,7 @@ void main() {
       await tester.pumpWidget(app(ds));
       await tester.pumpAndSettle();
       await _openMenu(tester);
-      expect(find.text(_pt[KApp.noticeAction]), findsOneWidget);
+      expect(find.text(_pt[KApp.noticeAction]), findsNothing);
     });
   });
 
@@ -149,19 +162,14 @@ void main() {
       expect(ds.sentNotices.single.etaMinutes, isNull);
     });
 
-    // Today is Bruno's. Ana may warn (she collects next), but the day is not
-    // hers to give — a different fact from "you stated an estimate", and it
-    // reads as a different sentence.
+    // Today is Bruno's. Ana may warn (she handed the child over today), but
+    // the day is not hers to give — a different fact from "you stated an
+    // estimate", and it reads as a different sentence.
     testWidgets('somebody else\'s day blocks it for another reason',
         (tester) async {
-      final tomorrow = today.day + 1 >
-              DateTime(today.year, today.month + 1, 0).day
-          ? null
-          : today.day + 1;
-      if (tomorrow == null) return;
       final ds = FakeCustodyDataSource(members: [ana, bruno], days: [
-        row(1, dayOfMonth(today.day), 2),
-        row(2, dayOfMonth(tomorrow), 1),
+        row(1, dayOfMonth(today.day - 1), 1),
+        row(2, dayOfMonth(today.day), 2),
       ]);
       await tester.pumpWidget(app(ds));
       await tester.pumpAndSettle();

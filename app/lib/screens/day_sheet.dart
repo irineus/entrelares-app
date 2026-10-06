@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../widgets/day_agenda.dart';
 import '../widgets/ui/ui.dart';
@@ -145,6 +146,8 @@ Future<DaySheetOutcome?> showDaySheet({
   bool askSwap = false,
   VoidCallback? onOpenHistory,
   VoidCallback? onCalendarStale,
+  VoidCallback? onSendNotice,
+  VoidCallback? onOpenChat,
 }) {
   return showAppSheet<DaySheetOutcome>(
     context: context,
@@ -178,6 +181,8 @@ Future<DaySheetOutcome?> showDaySheet({
       askSwap: askSwap,
       onOpenHistory: onOpenHistory,
       onCalendarStale: onCalendarStale,
+      onSendNotice: onSendNotice,
+      onOpenChat: onOpenChat,
     ),
   );
 }
@@ -252,6 +257,12 @@ class _DaySheet extends StatefulWidget {
   /// F-95: Relatórios → Histórico, where a swap's whole record lives.
   final VoidCallback? onOpenHistory;
 
+  /// Owner's QA of 3.1.10: under a read-only handoff time, the way out — the
+  /// aviso (null unless the day is TODAY and the reader may send one) and the
+  /// Conversa (null when it is off).
+  final VoidCallback? onSendNotice;
+  final VoidCallback? onOpenChat;
+
   /// F-95: the calendar re-reads the month — after a conflict or a request
   /// opened meanwhile, so what the sheet says ("o calendário foi atualizado")
   /// is true.
@@ -286,6 +297,8 @@ class _DaySheet extends StatefulWidget {
     this.onEditLane,
     this.askSwap = false,
     this.onOpenHistory,
+    this.onSendNotice,
+    this.onOpenChat,
     this.onCalendarStale,
   });
 
@@ -916,8 +929,59 @@ class _DaySheetState extends State<_DaySheet> {
     });
   }
 
+  /// Owner's QA of 3.1.10 — the line under a time the reader may not change:
+  /// whose time it is, then the way out with its one word as the link. TODAY
+  /// it is the aviso, for whoever may send one; another day it is the
+  /// Conversa. With no way out (an aviso they may not send, the Conversa off)
+  /// the line stops at whose time it is.
+  late final TapGestureRecognizer _handoffLinkTap = TapGestureRecognizer()
+    ..onTap = _followHandoffLink;
+
+  bool get _isToday => dateOnly(widget.date) == dateOnly(widget.today);
+
+  VoidCallback? get _handoffLinkAction => _isToday
+      ? widget.onSendNotice
+      : (widget.settings.chatEnabled ? widget.onOpenChat : null);
+
+  void _followHandoffLink() {
+    final action = _handoffLinkAction;
+    if (action == null) return;
+    // The sheet closes first: the aviso is a sheet of its own, the Conversa
+    // another tab.
+    Navigator.of(context).pop();
+    action();
+  }
+
+  Widget _handoffPartyLine(BuildContext context, Localization l) {
+    final style = Theme.of(context).textTheme.bodySmall;
+    final whose = l[KApp.noticeHandoffPartyOnly];
+    if (_handoffLinkAction == null) return Text(whose, style: style);
+    const marker = '\u0000';
+    final sentence = l.format(
+        _isToday ? KApp.noticeHandoffPartySend : KApp.noticeHandoffPartyChat,
+        [marker]);
+    final cut = sentence.indexOf(marker);
+    final link = l[_isToday ? KApp.noticeHandoffPartySendLink : KApp.chatTabChat];
+    return Text.rich(
+      TextSpan(style: style, children: [
+        TextSpan(text: '$whose ${sentence.substring(0, cut)}'),
+        TextSpan(
+          text: link,
+          recognizer: _handoffLinkTap,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.underline,
+          ),
+        ),
+        TextSpan(text: sentence.substring(cut + marker.length)),
+      ]),
+    );
+  }
+
   @override
   void dispose() {
+    _handoffLinkTap.dispose();
     // U-56: one event per sheet, fired where the answer is known — never from
     // build (T-76).
     unawaited(widget.dataSource.analytics?.trackEvent(
@@ -2229,8 +2293,7 @@ class _DaySheetState extends State<_DaySheet> {
                 Padding(
                   key: const ValueKey('handoff-party-only'),
                   padding: const EdgeInsets.only(top: Spacing.xs),
-                  child: Text(l[KApp.noticeHandoffPartyOnly],
-                      style: Theme.of(context).textTheme.bodySmall),
+                  child: _handoffPartyLine(context, l),
                 ),
             ],
           );

@@ -39,35 +39,22 @@ void main() {
   });
 
   group('who may send', () {
-    test('the three ends of the day, nulls dropped', () {
-      expect(
-        noticeSenderIds(
-            dayParentId: 1, previousParentId: 2, nextHandoffParentId: 3),
-        {1, 2, 3},
-      );
+    // Owner, 06/10/2026: the day's carer and who hands the child over today
+    // — never whoever receives at a LATER handoff.
+    test('the two ends of the day, nulls dropped', () {
+      expect(noticeSenderIds(dayParentId: 1, previousParentId: 2), {1, 2});
     });
 
     // Yesterday only ever ADDS a person on a transition day; on a day inside
     // someone's run it is the same person, and a set says so by itself.
-    test('a day inside one carer\'s run has one end, not three', () {
-      expect(
-        noticeSenderIds(
-            dayParentId: 1, previousParentId: 1, nextHandoffParentId: 1),
-        {1},
-      );
+    test('a day inside one carer\'s run has one end', () {
+      expect(noticeSenderIds(dayParentId: 1, previousParentId: 1), {1});
     });
 
-    test('an unplanned day and a family with no future handoff', () {
-      expect(
-        noticeSenderIds(
-            dayParentId: null, previousParentId: null, nextHandoffParentId: 3),
-        {3},
-      );
-      expect(
-        noticeSenderIds(
-            dayParentId: 1, previousParentId: 2, nextHandoffParentId: null),
-        {1, 2},
-      );
+    test('an unplanned day has no end', () {
+      expect(noticeSenderIds(dayParentId: null, previousParentId: null),
+          isEmpty);
+      expect(noticeSenderIds(dayParentId: 1, previousParentId: null), {1});
     });
   });
 
