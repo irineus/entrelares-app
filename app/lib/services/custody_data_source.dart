@@ -1061,6 +1061,10 @@ abstract class CustodyDataSource {
   /// F-95: one request, read fresh — a sheet opened from an old push must not
   /// act on a request that was answered, cancelled or auto-approved since.
   Future<SwapRequest?> fetchSwapRequest(int id);
+
+  /// F-96: which of [logIds] are a swap request's base write — the no-op
+  /// update made just before the request (`swap_requests.pre_edit_log_id`).
+  Future<Set<int>> fetchSwapBaseLogIds(List<int> logIds);
 }
 
 /// The three U-23 stamps, named rather than passed as column strings.

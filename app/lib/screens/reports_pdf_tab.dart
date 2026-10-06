@@ -385,6 +385,12 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         origins = await widget.dataSource
             .fetchResolutionOrigins([for (final log in logs) log.id]);
       } catch (_) {/* the report stays useful without the origins */}
+      // F-96: a swap request's no-op base write prints as the request.
+      var swapBases = const <int>{};
+      try {
+        swapBases = await widget.dataSource
+            .fetchSwapBaseLogIds([for (final log in logs) log.id]);
+      } catch (_) {/* it prints as "atualizou", as before */}
       // F-61: the caregivers' account trail for section 2 — the same
       // contract: a failure costs the section's lines, never the document.
       var accountEvents = const <AccountLog>[];
@@ -497,6 +503,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         appVersion: Env.appVersion,
         l: l,
         resolutionOrigins: origins,
+        swapBaseLogIds: swapBases,
         includeAcceptedFutureSwaps: _includeFutureSwaps,
         accounts: [
           for (final m in members)

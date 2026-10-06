@@ -807,6 +807,11 @@ abstract final class KApp {
   static const String noticeMinePickup = 'app.notice.minePickup';
   static const String noticeMineKeep = 'app.notice.mineKeep';
   static const String noticeQuickAction = 'app.notice.quickAction';
+  static const String auditSwapAsked = 'app.report.auditSwapAsked';
+  static const String pdfSwapAsked = 'app.report.pdfSwapAsked';
+  static const String sumPlannedToDate = 'app.report.sumPlannedToDate';
+  static const String sumPlannedRemaining = 'app.report.sumPlannedRemaining';
+  static const String sumFutureAccepted = 'app.report.sumFutureAccepted';
   static const String swapStoryAsked = 'app.swap.storyAsked';
   static const String swapStoryApproved = 'app.swap.storyApproved';
   static const String swapStoryAuto = 'app.swap.storyAuto';
@@ -1522,6 +1527,11 @@ abstract final class KApp {
     noticeMinePickup,
     noticeMineKeep,
     noticeQuickAction,
+    auditSwapAsked,
+    pdfSwapAsked,
+    sumPlannedToDate,
+    sumPlannedRemaining,
+    sumFutureAccepted,
     swapStoryAsked,
     swapStoryApproved,
     swapStoryAuto,
@@ -2386,6 +2396,11 @@ abstract final class StringsAppPtBr {
     KApp.noticeMinePickup: 'Você avisou que {0}{1} e precisa que alguém busque a criança.{2}',
     KApp.noticeMineKeep: 'Você avisou que {0}{1} e precisa que alguém fique com a criança hoje.{2}',
     KApp.noticeQuickAction: 'Avisar',
+    KApp.auditSwapAsked: 'pediu uma troca para este dia',
+    KApp.pdfSwapAsked: 'Pediu uma troca para o dia',
+    KApp.sumPlannedToDate: 'Planejado até hoje',
+    KApp.sumPlannedRemaining: 'Planejado restante',
+    KApp.sumFutureAccepted: 'Trocas futuras já aceitas: {0}',
     KApp.swapStoryAsked: 'Pedida por {0} em {1}',
     KApp.swapStoryApproved: 'aprovada por {0} em {1}',
     KApp.swapStoryAuto: 'aprovada automaticamente em {0}',
@@ -3244,6 +3259,11 @@ abstract final class StringsAppEn {
     KApp.noticeMinePickup: 'You said you {0}{1} and need someone to collect the child.{2}',
     KApp.noticeMineKeep: 'You said you {0}{1} and need someone to keep the child today.{2}',
     KApp.noticeQuickAction: 'Send a notice',
+    KApp.auditSwapAsked: 'asked for a swap for this day',
+    KApp.pdfSwapAsked: 'Asked for a swap for',
+    KApp.sumPlannedToDate: 'Planned to date',
+    KApp.sumPlannedRemaining: 'Planned ahead',
+    KApp.sumFutureAccepted: 'Future swaps already accepted: {0}',
     KApp.swapStoryAsked: 'Asked by {0} on {1}',
     KApp.swapStoryApproved: 'approved by {0} on {1}',
     KApp.swapStoryAuto: 'approved automatically on {0}',

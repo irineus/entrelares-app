@@ -1028,7 +1028,6 @@ abstract final class K {
   static const String sumEmptyTitle = 'rep.sum.emptyTitle';
   static const String sumEmptyBody = 'rep.sum.emptyBody';
   static const String sumEmptyAction = 'rep.sum.emptyAction';
-  static const String sumPlanned = 'rep.sum.planned';
   static const String sumActual = 'rep.sum.actual';
   static const String sumProjected = 'rep.sum.projected';
   static const String sumGiven = 'rep.sum.given';
@@ -2183,7 +2182,6 @@ abstract final class K {
     sumEmptyTitle,
     sumEmptyBody,
     sumEmptyAction,
-    sumPlanned,
     sumActual,
     sumProjected,
     sumGiven,

@@ -210,7 +210,9 @@ void main() {
           reason: '$key says "${pt[key]}"');
     }
     expect(pt[K.editorScheduledParent], 'Responsável planejado');
-    expect(pt[K.sumPlanned], 'Planejado');
+    // F-96: the Resumo's pair reads on one horizon, "até hoje".
+    expect(pt[KApp.sumPlannedToDate], 'Planejado até hoje');
+    expect(pt[KApp.sumPlannedRemaining], 'Planejado restante');
   });
 
   test('EN: what the system sends is a "notification", never an "alert"', () {

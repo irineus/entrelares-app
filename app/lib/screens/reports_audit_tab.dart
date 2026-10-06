@@ -94,6 +94,9 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
   /// F-45: log id → the request whose resolution produced that log.
   Map<int, SwapOrigin> _origins = const {};
 
+  /// F-96: the logs that are a swap request's base write.
+  Set<int> _swapBases = const {};
+
   /// F-51: the batches the reader chose to unfold, by batch id. A fresh load
   /// folds everything again — the folded view is the readable default.
   final Set<String> _expandedBatches = {};
@@ -171,8 +174,10 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
       }
 
       final origins = await _originsFor(activity);
+      final bases = await _basesFor(activity);
       if (!mounted) return;
       setState(() {
+        _swapBases = bases;
         _members = members;
         _roles = roles;
         _activity = activity;
@@ -214,8 +219,10 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
         final next = await widget.dataSource
             .fetchRecentActivityLogs(offset: _activity.length);
         final origins = await _originsFor(next);
+        final bases = await _basesFor(next);
         if (!mounted) return;
         setState(() {
+          _swapBases = {..._swapBases, ...bases};
           _activity = [..._activity, ...next];
           // Merged, never replaced: "Carregar mais" keeps earlier origins.
           _origins = {..._origins, ...origins};
@@ -237,6 +244,18 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
     try {
       return await widget.dataSource
           .fetchResolutionOrigins([for (final l in logs) l.id]);
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// F-96: best-effort like the origins — a failure costs the "pediu uma
+  /// troca" wording, never the timeline.
+  Future<Set<int>> _basesFor(List<ActivityLog> logs) async {
+    if (logs.isEmpty) return const {};
+    try {
+      return await widget.dataSource
+          .fetchSwapBaseLogIds([for (final l in logs) l.id]);
     } catch (_) {
       return const {};
     }
@@ -835,8 +854,11 @@ class _ReportsAuditTabState extends State<ReportsAuditTab> {
       children: [
         Text(l.format(K.auditDayLabel, [l.formatDate(view.affectedDate)]),
             style: Theme.of(context).textTheme.labelSmall),
-        RichLabel.of(l, K.auditScheduleChange,
-            args: [actor, scheduleActionLabel(log.action, l)]),
+        RichLabel.of(l, K.auditScheduleChange, args: [
+          actor,
+          scheduleActionLabel(log.action, l,
+              swapAsked: isSwapAskedBase(view, _swapBases, changes)),
+        ]),
         if (origin != null) _originBlock(origin, l),
         if (authorship.isNotEmpty) _authorshipBlock(authorship),
         for (final change in changes)
