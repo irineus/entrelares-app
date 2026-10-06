@@ -989,8 +989,6 @@ abstract final class K {
   static const String notifEmptyHistory = 'notif.empty.history';
   static const String notifRevertPendingBadge = 'notif.badge.revertPending';
   static const String notifPendingBadge = 'notif.badge.pending';
-  static const String notifLabelRequester = 'notif.label.requester';
-  static const String notifLabelRevertTo = 'notif.label.revertTo';
   static const String notifLabelTo = 'notif.label.to';
   static const String notifLabelProposed = 'notif.label.proposed';
   static const String notifLabelYourMessage = 'notif.label.yourMessage';
@@ -2146,8 +2144,6 @@ abstract final class K {
     notifEmptyHistory,
     notifRevertPendingBadge,
     notifPendingBadge,
-    notifLabelRequester,
-    notifLabelRevertTo,
     notifLabelTo,
     notifLabelProposed,
     notifLabelYourMessage,

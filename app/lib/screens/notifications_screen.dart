@@ -765,6 +765,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     required List<Widget> badges,
     required List<String> lines,
     required VoidCallback? onTap,
+    List<Widget> actions = const [],
   }) {
     final theme = Theme.of(context).textTheme;
     return Padding(
@@ -786,6 +787,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   const SizedBox(height: Spacing.xs),
                   for (final line in lines)
                     Text(line, style: theme.bodySmall),
+                  // U-60: the answer on the row itself. The card then has no
+                  // tap of its own (U-47: no button inside a tappable tile).
+                  if (actions.isNotEmpty) ...[
+                    const SizedBox(height: Spacing.sm),
+                    Wrap(
+                      spacing: Spacing.sm,
+                      runSpacing: Spacing.xs,
+                      children: actions,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -899,9 +910,60 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             : KApp.noticeAnsweredHelping]);
   }
 
+  String _firstNameOf(int? id) =>
+      (_nameOf(id) ?? '').trim().split(' ').first;
+
+  /// U-60: the answer straight from the row, through the S-25 RPCs the
+  /// frozen-day sheet calls. The sheet stays one tap away ("Detalhes") for a
+  /// note or a reason.
+  Future<void> _answerInline(SwapRequest req, {required bool approve}) async {
+    if (_answering != null) return;
+    final l = AppL10n.of(context).l;
+    setState(() => _answering = req.id);
+    final revert = req.isRevertPending;
+    try {
+      if (approve) {
+        await (revert
+            ? widget.dataSource
+                .approveRevert(req.id, allProfiles: _allProfiles)
+            : widget.dataSource
+                .approveSwap(req.id, allProfiles: _allProfiles));
+      } else {
+        await (revert
+            ? widget.dataSource.rejectRevert(req.id, allProfiles: _allProfiles)
+            : widget.dataSource.rejectSwap(req.id, allProfiles: _allProfiles));
+      }
+      if (!mounted) return;
+      showAppSnack(
+          context,
+          l[frozenOutcomeToastKey(approve
+              ? (revert
+                  ? FrozenDayOutcome.revertConfirmed
+                  : FrozenDayOutcome.approved)
+              : (revert
+                  ? FrozenDayOutcome.revertRejected
+                  : FrozenDayOutcome.rejected))]);
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(
+          context, translateSaveError(e.toString(), l[K.errSaveFailed], l));
+    }
+    if (mounted) setState(() => _answering = null);
+    await _loadAll();
+    await widget.badge.refresh();
+  }
+
+  /// U-60: the request being answered from its row — both buttons wait.
+  int? _answering;
+
   Widget _incomingRow(SwapRequest req, DateTime now, Localization l) {
     final isRevert = req.isRevertPending;
     final tag = req.toView().priorityTag(now); // F-20: pending → clock
+    final requester = _firstNameOf(req.requestingProfileId);
+    final message = (req.requestMessage ?? '').trim();
+    final canAnswer = _ownProfile?.isViewer != true &&
+        !(widget.connectivity?.offline ?? false);
+    final busy = _answering == req.id;
     return _requestRow(
       req: req,
       title: l.formatDate(req.scheduleDate),
@@ -912,16 +974,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         if (tag != SwapPriorityTag.none) _tagBadge(tag, l),
       ],
+      // U-60: a sentence, not "Solicitante: · Proposto:" to decode — who
+      // asks, what for, and the weekday; then the message and the deadline.
       lines: [
-        '${l[K.notifLabelRequester]}: '
-            '${_nameOf(req.requestingProfileId) ?? '—'} · '
-            '${l[isRevert ? K.notifLabelRevertTo : K.notifLabelProposed]}: '
-            '${_nameOf(req.proposedActualParentId) ?? '—'}',
+        swapRequestSentence(
+          l: l,
+          requesterName: requester.isEmpty ? '—' : requester,
+          date: req.scheduleDate,
+          isRevert: isRevert,
+          requesterIsProposed:
+              req.proposedActualParentId == req.requestingProfileId,
+        ),
+        if (message.isNotEmpty)
+          l.format(KApp.swapRowMessage, [requester, message]),
         // F-60: a request waiting on YOU says when it stops waiting.
         '${l[K.frozenAutoApproval]}: '
             '${l.formatDateTime(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
       ],
-      onTap: () => _openRequest(req),
+      onTap: canAnswer ? null : () => _openRequest(req),
+      actions: !canAnswer
+          ? const []
+          : [
+              FilledButton(
+                key: ValueKey('swap-request-approve-${req.id}'),
+                onPressed: busy || _answering != null
+                    ? null
+                    : () => _answerInline(req, approve: true),
+                child: Text(l[K.frozenApprove]),
+              ),
+              OutlinedButton(
+                key: ValueKey('swap-request-reject-${req.id}'),
+                onPressed: busy || _answering != null
+                    ? null
+                    : () => _answerInline(req, approve: false),
+                child: Text(l[K.frozenRejectAction]),
+              ),
+              TextButton(
+                key: ValueKey('swap-request-details-${req.id}'),
+                onPressed: busy ? null : () => _openRequest(req),
+                child: Text(l[KApp.swapRowDetails]),
+              ),
+            ],
     );
   }
 

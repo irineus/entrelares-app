@@ -866,8 +866,6 @@ abstract final class StringsEn {
     K.notifEmptyHistory: 'No notifications yet.',
     K.notifRevertPendingBadge: 'Revert pending',
     K.notifPendingBadge: 'Pending',
-    K.notifLabelRequester: 'Requested by',
-    K.notifLabelRevertTo: 'Asks to revert to',
     K.notifLabelTo: 'To',
     K.notifLabelProposed: 'Proposed',
     K.notifLabelYourMessage: 'Your message',

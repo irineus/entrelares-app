@@ -41,7 +41,11 @@ Future<void> tapChip(WidgetTester tester, String label) async {
 }
 
 Future<void> tapSave(WidgetTester tester) async {
-  final save = find.widgetWithText(FilledButton, pt[K.commonSave]);
+  // U-60: a save that opens a request says "Enviar pedido".
+  final send = find.widgetWithText(FilledButton, pt[KApp.editorSendRequest]);
+  final save = send.evaluate().isNotEmpty
+      ? send
+      : find.widgetWithText(FilledButton, pt[K.commonSave]);
   await tester.ensureVisible(save);
   await tester.pumpAndSettle();
   await tester.tap(save);

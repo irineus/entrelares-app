@@ -25,6 +25,7 @@ export 'src/billing_rules.dart';
 export 'src/auth_rules.dart';
 export 'src/bulk_rules.dart';
 export 'src/calendar_rules.dart';
+export 'src/swap_request_copy.dart';
 export 'src/channel_handoff_rules.dart';
 export 'src/child_rules.dart';
 export 'src/schedule_mode_rules.dart';

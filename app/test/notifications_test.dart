@@ -4,9 +4,10 @@
 //
 // U-42 (13/09/2026): "Para você" and "Enviadas" are LISTS. A request is one
 // compact row and the action lives in the frozen-day sheet the row opens —
-// the same sheet `frozen_day_test.dart` drives from the calendar. So these
-// tests prove the second door into that sheet, and that the list itself
-// carries no button of its own.
+// the same sheet `frozen_day_test.dart` drives from the calendar.
+// U-60 (owner, 05/10/2026) moved the answer onto the "Para você" row: a
+// sentence in plain words, the message, and Aprovar/Recusar on the row (the
+// S-25 RPCs), with "Detalhes" for the sheet. "Enviadas" stays as U-42 left it.
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -43,6 +44,10 @@ Widget notifApp(FakeCustodyDataSource ds, NotificationBadge badge,
 /// part of the contract, not an implementation detail.
 Finder requestRow(int id) => find.byKey(ValueKey('swap-request-$id'));
 
+/// U-60: the "Para você" row's way into the frozen-day sheet.
+Finder requestDetails(int id) =>
+    find.byKey(ValueKey('swap-request-details-$id'));
+
 /// Every action label the frozen-day sheet can render. The list must show
 /// NONE of them (U-42 acceptance) — the sheet is the one place to act.
 final _actionLabels = [
@@ -57,7 +62,8 @@ void main() {
   _landingTests();
 
   testWidgets('opening the page marks everything read and lists the incoming '
-      'request as a row with no action button', (tester) async {
+      'request as a sentence, with the message and the answer on the row',
+      (tester) async {
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
       ..pendingForMe = [
         swapReq(10, dayOfMonth(today.day), message: 'Tenho consulta')
@@ -70,21 +76,72 @@ void main() {
     // The incoming tab is the default and carries its count.
     expect(find.text('${pt[K.notifTabIncoming]} (1)'), findsOneWidget);
     expect(requestRow(10), findsOneWidget);
-    expect(find.textContaining('Bruno Lima'), findsOneWidget); // requester
     expect(find.text(pt[K.notifPendingBadge]), findsOneWidget);
-    expect(find.byIcon(Icons.chevron_right), findsOneWidget,
-        reason: 'a pending row leads somewhere, and says so');
-    for (final key in _actionLabels) {
-      expect(find.text(pt[key]), findsNothing,
-          reason: 'U-42: the list renders no action of its own ($key)');
-    }
+    // U-60: who asks, what for and the weekday — not "Solicitante: · Proposto:".
+    final date = dayOfMonth(today.day);
+    expect(
+        find.text(swapRequestSentence(
+            l: pt,
+            requesterName: 'Bruno',
+            date: date,
+            isRevert: false,
+            requesterIsProposed: false)),
+        findsOneWidget);
+    expect(find.textContaining(pt[K.notifLabelProposed]), findsNothing);
+    expect(find.text(pt.format(KApp.swapRowMessage, ['Bruno', 'Tenho consulta'])),
+        findsOneWidget);
+    // The answer lives on the row; the card itself has no tap (U-47).
+    expect(find.byKey(const ValueKey('swap-request-approve-10')), findsOneWidget);
+    expect(find.byKey(const ValueKey('swap-request-reject-10')), findsOneWidget);
+    expect(requestDetails(10), findsOneWidget);
+    expect(find.byIcon(Icons.chevron_right), findsNothing);
     expect(find.byType(TextField), findsNothing,
         reason: 'the F-44 note field lives in the sheet, not on every row');
-    // The requester's message is a fact for the sheet, not for the scan line.
-    expect(find.text('Tenho consulta'), findsNothing);
   });
 
-  testWidgets('tapping a row opens the frozen-day sheet; approving there '
+  testWidgets('U-60: approving on the row calls the RPC, refreshes the badge '
+      'and toasts', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..pendingForMe = [swapReq(10, dayOfMonth(today.day))];
+    final badge = NotificationBadge(ds);
+    await badge.refresh();
+    await tester.pumpWidget(notifApp(ds, badge));
+    await tester.pumpAndSettle();
+
+    ds.pendingForMe = [];
+    await tester.tap(find.byKey(const ValueKey('swap-request-approve-10')));
+    await tester.pumpAndSettle();
+    expect(ds.approvedSwaps, [(id: 10, note: null)]);
+    expect(badge.count, 0);
+    expect(find.text(pt[K.toastSwapApproved]), findsOneWidget);
+    expect(requestRow(10), findsNothing);
+  });
+
+  testWidgets('U-60: a revert asked of me reads as one, and Recusar on the '
+      'row rejects the revert', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..pendingForMe = [
+        swapReq(11, dayOfMonth(today.day), status: 'revert_pending')
+      ];
+    final badge = NotificationBadge(ds);
+    await tester.pumpWidget(notifApp(ds, badge));
+    await tester.pumpAndSettle();
+    expect(
+        find.text(swapRequestSentence(
+            l: pt,
+            requesterName: 'Bruno',
+            date: dayOfMonth(today.day),
+            isRevert: true,
+            requesterIsProposed: false)),
+        findsOneWidget);
+    ds.pendingForMe = [];
+    await tester.tap(find.byKey(const ValueKey('swap-request-reject-11')));
+    await tester.pumpAndSettle();
+    expect(ds.rejectedReverts, hasLength(1));
+    expect(find.text(pt[K.toastRevertRejected]), findsOneWidget);
+  });
+
+  testWidgets('"Detalhes" opens the frozen-day sheet; approving there '
       'records the F-44 note, refreshes the badge and toasts', (tester) async {
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
       ..pendingForMe = [
@@ -97,7 +154,7 @@ void main() {
     await tester.pumpWidget(notifApp(ds, badge));
     await tester.pumpAndSettle();
 
-    await tester.tap(requestRow(10));
+    await tester.tap(requestDetails(10));
     await tester.pumpAndSettle();
     // The sheet's title carries the urgency emoji, so `textContaining`.
     expect(find.textContaining(pt[K.frozenSwapTitle]), findsOneWidget,
@@ -107,7 +164,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField).last, 'Busco às 18h');
     ds.pendingForMe = []; // the approval resolves it server-side
-    await tester.tap(find.text(pt[K.frozenApprove]));
+    await tester.tap(find.text(pt[K.frozenApprove]).last); // the sheet, over the row's own
     await tester.pumpAndSettle();
 
     expect(ds.approvedSwaps, [(id: 10, note: 'Busco às 18h')]);
@@ -119,7 +176,7 @@ void main() {
         reason: 'the sheet closed with its outcome');
   });
 
-  testWidgets('rejecting from the sheet a row opened closes the request',
+  testWidgets('rejecting from the sheet "Detalhes" opened closes the request',
       (tester) async {
     final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
       ..pendingForMe = [swapReq(10, dayOfMonth(today.day))];
@@ -127,10 +184,10 @@ void main() {
     await tester.pumpWidget(notifApp(ds, badge));
     await tester.pumpAndSettle();
 
-    await tester.tap(requestRow(10));
+    await tester.tap(requestDetails(10));
     await tester.pumpAndSettle();
     ds.pendingForMe = [];
-    await tester.tap(find.text(pt[K.frozenRejectAction]));
+    await tester.tap(find.text(pt[K.frozenRejectAction]).last); // the sheet, over the row's own
     await tester.pumpAndSettle();
 
     expect(ds.rejectedSwaps, [(id: 10, reason: null)]);
@@ -148,9 +205,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(pt[K.notifRevertPendingBadge]), findsOneWidget);
-    expect(find.textContaining(pt[K.notifLabelRevertTo]), findsOneWidget);
 
-    await tester.tap(requestRow(11));
+    await tester.tap(requestDetails(11));
     await tester.pumpAndSettle();
     expect(find.textContaining(pt[K.frozenRevertTitle]), findsOneWidget);
     await tester.tap(find.text(pt[K.frozenConfirmRevert]));
@@ -170,7 +226,7 @@ void main() {
     // An English reader gets the 12-hour clock…
     await tester.pumpWidget(notifApp(ds, badge, language: AppLanguage.en));
     await tester.pumpAndSettle();
-    await tester.tap(requestRow(12));
+    await tester.tap(requestDetails(12));
     await tester.pumpAndSettle();
     expect(find.text('6:30 PM'), findsOneWidget);
     expect(find.text('18:30'), findsNothing,

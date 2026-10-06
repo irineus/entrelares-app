@@ -779,6 +779,24 @@ abstract final class KApp {
   static const String expensePdfChange = 'app.expense.pdfChange';
   static const String expensePdfUpdated = 'app.expense.pdfUpdated';
   static const String expensePdfDeleted = 'app.expense.pdfDeleted';
+  // ── U-60: a swap request said in plain words ──
+  static const String swapOnDayFem = 'app.swap.onDayFem';
+  static const String swapOnDayMasc = 'app.swap.onDayMasc';
+  static const String swapOfDayFem = 'app.swap.ofDayFem';
+  static const String swapOfDayMasc = 'app.swap.ofDayMasc';
+  static const String swapAskKeep = 'app.swap.askKeep';
+  static const String swapAskTake = 'app.swap.askTake';
+  static const String swapAskRevert = 'app.swap.askRevert';
+  static const String swapRowMessage = 'app.swap.rowMessage';
+  static const String swapRowDetails = 'app.swap.rowDetails';
+  static const String cardRequestsOne = 'app.swap.cardRequestsOne';
+  static const String cardRequestsMany = 'app.swap.cardRequestsMany';
+  static const String cardRequestsAnswer = 'app.swap.cardRequestsAnswer';
+  static const String editorAskSwap = 'app.swap.editorAsk';
+  static const String editorSendRequest = 'app.swap.editorSend';
+  static const String editorClearDayConfirm = 'app.swap.editorClearConfirm';
+  static const String calAskSwap = 'app.swap.calAsk';
+  static const String calAskSwapPick = 'app.swap.calAskPick';
   static const String expenseDiffLine = 'app.expense.diffLine';
   static const String expenseDiffAmount = 'app.expense.diffAmount';
   static const String expenseDiffSplit = 'app.expense.diffSplit';
@@ -1460,6 +1478,23 @@ abstract final class KApp {
     expensePdfChange,
     expensePdfUpdated,
     expensePdfDeleted,
+    swapOnDayFem,
+    swapOnDayMasc,
+    swapOfDayFem,
+    swapOfDayMasc,
+    swapAskKeep,
+    swapAskTake,
+    swapAskRevert,
+    swapRowMessage,
+    swapRowDetails,
+    cardRequestsOne,
+    cardRequestsMany,
+    cardRequestsAnswer,
+    editorAskSwap,
+    editorSendRequest,
+    editorClearDayConfirm,
+    calAskSwap,
+    calAskSwapPick,
     expenseDiffLine,
     expenseDiffAmount,
     expenseDiffSplit,
@@ -2290,6 +2325,23 @@ abstract final class StringsAppPtBr {
     KApp.expensePdfChange: '{0} — {1}: {2}',
     KApp.expensePdfUpdated: 'alterou "{0}": {1}',
     KApp.expensePdfDeleted: 'apagou "{0}" ({1})',
+    KApp.swapOnDayFem: 'na {0}',
+    KApp.swapOnDayMasc: 'no {0}',
+    KApp.swapOfDayFem: 'da {0}',
+    KApp.swapOfDayMasc: 'do {0}',
+    KApp.swapAskKeep: '{0} pede que você fique com a criança {1}.',
+    KApp.swapAskTake: '{0} pede para ficar com a criança {1}, que é seu dia.',
+    KApp.swapAskRevert: '{0} pede para desfazer a troca {1}.',
+    KApp.swapRowMessage: 'Mensagem de {0}: {1}',
+    KApp.swapRowDetails: 'Detalhes',
+    KApp.cardRequestsOne: 'Um pedido espera a sua resposta',
+    KApp.cardRequestsMany: '{0} pedidos esperam a sua resposta',
+    KApp.cardRequestsAnswer: 'Responder',
+    KApp.editorAskSwap: 'Pedir para outra pessoa ficar com este dia',
+    KApp.editorSendRequest: 'Enviar pedido',
+    KApp.editorClearDayConfirm: 'Limpar este dia? O que estava planejado nele é apagado, e o Histórico guarda o registro.',
+    KApp.calAskSwap: 'Pedir troca de um dia',
+    KApp.calAskSwapPick: 'Qual dia?',
     KApp.expenseDiffLine: '{0}: de {1} para {2}',
     KApp.expenseDiffAmount: 'Valor',
     KApp.expenseDiffSplit: 'Divisão: {0}',
@@ -3114,6 +3166,23 @@ abstract final class StringsAppEn {
     KApp.expensePdfChange: '{0} — {1}: {2}',
     KApp.expensePdfUpdated: 'changed "{0}": {1}',
     KApp.expensePdfDeleted: 'deleted "{0}" ({1})',
+    KApp.swapOnDayFem: 'on {0}',
+    KApp.swapOnDayMasc: 'on {0}',
+    KApp.swapOfDayFem: 'of {0}',
+    KApp.swapOfDayMasc: 'of {0}',
+    KApp.swapAskKeep: '{0} asks you to keep the child {1}.',
+    KApp.swapAskTake: '{0} asks to keep the child {1}, which is your day.',
+    KApp.swapAskRevert: '{0} asks to undo the swap {1}.',
+    KApp.swapRowMessage: 'Message from {0}: {1}',
+    KApp.swapRowDetails: 'Details',
+    KApp.cardRequestsOne: 'A request is waiting for your answer',
+    KApp.cardRequestsMany: '{0} requests are waiting for your answer',
+    KApp.cardRequestsAnswer: 'Answer',
+    KApp.editorAskSwap: 'Ask someone else to take this day',
+    KApp.editorSendRequest: 'Send request',
+    KApp.editorClearDayConfirm: 'Clear this day? What was planned on it is deleted, and the History keeps the record.',
+    KApp.calAskSwap: 'Ask to swap a day',
+    KApp.calAskSwapPick: 'Which day?',
     KApp.expenseDiffLine: '{0}: from {1} to {2}',
     KApp.expenseDiffAmount: 'Amount',
     KApp.expenseDiffSplit: 'Split: {0}',

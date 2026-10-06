@@ -44,9 +44,10 @@ Finder get closeX => find.byKey(AppSheetFrame.closeKey);
 Finder get anySheet => find.byType(AppSheetFrame);
 
 /// The pinned "Salvar" — null [FilledButton.onPressed] is the unlit state.
-bool saveEnabled(WidgetTester tester) => tester
-        .widget<FilledButton>(
-            find.ancestor(of: find.text(pt[K.commonSave]), matching: find.byType(FilledButton)))
+bool saveEnabled(WidgetTester tester, [String? label]) => tester
+        .widget<FilledButton>(find.ancestor(
+            of: find.text(label ?? pt[K.commonSave]),
+            matching: find.byType(FilledButton)))
         .onPressed !=
     null;
 
@@ -105,7 +106,10 @@ void main() {
     expect(saveEnabled(tester), isFalse);
 
     await tapSheet(tester, memberChip('Bruno'));
-    expect(saveEnabled(tester), isTrue, reason: 'the real carer is a change');
+    // U-60: the button says what it does — a real-carer change SENDS a request.
+    expect(find.text(pt[K.commonSave]), findsNothing);
+    expect(saveEnabled(tester, pt[KApp.editorSendRequest]), isTrue,
+        reason: 'the real carer is a change');
     await tapSheet(
         tester, find.widgetWithText(ChoiceChip, pt[KApp.editorNoSwap]));
     expect(saveEnabled(tester), isFalse);
