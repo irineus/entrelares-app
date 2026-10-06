@@ -77,6 +77,12 @@ abstract final class NotificationRenderer {
       // language joins a day to an hour. A row written before this item has
       // no `deadline` and renders the window-free sentence — still in the
       // READER's language, which a fallback to the stored PT-BR would not be.
+      // F-94: the eve reminder (19:00 the day before) — who asked, and the
+      // day; it states no deadline, the request's row does.
+      case 'auto_reminder' when date != null && kind == 'eve':
+        return l.format(
+            K.notifRenderAutoReminderEve, [name ?? l[K.notifRenderFbOtherCap], date]);
+
       case 'auto_reminder' when date != null:
         final deadline = _parseDeadline(p['deadline']);
         if (deadline == null) return l.format(K.notifRenderAutoReminder, [date]);
@@ -508,7 +514,9 @@ abstract final class NotificationRenderer {
     final kind = p['kind'];
 
     final key = switch (type) {
-      'auto_reminder' => K.notifRenderTitleAutoReminder,
+      'auto_reminder' => kind == 'eve'
+          ? K.notifRenderTitleAutoReminderEve
+          : K.notifRenderTitleAutoReminder,
       'auto_approved' => K.notifRenderTitleAutoApproved,
       'swap_family_info' => K.notifRenderTitleCalendarUpdated,
       'swap_sent' => K.notifRenderTitleSwapSent,

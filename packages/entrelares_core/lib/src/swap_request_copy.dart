@@ -42,3 +42,27 @@ String swapRequestSentence({
   return l.format(requesterIsProposed ? KApp.swapAskTake : KApp.swapAskKeep,
       [requesterName, swapOnDay(date, l)]);
 }
+
+/// F-94 — the Hoje card's line on a day whose request still waits, for the
+/// two parties: whoever has the day keeps it until the answer. [me] is the
+/// reader, [carerId] the day's current carer (the request froze the day),
+/// [targetId] who must answer; [firstName] names a profile.
+String pendingTodaySentence({
+  required Localization l,
+  required int me,
+  required int carerId,
+  required int targetId,
+  required String Function(int profileId) firstName,
+}) {
+  if (carerId == me && targetId == me) {
+    return l[KApp.cardPendingTodayYouUntilYou];
+  }
+  if (carerId == me) {
+    return l.format(KApp.cardPendingTodayYouStay, [firstName(targetId)]);
+  }
+  if (targetId == me) {
+    return l.format(KApp.cardPendingTodayUntilYou, [firstName(carerId)]);
+  }
+  return l.format(
+      KApp.cardPendingTodayBody, [firstName(carerId), firstName(targetId)]);
+}

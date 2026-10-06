@@ -63,4 +63,56 @@ void main() {
             requesterIsProposed: false),
         'Ana asks to undo the swap of Thu, 08 Oct.');
   });
+
+  // F-94: on the day, while the request waits, both parties read who keeps
+  // the day until the answer.
+  group('pendingTodaySentence', () {
+    String first(int id) => {1: 'Ana', 2: 'Bruno', 3: 'Vera'}[id]!;
+
+    test('the requester reads who stays and who must answer', () {
+      expect(
+          pendingTodaySentence(
+              l: pt, me: 1, carerId: 1, targetId: 2, firstName: first),
+          'Você segue responsável até Bruno responder.');
+    });
+
+    test('the target reads that the carer stays until they answer', () {
+      expect(
+          pendingTodaySentence(
+              l: pt, me: 2, carerId: 1, targetId: 2, firstName: first),
+          'Ana segue responsável até você responder.');
+      expect(
+          pendingTodaySentence(
+              l: en, me: 2, carerId: 1, targetId: 2, firstName: first),
+          'Ana stays responsible until you answer.');
+    });
+
+    test('scenario B: the target has the day and must answer', () {
+      expect(
+          pendingTodaySentence(
+              l: pt, me: 2, carerId: 2, targetId: 2, firstName: first),
+          'Você segue responsável até responder ao pedido.');
+    });
+
+    test('a third reader sees both names', () {
+      expect(
+          pendingTodaySentence(
+              l: pt, me: 3, carerId: 1, targetId: 2, firstName: first),
+          'Ana segue responsável até Bruno responder.');
+    });
+  });
+
+  // F-94: the eve reminder rides auto_reminder with kind 'eve'.
+  test('the eve reminder renders in the reader language', () {
+    const params = '{"kind":"eve","date":"2026-10-08","name":"Ana Souza"}';
+    expect(NotificationRenderer.title('auto_reminder', params, 'x', en),
+        'Request for tomorrow still unanswered');
+    expect(
+        NotificationRenderer.message('auto_reminder', params, 'x', en),
+        'Ana Souza made a request for tomorrow, 08 Oct 2026, that is still '
+        'waiting for your answer.');
+    expect(NotificationRenderer.message('auto_reminder', params, 'x', pt),
+        'Ana Souza fez um pedido para amanhã, 08/10/2026, que ainda espera a '
+        'sua resposta.');
+  });
 }

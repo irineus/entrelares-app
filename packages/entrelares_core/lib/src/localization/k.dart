@@ -789,6 +789,10 @@ abstract final class K {
   // stored PT-BR sentence would have taken away from an English reader.
   static const String notifRenderAutoReminderDeadline =
       'notifRender.autoReminder.deadline';
+  // F-94: the same type with `kind: 'eve'` — 19:00 on the eve of the day.
+  static const String notifRenderTitleAutoReminderEve =
+      'notifRender.title.autoReminder.eve';
+  static const String notifRenderAutoReminderEve = 'notifRender.autoReminder.eve';
   static const String notifRenderAutoApprovedRequester = 'notifRender.autoApproved.requester';
   static const String notifRenderAutoApprovedApprover = 'notifRender.autoApproved.approver';
   static const String notifRenderFamilyAutoSwap = 'notifRender.family.autoSwap';
@@ -1979,6 +1983,8 @@ abstract final class K {
     notifRenderTitleCalendarUpdated,
     notifRenderAutoReminder,
     notifRenderAutoReminderDeadline,
+    notifRenderTitleAutoReminderEve,
+    notifRenderAutoReminderEve,
     notifRenderAutoApprovedRequester,
     notifRenderAutoApprovedApprover,
     notifRenderFamilyAutoSwap,

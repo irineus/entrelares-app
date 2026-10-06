@@ -172,6 +172,9 @@ class CalendarScreen extends StatefulWidget {
   static const askSwapMenuKey = Key('ask-swap-menu');
   static const requestStripKey = Key('request-strip');
 
+  /// F-94: today's request, still unanswered, on the Hoje card.
+  static const pendingTodayStripKey = Key('pending-today-strip');
+
   const CalendarScreen(
       {super.key,
       required this.dataSource,
@@ -2185,17 +2188,97 @@ class _CalendarScreenState extends State<CalendarScreen>
       onGoToToday: _goToToday,
       onInvite: _onInviteNudgeTap,
       noticeStrip: _noticeStrip(context, todayRow, nextHandoff),
-      requestStrip: _requestStrip(context),
+      requestStrip: _requestStrips(context),
       laneSummary: _todayLaneSummary(AppL10n.of(context).l),
+    );
+  }
+
+  /// F-94: today's request that I asked or must answer, still open — the
+  /// day itself is here and nobody has said yes or no.
+  SwapRequest? get _pendingToday {
+    final me = _ownProfile?.id;
+    if (me == null || !isCurrentMonth(_visibleMonth, _today)) return null;
+    final todayIso = CareSchedule.isoDate(_today);
+    for (final r in _monthFrozen) {
+      if (CareSchedule.isoDate(r.scheduleDate) == todayIso &&
+          (r.requestingProfileId == me || r.targetProfileId == me)) {
+        return r;
+      }
+    }
+    return null;
+  }
+
+  /// The Hoje card's request strips: today's open request first (F-94), then
+  /// the others waiting for my answer (U-60).
+  Widget? _requestStrips(BuildContext context) {
+    final today = _pendingTodayStrip(context);
+    final waiting = _requestStrip(context);
+    if (today == null || waiting == null) return today ?? waiting;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [today, const SizedBox(height: Spacing.sm), waiting],
+    );
+  }
+
+  /// F-94 (owner, 05/10/2026): on the day, while the request waits, both
+  /// parties read who stays responsible until the answer — the target gets
+  /// "Responder", the requester "Cancelar pedido" (the same panel, which
+  /// holds both). No push on the morning of the day: the eve reminder was it.
+  Widget? _pendingTodayStrip(BuildContext context) {
+    final req = _pendingToday;
+    final me = _ownProfile?.id;
+    if (_loading || req == null || me == null) return null;
+    final l = AppL10n.of(context).l;
+    final todayIso = CareSchedule.isoDate(_today);
+    final row = _monthRows
+        .where((d) =>
+            CareSchedule.isoDate(d.scheduleDate) == todayIso &&
+            d.childId == req.childId)
+        .firstOrNull;
+    final carer = row?.effectiveParentId ??
+        req.previousActualParentId ??
+        req.targetProfileId;
+    String first(int id) =>
+        _members
+            .where((m) => m.id == id)
+            .firstOrNull
+            ?.fullName
+            .trim()
+            .split(' ')
+            .first ??
+        '—';
+    final iAnswer = req.targetProfileId == me;
+    return AppBanner(
+      key: CalendarScreen.pendingTodayStripKey,
+      tone: context.tokens.warning,
+      icon: Icons.hourglass_top,
+      title: l[KApp.cardPendingTodayTitle],
+      message: pendingTodaySentence(
+        l: l,
+        me: me,
+        carerId: carer,
+        targetId: req.targetProfileId,
+        firstName: first,
+      ),
+      actionLabel:
+          l[iAnswer ? KApp.cardRequestsAnswer : KApp.cardPendingTodayCancel],
+      actionIcon: iAnswer ? Icons.reply : Icons.close,
+      onAction: () => _openFrozenDay(req),
     );
   }
 
   /// U-60: the requests waiting for MY answer, on the card about today —
   /// the soonest said in words, "Responder" opening its approval panel.
+  /// Today's own request is the F-94 strip's, not this one's.
   Widget? _requestStrip(BuildContext context) {
-    if (_loading || _pendingForMe.isEmpty || _ownProfile == null) return null;
+    final today = _pendingToday;
+    final waiting = [
+      for (final r in _pendingForMe)
+        if (today == null || r.id != today.id) r
+    ];
+    if (_loading || waiting.isEmpty || _ownProfile == null) return null;
     final l = AppL10n.of(context).l;
-    final first = _pendingForMe.first;
+    final first = waiting.first;
     final requester = _members
             .where((m) => m.id == first.requestingProfileId)
             .firstOrNull
@@ -2204,7 +2287,7 @@ class _CalendarScreenState extends State<CalendarScreen>
             .split(' ')
             .first ??
         '—';
-    final count = _pendingForMe.length;
+    final count = waiting.length;
     return AppBanner(
       key: CalendarScreen.requestStripKey,
       tone: context.tokens.info,

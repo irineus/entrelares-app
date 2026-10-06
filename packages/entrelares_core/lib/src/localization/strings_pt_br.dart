@@ -698,6 +698,8 @@ abstract final class StringsPtBr {
     K.notifRenderTitleCalendarUpdated: 'Calendário atualizado',
     K.notifRenderAutoReminder: 'A solicitação do dia {0} será aprovada automaticamente se não houver resposta.',
     K.notifRenderAutoReminderDeadline: 'A solicitação do dia {0} será aprovada automaticamente em {1} às {2} se não houver resposta.',
+    K.notifRenderTitleAutoReminderEve: 'Pedido para amanhã sem resposta',
+    K.notifRenderAutoReminderEve: '{0} fez um pedido para amanhã, {1}, que ainda espera a sua resposta.',
     K.notifRenderAutoApprovedRequester: 'A solicitação do dia {0} foi aprovada automaticamente por falta de resposta.',
     K.notifRenderAutoApprovedApprover: 'A solicitação do dia {0} foi aprovada automaticamente. Você não respondeu dentro do prazo.',
     K.notifRenderFamilyAutoSwap: '{0} ficará com a criança no dia {1} (troca aprovada automaticamente por falta de resposta).',

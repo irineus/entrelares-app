@@ -696,6 +696,8 @@ abstract final class StringsEn {
     K.notifRenderTitleCalendarUpdated: 'Calendar updated',
     K.notifRenderAutoReminder: 'The request for {0} will be approved automatically if nobody replies.',
     K.notifRenderAutoReminderDeadline: 'The request for {0} will be approved automatically on {1} at {2} if nobody replies.',
+    K.notifRenderTitleAutoReminderEve: 'Request for tomorrow still unanswered',
+    K.notifRenderAutoReminderEve: '{0} made a request for tomorrow, {1}, that is still waiting for your answer.',
     K.notifRenderAutoApprovedRequester: 'The request for {0} was approved automatically for lack of a reply.',
     K.notifRenderAutoApprovedApprover: 'The request for {0} was approved automatically. You did not reply before the deadline.',
     K.notifRenderFamilyAutoSwap: '{0} will have the child on {1} (swap approved automatically for lack of a reply).',
