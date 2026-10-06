@@ -1187,36 +1187,6 @@ class _CalendarScreenState extends State<CalendarScreen>
         duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
   }
 
-  /// The web's navigation guard: month navigation while days are selected
-  /// asks before discarding the selection. Returns whether to proceed.
-  Future<bool> _confirmDiscardSelection() async {
-    final l = AppL10n.of(context).l;
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l.format(
-            _selectedDays.length == 1
-                ? K.navGuardSelectedOne
-                : K.navGuardSelectedMany,
-            [_selectedDays.length])),
-        content: Text(l[K.navGuardBody]),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(l[K.navGuardYes])),
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(l[K.navGuardNo])),
-        ],
-      ),
-    );
-    if (proceed == true) {
-      _cancelSelection();
-      return true;
-    }
-    return false;
-  }
-
   Future<void> _onPageChanged(int page) async {
     final month = _monthForPage(page);
     // The bounce-back below re-fires with the month already shown — no-op.
@@ -1231,9 +1201,12 @@ class _CalendarScreenState extends State<CalendarScreen>
       _bounceBack();
       return;
     }
-    if (_isSelectionMode && !await _confirmDiscardSelection()) {
-      _bounceBack();
-      return;
+    // F-100: a selection SURVIVES the month change — a school vacation runs
+    // from December into January. The month being left is remembered, so
+    // the sheets still know its days.
+    if (_isSelectionMode) {
+      _selectionDays.addAll(_daysByIso);
+      _selectionFrozen.addAll(_frozenByIso);
     }
     setState(() => _visibleMonth = month);
     _load();
@@ -1274,8 +1247,37 @@ class _CalendarScreenState extends State<CalendarScreen>
   void _toggleDaySelection(DateTime date) {
     final d = dateOnly(date);
     setState(() {
+      // F-100: the first tap after the long press closes the range.
+      final anchor = _rangeAnchor;
+      _rangeAnchor = null;
+      if (anchor != null && d != anchor && !_selectedDays.contains(d)) {
+        _selectedDays.addAll(selectionRange(anchor, d, horizon: _horizonDate));
+        return;
+      }
       if (!_selectedDays.remove(d)) _selectedDays.add(d);
+      if (_selectedDays.isEmpty) _forgetSelectionMonths();
     });
+  }
+
+  /// F-100: the day a long press started a range from (cleared by the tap
+  /// that closes it, or by any other tap).
+  DateTime? _rangeAnchor;
+
+  /// F-100: the days and open requests of the months the selection already
+  /// crossed — the sheets read a selection that spans months from these plus
+  /// the month on screen.
+  final Map<String, CareSchedule> _selectionDays = {};
+  final Map<String, SwapRequest> _selectionFrozen = {};
+
+  Map<String, CareSchedule> get _selDaysByIso =>
+      {..._selectionDays, ..._daysByIso};
+  Map<String, SwapRequest> get _selFrozenByIso =>
+      {..._selectionFrozen, ..._frozenByIso};
+
+  void _forgetSelectionMonths() {
+    _rangeAnchor = null;
+    _selectionDays.clear();
+    _selectionFrozen.clear();
   }
 
   /// F-07 (owner's QA, 29/09/2026) — *Todas* reads, a child's lane writes.
@@ -1293,6 +1295,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       _lane = lane;
       // A selection belongs to the lane it was made in.
       _selectedDays.clear();
+      _forgetSelectionMonths();
       _applyLaneView();
     });
   }
@@ -1302,7 +1305,11 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (_iAmViewer) return;
     if (_refuseWriteInTodas()) return;
     HapticFeedback.mediumImpact();
-    setState(() => _selectedDays.add(dateOnly(date)));
+    setState(() {
+      _selectedDays.add(dateOnly(date));
+      // F-100: the range's first day — the next tap is its last.
+      _rangeAnchor = dateOnly(date);
+    });
   }
 
   void _onDayTap(DateTime date) {
@@ -1393,6 +1400,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     setState(() {
       _selectedDays.clear();
       _selectionArmed = false;
+      _forgetSelectionMonths();
     });
   }
 
@@ -1411,7 +1419,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     final summary = await showBulkSheet(
       context: context,
       selectedDays: Set.of(_selectedDays),
-      daysByIso: _daysByIso,
+      daysByIso: _selDaysByIso,
       activeMembers: _assignableMembers,
       today: _today,
       dataSource: widget.dataSource,
@@ -1419,7 +1427,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       adminOffer: _adminOfferer,
       isPremium: _isPremiumForGate,
       settings: _settings,
-      frozenDates: [for (final r in _frozenByIso.values) r.scheduleDate],
+      frozenDates: [for (final r in _selFrozenByIso.values) r.scheduleDate],
       myProfile: _ownProfile,
       allProfiles: _members,
       childId: _lane,
@@ -1427,7 +1435,10 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (summary != null) {
       // Mirror of FinishBulkSave: the selection clears (armed state stays),
       // the month reloads and the summary is the toast.
-      setState(() => _selectedDays.clear());
+      setState(() {
+        _selectedDays.clear();
+        _forgetSelectionMonths();
+      });
       _load(silent: true);
       if (mounted) showAppSnack(context, summary);
     }
@@ -1436,11 +1447,11 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// Mirror of `WorkflowActionableCount`: how many selected days carry an
   /// action for the resolve sheet (awaiting me + sent by me + revertable).
   int get _workflowActionableCount {
-    final views = [for (final r in _frozenByIso.values) r.toView()];
-    final frozenDates = [for (final r in _frozenByIso.values) r.scheduleDate];
+    final views = [for (final r in _selFrozenByIso.values) r.toView()];
+    final frozenDates = [for (final r in _selFrozenByIso.values) r.scheduleDate];
     var revertable = 0;
     for (final d in _selectedDays) {
-      final row = _daysByIso[CareSchedule.isoDate(d)];
+      final row = _selDaysByIso[CareSchedule.isoDate(d)];
       if (row != null &&
           isRevertCandidate(
             scheduleDate: row.scheduleDate,
@@ -1475,7 +1486,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         selected: [
           for (final d in _selectedDays)
             () {
-              final row = _daysByIso[CareSchedule.isoDate(d)];
+              final row = _selDaysByIso[CareSchedule.isoDate(d)];
               return QuickSwapDay(
                 date: d,
                 scheduledParentId: row?.scheduledParentId ?? 0,
@@ -1485,7 +1496,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         ],
         requesterId: _ownProfile?.id,
         today: _today,
-        frozenDates: [for (final r in _frozenByIso.values) r.scheduleDate],
+        frozenDates: [for (final r in _selFrozenByIso.values) r.scheduleDate],
         members: _memberViews,
       );
 
@@ -1496,7 +1507,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     final summary = await showQuickSwapSheet(
       context: context,
       plan: plan,
-      daysByIso: _daysByIso,
+      daysByIso: _selDaysByIso,
       dataSource: widget.dataSource,
       myProfile: my,
       allProfiles: _members,
@@ -1505,7 +1516,10 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (summary != null) {
       // Same exit as the bulk sheet: selection clears, month reloads, the
       // summary is the toast.
-      setState(() => _selectedDays.clear());
+      setState(() {
+        _selectedDays.clear();
+        _forgetSelectionMonths();
+      });
       _load(silent: true);
       if (mounted) showAppSnack(context, summary);
     }
@@ -1516,8 +1530,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     final summary = await showResolveSheet(
       context: context,
       selectedDays: Set.of(_selectedDays),
-      openRequests: _frozenByIso.values.toList(),
-      daysByIso: _daysByIso,
+      openRequests: _selFrozenByIso.values.toList(),
+      daysByIso: _selDaysByIso,
       today: _today,
       ownProfileId: _ownProfile?.id,
       myProfile: _ownProfile,
@@ -1527,7 +1541,10 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (summary != null) {
       // Mirror of RunBulkWorkflowAsync's close: selection clears, month
       // reloads, the summary is the toast.
-      setState(() => _selectedDays.clear());
+      setState(() {
+        _selectedDays.clear();
+        _forgetSelectionMonths();
+      });
       _load(silent: true);
       if (mounted) showAppSnack(context, summary);
     }

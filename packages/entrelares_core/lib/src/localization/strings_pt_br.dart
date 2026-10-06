@@ -188,9 +188,6 @@ abstract final class StringsPtBr {
     K.quickSwapConfirm: 'Confirmar troca',
     K.navGuardSelectedOne: '{0} dia selecionado',
     K.navGuardSelectedMany: '{0} dias selecionados',
-    K.navGuardBody: 'Sair desta tela irá descartar a seleção. Deseja continuar?',
-    K.navGuardYes: 'Sim, continuar',
-    K.navGuardNo: 'Não, ficar aqui',
     // ── Today card ──
     K.cardBackToCurrentMonth: 'Voltar para o mês atual',
     K.cardGreeting: 'Olá, {0}!',

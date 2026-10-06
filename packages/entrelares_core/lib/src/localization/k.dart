@@ -223,9 +223,6 @@ abstract final class K {
   static const String quickSwapConfirm = 'quickSwap.confirm';
   static const String navGuardSelectedOne = 'navGuard.selectedOne';
   static const String navGuardSelectedMany = 'navGuard.selectedMany';
-  static const String navGuardBody = 'navGuard.body';
-  static const String navGuardYes = 'navGuard.yes';
-  static const String navGuardNo = 'navGuard.no';
 
   // ── Today card ──
   static const String cardBackToCurrentMonth = 'card.backToCurrentMonth';
@@ -1474,9 +1471,6 @@ abstract final class K {
     quickSwapConfirm,
     navGuardSelectedOne,
     navGuardSelectedMany,
-    navGuardBody,
-    navGuardYes,
-    navGuardNo,
     cardBackToCurrentMonth,
     cardGreeting,
     cardInviteTitle,
