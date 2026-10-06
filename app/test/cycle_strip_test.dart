@@ -79,6 +79,8 @@ final presetLabels = {
   '1-1': pt[K.wizPreset11],
   '5-2-2-5': pt[K.wizPreset5225],
   '2-2-3': pt[K.wizPreset223],
+  '3-11': pt[KApp.wizPreset311],
+  '3-2-1-6-1-1': pt[KApp.wizPreset321611],
 };
 
 void main() {
@@ -238,9 +240,14 @@ void main() {
         final blocks = wizardPresetBlocks(preset, const [1, 2]);
         final cycle = blocks.fold(0, (sum, b) => sum + b.days);
         final length = cycleStripLength(cycle);
+        // F-97: an anchored cycle starts on its weekday (a Friday).
+        final anchor = wizardPresetAnchor(preset);
+        final start = anchor == null
+            ? dateOnly(today)
+            : snapToWeekday(dateOnly(today), anchor);
         final expected = generateRotation(
-          start: dateOnly(today),
-          end: DateTime(today.year, today.month, today.day + length),
+          start: start,
+          end: DateTime(start.year, start.month, start.day + length),
           blocks: blocks,
         );
         final tokens = tokensOf(tester);

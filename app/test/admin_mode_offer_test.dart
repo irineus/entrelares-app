@@ -234,7 +234,10 @@ void main() {
   testWidgets('wizard: ticking "substituir" asks, and "Ativar" ticks it',
       (tester) async {
     final mode = AdminMode();
-    final ds = FakeCustodyDataSource(members: [anaAdmin, bruno], days: []);
+    // F-97: the box exists only when the range holds planned days.
+    final ahead = DateTime(today.year, today.month, today.day + 5);
+    final ds = FakeCustodyDataSource(
+        members: [anaAdmin, bruno], days: [row(9, ahead, anaAdmin.id)]);
     await tester.pumpWidget(app(ds, adminMode: mode));
     await tester.pumpAndSettle();
 
