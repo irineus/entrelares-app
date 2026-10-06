@@ -109,12 +109,25 @@ class _WizardSheet extends StatefulWidget {
 class _MutableBlock {
   int profileId;
   int days;
+
+  /// Owner's QA of 3.1.10: the row's fields are keyed by THIS, never by their
+  /// position — a field keyed by index kept showing the previous model's
+  /// numbers (7 and 7 under "Fins de semana alternados") while the plan was
+  /// generated from the new ones (3 and 11).
+  final int uid = _nextUid++;
+  static int _nextUid = 0;
+
   _MutableBlock(this.profileId, this.days);
 }
 
 class _WizardSheetState extends State<_WizardSheet> {
   String _preset = '7-7';
   List<_MutableBlock> _blocks = [];
+
+  /// Owner's QA of 3.1.10: the two people a quick model alternates, once the
+  /// user picked them ([_renameInPreset]) — so re-applying the model (a new
+  /// start, a new D-1) keeps them. Null: the roster's first two.
+  List<int>? _presetPeople;
   late DateTime _startDate;
   int _durationMonths = 3;
   /// U-37: one value, picked by the platform; null is "no handoff time".
@@ -201,7 +214,8 @@ class _WizardSheetState extends State<_WizardSheet> {
     } else {
       _startSnapped = false;
     }
-    final blocks = continueCycle(wizardPresetBlocks(preset, _profileIds),
+    final blocks = continueCycle(
+        wizardPresetBlocks(preset, _presetPeople ?? _profileIds),
         previousParentId: _prevParent, anchored: anchor != null);
     _blocks = [for (final b in blocks) _MutableBlock(b.profileId, b.days)];
   }
@@ -253,6 +267,26 @@ class _WizardSheetState extends State<_WizardSheet> {
       _plannedInRange = planned;
       if (changed && _preset.isNotEmpty) _applyPreset(_preset);
     });
+  }
+
+  /// Owner's QA of 3.1.10: changing WHO is in a block does not turn a quick
+  /// model into "Personalizado" — the pattern is the model, the names are the
+  /// family's. In a model the person is renamed in every block of theirs (and
+  /// two people trade places when one is picked over the other), so the
+  /// pattern stays the model's. Days, added and removed blocks still make it
+  /// custom; so does clearing a block's person.
+  void _setBlockPerson(_MutableBlock block, int person) {
+    final old = block.profileId;
+    if (_preset.isEmpty || person == 0 || old == 0) {
+      block.profileId = person;
+      if (person == 0) _preset = '';
+      return;
+    }
+    int swap(int id) => id == old ? person : (id == person ? old : id);
+    for (final b in _blocks) {
+      b.profileId = swap(b.profileId);
+    }
+    _presetPeople = [for (final id in _presetPeople ?? _profileIds) swap(id)];
   }
 
   List<CycleBlock> get _cycleBlocks =>
@@ -580,7 +614,7 @@ class _WizardSheetState extends State<_WizardSheet> {
             ),
             Expanded(
               child: DropdownButtonFormField<int>(
-                key: Key('wizBlockParent$index'),
+                key: ValueKey('wizBlockParent${block.uid}'),
                 isExpanded: true,
                 decoration:
                     InputDecoration(labelText: l[K.wizBlockParentLabel]),
@@ -595,10 +629,7 @@ class _WizardSheetState extends State<_WizardSheet> {
                 ],
                 onChanged: _generating
                     ? null
-                    : (v) => setState(() {
-                          block.profileId = v ?? 0;
-                          _preset = '';
-                        }),
+                    : (v) => setState(() => _setBlockPerson(block, v ?? 0)),
               ),
             ),
             const Padding(
@@ -609,7 +640,7 @@ class _WizardSheetState extends State<_WizardSheet> {
             SizedBox(
               width: 88,
               child: TextFormField(
-                key: Key('wizBlockDays$index'),
+                key: ValueKey('wizBlockDays${block.uid}'),
                 initialValue: '${block.days}',
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],

@@ -119,6 +119,9 @@ Future<DaySheetOutcome?> showDaySheet({
   required DateTime date,
   required CareSchedule? day,
   required CareSchedule? previousDay,
+  CareSchedule? nextDay,
+  String? Function(int profileId)? canonicalRoleOf,
+  Map<int, int> daysInMonth = const {},
   required List<Member> members,
   required List<MemberView> memberViews,
   required DateTime today,
@@ -149,6 +152,9 @@ Future<DaySheetOutcome?> showDaySheet({
       date: date,
       day: day,
       previousDay: previousDay,
+      nextDay: nextDay,
+      canonicalRoleOf: canonicalRoleOf,
+      daysInMonth: daysInMonth,
       members: members,
       memberViews: memberViews,
       today: today,
@@ -180,6 +186,12 @@ class _DaySheet extends StatefulWidget {
   final DateTime date;
   final CareSchedule? day;
   final CareSchedule? previousDay;
+
+  /// Owner's QA of 3.1.10: the day after and the month around it, for who the
+  /// swap entry pre-selects ([suggestSwapCandidate]).
+  final CareSchedule? nextDay;
+  final String? Function(int profileId)? canonicalRoleOf;
+  final Map<int, int> daysInMonth;
   final List<Member> members;
   final List<MemberView> memberViews;
   final DateTime today;
@@ -249,6 +261,9 @@ class _DaySheet extends StatefulWidget {
     required this.date,
     required this.day,
     required this.previousDay,
+    this.nextDay,
+    this.canonicalRoleOf,
+    this.daysInMonth = const {},
     required this.members,
     required this.memberViews,
     required this.today,
@@ -1225,24 +1240,33 @@ class _DaySheetState extends State<_DaySheet> {
     return null;
   }
 
-  /// U-60: who "Pedir para outra pessoa ficar com este dia" pre-selects — the
-  /// first carer the *Responsável real* field itself would offer (F-28's
-  /// filter) who is not the day's planned one.
+  /// U-60: who "Pedir para outra pessoa ficar com este dia" pre-selects,
+  /// among the carers the *Responsável real* field itself would offer (F-28's
+  /// filter) who are not the day's planned one — father and mother between
+  /// themselves, otherwise whoever has the child around the day (owner's QA
+  /// of 3.1.10, [suggestSwapCandidate]).
   int? get _askSwapCandidate {
     final scheduled = _scheduledParentId;
     if (scheduled == null) return null;
-    for (final m in widget.members) {
-      if (m.id == scheduled) continue;
-      if (canOfferAsActual(
-        candidateId: m.id,
-        userProfileId: widget.ownProfileId,
-        editingScheduledParentId: scheduled,
-        existingActualParentId: _day?.actualParentId,
-      )) {
-        return m.id;
-      }
-    }
-    return null;
+    final candidates = [
+      for (final m in widget.members)
+        if (m.id != scheduled &&
+            canOfferAsActual(
+              candidateId: m.id,
+              userProfileId: widget.ownProfileId,
+              editingScheduledParentId: scheduled,
+              existingActualParentId: _day?.actualParentId,
+            ))
+          m.id
+    ];
+    return suggestSwapCandidate(
+      scheduledParentId: scheduled,
+      candidates: candidates,
+      canonicalRoleOf: widget.canonicalRoleOf ?? (_) => null,
+      previousCarerId: widget.previousDay?.effectiveParentId,
+      nextCarerId: widget.nextDay?.effectiveParentId,
+      daysInMonth: widget.daysInMonth,
+    );
   }
 
   /// U-60: the explicit entry is offered where a NEW swap request is what

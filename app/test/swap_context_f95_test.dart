@@ -57,7 +57,7 @@ void main() {
     final story = find.byKey(const ValueKey('day-swap-story'));
     expect(story, findsOneWidget);
     final text = tester.widget<Text>(story).data!;
-    expect(text, startsWith('Pedida por Ana Souza em '));
+    expect(text, startsWith('Troca pedida por Ana Souza em '));
     expect(text, contains('aprovada por Bruno Lima em '));
     expect(text, endsWith('· "combinado"'));
   });

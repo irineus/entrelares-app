@@ -1973,11 +1973,16 @@ class _CalendarScreenState extends State<CalendarScreen>
     final iso = CareSchedule.isoDate(date);
     final previousIso =
         CareSchedule.isoDate(date.subtract(const Duration(days: 1)));
+    final nextIso = CareSchedule.isoDate(
+        DateTime(date.year, date.month, date.day + 1));
     final outcome = await showDaySheet(
       context: context,
       date: date,
       day: _daysByIso[iso],
       previousDay: _daysByIso[previousIso],
+      nextDay: _daysByIso[nextIso],
+      canonicalRoleOf: _canonicalRoleOf,
+      daysInMonth: _carerDayCounts(),
       members: _assignableMembers,
       memberViews: _memberViews,
       today: _today,
@@ -2609,6 +2614,25 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// it costs the grid the width of its own label.
   bool get _visibleMonthHasSwap => _daysByIso.values.any((d) =>
       d.actualParentId != null && d.actualParentId != d.scheduledParentId);
+
+  /// Owner's QA of 3.1.10 — how many days of the visible month each carer
+  /// has (the swap entry's tie-break).
+  Map<int, int> _carerDayCounts() {
+    final counts = <int, int>{};
+    for (final d in _daysByIso.values) {
+      counts[d.effectiveParentId] = (counts[d.effectiveParentId] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Owner's QA of 3.1.10 — a member's BUILT-IN role by its canonical name
+  /// (`father`, `mother`, …), or null for none or a custom role.
+  String? _canonicalRoleOf(int profileId) {
+    final roleId =
+        _members.where((m) => m.id == profileId).firstOrNull?.roleId;
+    final role = _roles.where((r) => r.id == roleId).firstOrNull;
+    return role == null ? null : RoleCatalog.find(role.roleName)?.canonicalName;
+  }
 
   /// U-28 — how a member's role reads for this reader, or null when the family
   /// never set one. Built-ins translate, custom roles pass through — the
