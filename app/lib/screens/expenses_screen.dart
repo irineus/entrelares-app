@@ -332,6 +332,27 @@ class _ExpensesScreenState extends State<ExpensesScreen>
     }
   }
 
+  /// F-93: the receiver's answer is final (F-34), so it is asked first —
+  /// amount and person named, with an optional note — never one tap.
+  Future<void> _answer(
+      Localization l, ExpenseSettlement s, {required bool received}) async {
+    final note = await showAppSheet<String>(
+      context: context,
+      builder: (_) => _AnswerSheet(
+        received: received,
+        amount: _money(s.amountCents, l),
+        fromName: _name(s.fromProfile, l),
+        maxChars: _settings.expenseDescriptionMaxChars,
+      ),
+    );
+    if (note == null || !mounted) return;
+    await _runSettlement(
+        l,
+        () => widget.dataSource.answerSettlement(s.id,
+            received: received, note: note.isEmpty ? null : note),
+        received ? KApp.expenseConfirmed : KApp.expenseRejected);
+  }
+
   Future<void> _runSettlement(
       Localization l, Future<void> Function() action, String doneKey) async {
     try {
@@ -529,6 +550,11 @@ class _ExpensesScreenState extends State<ExpensesScreen>
                                   _money(s.amountCents, l),
                                   _name(s.toProfile, l),
                                 ])),
+                      if (s.reference != null)
+                        Text(
+                            l.format(KApp.expenseReferenceLine, [s.reference]),
+                            key: ValueKey('settlement-reference-${s.id}'),
+                            style: textTheme.bodySmall),
                       if (canWrite && s.toProfile == me.id) ...[
                         const SizedBox(height: Spacing.sm),
                         Wrap(
@@ -537,20 +563,12 @@ class _ExpensesScreenState extends State<ExpensesScreen>
                           children: [
                             FilledButton(
                               key: ValueKey('settlement-confirm-${s.id}'),
-                              onPressed: () => _runSettlement(
-                                  l,
-                                  () => widget.dataSource
-                                      .answerSettlement(s.id, received: true),
-                                  KApp.expenseConfirmed),
+                              onPressed: () => _answer(l, s, received: true),
                               child: Text(l[KApp.expenseConfirm]),
                             ),
                             OutlinedButton(
                               key: ValueKey('settlement-reject-${s.id}'),
-                              onPressed: () => _runSettlement(
-                                  l,
-                                  () => widget.dataSource
-                                      .answerSettlement(s.id, received: false),
-                                  KApp.expenseRejected),
+                              onPressed: () => _answer(l, s, received: false),
                               child: Text(l[KApp.expenseReject]),
                             ),
                           ],
@@ -635,7 +653,9 @@ class _ExpensesScreenState extends State<ExpensesScreen>
     );
   }
 
-  /// Expenses and confirmed payments, newest first, as the filter asks.
+  /// Expenses and answered payments, newest first, as the filter asks. A
+  /// refused or taken-back payment stays (F-93): out of the balance, with its
+  /// badge — the payer's record of the dispute.
   List<({DateTime at, Expense? expense, ExpenseSettlement? payment})> _activity(
       List<Expense> expenses, List<ExpenseSettlement> settlements) {
     final rows = <({DateTime at, Expense? expense, ExpenseSettlement? payment})>[
@@ -643,7 +663,7 @@ class _ExpensesScreenState extends State<ExpensesScreen>
         for (final e in expenses) (at: e.spentOn, expense: e, payment: null),
       if (_show != _Show.expenses)
         for (final s in settlements)
-          if (s.isConfirmed)
+          if (!s.isPending)
             (
               at: (s.answeredAt ?? s.createdAt).toLocal(),
               expense: null,
@@ -718,11 +738,22 @@ class _ExpensesScreenState extends State<ExpensesScreen>
     final textTheme = Theme.of(context).textTheme;
     final tokens = context.tokens;
     final me = _me!.id;
-    final effect = s.fromProfile == me
-        ? _effectLine(context, l[KApp.expenseYouPaid], tokens.success)
-        : s.toProfile == me
-            ? _effectLine(context, l[KApp.expenseYouReceived], tokens.danger)
-            : _effectLine(context, l[KApp.expenseNotYours], null);
+    final effect = !s.isConfirmed
+        ? _effectLine(context, l[KApp.expenseOutOfBalance], null)
+        : s.fromProfile == me
+            ? _effectLine(context, l[KApp.expenseYouPaid], tokens.success)
+            : s.toProfile == me
+                ? _effectLine(
+                    context, l[KApp.expenseYouReceived], tokens.danger)
+                : _effectLine(context, l[KApp.expenseNotYours], null);
+    final details = [
+      l.formatDate((s.answeredAt ?? s.createdAt).toLocal()),
+      if (s.reference != null)
+        l.format(KApp.expenseReferenceLine, [s.reference]),
+      if (s.answerNote != null)
+        l.format(KApp.expenseNoteLine,
+            [_firstName(s.toProfile, l), s.answerNote]),
+    ];
     return Card(
       key: ValueKey('payment-${s.id}'),
       margin: const EdgeInsets.only(bottom: Spacing.sm),
@@ -730,7 +761,23 @@ class _ExpensesScreenState extends State<ExpensesScreen>
         leading: const Icon(Icons.payments_outlined),
         title: Text(l.format(KApp.expensePaymentRow,
             [_firstName(s.fromProfile, l), _firstName(s.toProfile, l)])),
-        subtitle: Text(l.formatDate((s.answeredAt ?? s.createdAt).toLocal())),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!s.isConfirmed)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: Spacing.xs / 2),
+                child: AppBadge(
+                  key: ValueKey('payment-badge-${s.id}'),
+                  text: l[s.isRejected
+                      ? KApp.expenseBadgeRejected
+                      : KApp.expenseBadgeCancelled],
+                  tone: s.isRejected ? tokens.danger : tokens.neutral,
+                ),
+              ),
+            for (final d in details) Text(d),
+          ],
+        ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -1227,6 +1274,7 @@ class _SettleSheet extends StatefulWidget {
 
 class _SettleSheetState extends State<_SettleSheet> {
   final TextEditingController _amount = TextEditingController();
+  final TextEditingController _reference = TextEditingController();
   String? _error;
   bool _busy = false;
   bool _seeded = false;
@@ -1243,6 +1291,7 @@ class _SettleSheetState extends State<_SettleSheet> {
   @override
   void dispose() {
     _amount.dispose();
+    _reference.dispose();
     super.dispose();
   }
 
@@ -1271,10 +1320,12 @@ class _SettleSheetState extends State<_SettleSheet> {
       _error = null;
     });
     try {
+      final reference = _reference.text.trim();
       await widget.dataSource.requestSettlement(
           childId: widget.childId,
           toProfileId: widget.toProfileId,
-          amountCents: amount!);
+          amountCents: amount!,
+          reference: reference.isEmpty ? null : reference);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -1310,6 +1361,14 @@ class _SettleSheetState extends State<_SettleSheet> {
           label: l[KApp.expenseAmount],
           controller: _amount,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        ),
+        const SizedBox(height: Spacing.sm),
+        AppTextField(
+          key: const ValueKey('settle-reference'),
+          label: l[KApp.expenseReference],
+          hint: l[KApp.expenseReferenceHint],
+          controller: _reference,
+          maxLength: widget.settings.expenseDescriptionMaxChars,
         ),
       ],
     );
@@ -1394,6 +1453,12 @@ class _ExpenseDetailSheetState extends State<_ExpenseDetailSheet> {
         [who, when]);
   }
 
+  List<String> _diffLines(Localization l, ExpenseHistoryEntry h) {
+    final lines = ExpenseDiff.describe(
+        ExpenseDiff.between(h.oldData, h.newData), l, widget.nameOf);
+    return lines.isEmpty ? [l[KApp.expenseDiffNone]] : lines;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context).l;
@@ -1439,18 +1504,82 @@ class _ExpenseDetailSheetState extends State<_ExpenseDetailSheet> {
             Text(_changeLine(l, h),
                 key: ValueKey('expense-change-${h.id}'),
                 style: textTheme.bodySmall),
-            if (h.action == 'updated' && h.oldData != null)
-              Padding(
-                padding: const EdgeInsets.only(left: Spacing.md),
-                child: Text(
-                  l.format(KApp.expenseChangeBefore, [
-                    '${h.oldData!['description'] ?? ''}',
-                    money(int.tryParse('${h.oldData!['amount_cents']}') ?? 0),
-                  ]),
-                  style: textTheme.bodySmall,
+            // F-93: every field the edit moved — payer, date, category and
+            // each person's part, not only the description and the amount.
+            if (h.action == 'updated')
+              for (final (i, line) in _diffLines(l, h).indexed)
+                Padding(
+                  key: ValueKey('expense-change-${h.id}-$i'),
+                  padding: const EdgeInsets.only(left: Spacing.md),
+                  child: Text(line, style: textTheme.bodySmall),
                 ),
-              ),
           ],
+      ],
+    );
+  }
+}
+
+/// F-93: the receiver's answer, asked before it is sent — it is FINAL (F-34),
+/// so a mis-tap on a large Pix must not be permanent. Names the amount and
+/// the person, takes an optional note, and pops the note ('' = none) or null
+/// when the reader backs out.
+class _AnswerSheet extends StatefulWidget {
+  final bool received;
+  final String amount;
+  final String fromName;
+  final int maxChars;
+
+  const _AnswerSheet({
+    required this.received,
+    required this.amount,
+    required this.fromName,
+    required this.maxChars,
+  });
+
+  @override
+  State<_AnswerSheet> createState() => _AnswerSheetState();
+}
+
+class _AnswerSheetState extends State<_AnswerSheet> {
+  final TextEditingController _note = TextEditingController();
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context).l;
+    return AppSheetFrame(
+      key: const ValueKey('settlement-answer-sheet'),
+      title: l[widget.received
+          ? KApp.expenseAnswerYesTitle
+          : KApp.expenseAnswerNoTitle],
+      primaryLabel:
+          l[widget.received ? KApp.expenseConfirm : KApp.expenseReject],
+      onPrimary: () => Navigator.of(context).pop(_note.text.trim()),
+      secondaryLabel: l[K.commonCancel],
+      onSecondary: () => Navigator.of(context).pop(),
+      children: [
+        Text(
+          l.format(
+              widget.received
+                  ? KApp.expenseAnswerYesAsk
+                  : KApp.expenseAnswerNoAsk,
+              [widget.amount, widget.fromName]),
+          key: const ValueKey('settlement-answer-ask'),
+        ),
+        const SizedBox(height: Spacing.md),
+        AppTextField(
+          key: const ValueKey('settlement-answer-note'),
+          label: l[KApp.expenseAnswerNote],
+          hint: l[KApp.expenseAnswerNoteHint],
+          controller: _note,
+          maxLength: widget.maxChars,
+          textCapitalization: TextCapitalization.sentences,
+        ),
       ],
     );
   }

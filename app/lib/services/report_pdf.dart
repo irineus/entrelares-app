@@ -587,12 +587,50 @@ List<pw.Widget> _expensesSection(
             style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
         for (final p in e.payments)
           pw.Text(
-              l.format(KApp.expensePdfSettlement, [
-                l.formatDate(p.date),
-                p.fromName,
-                money(p.amountCents),
-                p.toName,
-              ]),
+              _withPaymentFacts(
+                  l.format(KApp.expensePdfSettlement, [
+                    l.formatDate(p.date),
+                    p.fromName,
+                    money(p.amountCents),
+                    p.toName,
+                  ]),
+                  l,
+                  reference: p.reference,
+                  noteBy: p.toName,
+                  note: p.note),
+              style: small),
+      ],
+      // F-93: what was recorded and never entered the balance — the payer's
+      // proof of the dispute, kept on paper.
+      if (e.unconfirmed.isNotEmpty) ...[
+        pw.SizedBox(height: 6),
+        pw.Text(l[KApp.expensePdfUnconfirmed],
+            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+        for (final u in e.unconfirmed)
+          pw.Text(
+              _withPaymentFacts(
+                  l.format(KApp.expensePdfUnconfirmedLine, [
+                    l.formatDateTime(u.recordedAt),
+                    u.fromName,
+                    money(u.amountCents),
+                    u.toName,
+                    switch (u.state) {
+                      ReportPaymentState.pending =>
+                        l[KApp.expensePdfStatusPending],
+                      ReportPaymentState.rejected =>
+                        l.format(KApp.expensePdfStatusRejected, [
+                          u.toName,
+                          l.formatDateTime(u.answeredAt ?? u.recordedAt),
+                        ]),
+                      ReportPaymentState.cancelled =>
+                        l.format(KApp.expensePdfStatusCancelled,
+                            [l.formatDateTime(u.answeredAt ?? u.recordedAt)]),
+                    },
+                  ]),
+                  l,
+                  reference: u.reference,
+                  noteBy: u.toName,
+                  note: u.note),
               style: small),
       ],
       if (e.changes.isNotEmpty) ...[
@@ -608,6 +646,15 @@ List<pw.Widget> _expensesSection(
     ],
   ];
 }
+
+/// F-93: a payment line plus what the payer and the receiver typed about it.
+String _withPaymentFacts(String line, Localization l,
+        {String? reference, required String noteBy, String? note}) =>
+    [
+      line,
+      if (reference != null) l.format(KApp.expenseReferenceLine, [reference]),
+      if (note != null) l.format(KApp.expenseNoteLine, [noteBy, note]),
+    ].join(' · ');
 
 /// F-35: the Conversa of the period, in order, as written — immutable on the
 /// server, so the PDF says exactly what the family said.

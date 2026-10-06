@@ -254,22 +254,55 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               fromName: name(s.fromProfile),
               toName: name(s.toProfile),
               amountCents: s.amountCents,
+              reference: s.reference,
+              note: s.answerNote,
             ),
       ],
+      // F-93: recorded in the period and never confirmed — still waiting,
+      // refused or taken back. Out of the balance, kept in the record.
+      unconfirmed: [
+        for (final s in settlements)
+          if (!s.isConfirmed && inPeriod(s.createdAt.toLocal()))
+            ReportExpenseUnconfirmed(
+              recordedAt: s.createdAt.toLocal(),
+              answeredAt: s.answeredAt?.toLocal(),
+              fromName: name(s.fromProfile),
+              toName: name(s.toProfile),
+              amountCents: s.amountCents,
+              state: s.isRejected
+                  ? ReportPaymentState.rejected
+                  : s.isCancelled
+                      ? ReportPaymentState.cancelled
+                      : ReportPaymentState.pending,
+              reference: s.reference,
+              note: s.answerNote,
+            ),
+      ].reversed.toList(),
       changes: [
         for (final h in history)
           if (h.action != 'created' && h.oldData != null)
             ReportExpenseChange(
               atLocal: h.at.toLocal(),
               actorName: name(h.actorId),
-              text: l.format(
-                  h.action == 'updated'
-                      ? KApp.expensePdfUpdated
-                      : KApp.expensePdfDeleted,
-                  [
-                    '${h.oldData!['description'] ?? ''}',
-                    money(int.tryParse('${h.oldData!['amount_cents']}') ?? 0),
-                  ]),
+              // F-93: an edit prints every field it moved — payer, date,
+              // category, each person's part — not only description/amount.
+              text: h.action == 'updated'
+                  ? l.format(KApp.expensePdfUpdated, [
+                      '${h.oldData!['description'] ?? ''}',
+                      () {
+                        final lines = ExpenseDiff.describe(
+                            ExpenseDiff.between(h.oldData, h.newData),
+                            l,
+                            name);
+                        return lines.isEmpty
+                            ? l[KApp.expenseDiffNone]
+                            : lines.join('; ');
+                      }(),
+                    ])
+                  : l.format(KApp.expensePdfDeleted, [
+                      '${h.oldData!['description'] ?? ''}',
+                      money(int.tryParse('${h.oldData!['amount_cents']}') ?? 0),
+                    ]),
             ),
       ],
     );

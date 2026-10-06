@@ -137,6 +137,12 @@ class ExpenseSettlement {
   final DateTime createdAt;
   final DateTime? answeredAt;
 
+  /// F-93: what the payer typed to identify the payment (e.g. the Pix id).
+  final String? reference;
+
+  /// F-93: what the receiver wrote with the answer ("chegou só uma parte").
+  final String? answerNote;
+
   const ExpenseSettlement({
     required this.id,
     required this.fromProfile,
@@ -146,10 +152,14 @@ class ExpenseSettlement {
     required this.createdAt,
     this.childId,
     this.answeredAt,
+    this.reference,
+    this.answerNote,
   });
 
   bool get isPending => status == 'pending';
   bool get isConfirmed => status == 'confirmed';
+  bool get isRejected => status == 'rejected';
+  bool get isCancelled => status == 'cancelled';
 
   factory ExpenseSettlement.fromJson(Map<String, dynamic> json) =>
       ExpenseSettlement(
@@ -161,5 +171,7 @@ class ExpenseSettlement {
         status: json['status'] as String,
         createdAt: _instant(json['created_at'])!,
         answeredAt: _instant(json['answered_at']),
+        reference: json['reference'] as String?,
+        answerNote: json['answer_note'] as String?,
       );
 }
