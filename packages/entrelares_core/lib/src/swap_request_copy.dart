@@ -8,6 +8,7 @@
 library;
 
 import 'calendar_rules.dart';
+import 'localization/date_formats.dart';
 import 'localization/k_app.dart';
 import 'localization/localization.dart';
 
@@ -65,4 +66,26 @@ String pendingTodaySentence({
   }
   return l.format(
       KApp.cardPendingTodayBody, [firstName(carerId), firstName(targetId)]);
+}
+
+/// F-95 — the story of a swapped day, one line under the pills: who asked
+/// and when, who approved and when (or that it was approved automatically),
+/// and the approver's note. "Pedida por Ana em 03/10 09:12, aprovada por
+/// Bruno em 04/10 18:12 · "combinado"".
+String swapStorySentence({
+  required Localization l,
+  required String requesterName,
+  required DateTime? askedAtLocal,
+  required String approverName,
+  required DateTime? approvedAtLocal,
+  required bool automatic,
+  String? note,
+}) {
+  String when(DateTime? t) => t == null ? '—' : l.formatDateTimeShort(t);
+  final asked = l.format(KApp.swapStoryAsked, [requesterName, when(askedAtLocal)]);
+  final approved = automatic
+      ? l.format(KApp.swapStoryAuto, [when(approvedAtLocal)])
+      : l.format(KApp.swapStoryApproved, [approverName, when(approvedAtLocal)]);
+  final trimmed = note?.trim() ?? '';
+  return trimmed.isEmpty ? '$asked, $approved' : '$asked, $approved · "$trimmed"';
 }

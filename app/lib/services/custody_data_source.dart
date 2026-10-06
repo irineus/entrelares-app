@@ -1052,6 +1052,15 @@ abstract class CustodyDataSource {
   /// resolution paths). Enrichment only: a failure costs the origin line, never
   /// the timeline.
   Future<Map<int, SwapOrigin>> fetchResolutionOrigins(List<int> logIds);
+
+  /// F-95: the approved swap that put [date] (in [childId]'s lane) in its
+  /// current state — who asked, who approved, when, and the messages. Null
+  /// when the day was never swapped through a request.
+  Future<SwapRequest?> fetchDaySwapOrigin(DateTime date, {int? childId});
+
+  /// F-95: one request, read fresh — a sheet opened from an old push must not
+  /// act on a request that was answered, cancelled or auto-approved since.
+  Future<SwapRequest?> fetchSwapRequest(int id);
 }
 
 /// The three U-23 stamps, named rather than passed as column strings.

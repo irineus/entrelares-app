@@ -115,4 +115,28 @@ void main() {
         'Ana Souza fez um pedido para amanhã, 08/10/2026, que ainda espera a '
         'sua resposta.');
   });
+
+  // F-95: the story of a swapped day, one line under the pills.
+  test('swapStorySentence: asked, approved, the note', () {
+    expect(
+        swapStorySentence(
+            l: pt,
+            requesterName: 'Ana',
+            askedAtLocal: DateTime(2026, 10, 3, 9, 12),
+            approverName: 'Bruno',
+            approvedAtLocal: DateTime(2026, 10, 4, 18, 12),
+            automatic: false,
+            note: ' combinado '),
+        'Pedida por Ana em 03/10 09:12, aprovada por Bruno em 04/10 18:12 · '
+        '"combinado"');
+    expect(
+        swapStorySentence(
+            l: pt,
+            requesterName: 'Ana',
+            askedAtLocal: DateTime(2026, 10, 3, 9, 12),
+            approverName: 'Bruno',
+            approvedAtLocal: DateTime(2026, 10, 10),
+            automatic: true),
+        'Pedida por Ana em 03/10 09:12, aprovada automaticamente em 10/10 00:00');
+  });
 }

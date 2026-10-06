@@ -360,6 +360,26 @@ class FakeCustodyDataSource implements CustodyDataSource {
   // ── Lote 3: swap workflow ──────────────────────────────────────────────────
 
   List<SwapRequest> frozenRequests = [];
+
+  /// F-95: the approved request behind a swapped day, by ISO date.
+  Map<String, SwapRequest> daySwapOrigins = {};
+
+  /// F-95: what a fresh read of one request answers; unset ids fall back to
+  /// the open lists (so a test that never sets it sees the request as open).
+  Map<int, SwapRequest?> swapRequestsById = {};
+
+  @override
+  Future<SwapRequest?> fetchDaySwapOrigin(DateTime date, {int? childId}) async =>
+      daySwapOrigins[CareSchedule.isoDate(date)];
+
+  @override
+  Future<SwapRequest?> fetchSwapRequest(int id) async {
+    if (swapRequestsById.containsKey(id)) return swapRequestsById[id];
+    for (final r in [...frozenRequests, ...pendingForMe, ...sentRequests]) {
+      if (r.id == id) return r;
+    }
+    return null;
+  }
   List<SwapRequest> pendingForMe = [];
   List<SwapRequest> sentRequests = [];
   List<AppNotification> notifications = [];

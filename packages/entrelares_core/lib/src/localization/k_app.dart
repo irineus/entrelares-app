@@ -803,6 +803,13 @@ abstract final class KApp {
   static const String cardPendingTodayUntilYou = 'app.swap.pendingTodayUntilYou';
   static const String cardPendingTodayYouUntilYou = 'app.swap.pendingTodayYouUntilYou';
   static const String cardPendingTodayCancel = 'app.swap.pendingTodayCancel';
+  static const String swapStoryAsked = 'app.swap.storyAsked';
+  static const String swapStoryApproved = 'app.swap.storyApproved';
+  static const String swapStoryAuto = 'app.swap.storyAuto';
+  static const String swapStorySeeHistory = 'app.swap.storySeeHistory';
+  static const String frozenViewDay = 'app.swap.frozenViewDay';
+  static const String frozenAlreadyResolved = 'app.swap.frozenAlreadyResolved';
+  static const String errConflictReloaded = 'app.swap.errConflictReloaded';
   static const String expenseDiffLine = 'app.expense.diffLine';
   static const String expenseDiffAmount = 'app.expense.diffAmount';
   static const String expenseDiffSplit = 'app.expense.diffSplit';
@@ -1507,6 +1514,13 @@ abstract final class KApp {
     cardPendingTodayUntilYou,
     cardPendingTodayYouUntilYou,
     cardPendingTodayCancel,
+    swapStoryAsked,
+    swapStoryApproved,
+    swapStoryAuto,
+    swapStorySeeHistory,
+    frozenViewDay,
+    frozenAlreadyResolved,
+    errConflictReloaded,
     expenseDiffLine,
     expenseDiffAmount,
     expenseDiffSplit,
@@ -2360,6 +2374,13 @@ abstract final class StringsAppPtBr {
     KApp.cardPendingTodayUntilYou: '{0} segue responsável até você responder.',
     KApp.cardPendingTodayYouUntilYou: 'Você segue responsável até responder ao pedido.',
     KApp.cardPendingTodayCancel: 'Cancelar pedido',
+    KApp.swapStoryAsked: 'Pedida por {0} em {1}',
+    KApp.swapStoryApproved: 'aprovada por {0} em {1}',
+    KApp.swapStoryAuto: 'aprovada automaticamente em {0}',
+    KApp.swapStorySeeHistory: 'Ver no Histórico',
+    KApp.frozenViewDay: 'Ver o dia',
+    KApp.frozenAlreadyResolved: 'Esta solicitação já foi resolvida.',
+    KApp.errConflictReloaded: 'Outro responsável salvou este dia primeiro. O dia foi recarregado: confira e salve de novo.',
     KApp.expenseDiffLine: '{0}: de {1} para {2}',
     KApp.expenseDiffAmount: 'Valor',
     KApp.expenseDiffSplit: 'Divisão: {0}',
@@ -3207,6 +3228,13 @@ abstract final class StringsAppEn {
     KApp.cardPendingTodayUntilYou: '{0} stays responsible until you answer.',
     KApp.cardPendingTodayYouUntilYou: 'You stay responsible until you answer the request.',
     KApp.cardPendingTodayCancel: 'Cancel request',
+    KApp.swapStoryAsked: 'Asked by {0} on {1}',
+    KApp.swapStoryApproved: 'approved by {0} on {1}',
+    KApp.swapStoryAuto: 'approved automatically on {0}',
+    KApp.swapStorySeeHistory: 'See in the History',
+    KApp.frozenViewDay: 'See the day',
+    KApp.frozenAlreadyResolved: 'This request has already been settled.',
+    KApp.errConflictReloaded: 'Another caregiver saved this day first. The day was reloaded: check it and save again.',
     KApp.expenseDiffLine: '{0}: from {1} to {2}',
     KApp.expenseDiffAmount: 'Amount',
     KApp.expenseDiffSplit: 'Split: {0}',
