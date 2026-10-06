@@ -39,6 +39,10 @@ bool isDayConflict(String raw) =>
 bool isSwapAlreadyAnswered(String raw) =>
     raw.contains('não está mais pendente');
 
+/// F-99: `enforce_handoff_party` refused a time change from someone at neither
+/// end of the handoff (the marker is our trigger's own, a stable contract).
+bool isHandoffPartyRefusal(String raw) => raw.contains('HANDOFF_PARTY');
+
 /// S-25: a write refused because the day is frozen by an open request — on a
 /// batch re-run, the day whose request the previous attempt already opened.
 bool isFrozenDayRefusal(String raw) =>
@@ -168,6 +172,10 @@ String translateSaveError(String raw, String fallback, Localization l) {
   if (isNetworkFailure(raw) || _isGatewayStatus(fields.code)) {
     return fallback;
   }
+
+  // F-99: the database's marker for a handoff time changed by someone at
+  // neither end of the handoff — said in the reader's language.
+  if (isHandoffPartyRefusal(raw)) return l[KApp.errHandoffParty];
 
   if (fields.code == '23505') {
     if (message != null &&

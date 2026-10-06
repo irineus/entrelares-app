@@ -170,4 +170,26 @@ void main() {
             mine: true),
         startsWith('You said you '));
   });
+
+  // F-99: the handoff time is the two ends' or an admin's.
+  test('mayChangeHandoff: the day, the day before, or an admin', () {
+    bool may(int me, {bool admin = false}) => mayChangeHandoff(
+        me: me,
+        isAdmin: admin,
+        scheduledParentId: 1,
+        actualParentId: null,
+        previousEffectiveParentId: 2);
+    expect(may(1), isTrue, reason: 'the carer of the day');
+    expect(may(2), isTrue, reason: 'who hands over (D-1)');
+    expect(may(3), isFalse, reason: 'a third caregiver');
+    expect(may(3, admin: true), isTrue);
+  });
+
+  test('the HANDOFF_PARTY marker is said in the reader language', () {
+    const raw = 'PostgrestException(message: HANDOFF_PARTY: Só quem entrega '
+        'ou recebe a criança neste dia pode mudar o horário da entrega., '
+        'code: 23514, details: null, hint: null)';
+    expect(translateSaveError(raw, 'x', en), en[KApp.errHandoffParty]);
+    expect(translateSaveError(raw, 'x', pt), pt[KApp.errHandoffParty]);
+  });
 }

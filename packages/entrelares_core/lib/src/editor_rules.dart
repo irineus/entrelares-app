@@ -132,3 +132,21 @@ bool dayDraftChanged({
   return stored?.hour != draftHandoff?.hour ||
       stored?.minute != draftHandoff?.minute;
 }
+
+/// F-99 (owner, 05/10/2026) — the client half of `enforce_handoff_party`: a
+/// day's handoff time is changed by its two ends (the day's planned or real
+/// carer, and the previous day's effective carer) or by an admin. A hint for
+/// the UI only; the database refuses everyone else.
+bool mayChangeHandoff({
+  required int? me,
+  required bool isAdmin,
+  required int? scheduledParentId,
+  required int? actualParentId,
+  required int? previousEffectiveParentId,
+}) {
+  if (isAdmin) return true;
+  if (me == null) return false;
+  return me == scheduledParentId ||
+      me == actualParentId ||
+      me == previousEffectiveParentId;
+}
