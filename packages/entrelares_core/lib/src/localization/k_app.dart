@@ -818,6 +818,10 @@ abstract final class KApp {
   static const String pdfReadyAnnounce = 'app.report.pdfReadyAnnounce';
   static const String pdfChildrenPick = 'app.report.pdfChildrenPick';
   static const String attestRetry = 'app.report.attestRetry';
+  static const String wizPreset311 = 'app.wizard.preset311';
+  static const String wizPreset321611 = 'app.wizard.preset321611';
+  static const String wizAnchoredStart = 'app.wizard.anchoredStart';
+  static const String wizContinues = 'app.wizard.continues';
   static const String swapStoryAsked = 'app.swap.storyAsked';
   static const String swapStoryApproved = 'app.swap.storyApproved';
   static const String swapStoryAuto = 'app.swap.storyAuto';
@@ -1544,6 +1548,10 @@ abstract final class KApp {
     pdfReadyAnnounce,
     pdfChildrenPick,
     attestRetry,
+    wizPreset311,
+    wizPreset321611,
+    wizAnchoredStart,
+    wizContinues,
     swapStoryAsked,
     swapStoryApproved,
     swapStoryAuto,
@@ -2419,6 +2427,10 @@ abstract final class StringsAppPtBr {
     KApp.pdfReadyAnnounce: 'Relatório gerado.',
     KApp.pdfChildrenPick: 'Crianças no cabeçalho',
     KApp.attestRetry: 'Tentar de novo',
+    KApp.wizPreset311: 'Fins de semana alternados (sex–dom)',
+    KApp.wizPreset321611: 'Fins de semana alternados + pernoite de quarta',
+    KApp.wizAnchoredStart: 'Este modelo começa numa sexta: o início passou para {0}.',
+    KApp.wizContinues: 'Continua o plano: no dia anterior a criança estava com {0}.',
     KApp.swapStoryAsked: 'Pedida por {0} em {1}',
     KApp.swapStoryApproved: 'aprovada por {0} em {1}',
     KApp.swapStoryAuto: 'aprovada automaticamente em {0}',
@@ -3288,6 +3300,10 @@ abstract final class StringsAppEn {
     KApp.pdfReadyAnnounce: 'Report generated.',
     KApp.pdfChildrenPick: 'Children in the header',
     KApp.attestRetry: 'Try again',
+    KApp.wizPreset311: 'Alternating weekends (Fri–Sun)',
+    KApp.wizPreset321611: 'Alternating weekends + Wednesday overnight',
+    KApp.wizAnchoredStart: 'This pattern starts on a Friday: the start moved to {0}.',
+    KApp.wizContinues: 'Continues the plan: the day before, the child was with {0}.',
     KApp.swapStoryAsked: 'Asked by {0} on {1}',
     KApp.swapStoryApproved: 'approved by {0} on {1}',
     KApp.swapStoryAuto: 'approved automatically on {0}',

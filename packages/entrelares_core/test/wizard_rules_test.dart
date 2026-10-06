@@ -11,6 +11,77 @@ import 'package:test/test.dart';
 final _today = DateTime(2026, 8, 19);
 
 void main() {
+  // F-97 (owner, 05/10/2026): the alternating weekends, anchored on Friday,
+  // and a plan that continues the one already written.
+  group('F-97 · alternating weekends and continuation', () {
+    test('the two presets expand as decided, 14 days each', () {
+      List<(int, int)> pairs(String p) => [
+            for (final b in wizardPresetBlocks(p, const [1, 2]))
+              (b.profileId, b.days)
+          ];
+      expect(pairs('3-11'), [(2, 3), (1, 11)]);
+      expect(pairs('3-2-1-6-1-1'),
+          [(2, 3), (1, 2), (2, 1), (1, 6), (2, 1), (1, 1)]);
+      for (final p in ['3-11', '3-2-1-6-1-1']) {
+        expect(wizardPresetBlocks(p, const [1, 2]).fold(0, (s, b) => s + b.days),
+            14);
+        expect(wizardPresetAnchor(p), DateTime.friday);
+      }
+      expect(wizardPresetAnchor('7-7'), isNull);
+    });
+
+    test('the weekend falls on Fri–Sun, and the overnight on a Wednesday', () {
+      final friday = DateTime(2026, 10, 9);
+      final days = generateRotation(
+          start: friday,
+          end: DateTime(2026, 10, 23),
+          blocks: wizardPresetBlocks('3-2-1-6-1-1', const [1, 2]));
+      String who(DateTime d) =>
+          '${days.firstWhere((g) => g.date == d).scheduledParentId}';
+      expect([for (var i = 9; i <= 11; i++) who(DateTime(2026, 10, i))],
+          ['2', '2', '2'], reason: 'Fri, Sat, Sun');
+      expect(who(DateTime(2026, 10, 14)), '2', reason: 'Wednesday overnight');
+      expect([for (var i = 16; i <= 18; i++) who(DateTime(2026, 10, i))],
+          ['1', '1', '1'], reason: 'the next weekend is the other parent');
+      expect(who(DateTime(2026, 10, 21)), '2', reason: 'Wednesday again');
+    });
+
+    test('snapToWeekday moves forward to Friday, or keeps a Friday', () {
+      expect(snapToWeekday(DateTime(2026, 10, 5), DateTime.friday),
+          DateTime(2026, 10, 9));
+      expect(snapToWeekday(DateTime(2026, 10, 9), DateTime.friday),
+          DateTime(2026, 10, 9));
+      expect(snapToWeekday(DateTime(2026, 10, 10), DateTime.friday),
+          DateTime(2026, 10, 16));
+    });
+
+    test('a 7/7 ending on Ana continues with Bruno; an anchored one keeps '
+        'its order', () {
+      final turned = continueCycle(wizardPresetBlocks('7-7', const [1, 2]),
+          previousParentId: 1, anchored: false);
+      expect(turned.first.profileId, 2);
+      final kept = continueCycle(wizardPresetBlocks('3-11', const [1, 2]),
+          previousParentId: 2, anchored: true);
+      expect(kept.first.profileId, 2);
+    });
+
+    test('D-1 makes the first generated day a transition with the handoff', () {
+      final days = generateRotation(
+          start: DateTime(2026, 10, 9),
+          end: DateTime(2026, 10, 12),
+          blocks: const [CycleBlock(2, 3), CycleBlock(1, 11)],
+          handoffTime: (hour: 18, minute: 0),
+          previousParentId: 1);
+      expect(days.first.handoffTime, (hour: 18, minute: 0));
+      final fresh = generateRotation(
+          start: DateTime(2026, 10, 9),
+          end: DateTime(2026, 10, 12),
+          blocks: const [CycleBlock(2, 3), CycleBlock(1, 11)],
+          handoffTime: (hour: 18, minute: 0));
+      expect(fresh.first.handoffTime, isNull);
+    });
+  });
+
   group('wizardPresetBlocks', () {
     const profiles = [10, 20];
     test('7-7 alternates the first two profiles', () {

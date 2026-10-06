@@ -20,7 +20,19 @@ class CycleBlock {
 
 /// The preset ids, in menu order. The VALUES are pattern ids and never change
 /// with the language — only the labels do (U-13).
-const wizardPresetIds = ['7-7', '14-14', '1-1', '5-2-2-5', '2-2-3'];
+const wizardPresetIds = [
+  '7-7',
+  '14-14',
+  '1-1',
+  '5-2-2-5',
+  '2-2-3',
+  // F-97 (owner, 05/10/2026): the most common Brazilian arrangement — the
+  // child lives with one parent, the other has every other weekend (Fri–Sun),
+  // optionally plus a Wednesday overnight. Both are 14-day cycles anchored on
+  // a FRIDAY ([wizardPresetAnchor]).
+  '3-11',
+  '3-2-1-6-1-1',
+];
 
 /// Mirror of `ApplyPresetBlocks`: expands a preset id over the first two
 /// profiles ([profileIds] in roster order; missing slots become 0 and fail
@@ -46,8 +58,51 @@ List<CycleBlock> wizardPresetBlocks(String preset, List<int> profileIds) {
         CycleBlock(p1, 2),
         CycleBlock(p2, 3),
       ],
+    // F-97: "Fins de semana alternados (sex–dom)" — p2 has Fri, Sat, Sun;
+    // p1 the eleven days until the next weekend of p2.
+    '3-11' => [CycleBlock(p2, 3), CycleBlock(p1, 11)],
+    // F-97: "… + pernoite de quarta" — p2's weekend, p1 Mon–Tue, p2 Wednesday,
+    // p1 Thu through the next Tuesday (p1's own weekend), p2 Wednesday again,
+    // p1 Thursday.
+    '3-2-1-6-1-1' => [
+        CycleBlock(p2, 3),
+        CycleBlock(p1, 2),
+        CycleBlock(p2, 1),
+        CycleBlock(p1, 6),
+        CycleBlock(p2, 1),
+        CycleBlock(p1, 1),
+      ],
     _ => [CycleBlock(p1, 7), CycleBlock(p2, 7)],
   };
+}
+
+/// F-97: the weekday a preset's cycle must start on ([DateTime.friday] for
+/// the alternating weekends), or null when any day will do.
+int? wizardPresetAnchor(String preset) =>
+    const {'3-11': DateTime.friday, '3-2-1-6-1-1': DateTime.friday}[preset];
+
+/// F-97: [start] moved to the next [weekday] — or kept, when it already is
+/// one. Never earlier: a start in the past is refused anyway.
+DateTime snapToWeekday(DateTime start, int weekday) {
+  final d = dateOnly(start);
+  final ahead = (weekday - d.weekday + 7) % 7;
+  return DateTime(d.year, d.month, d.day + ahead);
+}
+
+/// F-97: a plan that CONTINUES one already written. [previousParentId] is
+/// D-1's effective carer. For a free-weekday cycle the blocks turn so the
+/// first one is the block right after the first block of that carer — a
+/// 7/7 ending on Mom's week continues with Dad's, not with Mom again. An
+/// anchored cycle ([anchored]) is never turned: its weekday alignment IS the
+/// pattern, and turning it would move the weekends; D-1 then only feeds the
+/// first day's handoff ([generateRotation]'s `previousParentId`).
+List<CycleBlock> continueCycle(List<CycleBlock> blocks,
+    {required int? previousParentId, required bool anchored}) {
+  if (anchored || previousParentId == null || blocks.length < 2) return blocks;
+  final i = blocks.indexWhere((b) => b.profileId == previousParentId);
+  if (i < 0) return blocks;
+  final from = (i + 1) % blocks.length;
+  return [...blocks.sublist(from), ...blocks.sublist(0, from)];
 }
 
 /// Mirror of `SetBlockDays`' `Math.Clamp(days, 1, 60)`.
@@ -158,13 +213,15 @@ class GeneratedDay {
 /// cycling through [blocks]. T-27: a handoff time lands only on TRANSITION
 /// days — and the wizard's local rule deliberately differs from the
 /// calendar's [isTransitionDay]: the FIRST generated day has no previous
-/// parent and gets NO handoff (custody isn't changing hands mid-plan there).
+/// parent and gets NO handoff (custody isn't changing hands mid-plan there) —
+/// unless [previousParentId] says who had D-1 (F-97).
 /// [end] arrives already clamped by [clampScheduleEnd] (F-39).
 List<GeneratedDay> generateRotation({
   required DateTime start,
   required DateTime end,
   required List<CycleBlock> blocks,
   ({int hour, int minute})? handoffTime,
+  int? previousParentId,
 }) {
   final result = <GeneratedDay>[];
   if (blocks.isEmpty) return result;
@@ -172,7 +229,8 @@ List<GeneratedDay> generateRotation({
   final last = dateOnly(end);
   var blockIndex = 0;
   var dayInBlock = 0;
-  int? previousParentId;
+  // F-97: D-1's carer when the plan continues one already written — the first
+  // generated day is then a real transition and gets the handoff time.
   while (current.isBefore(last)) {
     final block = blocks[blockIndex];
     final isTransition =
