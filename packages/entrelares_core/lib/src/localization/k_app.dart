@@ -767,7 +767,6 @@ abstract final class KApp {
   static const String expenseChangeCreated = 'app.expense.changeCreated';
   static const String expenseChangeUpdated = 'app.expense.changeUpdated';
   static const String expenseChangeDeleted = 'app.expense.changeDeleted';
-  static const String expenseChangeBefore = 'app.expense.changeBefore';
   static const String expenseOpen = 'app.expense.open';
   static const String expenseFormerMember = 'app.expense.formerMember';
   static const String expensePdfSection = 'app.expense.pdfSection';
@@ -780,6 +779,29 @@ abstract final class KApp {
   static const String expensePdfChange = 'app.expense.pdfChange';
   static const String expensePdfUpdated = 'app.expense.pdfUpdated';
   static const String expensePdfDeleted = 'app.expense.pdfDeleted';
+  static const String expenseDiffLine = 'app.expense.diffLine';
+  static const String expenseDiffAmount = 'app.expense.diffAmount';
+  static const String expenseDiffSplit = 'app.expense.diffSplit';
+  static const String expenseDiffShare = 'app.expense.diffShare';
+  static const String expenseDiffNone = 'app.expense.diffNone';
+  static const String expenseAnswerYesTitle = 'app.expense.answerYesTitle';
+  static const String expenseAnswerNoTitle = 'app.expense.answerNoTitle';
+  static const String expenseAnswerYesAsk = 'app.expense.answerYesAsk';
+  static const String expenseAnswerNoAsk = 'app.expense.answerNoAsk';
+  static const String expenseAnswerNote = 'app.expense.answerNote';
+  static const String expenseAnswerNoteHint = 'app.expense.answerNoteHint';
+  static const String expenseReference = 'app.expense.reference';
+  static const String expenseReferenceHint = 'app.expense.referenceHint';
+  static const String expenseReferenceLine = 'app.expense.referenceLine';
+  static const String expenseNoteLine = 'app.expense.noteLine';
+  static const String expenseBadgeRejected = 'app.expense.badgeRejected';
+  static const String expenseBadgeCancelled = 'app.expense.badgeCancelled';
+  static const String expenseOutOfBalance = 'app.expense.outOfBalance';
+  static const String expensePdfUnconfirmed = 'app.expense.pdfUnconfirmed';
+  static const String expensePdfUnconfirmedLine = 'app.expense.pdfUnconfirmedLine';
+  static const String expensePdfStatusPending = 'app.expense.pdfStatusPending';
+  static const String expensePdfStatusRejected = 'app.expense.pdfStatusRejected';
+  static const String expensePdfStatusCancelled = 'app.expense.pdfStatusCancelled';
   // ── F-35: the family's Conversa ──
   static const String chatNav = 'app.chat.nav';
   static const String chatTabChat = 'app.chat.tabChat';
@@ -1426,7 +1448,6 @@ abstract final class KApp {
     expenseChangeCreated,
     expenseChangeUpdated,
     expenseChangeDeleted,
-    expenseChangeBefore,
     expenseOpen,
     expenseFormerMember,
     expensePdfSection,
@@ -1439,6 +1460,29 @@ abstract final class KApp {
     expensePdfChange,
     expensePdfUpdated,
     expensePdfDeleted,
+    expenseDiffLine,
+    expenseDiffAmount,
+    expenseDiffSplit,
+    expenseDiffShare,
+    expenseDiffNone,
+    expenseAnswerYesTitle,
+    expenseAnswerNoTitle,
+    expenseAnswerYesAsk,
+    expenseAnswerNoAsk,
+    expenseAnswerNote,
+    expenseAnswerNoteHint,
+    expenseReference,
+    expenseReferenceHint,
+    expenseReferenceLine,
+    expenseNoteLine,
+    expenseBadgeRejected,
+    expenseBadgeCancelled,
+    expenseOutOfBalance,
+    expensePdfUnconfirmed,
+    expensePdfUnconfirmedLine,
+    expensePdfStatusPending,
+    expensePdfStatusRejected,
+    expensePdfStatusCancelled,
     chatNav,
     chatTabChat,
     chatTabNotifications,
@@ -2234,19 +2278,41 @@ abstract final class StringsAppPtBr {
     KApp.expenseChangeCreated: '{0} lançou em {1}',
     KApp.expenseChangeUpdated: '{0} alterou em {1}',
     KApp.expenseChangeDeleted: '{0} apagou em {1}',
-    KApp.expenseChangeBefore: 'Antes: {0} · {1}',
     KApp.expenseOpen: 'Abrir Despesas',
     KApp.expenseFormerMember: 'Ex-membro',
     KApp.expensePdfSection: '{0}. Despesas',
-    KApp.expensePdfLead: 'O que a família lançou como despesa da criança no período, quem pagou e a parte de cada um. Um pagamento entre responsáveis só aparece depois que quem recebeu confirmou.',
+    KApp.expensePdfLead: 'O que a família lançou como despesa da criança no período, quem pagou e a parte de cada um. Um pagamento entre responsáveis só entra no saldo depois que quem recebeu confirmou; os não confirmados ficam listados à parte.',
     KApp.expensePdfEmpty: 'Nenhuma despesa no período.',
     KApp.expensePdfTotals: '{0}: pagou {1} · parte {2}',
     KApp.expensePdfSettlements: 'Pagamentos confirmados',
     KApp.expensePdfSettlement: '{0} — {1} pagou {2} a {3}',
     KApp.expensePdfChanges: 'Alterações e exclusões',
     KApp.expensePdfChange: '{0} — {1}: {2}',
-    KApp.expensePdfUpdated: 'alterou "{0}" (antes: {1})',
+    KApp.expensePdfUpdated: 'alterou "{0}": {1}',
     KApp.expensePdfDeleted: 'apagou "{0}" ({1})',
+    KApp.expenseDiffLine: '{0}: de {1} para {2}',
+    KApp.expenseDiffAmount: 'Valor',
+    KApp.expenseDiffSplit: 'Divisão: {0}',
+    KApp.expenseDiffShare: '{0} de {1} para {2}',
+    KApp.expenseDiffNone: 'nenhum campo mudou',
+    KApp.expenseAnswerYesTitle: 'Confirmar que recebeu',
+    KApp.expenseAnswerNoTitle: 'Dizer que não recebeu',
+    KApp.expenseAnswerYesAsk: 'Você recebeu {0} de {1}? O pagamento entra no saldo, e esta resposta não pode ser desfeita.',
+    KApp.expenseAnswerNoAsk: 'Você não recebeu {0} de {1}? O pagamento fica fora do saldo, guardado no registro, e esta resposta não pode ser desfeita.',
+    KApp.expenseAnswerNote: 'Comentário (opcional)',
+    KApp.expenseAnswerNoteHint: 'Ex.: chegou só uma parte',
+    KApp.expenseReference: 'Referência (opcional)',
+    KApp.expenseReferenceHint: 'Ex.: o identificador do Pix',
+    KApp.expenseReferenceLine: 'Referência: {0}',
+    KApp.expenseNoteLine: 'Comentário de {0}: {1}',
+    KApp.expenseBadgeRejected: 'Não confirmado',
+    KApp.expenseBadgeCancelled: 'Desfeito',
+    KApp.expenseOutOfBalance: 'fora do saldo',
+    KApp.expensePdfUnconfirmed: 'Pagamentos registrados e não confirmados',
+    KApp.expensePdfUnconfirmedLine: '{0} — {1} registrou {2} pagos a {3}: {4}',
+    KApp.expensePdfStatusPending: 'aguardando a confirmação',
+    KApp.expensePdfStatusRejected: '{0} disse que não recebeu, em {1}',
+    KApp.expensePdfStatusCancelled: 'desfeito por quem registrou, em {0}',
     KApp.chatNav: 'Comunicação',
     KApp.chatTabChat: 'Conversa',
     KApp.chatTabNotifications: 'Notificações',
@@ -3036,19 +3102,41 @@ abstract final class StringsAppEn {
     KApp.expenseChangeCreated: '{0} added it on {1}',
     KApp.expenseChangeUpdated: '{0} changed it on {1}',
     KApp.expenseChangeDeleted: '{0} deleted it on {1}',
-    KApp.expenseChangeBefore: 'Before: {0} · {1}',
     KApp.expenseOpen: 'Open Expenses',
     KApp.expenseFormerMember: 'Former member',
     KApp.expensePdfSection: '{0}. Expenses',
-    KApp.expensePdfLead: 'What the family added as the child\'s expenses in the period, who paid and each one\'s share. A payment between caregivers shows only after the receiver confirmed it.',
+    KApp.expensePdfLead: 'What the family added as the child\'s expenses in the period, who paid and each one\'s share. A payment between caregivers enters the balance only after the receiver confirmed it; the unconfirmed ones are listed apart.',
     KApp.expensePdfEmpty: 'No expenses in the period.',
     KApp.expensePdfTotals: '{0}: paid {1} · share {2}',
     KApp.expensePdfSettlements: 'Confirmed payments',
     KApp.expensePdfSettlement: '{0} — {1} paid {2} to {3}',
     KApp.expensePdfChanges: 'Changes and deletions',
     KApp.expensePdfChange: '{0} — {1}: {2}',
-    KApp.expensePdfUpdated: 'changed "{0}" (before: {1})',
+    KApp.expensePdfUpdated: 'changed "{0}": {1}',
     KApp.expensePdfDeleted: 'deleted "{0}" ({1})',
+    KApp.expenseDiffLine: '{0}: from {1} to {2}',
+    KApp.expenseDiffAmount: 'Amount',
+    KApp.expenseDiffSplit: 'Split: {0}',
+    KApp.expenseDiffShare: '{0} from {1} to {2}',
+    KApp.expenseDiffNone: 'no field changed',
+    KApp.expenseAnswerYesTitle: 'Confirm you received it',
+    KApp.expenseAnswerNoTitle: 'Say you did not receive it',
+    KApp.expenseAnswerYesAsk: 'Did you receive {0} from {1}? The payment enters the balance, and this answer cannot be undone.',
+    KApp.expenseAnswerNoAsk: 'You did not receive {0} from {1}? The payment stays out of the balance, kept in the record, and this answer cannot be undone.',
+    KApp.expenseAnswerNote: 'Comment (optional)',
+    KApp.expenseAnswerNoteHint: 'E.g.: only part of it arrived',
+    KApp.expenseReference: 'Reference (optional)',
+    KApp.expenseReferenceHint: 'E.g.: the Pix transaction ID',
+    KApp.expenseReferenceLine: 'Reference: {0}',
+    KApp.expenseNoteLine: 'Comment from {0}: {1}',
+    KApp.expenseBadgeRejected: 'Not confirmed',
+    KApp.expenseBadgeCancelled: 'Taken back',
+    KApp.expenseOutOfBalance: 'not in the balance',
+    KApp.expensePdfUnconfirmed: 'Recorded payments not confirmed',
+    KApp.expensePdfUnconfirmedLine: '{0} — {1} recorded {2} paid to {3}: {4}',
+    KApp.expensePdfStatusPending: 'awaiting confirmation',
+    KApp.expensePdfStatusRejected: '{0} said it was not received, on {1}',
+    KApp.expensePdfStatusCancelled: 'taken back by who recorded it, on {0}',
     KApp.chatNav: 'Inbox',
     KApp.chatTabChat: 'Chat',
     KApp.chatTabNotifications: 'Notifications',

@@ -864,11 +864,16 @@ abstract class CustodyDataSource {
   Future<void> deleteExpense(int id);
 
   /// "I paid [amountCents] to [toProfileId]" — waits for the receiver.
+  /// [reference] (F-93): optional, e.g. the Pix id.
   Future<int> requestSettlement(
-      {int? childId, required int toProfileId, required int amountCents});
+      {int? childId,
+      required int toProfileId,
+      required int amountCents,
+      String? reference});
 
-  /// The receiver's answer.
-  Future<void> answerSettlement(int id, {required bool received});
+  /// The receiver's answer — final. [note] (F-93): optional.
+  Future<void> answerSettlement(int id,
+      {required bool received, String? note});
 
   /// The one who recorded it takes it back while it waits.
   Future<void> cancelSettlement(int id);

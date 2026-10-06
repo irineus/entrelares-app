@@ -1536,10 +1536,12 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Future<int> requestSettlement(
       {int? childId,
       required int toProfileId,
-      required int amountCents}) async {
+      required int amountCents,
+      String? reference}) async {
     if (throwOnExpenseWrite != null) throw throwOnExpenseWrite!;
     final id = _nextExpenseId++;
-    expenseWrites.add('settle:$toProfileId:$amountCents');
+    expenseWrites.add('settle:$toProfileId:$amountCents'
+        '${reference == null ? '' : ':$reference'}');
     settlements = [
       ExpenseSettlement(
           id: id,
@@ -1548,7 +1550,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
           toProfile: toProfileId,
           amountCents: amountCents,
           status: 'pending',
-          createdAt: DateTime.utc(2026, 9, 24)),
+          createdAt: DateTime.utc(2026, 9, 24),
+          reference: reference),
       ...settlements
     ];
     return id;
@@ -1572,7 +1575,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
     return () => expenseListener = null;
   }
 
-  ExpenseSettlement _withStatus(ExpenseSettlement s, String status) =>
+  ExpenseSettlement _withStatus(ExpenseSettlement s, String status,
+          {String? note}) =>
       ExpenseSettlement(
           id: s.id,
           childId: s.childId,
@@ -1581,15 +1585,21 @@ class FakeCustodyDataSource implements CustodyDataSource {
           amountCents: s.amountCents,
           status: status,
           createdAt: s.createdAt,
-          answeredAt: DateTime.utc(2026, 9, 24));
+          answeredAt: DateTime.utc(2026, 9, 24),
+          reference: s.reference,
+          answerNote: note);
 
   @override
-  Future<void> answerSettlement(int id, {required bool received}) async {
+  Future<void> answerSettlement(int id,
+      {required bool received, String? note}) async {
     if (throwOnExpenseWrite != null) throw throwOnExpenseWrite!;
-    expenseWrites.add('answer:$id:$received');
+    expenseWrites
+        .add('answer:$id:$received${note == null ? '' : ':$note'}');
     settlements = [
       for (final s in settlements)
-        s.id == id ? _withStatus(s, received ? 'confirmed' : 'rejected') : s
+        s.id == id
+            ? _withStatus(s, received ? 'confirmed' : 'rejected', note: note)
+            : s
     ];
   }
 

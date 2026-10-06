@@ -538,7 +538,8 @@ List<ReportAgendaItem> reportAgendaInOrder(Iterable<ReportAgendaItem> items) {
 }
 
 /// F-34: the expenses section — built by the caller from the period's live
-/// expenses, its confirmed payments and the trail of changes. Money in cents.
+/// expenses, its confirmed payments, the ones never confirmed (F-93) and the
+/// trail of changes. Money in cents.
 class ReportExpenseLine {
   final DateTime date;
   final String description;
@@ -570,11 +571,48 @@ class ReportExpensePayment {
   final String toName;
   final int amountCents;
 
+  /// F-93: the payer's reference (e.g. the Pix id) and the receiver's note.
+  final String? reference;
+  final String? note;
+
   const ReportExpensePayment({
     required this.date,
     required this.fromName,
     required this.toName,
     required this.amountCents,
+    this.reference,
+    this.note,
+  });
+}
+
+/// F-93: how a payment that never entered the balance ended — still waiting,
+/// refused by the receiver, or taken back by whoever recorded it.
+enum ReportPaymentState { pending, rejected, cancelled }
+
+/// F-93: a payment recorded and NOT confirmed. It stays on paper because it
+/// is the payer's proof of the dispute; it never counts in the balance.
+class ReportExpenseUnconfirmed {
+  /// When it was recorded (local).
+  final DateTime recordedAt;
+
+  /// When it was refused or taken back (local); null while it waits.
+  final DateTime? answeredAt;
+  final String fromName;
+  final String toName;
+  final int amountCents;
+  final ReportPaymentState state;
+  final String? reference;
+  final String? note;
+
+  const ReportExpenseUnconfirmed({
+    required this.recordedAt,
+    required this.fromName,
+    required this.toName,
+    required this.amountCents,
+    required this.state,
+    this.answeredAt,
+    this.reference,
+    this.note,
   });
 }
 
@@ -595,17 +633,22 @@ class ReportExpenses {
   final List<ReportExpenseLine> lines;
   final List<ReportExpenseTotal> totals;
   final List<ReportExpensePayment> payments;
+  final List<ReportExpenseUnconfirmed> unconfirmed;
   final List<ReportExpenseChange> changes;
 
   const ReportExpenses({
     this.lines = const [],
     this.totals = const [],
     this.payments = const [],
+    this.unconfirmed = const [],
     this.changes = const [],
   });
 
   bool get isEmpty =>
-      lines.isEmpty && payments.isEmpty && changes.isEmpty;
+      lines.isEmpty &&
+      payments.isEmpty &&
+      unconfirmed.isEmpty &&
+      changes.isEmpty;
 }
 
 /// F-35: one Conversa text as the PDF prints it — built by the caller from

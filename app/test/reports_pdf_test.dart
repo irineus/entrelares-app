@@ -251,6 +251,7 @@ void main() {
       List<AuditLogView> logs = const [],
       Localization? localization,
       List<ReportDayAccount> dayAccounts = const [],
+      ReportExpenses? expenses,
     }) {
       final loc = localization ?? l;
       return buildCustodyReport(
@@ -287,8 +288,81 @@ void main() {
         resolutionOrigins: origins,
         includeAcceptedFutureSwaps: future,
         dayAccounts: dayAccounts,
+        expenses: expenses,
       );
     }
+
+    // F-93: the record holds up — a refused payment stays on paper, apart
+    // from the confirmed ones, with the receiver's comment and the payer's
+    // reference; an edited split prints the parts, not just the amount.
+    // English, because the test faces drop accents.
+    test('F-93: a refused payment and an edited split reach the page',
+        () async {
+      final en = Localization(AppLanguage.en);
+      String name(int id) => id == 1 ? 'Ana Souza' : 'Bruno Lima';
+      final split = ExpenseDiff.describe(
+          ExpenseDiff.between({
+            'paid_by': 1,
+            'shares': [
+              {'profile_id': 1, 'share_cents': 3000},
+              {'profile_id': 2, 'share_cents': 7000},
+            ],
+          }, {
+            'paid_by': 1,
+            'shares': [
+              {'profile_id': 1, 'share_cents': 5000},
+              {'profile_id': 2, 'share_cents': 5000},
+            ],
+          }),
+          en,
+          name);
+      final text = await render(
+          report(
+              localization: en,
+              expenses: ReportExpenses(
+                payments: [
+                  ReportExpensePayment(
+                      date: DateTime(2026, 8, 20),
+                      fromName: 'Bruno Lima',
+                      toName: 'Ana Souza',
+                      amountCents: 2000,
+                      reference: 'PIX-OK-1'),
+                ],
+                unconfirmed: [
+                  ReportExpenseUnconfirmed(
+                      recordedAt: DateTime(2026, 8, 21, 9),
+                      answeredAt: DateTime(2026, 8, 22, 18),
+                      fromName: 'Bruno Lima',
+                      toName: 'Ana Souza',
+                      amountCents: 70000,
+                      state: ReportPaymentState.rejected,
+                      reference: 'PIX-REFUSED-7',
+                      note: 'only part of it arrived'),
+                ],
+                changes: [
+                  ReportExpenseChange(
+                      atLocal: DateTime(2026, 8, 23, 10),
+                      actorName: 'Bruno Lima',
+                      text: en.format(
+                          KApp.expensePdfUpdated, ['School fee', split.single])),
+                ],
+              )),
+          en);
+      // Each word is its own text object on the page: read them in order.
+      final page = RegExp(r'\(((?:[^()\\]|\\.)*)\)')
+          .allMatches(text)
+          .map((m) => m.group(1))
+          .join(' ');
+
+      expect(page, contains('Confirmed payments'));
+      expect(page, contains('Reference: PIX-OK-1'));
+      expect(page, contains('Recorded payments not confirmed'));
+      expect(page, contains('Ana Souza said it was not received'));
+      expect(page, contains('Reference: PIX-REFUSED-7'));
+      expect(page, contains('Comment from Ana Souza: only part of it arrived'));
+      expect(page, contains('Split: Ana Souza'));
+      expect(page, contains('Bruno Lima from R\$70.00 to R\$50.00'));
+    });
 
     // F-67: section 4 prints both dates, the author and the text; a corrected
     // relato keeps its text and says when it was corrected.

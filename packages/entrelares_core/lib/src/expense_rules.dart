@@ -9,7 +9,10 @@
 /// Splitwise's "simplify debts" reads them.
 library;
 
+import 'localization/date_formats.dart';
 import 'localization/k.dart';
+import 'localization/k_app.dart';
+import 'localization/localization.dart';
 
 /// The seven closed categories (wire keys = `expenses.category`'s CHECK).
 enum ExpenseCategory {
@@ -255,5 +258,115 @@ abstract final class ExpenseLedger {
       }
     }
     return out;
+  }
+}
+
+/// F-93 — the fields an edit can change, as the trail records them.
+enum ExpenseField { description, amount, category, paidBy, spentOn, split }
+
+/// One field that changed between two snapshots of `expense_history`. For
+/// [ExpenseField.split], [shares] holds each person whose part moved
+/// (null = was not / is no longer in the split); [before]/[after] stay null.
+class ExpenseFieldChange {
+  final ExpenseField field;
+  final Object? before;
+  final Object? after;
+  final List<({int profileId, int? beforeCents, int? afterCents})> shares;
+
+  const ExpenseFieldChange(this.field,
+      {this.before, this.after, this.shares = const []});
+}
+
+/// F-93 — what an edit actually changed. The trail always held the whole
+/// expense before and after (`expense_snapshot`: payer, date, category, the
+/// split per person), and the screens printed only the description and the
+/// amount — a 70/30 → 50/50 edit read as no change at all.
+abstract final class ExpenseDiff {
+  static int? _cents(Object? raw) =>
+      raw == null ? null : (raw is int ? raw : int.tryParse('$raw'));
+
+  static Map<int, int> _shares(Map<String, dynamic> snap) => {
+        for (final s in (snap['shares'] as List?) ?? const [])
+          if (_cents((s as Map)['profile_id']) != null)
+            _cents(s['profile_id'])!: _cents(s['share_cents']) ?? 0
+      };
+
+  /// The fields that differ between [before] and [after], in reading order.
+  /// The split is compared by what each person OWES (`share_cents`): a
+  /// method change that leaves every part where it was changed nothing.
+  static List<ExpenseFieldChange> between(
+      Map<String, dynamic>? before, Map<String, dynamic>? after) {
+    if (before == null || after == null) return const [];
+    final out = <ExpenseFieldChange>[];
+    void plain(ExpenseField f, String key, Object? Function(Object?) read) {
+      final b = read(before[key]);
+      final a = read(after[key]);
+      if (b != a) out.add(ExpenseFieldChange(f, before: b, after: a));
+    }
+
+    String? text(Object? raw) => raw == null ? null : '$raw';
+    plain(ExpenseField.description, 'description', text);
+    plain(ExpenseField.amount, 'amount_cents', _cents);
+    plain(ExpenseField.category, 'category', text);
+    plain(ExpenseField.paidBy, 'paid_by', _cents);
+    plain(ExpenseField.spentOn, 'spent_on', text);
+
+    final b = _shares(before);
+    final a = _shares(after);
+    final ids = {...b.keys, ...a.keys}.toList()..sort();
+    final moved = [
+      for (final id in ids)
+        if (b[id] != a[id])
+          (profileId: id, beforeCents: b[id], afterCents: a[id])
+    ];
+    if (moved.isNotEmpty) {
+      out.add(ExpenseFieldChange(ExpenseField.split, shares: moved));
+    }
+    return out;
+  }
+
+  /// One sentence per changed field, in the reader's words — the same lines
+  /// on the expense's sheet and in the PDF. [nameOf] answers a profile id.
+  static List<String> describe(List<ExpenseFieldChange> changes,
+      Localization l, String Function(int profileId) nameOf) {
+    String money(Object? c) =>
+        c == null ? '—' : ExpenseRules.brl(c as int, english: l.isEnglish);
+    String category(Object? c) => l[
+        (ExpenseCategory.parse(c as String?) ?? ExpenseCategory.other)
+            .labelKey];
+    String day(Object? d) {
+      final parsed = d == null ? null : DateTime.tryParse('$d');
+      return parsed == null ? '—' : l.formatDate(parsed);
+    }
+
+    String person(Object? id) => id == null ? '—' : nameOf(id as int);
+    String line(String labelKey, String b, String a) =>
+        l.format(KApp.expenseDiffLine, [l[labelKey], b, a]);
+
+    return [
+      for (final c in changes)
+        switch (c.field) {
+          ExpenseField.description => line(KApp.expenseDesc,
+              '"${c.before ?? ''}"', '"${c.after ?? ''}"'),
+          ExpenseField.amount =>
+            line(KApp.expenseDiffAmount, money(c.before), money(c.after)),
+          ExpenseField.category => line(
+              KApp.expenseCategory, category(c.before), category(c.after)),
+          ExpenseField.paidBy =>
+            line(KApp.expensePaidBy, person(c.before), person(c.after)),
+          ExpenseField.spentOn =>
+            line(KApp.expenseDate, day(c.before), day(c.after)),
+          ExpenseField.split => l.format(KApp.expenseDiffSplit, [
+              [
+                for (final s in c.shares)
+                  l.format(KApp.expenseDiffShare, [
+                    nameOf(s.profileId),
+                    money(s.beforeCents),
+                    money(s.afterCents),
+                  ])
+              ].join('; ')
+            ]),
+        }
+    ];
   }
 }

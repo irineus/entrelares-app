@@ -2193,17 +2193,20 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<int> requestSettlement(
           {int? childId,
           required int toProfileId,
-          required int amountCents}) async =>
+          required int amountCents,
+          String? reference}) async =>
       await _client.rpc<dynamic>('request_settlement', params: {
         'p_child_id': childId,
         'p_to': toProfileId,
         'p_amount': amountCents,
+        'p_reference': reference,
       }) as int;
 
   @override
-  Future<void> answerSettlement(int id, {required bool received}) async {
+  Future<void> answerSettlement(int id,
+      {required bool received, String? note}) async {
     await _client.rpc<dynamic>('answer_settlement',
-        params: {'p_id': id, 'p_received': received});
+        params: {'p_id': id, 'p_received': received, 'p_note': note});
   }
 
   @override
