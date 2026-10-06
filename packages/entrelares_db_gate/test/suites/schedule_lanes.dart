@@ -176,7 +176,11 @@ void scheduleLaneTests(GateFixture fx) {
         () async {
       final d = fx.nextFutureDate();
       final lia = await insertDay(fam.admin, d, child: childA);
-      final theo = await insertDay(fam.admin, d, child: childB);
+      // F-99: Theo's day is the member's, so the member is an end of its
+      // handoff and may write the time — the probe is the frozen lane, not
+      // who may change a handoff.
+      final theo = await insertDay(fam.admin, d,
+          child: childB, parent: fam.memberProfile.id);
       final request = await openSwap(lia);
       expect(request['child_id'], childA,
           reason: 'the lane is stamped from schedule_id');
