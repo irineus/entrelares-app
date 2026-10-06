@@ -272,7 +272,8 @@ void main() {
       await tester.pumpWidget(app(ds));
       await tester.pumpAndSettle();
 
-      expect(find.text(_pt[KApp.noticeOpenMine]), findsOneWidget);
+      // Owner's QA of 3.1.10: no title — the second person says it is hers.
+      expect(find.byKey(const ValueKey('notice-strip-1')), findsOneWidget);
       await tester.tap(find.text(_pt[KApp.noticeCancel]).last);
       await tester.pumpAndSettle();
 

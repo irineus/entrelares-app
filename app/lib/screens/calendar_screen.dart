@@ -164,6 +164,12 @@ class CalendarScreen extends StatefulWidget {
   /// them for the session.
   final PushTodayPrefs? pushTodayPrefs;
 
+  /// Owner's QA of 3.1.10: true while this screen shows one of its system
+  /// strips ([_SystemStrip]) — the shell then holds back its own offers
+  /// ("Abrir no app", the install invitation), so the calendar never carries
+  /// more than one.
+  final ValueNotifier<bool>? systemStripShowing;
+
   /// F-70: the plan-end strip, for tests.
   static const planEndStripKey = Key('plan-end-strip');
 
@@ -204,6 +210,7 @@ class CalendarScreen extends StatefulWidget {
       this.push,
       this.installFacts,
       this.pushTodayPrefs,
+      this.systemStripShowing,
       this.planRequest,
       this.dayRequest});
 
@@ -1026,6 +1033,29 @@ class _CalendarScreenState extends State<CalendarScreen>
   OnboardingSignals? get _effectiveSignals => _onboardingSignals?.copyWith(
       hasAnyPlannedDay:
           _onboardingSignals!.hasAnyPlannedDay || _daysByIso.isNotEmpty);
+
+  /// Owner's QA of 3.1.10 (06/10/2026) — ONE system strip at a time over the
+  /// calendar. On a first opening the notifications offer, the checklist, the
+  /// handoff nudge and the shell's "Abrir no app" all stood above the grid
+  /// and left it a single week. The order is the owner's: notifications, then
+  /// the first steps, then the rest; the next one shows once the one before
+  /// is answered or sent away. The day's own strips (a request, an aviso) are
+  /// not in this queue — they are about today.
+  _SystemStrip? get _systemStrip {
+    if (_showPushToday) return _SystemStrip.pushToday;
+    if (_showChecklist) return _SystemStrip.checklist;
+    if (_showHandoffNudge) return _SystemStrip.handoffNudge;
+    return null;
+  }
+
+  /// Tells the shell, after the frame, whether a system strip is on screen.
+  void _reportSystemStrip(bool showing) {
+    final notifier = widget.systemStripShowing;
+    if (notifier == null || notifier.value == showing) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) notifier.value = showing;
+    });
+  }
 
   bool get _showChecklist {
     final signals = _effectiveSignals;
@@ -2236,6 +2266,8 @@ class _CalendarScreenState extends State<CalendarScreen>
       onInvite: _onInviteNudgeTap,
       noticeStrip: _noticeStrip(context, todayRow, nextHandoff),
       requestStrip: _requestStrips(context),
+      onSendNotice: _canOfferNotice ? _openNoticeFromMenu : null,
+      sendNoticeKey: CalendarScreen.noticeQuickActionKey,
       laneSummary: _todayLaneSummary(AppL10n.of(context).l),
     );
   }
@@ -2255,23 +2287,30 @@ class _CalendarScreenState extends State<CalendarScreen>
     return null;
   }
 
-  /// The Hoje card's request strips: today's open request first (F-94), then
-  /// the others waiting for my answer (U-60).
+  /// The Hoje card's request strip — ONE line (owner's QA of 3.1.10): today's
+  /// open request when there is one (F-94), with the others waiting for my
+  /// answer as a "+N" under it; otherwise the waiting ones (U-60).
   Widget? _requestStrips(BuildContext context) {
-    final today = _pendingTodayStrip(context);
-    final waiting = _requestStrip(context);
-    if (today == null || waiting == null) return today ?? waiting;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [today, const SizedBox(height: Spacing.sm), waiting],
-    );
+    final waiting = _waitingForMe;
+    return _pendingTodayStrip(context, others: waiting.length) ??
+        _requestStrip(context);
+  }
+
+  /// The requests waiting for MY answer, today's own request left out (it has
+  /// its own line).
+  List<SwapRequest> get _waitingForMe {
+    final today = _pendingToday;
+    return [
+      for (final r in _pendingForMe)
+        if (today == null || r.id != today.id) r
+    ];
   }
 
   /// F-94 (owner, 05/10/2026): on the day, while the request waits, both
   /// parties read who stays responsible until the answer — the target gets
   /// "Responder", the requester "Cancelar pedido" (the same panel, which
   /// holds both). No push on the morning of the day: the eve reminder was it.
-  Widget? _pendingTodayStrip(BuildContext context) {
+  Widget? _pendingTodayStrip(BuildContext context, {int others = 0}) {
     final req = _pendingToday;
     final me = _ownProfile?.id;
     if (_loading || req == null || me == null) return null;
@@ -2295,22 +2334,28 @@ class _CalendarScreenState extends State<CalendarScreen>
             .first ??
         '—';
     final iAnswer = req.targetProfileId == me;
-    return AppBanner(
+    return AppStripLine(
       key: CalendarScreen.pendingTodayStripKey,
       tone: context.tokens.warning,
       icon: Icons.hourglass_top,
-      title: l[KApp.cardPendingTodayTitle],
-      message: pendingTodaySentence(
-        l: l,
-        me: me,
-        carerId: carer,
-        targetId: req.targetProfileId,
-        firstName: first,
-      ),
+      message: l.format(KApp.cardPendingTodayLine, [
+        pendingTodaySentence(
+          l: l,
+          me: me,
+          carerId: carer,
+          targetId: req.targetProfileId,
+          firstName: first,
+        ),
+      ]),
       actionLabel:
           l[iAnswer ? KApp.cardRequestsAnswer : KApp.cardPendingTodayCancel],
-      actionIcon: iAnswer ? Icons.reply : Icons.close,
       onAction: () => _openFrozenDay(req),
+      extraLabel: others == 0
+          ? null
+          : l.format(
+              others == 1 ? KApp.cardRequestsMoreOne : KApp.cardRequestsMore,
+              [others]),
+      onExtra: others == 0 ? null : widget.onOpenNotifications ?? () {},
     );
   }
 
@@ -2318,11 +2363,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// the soonest said in words, "Responder" opening its approval panel.
   /// Today's own request is the F-94 strip's, not this one's.
   Widget? _requestStrip(BuildContext context) {
-    final today = _pendingToday;
-    final waiting = [
-      for (final r in _pendingForMe)
-        if (today == null || r.id != today.id) r
-    ];
+    final waiting = _waitingForMe;
     if (_loading || waiting.isEmpty || _ownProfile == null) return null;
     final l = AppL10n.of(context).l;
     final first = waiting.first;
@@ -2335,24 +2376,27 @@ class _CalendarScreenState extends State<CalendarScreen>
             .first ??
         '—';
     final count = waiting.length;
-    return AppBanner(
+    // Owner's QA of 3.1.10: one line. One request says itself and answers in
+    // place; several say how many and open the list.
+    return AppStripLine(
       key: CalendarScreen.requestStripKey,
       tone: context.tokens.info,
       icon: Icons.swap_horiz,
-      title: count == 1
-          ? l[KApp.cardRequestsOne]
+      message: count == 1
+          ? swapRequestSentence(
+              l: l,
+              requesterName: requester,
+              date: first.scheduleDate,
+              isRevert: first.isRevertPending,
+              requesterIsProposed:
+                  first.proposedActualParentId == first.requestingProfileId,
+            )
           : l.format(KApp.cardRequestsMany, [count]),
-      message: swapRequestSentence(
-        l: l,
-        requesterName: requester,
-        date: first.scheduleDate,
-        isRevert: first.isRevertPending,
-        requesterIsProposed:
-            first.proposedActualParentId == first.requestingProfileId,
-      ),
-      actionLabel: l[KApp.cardRequestsAnswer],
-      actionIcon: Icons.reply,
-      onAction: () => _openFrozenDay(first),
+      actionLabel:
+          l[count == 1 ? KApp.cardRequestsAnswer : KApp.cardRequestsSee],
+      onAction: count == 1
+          ? () => _openFrozenDay(first)
+          : (widget.onOpenNotifications ?? () => _openFrozenDay(first)),
     );
   }
 
@@ -2465,44 +2509,31 @@ class _CalendarScreenState extends State<CalendarScreen>
         // "Só avisando" asks for nothing, so its banner offers nothing: an
         // action on a notice that made no request is an invitation to answer
         // a question nobody asked.
-        AppBanner(
+        // Owner's QA of 3.1.10: one line each, like every strip on the card.
+        AppStripLine(
           key: ValueKey('notice-strip-${n.id}'),
           tone: context.tokens.warning,
           icon: Icons.campaign_outlined,
           message: _noticeSentence(n, l),
           actionLabel: answerable(n) ? l[KApp.noticeAnswerTitle] : null,
-          actionIcon: answerable(n) ? Icons.reply : null,
           onAction: answerable(n) ? () => _answerNotice(n) : null,
         ),
       if (mine != null)
-        AppBanner(
+        AppStripLine(
           key: ValueKey('notice-strip-${mine.id}'),
           tone: context.tokens.warning,
           icon: Icons.campaign_outlined,
-          title: l[KApp.noticeOpenMine],
-          // F-98: the author reads herself in the second person.
+          // F-98: the author reads herself in the second person — which is
+          // also what says it is hers, so the strip needs no title.
           message: _noticeSentence(mine, l, mine: true),
           actionLabel: l[KApp.noticeCancel],
-          actionIcon: Icons.close,
           onAction: () => _confirmCancelNotice(mine),
         ),
     ];
-    if (strips.isEmpty) {
-      // F-98 (owner): sending an aviso is the most time-critical action of the
-      // day, so the card offers it to whoever may send one today — one 48 dp
-      // one line, and only to those (U-28 counted what card height costs the
-      // grid, so nobody else pays for it).
-      if (!_canOfferNotice) return null;
-      return Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: TextButton.icon(
-          key: CalendarScreen.noticeQuickActionKey,
-          icon: const Icon(Icons.campaign_outlined, size: 18),
-          label: Text(l[KApp.noticeQuickAction]),
-          onPressed: _openNoticeFromMenu,
-        ),
-      );
-    }
+    // Owner's QA of 3.1.10: "Avisar" is an icon in the card's header now
+    // ([TodayCard.onSendNotice]) — a line of its own pushed the calendar down
+    // for the one action of the day most people never need.
+    if (strips.isEmpty) return null;
     if (strips.length == 1) return strips.single;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2958,6 +2989,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     final l = app.l;
     final views = _memberViews;
     final quickSwap = _isSelectionMode ? _quickSwapPlan : null;
+    final strip = _systemStrip;
+    _reportSystemStrip(strip != null);
     return Scaffold(
       // U-28: the app bar names the TAB, like the other three do. The month
       // moved down to sit against the grid it labels — up here, competing with
@@ -3021,7 +3054,7 @@ class _CalendarScreenState extends State<CalendarScreen>
           skipTraversal: true,
           child: Column(
         children: [
-          if (_showChecklist)
+          if (strip == _SystemStrip.checklist)
             OnboardingLauncher(
               signals: _effectiveSignals!,
               onOpen: _openChecklist,
@@ -3037,8 +3070,8 @@ class _CalendarScreenState extends State<CalendarScreen>
             KeyedSubtree(
                 key: widget.tourKeys?.keyFor(TourTarget.todayCard),
                 child: _todayCard(context)),
-          if (_showPushToday) _pushToday(l),
-          if (_showHandoffNudge) _handoffNudge(l),
+          if (strip == _SystemStrip.pushToday) _pushToday(l),
+          if (strip == _SystemStrip.handoffNudge) _handoffNudge(l),
           if (_iAmViewer)
             Padding(
               key: const ValueKey('viewer-read-only'),
@@ -4232,3 +4265,6 @@ class _SplitColumns extends StatelessWidget {
     });
   }
 }
+
+/// Owner's QA of 3.1.10 — the system strips the calendar queues, in order.
+enum _SystemStrip { pushToday, checklist, handoffNudge }

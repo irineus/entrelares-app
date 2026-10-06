@@ -55,6 +55,13 @@ class TodayCard extends StatelessWidget {
   /// card itself has no tap).
   final Widget? requestStrip;
 
+  /// Owner's QA of 3.1.10: "Avisar", as an icon in the header — null when
+  /// the reader may not send an aviso today. It was a line of its own under
+  /// the responsible row, and the calendar paid for it on every opening.
+  /// Drawn only on the current month, for [noticeStrip]'s reason.
+  final VoidCallback? onSendNotice;
+  final Key? sendNoticeKey;
+
   /// F-07 (PR 4b): in a per-child plan's *Todas*, when the children are with
   /// different carers today — "Lia com Ana; Theo com Bruno" in place of the
   /// one responsible name.
@@ -74,6 +81,8 @@ class TodayCard extends StatelessWidget {
     required this.onInvite,
     this.noticeStrip,
     this.requestStrip,
+    this.onSendNotice,
+    this.sendNoticeKey,
   });
 
   /// A heading starts with a capital; the date formatters lowercase because
@@ -88,6 +97,8 @@ class TodayCard extends StatelessWidget {
   /// leaves "Olá, Ana" its room; past that the date shrinks to its floor and
   /// then ellipsizes, never the reader's font setting.
   static const double _dateShare = 0.7;
+
+  bool get _sendsNotice => viewingCurrentMonth && onSendNotice != null;
 
   String get _firstName {
     final parts = userFullName.trim().split(' ');
@@ -121,7 +132,8 @@ class TodayCard extends StatelessWidget {
           children: [
             Container(
               color: user.tone.container,
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+              padding: EdgeInsets.fromLTRB(12, _sendsNotice ? 0 : 4,
+                  _sendsNotice ? 0 : 12, _sendsNotice ? 0 : 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -171,24 +183,41 @@ class TodayCard extends StatelessWidget {
                         // inside it would have nothing to align against; the
                         // box takes its whole share and puts the date at the
                         // end of it, which is what "right-aligned" means.
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                              maxWidth: box.maxWidth * _dateShare),
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: Spacing.sm),
-                            child: AppShrinkToFit(
-                              alignment: Alignment.centerRight,
-                              child: Text(
-                                _capitalize(l.formatTodayHeading(today)),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: user.tone.onContainer),
+                        // Owner's QA of 3.1.10: the date and the aviso icon
+                        // are ONE group at the right edge — three children
+                        // under `spaceBetween` put the date in the middle.
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                  maxWidth: box.maxWidth * _dateShare),
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: Spacing.sm),
+                                child: AppShrinkToFit(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    _capitalize(l.formatTodayHeading(today)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: user.tone.onContainer),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            if (_sendsNotice)
+                              IconButton(
+                                key: sendNoticeKey,
+                                onPressed: onSendNotice,
+                                tooltip: l[KApp.noticeQuickAction],
+                                color: user.tone.onContainer,
+                                icon: const Icon(Icons.campaign_outlined,
+                                    size: 20),
+                              ),
+                          ],
                         ),
                       ],
                     ),

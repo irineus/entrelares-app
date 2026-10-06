@@ -133,6 +133,12 @@ class HomeShell extends StatelessWidget {
   /// about the whole app. Listened to for the reason [deletionBanner] gives.
   final ValueListenable<InstallHintBanner?>? installHint;
 
+  /// Owner's QA of 3.1.10: true while the calendar shows one of its system
+  /// strips. On the calendar tab the shell's offers wait ("Abrir no app", the
+  /// Play invitation, the install hint) — one strip at a time. A deletion
+  /// scheduled, admin mode and the offline strip are states, never held.
+  final ValueListenable<bool>? calendarStripShowing;
+
   /// T-18: the "Sem conexão · dados de HH:mm" strip. Above every tab because
   /// connectivity is a fact about the app, and because the calendar is not the
   /// only screen whose data stops being current. Listened to for the reason
@@ -170,6 +176,7 @@ class HomeShell extends StatelessWidget {
       this.appHandoff,
       this.playInvite,
       this.installHint,
+      this.calendarStripShowing,
       this.connectivity,
       this.tourKeys,
       this.expensesTab,
@@ -182,7 +189,7 @@ class HomeShell extends StatelessWidget {
       body: ListenableBuilder(
         listenable: Listenable.merge(
             [adminMode, deletionBanner, appHandoff, playInvite, installHint,
-            connectivity]),
+            connectivity, calendarStripShowing]),
         builder: (context, _) {
           // T-18 device measurement (14/09/2026): every strip here wrapped
           // itself in a SafeArea, AND the tab below still received the status
@@ -191,9 +198,11 @@ class HomeShell extends StatelessWidget {
           // visible strip takes the inset now, and the tab loses it whenever
           // any strip is showing (two strips used to take it twice as well).
           final deletion = deletionBanner?.value;
-          final handoff = appHandoff?.value;
-          final invite = playInvite?.value;
-          final install = installHint?.value;
+          final holdOffers = shell.currentIndex == 0 &&
+              (calendarStripShowing?.value ?? false);
+          final handoff = holdOffers ? null : appHandoff?.value;
+          final invite = holdOffers ? null : playInvite?.value;
+          final install = holdOffers ? null : installHint?.value;
           final offline = connectivity?.value;
           final showsOffline = offline?.offline ?? false;
           final adminTop = adminMode.isActive;

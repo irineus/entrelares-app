@@ -165,10 +165,8 @@ void main() {
 
     final strip = find.byKey(CalendarScreen.requestStripKey);
     expect(strip, findsOneWidget);
-    expect(
-        find.descendant(
-            of: strip, matching: find.text(pt[KApp.cardRequestsOne])),
-        findsOneWidget);
+    // Owner's QA of 3.1.10: one request is one line — the sentence and
+    // "Responder" — with no title over it.
     expect(
         find.descendant(
             of: strip,
@@ -183,6 +181,29 @@ void main() {
         of: strip, matching: find.text(pt[KApp.cardRequestsAnswer])));
     await tester.pumpAndSettle();
     expect(find.textContaining(pt[K.frozenSwapTitle]), findsOneWidget);
+  });
+
+  testWidgets('several requests are one line that says how many and opens '
+      'the list', (tester) async {
+    final day = futureDay ?? today.day;
+    final ds = FakeCustodyDataSource(
+        members: [ana, bruno], days: [row(7, dateOnly(today), ana.id)])
+      ..pendingForMe = [
+        swapReq(31, dayOfMonth(day), message: 'Viagem'),
+        swapReq(32, dayOfMonth(day), message: 'Consulta'),
+      ];
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    final strip = find.byKey(CalendarScreen.requestStripKey);
+    expect(
+        find.descendant(
+            of: strip, matching: find.text(pt.format(KApp.cardRequestsMany, [2]))),
+        findsOneWidget);
+    expect(
+        find.descendant(of: strip, matching: find.text(pt[KApp.cardRequestsSee])),
+        findsOneWidget);
+    // One row: the action sits beside the sentence, not under it.
+    expect(tester.getSize(strip).height, lessThan(60));
   });
 
   testWidgets('no request waiting: the Hoje card grows by nothing',
