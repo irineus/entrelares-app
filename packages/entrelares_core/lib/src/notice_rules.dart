@@ -34,6 +34,7 @@
 /// is null — the single rule the sheet states out loud, in both directions.
 library;
 
+import 'localization/k_app.dart';
 import 'localization/k.dart';
 import 'localization/localization.dart';
 import 'swap_rules.dart' show normalizeFreeText;
@@ -248,6 +249,9 @@ String noticeNoteSuffix(Localization l, String? note) {
 }
 
 /// The whole sentence, in the reader's language.
+///
+/// [mine] (F-98): the author reads herself in the second person — "Você
+/// avisou que vai atrasar…", never her own name in the third.
 String noticeSentence({
   required Localization l,
   required String senderName,
@@ -255,8 +259,22 @@ String noticeSentence({
   required int? etaMinutes,
   required NoticeRequest request,
   String? note,
+  bool mine = false,
 }) =>
-    l.format(
+    mine
+        ? l.format(
+            switch (request) {
+              NoticeRequest.info => KApp.noticeMineInfo,
+              NoticeRequest.pickup => KApp.noticeMinePickup,
+              NoticeRequest.keep => KApp.noticeMineKeep,
+            },
+            [
+              noticeReasonClause(l, reason),
+              noticeEtaClause(l, etaMinutes),
+              noticeNoteSuffix(l, note),
+            ],
+          )
+        : l.format(
       switch (request) {
         NoticeRequest.info => K.notifRenderDayNoticeInfo,
         NoticeRequest.pickup => K.notifRenderDayNoticePickup,

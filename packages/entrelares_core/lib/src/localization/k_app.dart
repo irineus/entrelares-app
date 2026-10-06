@@ -803,6 +803,10 @@ abstract final class KApp {
   static const String cardPendingTodayUntilYou = 'app.swap.pendingTodayUntilYou';
   static const String cardPendingTodayYouUntilYou = 'app.swap.pendingTodayYouUntilYou';
   static const String cardPendingTodayCancel = 'app.swap.pendingTodayCancel';
+  static const String noticeMineInfo = 'app.notice.mineInfo';
+  static const String noticeMinePickup = 'app.notice.minePickup';
+  static const String noticeMineKeep = 'app.notice.mineKeep';
+  static const String noticeQuickAction = 'app.notice.quickAction';
   static const String swapStoryAsked = 'app.swap.storyAsked';
   static const String swapStoryApproved = 'app.swap.storyApproved';
   static const String swapStoryAuto = 'app.swap.storyAuto';
@@ -1514,6 +1518,10 @@ abstract final class KApp {
     cardPendingTodayUntilYou,
     cardPendingTodayYouUntilYou,
     cardPendingTodayCancel,
+    noticeMineInfo,
+    noticeMinePickup,
+    noticeMineKeep,
+    noticeQuickAction,
     swapStoryAsked,
     swapStoryApproved,
     swapStoryAuto,
@@ -2374,6 +2382,10 @@ abstract final class StringsAppPtBr {
     KApp.cardPendingTodayUntilYou: '{0} segue responsável até você responder.',
     KApp.cardPendingTodayYouUntilYou: 'Você segue responsável até responder ao pedido.',
     KApp.cardPendingTodayCancel: 'Cancelar pedido',
+    KApp.noticeMineInfo: 'Você avisou que {0}{1}.{2}',
+    KApp.noticeMinePickup: 'Você avisou que {0}{1} e precisa que alguém busque a criança.{2}',
+    KApp.noticeMineKeep: 'Você avisou que {0}{1} e precisa que alguém fique com a criança hoje.{2}',
+    KApp.noticeQuickAction: 'Avisar',
     KApp.swapStoryAsked: 'Pedida por {0} em {1}',
     KApp.swapStoryApproved: 'aprovada por {0} em {1}',
     KApp.swapStoryAuto: 'aprovada automaticamente em {0}',
@@ -3228,6 +3240,10 @@ abstract final class StringsAppEn {
     KApp.cardPendingTodayUntilYou: '{0} stays responsible until you answer.',
     KApp.cardPendingTodayYouUntilYou: 'You stay responsible until you answer the request.',
     KApp.cardPendingTodayCancel: 'Cancel request',
+    KApp.noticeMineInfo: 'You said you {0}{1}.{2}',
+    KApp.noticeMinePickup: 'You said you {0}{1} and need someone to collect the child.{2}',
+    KApp.noticeMineKeep: 'You said you {0}{1} and need someone to keep the child today.{2}',
+    KApp.noticeQuickAction: 'Send a notice',
     KApp.swapStoryAsked: 'Asked by {0} on {1}',
     KApp.swapStoryApproved: 'approved by {0} on {1}',
     KApp.swapStoryAuto: 'approved automatically on {0}',

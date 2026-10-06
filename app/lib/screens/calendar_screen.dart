@@ -178,6 +178,9 @@ class CalendarScreen extends StatefulWidget {
   /// F-94: today's request, still unanswered, on the Hoje card.
   static const pendingTodayStripKey = Key('pending-today-strip');
 
+  /// F-98: the Hoje card's own "Avisar" for whoever may send one today.
+  static const noticeQuickActionKey = Key('notice-quick-action');
+
   const CalendarScreen(
       {super.key,
       required this.dataSource,
@@ -2409,7 +2412,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// notification carries, composed once in core. Two copies of it is how the
   /// strip says "30 min" while the notification says "sem previsão", both
   /// well-formed.
-  String _noticeSentence(DayNotice notice, Localization l) {
+  String _noticeSentence(DayNotice notice, Localization l, {bool mine = false}) {
     final reason = NoticeReason.fromWire(notice.reason);
     final request = NoticeRequest.fromWire(notice.request);
     // A row we cannot read is a FUTURE writer's; saying nothing about it beats
@@ -2429,6 +2432,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       etaMinutes: notice.etaMinutes,
       request: request,
       note: notice.note,
+      mine: mine,
     );
   }
 
@@ -2438,50 +2442,76 @@ class _CalendarScreenState extends State<CalendarScreen>
     final l = AppL10n.of(context).l;
     final me = _ownProfile!.id;
 
-    final mine = _myOpenNotice;
-    if (mine != null) {
-      return AppBanner(
-        tone: context.tokens.warning,
-        icon: Icons.campaign_outlined,
-        title: l[KApp.noticeOpenMine],
-        message: _noticeSentence(mine, l),
-        actionLabel: l[KApp.noticeCancel],
-        actionIcon: Icons.close,
-        onAction: () => _confirmCancelNotice(mine),
-      );
-    }
-
-    // Somebody else is asking. PR 2 puts the two answers on this banner; here
-    // it says what happened, which is already more than the product did.
+    // F-98 (owner, 05/10/2026): the others' open avisos are shown WITH mine —
+    // my own open "Só avisando" used to hide the other parent's "alguém pode
+    // buscar?" all day — and the ones that ask for an answer come first. When
+    // an aviso closes is still F-52's rule.
     final theirs = [
       for (final n in _openNotices)
         if (n.senderProfileId != me) n
     ];
-    if (theirs.isNotEmpty) {
-      final first = theirs.first;
-      // "Só avisando" asks for nothing, so the banner offers nothing: an
-      // action on a notice that made no request is an invitation to answer a
-      // question nobody asked.
-      final answerable =
-          NoticeRequest.fromWire(first.request) != NoticeRequest.info &&
-              !_iAmViewer;
-      return AppBanner(
-        tone: context.tokens.warning,
-        icon: Icons.campaign_outlined,
-        message: _noticeSentence(first, l),
-        actionLabel: answerable ? l[KApp.noticeAnswerTitle] : null,
-        actionIcon: answerable ? Icons.reply : null,
-        onAction: answerable ? () => _answerNotice(first) : null,
+    bool answerable(DayNotice n) =>
+        NoticeRequest.fromWire(n.request) != null &&
+        NoticeRequest.fromWire(n.request) != NoticeRequest.info &&
+        !_iAmViewer;
+    final ordered = [
+      ...theirs.where(answerable),
+      ...theirs.where((n) => !answerable(n)),
+    ];
+    final mine = _myOpenNotice;
+    final strips = <Widget>[
+      for (final n in ordered)
+        // "Só avisando" asks for nothing, so its banner offers nothing: an
+        // action on a notice that made no request is an invitation to answer
+        // a question nobody asked.
+        AppBanner(
+          key: ValueKey('notice-strip-${n.id}'),
+          tone: context.tokens.warning,
+          icon: Icons.campaign_outlined,
+          message: _noticeSentence(n, l),
+          actionLabel: answerable(n) ? l[KApp.noticeAnswerTitle] : null,
+          actionIcon: answerable(n) ? Icons.reply : null,
+          onAction: answerable(n) ? () => _answerNotice(n) : null,
+        ),
+      if (mine != null)
+        AppBanner(
+          key: ValueKey('notice-strip-${mine.id}'),
+          tone: context.tokens.warning,
+          icon: Icons.campaign_outlined,
+          title: l[KApp.noticeOpenMine],
+          // F-98: the author reads herself in the second person.
+          message: _noticeSentence(mine, l, mine: true),
+          actionLabel: l[KApp.noticeCancel],
+          actionIcon: Icons.close,
+          onAction: () => _confirmCancelNotice(mine),
+        ),
+    ];
+    if (strips.isEmpty) {
+      // F-98 (owner): sending an aviso is the most time-critical action of the
+      // day, so the card offers it to whoever may send one today — one 48 dp
+      // one line, and only to those (U-28 counted what card height costs the
+      // grid, so nobody else pays for it).
+      if (!_canOfferNotice) return null;
+      return Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: TextButton.icon(
+          key: CalendarScreen.noticeQuickActionKey,
+          icon: const Icon(Icons.campaign_outlined, size: 18),
+          label: Text(l[KApp.noticeQuickAction]),
+          onPressed: _openNoticeFromMenu,
+        ),
       );
     }
-
-    // Nothing open: the card grows by NOTHING. An idle affordance here cost
-    // the month grid 8 dp per cell (76 → 67.8 at 360x740, measured), and U-28
-    // already paid for that lesson once — the Hoje card growing takes a whole
-    // week off the grid for everyone, every day, to serve a rare event. The
-    // way to SEND one lives in the month bar instead, which is a row of
-    // buttons already and costs no height at all.
-    return null;
+    if (strips.length == 1) return strips.single;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, w) in strips.indexed) ...[
+          if (i > 0) const SizedBox(height: Spacing.sm),
+          w,
+        ],
+      ],
+    );
   }
 
   Future<void> _openNoticeSheet(int? dayParentId, int sentToday) async {

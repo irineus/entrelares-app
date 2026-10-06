@@ -214,7 +214,11 @@ void main() {
     testWidgets('at 1.3× the 76 dp cell keeps the comfortable step, unclamped',
         (tester) async {
       await _pump(tester, const Size(360, 740), scale: 1.3, withMarks: true);
-      expect(_cellHeight(tester), _cellCeiling);
+      // F-98 (owner, 05/10/2026): the Hoje card offers "Avisar" to whoever may
+      // send one today — the reader of this scene — and that 48 dp row costs
+      // the cell 0.6 dp here, the price U-28 taught us to count and the owner
+      // chose to pay. The step must not change.
+      expect(_cellHeight(tester), closeTo(_cellCeiling, 1.0));
       expect(_timeFontSize(tester), DayCellType.comfortable.time);
       // The clamp is a no-op here: the reader's scale reaches the text.
       expect(_paintedScaleOf(tester, find.text('18:00')), closeTo(1.3, 1e-9));
