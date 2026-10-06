@@ -1278,14 +1278,18 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// write (the server refuses it anyway).
   bool get _iAmViewer => _ownProfile?.isViewer == true;
 
+  /// Owner's QA of 3.1.10: in selection mode a tap marks or unmarks ONE day —
+  /// so alternate days are three taps. A run of days is a drag
+  /// ([_onDragSelect]); on the web, Shift+click also closes a run from the
+  /// last day clicked.
   void _toggleDaySelection(DateTime date) {
     final d = dateOnly(date);
+    final from = _lastPicked;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
     setState(() {
-      // F-100: the first tap after the long press closes the range.
-      final anchor = _rangeAnchor;
-      _rangeAnchor = null;
-      if (anchor != null && d != anchor && !_selectedDays.contains(d)) {
-        _selectedDays.addAll(selectionRange(anchor, d, horizon: _horizonDate));
+      _lastPicked = d;
+      if (shift && from != null && from != d) {
+        _selectedDays.addAll(selectionRange(from, d, horizon: _horizonDate));
         return;
       }
       if (!_selectedDays.remove(d)) _selectedDays.add(d);
@@ -1293,9 +1297,43 @@ class _CalendarScreenState extends State<CalendarScreen>
     });
   }
 
-  /// F-100: the day a long press started a range from (cleared by the tap
-  /// that closes it, or by any other tap).
-  DateTime? _rangeAnchor;
+  /// Owner's QA of 3.1.10 — press and DRAG: the day the press started on, and
+  /// the selection as it was before it (so dragging back takes days out
+  /// again). Both null when no drag is under way.
+  DateTime? _dragAnchor;
+  Set<DateTime>? _dragBase;
+
+  /// The last day picked by a tap or a press — where a Shift+click run
+  /// starts.
+  DateTime? _lastPicked;
+
+  /// The finger is over [date] while pressing: the selection is what it was
+  /// before the press plus every day from the press to here. It stops at the
+  /// month's edge (the grid maps no further) and at the planning horizon.
+  void _onDragSelect(DateTime date) {
+    final anchor = _dragAnchor;
+    final base = _dragBase;
+    if (anchor == null || base == null) return;
+    final next = {
+      ...base,
+      ...selectionRange(anchor, date, horizon: _horizonDate),
+    };
+    if (next.length == _selectedDays.length && next.containsAll(_selectedDays)) {
+      return;
+    }
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selectedDays
+        ..clear()
+        ..addAll(next);
+      _lastPicked = dateOnly(date);
+    });
+  }
+
+  void _onDragEnd() {
+    _dragAnchor = null;
+    _dragBase = null;
+  }
 
   /// F-100: the days and open requests of the months the selection already
   /// crossed — the sheets read a selection that spans months from these plus
@@ -1309,7 +1347,9 @@ class _CalendarScreenState extends State<CalendarScreen>
       {..._selectionFrozen, ..._frozenByIso};
 
   void _forgetSelectionMonths() {
-    _rangeAnchor = null;
+    _dragAnchor = null;
+    _dragBase = null;
+    _lastPicked = null;
     _selectionDays.clear();
     _selectionFrozen.clear();
   }
@@ -1340,9 +1380,12 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (_refuseWriteInTodas()) return;
     HapticFeedback.mediumImpact();
     setState(() {
+      // Owner's QA of 3.1.10: the press may become a drag — remember where
+      // it started and what was selected before it.
+      _dragBase = {..._selectedDays};
+      _dragAnchor = dateOnly(date);
+      _lastPicked = dateOnly(date);
       _selectedDays.add(dateOnly(date));
-      // F-100: the range's first day — the next tap is its last.
-      _rangeAnchor = dateOnly(date);
     });
   }
 
@@ -3156,6 +3199,8 @@ class _CalendarScreenState extends State<CalendarScreen>
                           },
                           onDayTap: _onDayTap,
                           onDayLongPress: _onDayLongPress,
+                          onDragSelect: _onDragSelect,
+                          onDragEnd: _onDragEnd,
                           // U-28 QA: the height the grid may actually spend.
                           availableHeight: box.maxHeight,
                           // U-40: only the month whose rows are in hand can
@@ -3478,6 +3523,11 @@ class _MonthGrid extends StatelessWidget {
   final void Function(DateTime) onDayTap;
   final void Function(DateTime) onDayLongPress;
 
+  /// Owner's QA of 3.1.10: the finger moved while still pressing — over
+  /// [onDragSelect]'s day — and was lifted ([onDragEnd]).
+  final void Function(DateTime) onDragSelect;
+  final VoidCallback onDragEnd;
+
   /// What the PageView's box gives this month, in logical pixels. The cell
   /// height is derived from it and the number of weeks the month really has.
   final double availableHeight;
@@ -3503,6 +3553,8 @@ class _MonthGrid extends StatelessWidget {
     required this.selectedIso,
     required this.onDayTap,
     required this.onDayLongPress,
+    required this.onDragSelect,
+    required this.onDragEnd,
     required this.availableHeight,
     required this.emptyPrompt,
     required this.horizonNote,
@@ -3647,9 +3699,56 @@ class _MonthGrid extends StatelessWidget {
     return widest;
   }
 
+  /// Owner's QA of 3.1.10 — the day under [position] in a grid of [size]:
+  /// seven columns 4 dp apart, rows [_daySpacing] apart. Off the grid it is
+  /// null — unless [clamp], for a drag, which stops at the month's first and
+  /// last day instead of leaving it.
+  DateTime? _dayAt(Offset position, Size size, double ratio, int blanksBefore,
+      int daysInMonth,
+      {bool clamp = false}) {
+    const gap = 4.0;
+    final cellWidth = (size.width - gap * 6) / 7;
+    final cellHeight = cellWidth / ratio;
+    var col = (position.dx / (cellWidth + gap)).floor();
+    final row = (position.dy / (cellHeight + _daySpacing)).floor();
+    if (!clamp && (col < 0 || col > 6 || row < 0)) return null;
+    col = col.clamp(0, 6);
+    var day = math.max(row, 0) * 7 + col - blanksBefore + 1;
+    if (day < 1 || day > daysInMonth) {
+      if (!clamp) return null;
+      day = day.clamp(1, daysInMonth);
+    }
+    return DateTime(month.year, month.month, day);
+  }
+
   Widget _grid(BuildContext context, double ratio, DayCellType type,
           int daysInMonth, int blanksBefore, String todayIso) =>
-      GridView.count(
+      // Owner's QA of 3.1.10: the long press belongs to the GRID, not to a
+      // cell — a cell's own press could not follow the finger into the next
+      // one. Press and drag paints the run; press alone picks the day. The
+      // cell keeps its semantic long press for screen readers.
+      Builder(
+        builder: (gridContext) {
+          Size size() => (gridContext.findRenderObject()! as RenderBox).size;
+          return GestureDetector(
+            // Each cell already says "double-tap and hold to select" (U-32);
+            // the grid's own press is for fingers, and as a node of its own
+            // it would read as an unlabelled button the size of the month.
+            excludeFromSemantics: true,
+            onLongPressStart: (d) {
+              final day = _dayAt(
+                  d.localPosition, size(), ratio, blanksBefore, daysInMonth);
+              if (day != null) onDayLongPress(day);
+            },
+            onLongPressMoveUpdate: (d) {
+              final day = _dayAt(
+                  d.localPosition, size(), ratio, blanksBefore, daysInMonth,
+                  clamp: true);
+              if (day != null) onDragSelect(day);
+            },
+            onLongPressEnd: (_) => onDragEnd(),
+            onLongPressCancel: onDragEnd,
+            child: GridView.count(
             crossAxisCount: 7,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -3688,7 +3787,10 @@ class _MonthGrid extends StatelessWidget {
                   onLongPress: onDayLongPress,
                 ),
             ],
+          ),
           );
+        },
+      );
 }
 
 /// U-40 — the sentence under an empty month. Two shapes, both decided in
@@ -4043,9 +4145,9 @@ class _DayCell extends StatelessWidget {
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: () => onTap(date),
-                // U-11: the mobile entry point to bulk selection (web:
-                // 500 ms press).
-                onLongPress: () => onLongPress(date),
+                // U-11: the mobile entry point to bulk selection lives on the
+                // GRID since the owner's QA of 3.1.10 (press and drag); the
+                // semantic long press above stays for screen readers.
                 hoverColor: (assigned ? slot.tone.solid : tokens.text)
                     .withValues(alpha: _hoverAlpha),
                 child: CustomPaint(
