@@ -824,6 +824,12 @@ abstract final class KApp {
   static const String wizContinues = 'app.wizard.continues';
   static const String errHandoffParty = 'app.save.errHandoffParty';
   static const String noticeHandoffPartyOnly = 'app.notice.handoffPartyOnly';
+  // Owner's QA of 3.1.10: the way out under the read-only time — the aviso
+  // (today, for whoever may send one) or the Conversa (another day).
+  static const String noticeHandoffPartySend = 'app.notice.handoffPartySend';
+  static const String noticeHandoffPartySendLink =
+      'app.notice.handoffPartySendLink';
+  static const String noticeHandoffPartyChat = 'app.notice.handoffPartyChat';
   static const String swapStoryAsked = 'app.swap.storyAsked';
   static const String swapStoryApproved = 'app.swap.storyApproved';
   static const String swapStoryAuto = 'app.swap.storyAuto';
@@ -1556,6 +1562,9 @@ abstract final class KApp {
     wizContinues,
     errHandoffParty,
     noticeHandoffPartyOnly,
+    noticeHandoffPartySend,
+    noticeHandoffPartySendLink,
+    noticeHandoffPartyChat,
     swapStoryAsked,
     swapStoryApproved,
     swapStoryAuto,
@@ -2436,7 +2445,10 @@ abstract final class StringsAppPtBr {
     KApp.wizAnchoredStart: 'Este modelo começa numa sexta: o início passou para {0}.',
     KApp.wizContinues: 'Continua o plano: no dia anterior a criança estava com {0}.',
     KApp.errHandoffParty: 'Só quem entrega ou recebe a criança neste dia pode mudar o horário da entrega.',
-    KApp.noticeHandoffPartyOnly: 'O horário é de quem entrega e de quem recebe a criança. Para avisar de um imprevisto, envie um aviso.',
+    KApp.noticeHandoffPartyOnly: 'O horário é de quem entrega e de quem recebe a criança.',
+    KApp.noticeHandoffPartySend: 'Para avisar de um imprevisto, envie um {0}.',
+    KApp.noticeHandoffPartySendLink: 'aviso',
+    KApp.noticeHandoffPartyChat: 'Para combinar outro horário, fale na {0}.',
     KApp.swapStoryAsked: 'Troca pedida por {0} em {1}',
     KApp.swapStoryApproved: 'aprovada por {0} em {1}',
     KApp.swapStoryAuto: 'aprovada automaticamente em {0}',
@@ -3311,7 +3323,10 @@ abstract final class StringsAppEn {
     KApp.wizAnchoredStart: 'This pattern starts on a Friday: the start moved to {0}.',
     KApp.wizContinues: 'Continues the plan: the day before, the child was with {0}.',
     KApp.errHandoffParty: 'Only who hands the child over or receives them on this day can change the handoff time.',
-    KApp.noticeHandoffPartyOnly: 'The time belongs to who hands the child over and who receives them. To tell about a change of plans, send a notice.',
+    KApp.noticeHandoffPartyOnly: 'The time belongs to who hands the child over and who receives them.',
+    KApp.noticeHandoffPartySend: 'To tell about a change of plans, send a {0}.',
+    KApp.noticeHandoffPartySendLink: 'notice',
+    KApp.noticeHandoffPartyChat: 'To agree on another time, use the {0}.',
     KApp.swapStoryAsked: 'Swap requested by {0} on {1}',
     KApp.swapStoryApproved: 'approved by {0} on {1}',
     KApp.swapStoryAuto: 'approved automatically on {0}',

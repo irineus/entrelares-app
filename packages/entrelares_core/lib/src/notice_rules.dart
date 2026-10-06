@@ -134,23 +134,23 @@ const int noticeAnswerNoteMaxLength = noticeNoteMaxLength;
 /// * [dayParentId] — the carer whose day it is;
 /// * [previousParentId] — yesterday's carer, who only ADDS a person when today
 ///   is a transition day (otherwise it is the same person). Theirs is the
-///   handover that is happening;
-/// * [nextHandoffParentId] — the carer of the next day with a different
-///   responsible. Theirs is the collection that is coming.
+///   handover that is happening.
 ///
-/// Nulls are dropped: an unplanned day has no carer, and a family with no
-/// future handoff inside the scan window has no third end. A frozen member
-/// (S-11) and a pending one with no account (F-56) are filtered by the caller
-/// — this function answers ROLE, not eligibility to act.
+/// Owner, 06/10/2026 (QA of 3.1.10): ONLY these two. The third end F-52 had —
+/// whoever receives the child at the NEXT handoff — let a parent whose next
+/// day was two days away send "atraso, alguém pode buscar?" about a day that
+/// was entirely the other parent's.
+///
+/// Nulls are dropped: an unplanned day has no carer. A frozen member (S-11)
+/// and a pending one with no account (F-56) are filtered by the caller — this
+/// function answers ROLE, not eligibility to act.
 Set<int> noticeSenderIds({
   required int? dayParentId,
   required int? previousParentId,
-  required int? nextHandoffParentId,
 }) =>
     {
       ?dayParentId,
       ?previousParentId,
-      ?nextHandoffParentId,
     };
 
 /// The requests [senderId] may make about this day.

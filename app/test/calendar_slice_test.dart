@@ -2070,7 +2070,8 @@ Widget app(FakeCustodyDataSource ds,
         {AppLanguage language = AppLanguage.ptBr,
         AdminMode? adminMode,
         AnalyticsService? analytics,
-        void Function(MemberLinkTarget target, int memberId)? onOpenMember}) =>
+        void Function(MemberLinkTarget target, int memberId)? onOpenMember,
+        VoidCallback? onOpenChat}) =>
     AppL10n(
       l: Localization(language),
       setLanguage: (_) async {},
@@ -2082,6 +2083,7 @@ Widget app(FakeCustodyDataSource ds,
           // F-07: the legend's chips are tappable in the app, so they are
           // measured as targets here too (the U-32 gate reads this app).
           onOpenMember: onOpenMember ?? (_, _) {},
+          onOpenChat: onOpenChat,
         ),
       ),
     );
