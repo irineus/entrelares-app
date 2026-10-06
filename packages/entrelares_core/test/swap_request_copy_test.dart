@@ -139,4 +139,35 @@ void main() {
             automatic: true),
         'Pedida por Ana em 03/10 09:12, aprovada automaticamente em 10/10 00:00');
   });
+
+  // F-98: the author of an aviso reads herself in the second person.
+  test('noticeSentence(mine: true) is "Você avisou que…"', () {
+    expect(
+        noticeSentence(
+            l: pt,
+            senderName: 'Ana Souza',
+            reason: NoticeReason.delay,
+            etaMinutes: 15,
+            request: NoticeRequest.info,
+            mine: true),
+        startsWith('Você avisou que '));
+    expect(
+        noticeSentence(
+            l: pt,
+            senderName: 'Ana Souza',
+            reason: NoticeReason.delay,
+            etaMinutes: null,
+            request: NoticeRequest.pickup,
+            mine: true),
+        isNot(contains('Ana Souza')));
+    expect(
+        noticeSentence(
+            l: en,
+            senderName: 'Ana Souza',
+            reason: NoticeReason.delay,
+            etaMinutes: 15,
+            request: NoticeRequest.info,
+            mine: true),
+        startsWith('You said you '));
+  });
 }
