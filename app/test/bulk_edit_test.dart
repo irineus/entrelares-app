@@ -4,7 +4,9 @@
 // end to end (S-09 kept planned parent, skip counting, no-op days, the
 // admin-only delete-all path and the S-09 overwrite confirmation).
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/member.dart';
@@ -252,8 +254,79 @@ void main() {
         reason: 'the day picked last month is still selected');
   });
 
-  // F-100: press the first day, tap the last — the range is selected.
-  testWidgets('a long press then a tap selects the whole range',
+  // Owner's QA of 3.1.10 (06/10/2026): press and DRAG paints a run; after
+  // the finger lifts, each tap marks or unmarks ONE day — alternate days are
+  // three taps (F-100's "press, then tap the last day" took that away).
+  Future<TestGesture> pressOn(WidgetTester tester, int day) async {
+    final cell = find.text('$day').last;
+    await tester.ensureVisible(cell);
+    await tester.pumpAndSettle();
+    final gesture = await tester.startGesture(tester.getCenter(cell));
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+    return gesture;
+  }
+
+  testWidgets('press and drag selects the run, and dragging back takes days '
+      'out again', (tester) async {
+    final lastDay = DateTime(today.year, today.month + 1, 0).day;
+    if (today.day + 4 > lastDay) return;
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    final gesture = await pressOn(tester, today.day + 1);
+    await gesture.moveTo(tester.getCenter(find.text('${today.day + 4}').last));
+    await tester.pump();
+    expect(find.text(pt.format(K.selectionEdit, [4])), findsOneWidget);
+    await gesture.moveTo(tester.getCenter(find.text('${today.day + 2}').last));
+    await tester.pump();
+    expect(find.text(pt.format(K.selectionEdit, [2])), findsOneWidget,
+        reason: 'the run follows the finger back');
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text(pt.format(K.selectionEdit, [2])), findsOneWidget);
+  });
+
+  testWidgets('a press without a drag, then taps: alternate days',
+      (tester) async {
+    final lastDay = DateTime(today.year, today.month + 1, 0).day;
+    if (today.day + 5 > lastDay) return;
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    await longPressDay(tester, today.day + 1);
+    for (final d in [today.day + 3, today.day + 5]) {
+      final cell = find.text('$d').last;
+      await tester.ensureVisible(cell);
+      await tester.pumpAndSettle();
+      await tester.tap(cell);
+      await tester.pumpAndSettle();
+    }
+    expect(find.text(pt.format(K.selectionEdit, [3])), findsOneWidget,
+        reason: 'three days, none of the ones between them');
+  });
+
+  testWidgets('a second press and drag ADDS a run to the selection',
+      (tester) async {
+    final lastDay = DateTime(today.year, today.month + 1, 0).day;
+    if (today.day + 6 > lastDay) return;
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    var gesture = await pressOn(tester, today.day + 1);
+    await gesture.moveTo(tester.getCenter(find.text('${today.day + 2}').last));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    gesture = await pressOn(tester, today.day + 5);
+    await gesture.moveTo(tester.getCenter(find.text('${today.day + 6}').last));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text(pt.format(K.selectionEdit, [4])), findsOneWidget);
+  });
+
+  testWidgets('on the web, Shift+click closes a run from the last day picked',
       (tester) async {
     final lastDay = DateTime(today.year, today.month + 1, 0).day;
     if (today.day + 4 > lastDay) return;
@@ -265,12 +338,10 @@ void main() {
     final cell = find.text('${today.day + 4}').last;
     await tester.ensureVisible(cell);
     await tester.pumpAndSettle();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await tester.tap(cell);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
     await tester.pumpAndSettle();
     expect(find.text(pt.format(K.selectionEdit, [4])), findsOneWidget);
-    // After the range, a tap toggles again.
-    await tester.tap(cell);
-    await tester.pumpAndSettle();
-    expect(find.text(pt.format(K.selectionEdit, [3])), findsOneWidget);
   });
 }
