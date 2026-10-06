@@ -124,6 +124,9 @@ const K = {
 
 	autoReminder: "notifRender.autoReminder",
 	autoReminderDeadline: "notifRender.autoReminder.deadline",
+	// F-94: the eve reminder — the same type with `kind: 'eve'`.
+	titleAutoReminderEve: "notifRender.title.autoReminder.eve",
+	autoReminderEve: "notifRender.autoReminder.eve",
 	autoApprovedRequester: "notifRender.autoApproved.requester",
 	autoApprovedApprover: "notifRender.autoApproved.approver",
 	swapRequestedTarget: "notifRender.swapRequested.target",
@@ -253,6 +256,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.revertCancelled": "Pedido de reversão cancelado",
 		"notifRender.autoReminder": "A solicitação do dia {0} será aprovada automaticamente se não houver resposta.",
 		"notifRender.autoReminder.deadline": "A solicitação do dia {0} será aprovada automaticamente em {1} às {2} se não houver resposta.",
+		"notifRender.title.autoReminder.eve": "Pedido para amanhã sem resposta",
+		"notifRender.autoReminder.eve": "{0} fez um pedido para amanhã, {1}, que ainda espera a sua resposta.",
 		"notifRender.autoApproved.requester": "A solicitação do dia {0} foi aprovada automaticamente por falta de resposta.",
 		"notifRender.autoApproved.approver": "A solicitação do dia {0} foi aprovada automaticamente. Você não respondeu dentro do prazo.",
 		"notifRender.swapRequested.target": "{0} solicitou que você fique responsável pela criança no dia {1}.{2}",
@@ -368,6 +373,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.revertCancelled": "Revert request cancelled",
 		"notifRender.autoReminder": "The request for {0} will be approved automatically if nobody replies.",
 		"notifRender.autoReminder.deadline": "The request for {0} will be approved automatically on {1} at {2} if nobody replies.",
+		"notifRender.title.autoReminder.eve": "Request for tomorrow still unanswered",
+		"notifRender.autoReminder.eve": "{0} made a request for tomorrow, {1}, that is still waiting for your answer.",
 		"notifRender.autoApproved.requester": "The request for {0} was approved automatically for lack of a reply.",
 		"notifRender.autoApproved.approver": "The request for {0} was approved automatically. You did not reply before the deadline.",
 		"notifRender.swapRequested.target": "{0} asked you to be responsible for the child on {1}.{2}",
@@ -618,6 +625,12 @@ export function renderPush(
 
 	switch (type) {
 		case "auto_reminder": {
+			// F-94: 19:00 on the eve of the day — who asked, and the day.
+			if (kind === "eve") {
+				titleKey = K.titleAutoReminderEve;
+				body = fmt(lang, K.autoReminderEve, [name ?? otherCap(), date]);
+				break;
+			}
 			titleKey = K.titleAutoReminder;
 			// F-60: the push says the INSTANT the request stops waiting, the
 			// same one the in-app sentence and the e-mail say. A row written

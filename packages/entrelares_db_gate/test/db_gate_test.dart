@@ -84,6 +84,7 @@ import 'suites/sudo_elevation.dart';
 import 'suites/support_request.dart';
 import 'suites/swap_message.dart';
 import 'suites/swap_answer.dart';
+import 'suites/swap_eve_reminder.dart';
 import 'suites/revert_party.dart';
 import 'suites/test_recipient_suppression.dart';
 
@@ -144,6 +145,8 @@ void main() {
   autoApprovalTests(fx);
   swapMessageTests(fx);
   swapAnswerTests(fx);
+  // F-94: the eve reminder at 19:00 São Paulo, once per request.
+  swapEveReminderTests(fx);
   revertPartyTests(fx);
   revertNotesTests(fx);
   // F-52: the aviso de imprevisto — who may send one, who may offer the DAY,

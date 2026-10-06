@@ -797,6 +797,12 @@ abstract final class KApp {
   static const String editorClearDayConfirm = 'app.swap.editorClearConfirm';
   static const String calAskSwap = 'app.swap.calAsk';
   static const String calAskSwapPick = 'app.swap.calAskPick';
+  static const String cardPendingTodayTitle = 'app.swap.pendingTodayTitle';
+  static const String cardPendingTodayBody = 'app.swap.pendingTodayBody';
+  static const String cardPendingTodayYouStay = 'app.swap.pendingTodayYouStay';
+  static const String cardPendingTodayUntilYou = 'app.swap.pendingTodayUntilYou';
+  static const String cardPendingTodayYouUntilYou = 'app.swap.pendingTodayYouUntilYou';
+  static const String cardPendingTodayCancel = 'app.swap.pendingTodayCancel';
   static const String expenseDiffLine = 'app.expense.diffLine';
   static const String expenseDiffAmount = 'app.expense.diffAmount';
   static const String expenseDiffSplit = 'app.expense.diffSplit';
@@ -1495,6 +1501,12 @@ abstract final class KApp {
     editorClearDayConfirm,
     calAskSwap,
     calAskSwapPick,
+    cardPendingTodayTitle,
+    cardPendingTodayBody,
+    cardPendingTodayYouStay,
+    cardPendingTodayUntilYou,
+    cardPendingTodayYouUntilYou,
+    cardPendingTodayCancel,
     expenseDiffLine,
     expenseDiffAmount,
     expenseDiffSplit,
@@ -2342,6 +2354,12 @@ abstract final class StringsAppPtBr {
     KApp.editorClearDayConfirm: 'Limpar este dia? O que estava planejado nele é apagado, e o Histórico guarda o registro.',
     KApp.calAskSwap: 'Pedir troca de um dia',
     KApp.calAskSwapPick: 'Qual dia?',
+    KApp.cardPendingTodayTitle: 'Pedido para hoje ainda sem resposta',
+    KApp.cardPendingTodayBody: '{0} segue responsável até {1} responder.',
+    KApp.cardPendingTodayYouStay: 'Você segue responsável até {0} responder.',
+    KApp.cardPendingTodayUntilYou: '{0} segue responsável até você responder.',
+    KApp.cardPendingTodayYouUntilYou: 'Você segue responsável até responder ao pedido.',
+    KApp.cardPendingTodayCancel: 'Cancelar pedido',
     KApp.expenseDiffLine: '{0}: de {1} para {2}',
     KApp.expenseDiffAmount: 'Valor',
     KApp.expenseDiffSplit: 'Divisão: {0}',
@@ -3183,6 +3201,12 @@ abstract final class StringsAppEn {
     KApp.editorClearDayConfirm: 'Clear this day? What was planned on it is deleted, and the History keeps the record.',
     KApp.calAskSwap: 'Ask to swap a day',
     KApp.calAskSwapPick: 'Which day?',
+    KApp.cardPendingTodayTitle: 'Request for today still unanswered',
+    KApp.cardPendingTodayBody: '{0} stays responsible until {1} answers.',
+    KApp.cardPendingTodayYouStay: 'You stay responsible until {0} answers.',
+    KApp.cardPendingTodayUntilYou: '{0} stays responsible until you answer.',
+    KApp.cardPendingTodayYouUntilYou: 'You stay responsible until you answer the request.',
+    KApp.cardPendingTodayCancel: 'Cancel request',
     KApp.expenseDiffLine: '{0}: from {1} to {2}',
     KApp.expenseDiffAmount: 'Amount',
     KApp.expenseDiffSplit: 'Split: {0}',
