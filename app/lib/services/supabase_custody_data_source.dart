@@ -2609,6 +2609,23 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<Set<int>> fetchSwapBaseLogIds(List<int> logIds) async {
+    if (logIds.isEmpty) return const {};
+    final out = <int>{};
+    for (final chunk in _chunks(logIds)) {
+      final rows = await _client
+          .from('swap_requests')
+          .select('pre_edit_log_id')
+          .inFilter('pre_edit_log_id', chunk);
+      for (final r in rows) {
+        final id = r['pre_edit_log_id'];
+        if (id is int) out.add(id);
+      }
+    }
+    return out;
+  }
+
+  @override
   Future<SwapRequest?> fetchSwapRequest(int id) async {
     final row =
         await _client.from('swap_requests').select().eq('id', id).maybeSingle();

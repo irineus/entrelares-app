@@ -372,6 +372,13 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Future<SwapRequest?> fetchDaySwapOrigin(DateTime date, {int? childId}) async =>
       daySwapOrigins[CareSchedule.isoDate(date)];
 
+  /// F-96: the activity logs a swap request's base write produced.
+  Set<int> swapBaseLogIds = {};
+
+  @override
+  Future<Set<int>> fetchSwapBaseLogIds(List<int> logIds) async =>
+      {for (final id in logIds) if (swapBaseLogIds.contains(id)) id};
+
   @override
   Future<SwapRequest?> fetchSwapRequest(int id) async {
     if (swapRequestsById.containsKey(id)) return swapRequestsById[id];

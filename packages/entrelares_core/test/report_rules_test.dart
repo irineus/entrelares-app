@@ -48,6 +48,53 @@ CaregiverStat _statOf(List<CaregiverStat> stats, int id) =>
     stats.firstWhere((s) => s.profileId == id);
 
 void main() {
+  // F-96: one horizon for planned × actual, and the future counted apart.
+  group('F-96 · until today and ahead', () {
+    final today = DateTime(2026, 8, 19);
+    final days = [
+      ReportDay(scheduleDate: DateTime(2026, 8, 15), scheduledParentId: 1),
+      ReportDay(
+          scheduleDate: DateTime(2026, 8, 17),
+          scheduledParentId: 1,
+          actualParentId: 2),
+      ReportDay(scheduleDate: DateTime(2026, 8, 19), scheduledParentId: 1),
+      ReportDay(
+          scheduleDate: DateTime(2026, 8, 21),
+          scheduledParentId: 2,
+          actualParentId: 1),
+    ];
+    test('planned to date and remaining split on today', () {
+      final ana = caregiverStats(
+              members: const [MemberView(id: 1, fullName: 'Ana')],
+              days: days,
+              today: today,
+              includeFutureSwaps: false)
+          .single;
+      expect(ana.plannedToDate, 2);
+      expect(ana.plannedRemaining, 1, reason: 'today counts as ahead');
+      expect(ana.actualDays, 1);
+    });
+    test('an accepted swap ahead is counted apart', () {
+      expect(futureAcceptedSwaps(days: days, today: today), 1);
+      expect(
+          totalVisibleSwaps(days: days, today: today, includeFutureSwaps: false),
+          1);
+    });
+    test('the base write of a swap request reads as the request', () {
+      final pt = Localization(AppLanguage.ptBr);
+      final log = AuditLogView(
+          id: 7, affectedDate: _d, createdAtLocal: _d, action: 'UPDATE');
+      expect(isSwapAskedBase(log, {7}, const []), isTrue);
+      expect(isSwapAskedBase(log, {8}, const []), isFalse);
+      expect(
+          isSwapAskedBase(log, {7}, const [AuditFieldChange('x', 'a', 'b')]),
+          isFalse,
+          reason: 'a base that changed a field is an edit, said as one');
+      expect(reportActionLabel('UPDATE', pt, swapAsked: true),
+          pt[KApp.pdfSwapAsked]);
+    });
+  });
+
   // F-67: section 4 reads by the day told, then by the instant written.
   test('relatos are ordered by day, then by the instant written', () {
     final a = ReportDayAccount(
@@ -692,3 +739,5 @@ void main() {
     });
   });
 }
+
+final _d = DateTime(2026, 8, 19);

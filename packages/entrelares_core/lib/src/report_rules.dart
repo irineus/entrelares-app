@@ -72,6 +72,13 @@ class CaregiverStat {
   /// REALIZED (past) days where they were the real responsible.
   final int actualDays;
 
+  /// F-96: the planned days already behind us — the number [actualDays] is
+  /// compared with ("Planejado até hoje" × "Realizado", one horizon).
+  final int plannedToDate;
+
+  /// F-96: the planned days from today on ("Planejado restante").
+  final int plannedRemaining;
+
   /// U-20: `actual ?? scheduled` over the WHOLE period — approval writes
   /// `actual_parent_id` immediately, even for future days. Always computed;
   /// only SHOWN when the reader asked for the projection.
@@ -90,6 +97,8 @@ class CaregiverStat {
     required this.colorSlot,
     required this.plannedDays,
     required this.actualDays,
+    this.plannedToDate = 0,
+    this.plannedRemaining = 0,
     required this.projectedDays,
     required this.swapsGiven,
     required this.swapsReceived,
@@ -133,6 +142,14 @@ List<CaregiverStat> caregiverStats({
                 d.scheduleDate.isBefore(floor) &&
                 (d.actualParentId ?? d.scheduledParentId) == m.id)
             .length,
+        plannedToDate: days
+            .where((d) =>
+                d.scheduleDate.isBefore(floor) && d.scheduledParentId == m.id)
+            .length,
+        plannedRemaining: days
+            .where((d) =>
+                !d.scheduleDate.isBefore(floor) && d.scheduledParentId == m.id)
+            .length,
         projectedDays: days
             .where((d) => (d.actualParentId ?? d.scheduledParentId) == m.id)
             .length,
@@ -161,6 +178,20 @@ int totalVisibleSwaps({
     days
         .where((d) => isVisibleSwap(d,
             today: today, includeFutureSwaps: includeFutureSwaps))
+        .length;
+
+/// F-96: swaps already approved for days still ahead — counted APART from
+/// the realized ones, so "Total de trocas realizadas: 0" right after an
+/// approval no longer reads as "nothing happened".
+int futureAcceptedSwaps({
+  required List<ReportDay> days,
+  required DateTime today,
+}) =>
+    days
+        .where((d) =>
+            d.actualParentId != null &&
+            d.actualParentId != d.scheduledParentId &&
+            !d.scheduleDate.isBefore(dateOnly(today)))
         .length;
 
 /// Mirror of `ReportsSummary.HasData`: a period with no assignment at all
@@ -773,6 +804,8 @@ CustodyReport buildCustodyReport({
   // F-45: log id → the swap request whose resolution produced it. A report
   // without the lookup (or a log without a request) simply omits the origin.
   Map<int, SwapOrigin> resolutionOrigins = const {},
+  // F-96: the logs that are a swap request's base write (pre_edit_log_id).
+  Set<int> swapBaseLogIds = const {},
   bool includeAcceptedFutureSwaps = false,
   // F-61: the caregivers' account facts and trail. Enrichment like the
   // origins — absent, section 2 prints its empty line and the rest stands.
@@ -859,7 +892,8 @@ CustodyReport buildCustodyReport({
     ),
     auditEntries: [
       for (final log in entries)
-        _entryFor(log, resolutionOrigins[log.id], members, diffFor, l),
+        _entryFor(log, resolutionOrigins[log.id], members, diffFor, l,
+            swapBaseLogIds: swapBaseLogIds),
     ],
     includesFutureSwaps: includeAcceptedFutureSwaps,
     caregiverTimelines: accounts.isEmpty
@@ -884,8 +918,9 @@ ReportAuditEntry _entryFor(
   SwapOrigin? origin,
   List<MemberView> members,
   List<AuditFieldChange> Function(AuditLogView) diffFor,
-  Localization l,
-) {
+  Localization l, {
+  Set<int> swapBaseLogIds = const {},
+}) {
   String? performer;
   if (log.performedById != null) {
     for (final m in members) {
@@ -893,12 +928,14 @@ ReportAuditEntry _entryFor(
     }
   }
 
+  final changes = diffFor(log);
   return ReportAuditEntry(
     affectedDate: dateOnly(log.affectedDate),
     timestampLocal: log.createdAtLocal,
-    actionLabel: reportActionLabel(log.action, l),
+    actionLabel: reportActionLabel(log.action, l,
+        swapAsked: isSwapAskedBase(log, swapBaseLogIds, changes)),
     performedBy: performer ?? l[K.pdfDocSystem],
-    changes: diffFor(log),
+    changes: changes,
     originText:
         origin == null ? null : resolutionOriginText(origin, members, l),
     originMessage: origin?.requestMessage,

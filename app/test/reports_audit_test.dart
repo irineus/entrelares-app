@@ -104,6 +104,24 @@ Future<void> pumpAudit(
 }
 
 void main() {
+  // F-96: a swap request's base write (F-85: required, it is the revert's
+  // snapshot) changed nothing, and read "atualizou o agendamento" — in a
+  // dispute, an edit the requester never made. It reads as the request.
+  testWidgets('F-96: the no-op base write of a swap request reads as the '
+      'request', (tester) async {
+    final same = {'scheduled_parent_id': 1, 'actual_parent_id': null};
+    final ds = source(logs: [
+      activity(id: 900, oldData: same, newData: same),
+      activity(id: 901, oldData: same, newData: same, hour: 11),
+    ])
+      ..swapBaseLogIds = {900};
+    await pumpAudit(tester, ds);
+    final l = Localization(AppLanguage.ptBr);
+    expect(find.textContaining(l[KApp.auditSwapAsked]), findsOneWidget);
+    expect(find.textContaining(l[K.auditUpdatedSchedule]), findsOneWidget,
+        reason: 'a no-op that is not a request base keeps its words');
+  });
+
   final l = Localization(AppLanguage.ptBr);
 
   group('the calendar trail', () {

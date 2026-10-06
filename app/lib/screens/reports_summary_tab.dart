@@ -192,11 +192,35 @@ class _ReportsSummaryTabState extends State<ReportsSummaryTab> {
                 textAlign: TextAlign.center,
               ),
             ),
+            // F-96: an approved swap for a day still ahead is counted apart —
+            // "0 trocas realizadas" right after an approval read as nothing.
+            if (!_includeFutureSwaps && _futureAccepted > 0) ...[
+              const SizedBox(height: Spacing.xs),
+              Center(
+                child: Text(
+                  l.format(KApp.sumFutureAccepted, [_futureAccepted]),
+                  key: const ValueKey('summary-future-accepted'),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ],
         ],
       ),
     );
   }
+
+  int get _futureAccepted => futureAcceptedSwaps(
+        days: [
+          for (final d in _days)
+            ReportDay(
+              scheduleDate: d.scheduleDate,
+              scheduledParentId: d.scheduledParentId,
+              actualParentId: d.actualParentId,
+            ),
+        ],
+        today: widget.now(),
+      );
 
   Widget _filterCard(Localization l) {
     final thisYear = widget.now().year;
@@ -330,11 +354,18 @@ class _ReportsSummaryTabState extends State<ReportsSummaryTab> {
             // value under its own label — planned beside actual, given beside
             // received. Every card shares the same grid, whatever the
             // reader's font scale does inside a column.
+            // F-96: ONE horizon — what was planned up to today beside what
+            // happened up to today; the days still ahead are their own line,
+            // or "Planejado 47 × Realizado 0" reads as nothing fulfilled.
             _statPair(
-              l[K.sumPlanned], _daysLabel(stat.plannedDays, l),
+              l[KApp.sumPlannedToDate], _daysLabel(stat.plannedToDate, l),
               l[K.sumActual], _daysLabel(stat.actualDays, l),
               tone: slot.tone,
             ),
+            const SizedBox(height: Spacing.sm),
+            _stat(l[KApp.sumPlannedRemaining],
+                _daysLabel(stat.plannedRemaining, l),
+                tone: slot.tone),
             if (_includeFutureSwaps) ...[
               const SizedBox(height: Spacing.sm),
               _stat(l[K.sumProjected], _daysLabel(stat.projectedDays, l),

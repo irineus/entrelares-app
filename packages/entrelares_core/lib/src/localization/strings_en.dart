@@ -902,7 +902,6 @@ abstract final class StringsEn {
     K.sumEmptyTitle: 'No data found',
     K.sumEmptyBody: 'There are no schedules recorded for the selected period. Assign caregivers on the calendar and the data will show up here.',
     K.sumEmptyAction: 'Go to the calendar',
-    K.sumPlanned: 'Planned',
     K.sumActual: 'Actual',
     K.sumProjected: 'Projected',
     K.sumGiven: 'Gave away',

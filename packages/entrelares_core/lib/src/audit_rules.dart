@@ -289,17 +289,34 @@ String formatAuditTime(String raw) {
 
 /// The calendar-change action, in the reader's language — the timeline's
 /// phrasing (`ReportsAudit.razor`).
-String scheduleActionLabel(String action, Localization l) => switch (action) {
+///
+/// F-96: [swapAsked] — the UPDATE is the no-op base write a swap request
+/// makes before it is created (F-85: the revert's snapshot comes from it), and
+/// it changed nothing. It reads as the request it belongs to, never as an
+/// edit the requester did not make.
+String scheduleActionLabel(String action, Localization l,
+        {bool swapAsked = false}) =>
+    switch (action) {
       'INSERT' => l[K.auditCreatedSchedule],
       'DELETE' => l[K.auditDeletedSchedule],
+      _ when swapAsked => l[KApp.auditSwapAsked],
       _ => l[K.auditUpdatedSchedule],
     };
 
+/// F-96: a log is a swap request's base write when a request points at it
+/// (`swap_requests.pre_edit_log_id`) and it moved no field.
+bool isSwapAskedBase(AuditLogView log, Set<int> swapBaseLogIds,
+        List<AuditFieldChange> changes) =>
+    log.action == 'UPDATE' && swapBaseLogIds.contains(log.id) && changes.isEmpty;
+
 /// The same action phrased as a neutral third-person statement for the F-33
 /// document (`ReportPdfService.ActionLabel`).
-String reportActionLabel(String action, Localization l) => switch (action) {
+String reportActionLabel(String action, Localization l,
+        {bool swapAsked = false}) =>
+    switch (action) {
       'INSERT' => l[K.pdfDocActionInsert],
       'DELETE' => l[K.pdfDocActionDelete],
+      _ when swapAsked => l[KApp.pdfSwapAsked],
       _ => l[K.pdfDocActionUpdate],
     };
 
