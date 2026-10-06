@@ -34,15 +34,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(strip(), findsOneWidget);
-    expect(
-        find.descendant(
-            of: strip(), matching: find.text(pt[KApp.cardPendingTodayTitle])),
-        findsOneWidget);
+    // Owner's QA of 3.1.10: one line — what it is and who stays, together.
     expect(
         find.descendant(
             of: strip(),
-            matching:
-                find.text(pt[KApp.cardPendingTodayYouUntilYou])),
+            matching: find.text(pt.format(KApp.cardPendingTodayLine,
+                [pt[KApp.cardPendingTodayYouUntilYou]]))),
         findsOneWidget,
         reason: 'scenario B: Ana has the day and must answer');
     // The U-60 strip does not repeat today's request.
@@ -68,8 +65,8 @@ void main() {
     expect(
         find.descendant(
             of: strip(),
-            matching: find.text(
-                pt.format(KApp.cardPendingTodayYouStay, ['Bruno']))),
+            matching: find.text(pt.format(KApp.cardPendingTodayLine,
+                [pt.format(KApp.cardPendingTodayYouStay, ['Bruno'])]))),
         findsOneWidget);
     expect(
         find.descendant(

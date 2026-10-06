@@ -508,6 +508,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
             appHandoff: _appHandoff,
             playInvite: _playInvite,
             installHint: _installHint,
+            calendarStripShowing: _calendarStripShowing,
             connectivity: appConnectivity,
             tourKeys: _tourKeys,
             expensesTab: _expensesTab,
@@ -562,6 +563,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   push: _push,
                   installFacts: _browserFacts,
                   pushTodayPrefs: _pushTodayPrefs,
+                  systemStripShowing: _calendarStripShowing,
                   planRequest: _planRequest,
                   dayRequest: _dayRequest);
               },
@@ -871,6 +873,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// gives.
   final _installHint = ValueNotifier<InstallHintBanner?>(null);
 
+  /// Owner's QA of 3.1.10: the calendar's "one system strip at a time", told
+  /// to the shell (which holds its own offers back meanwhile).
+  final _calendarStripShowing = ValueNotifier<bool>(false);
+
   /// U-55: the "Definir horário" strip's dismissal, per family, per device.
   late final _handoffNudgePrefs = SharedHandoffNudgePrefs(widget.prefs);
   late final _pushTodayPrefs = SharedPushTodayPrefs(widget.prefs);
@@ -1170,6 +1176,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _appHandoff.dispose();
     _playInvite.dispose();
     _installHint.dispose();
+    _calendarStripShowing.dispose();
     _planRequest.dispose();
     super.dispose();
   }

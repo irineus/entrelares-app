@@ -384,7 +384,6 @@ abstract final class KApp {
   static const String noticeCapReached = 'app.notice.capReached';
   static const String noticeSent = 'app.notice.sent';
   static const String noticeErrSend = 'app.notice.errSend';
-  static const String noticeOpenMine = 'app.notice.openMine';
   static const String noticeCancel = 'app.notice.cancel';
   static const String noticeCancelConfirm = 'app.notice.cancelConfirm';
   static const String noticeCancelKeep = 'app.notice.cancelKeep';
@@ -789,7 +788,11 @@ abstract final class KApp {
   static const String swapAskRevert = 'app.swap.askRevert';
   static const String swapRowMessage = 'app.swap.rowMessage';
   static const String swapRowDetails = 'app.swap.rowDetails';
-  static const String cardRequestsOne = 'app.swap.cardRequestsOne';
+  // Owner's QA of 3.1.10: the strip is one line — several requests say how
+  // many and open the list; today's request carries the others as "+N".
+  static const String cardRequestsSee = 'app.swap.cardRequestsSee';
+  static const String cardRequestsMoreOne = 'app.swap.cardRequestsMoreOne';
+  static const String cardRequestsMore = 'app.swap.cardRequestsMore';
   static const String cardRequestsMany = 'app.swap.cardRequestsMany';
   static const String cardRequestsAnswer = 'app.swap.cardRequestsAnswer';
   static const String editorAskSwap = 'app.swap.editorAsk';
@@ -797,7 +800,7 @@ abstract final class KApp {
   static const String editorClearDayConfirm = 'app.swap.editorClearConfirm';
   static const String calAskSwap = 'app.swap.calAsk';
   static const String calAskSwapPick = 'app.swap.calAskPick';
-  static const String cardPendingTodayTitle = 'app.swap.pendingTodayTitle';
+  static const String cardPendingTodayLine = 'app.swap.pendingTodayLine';
   static const String cardPendingTodayBody = 'app.swap.pendingTodayBody';
   static const String cardPendingTodayYouStay = 'app.swap.pendingTodayYouStay';
   static const String cardPendingTodayUntilYou = 'app.swap.pendingTodayUntilYou';
@@ -1171,7 +1174,6 @@ abstract final class KApp {
     noticeCapReached,
     noticeSent,
     noticeErrSend,
-    noticeOpenMine,
     noticeCancel,
     noticeCancelConfirm,
     noticeCancelKeep,
@@ -1527,7 +1529,9 @@ abstract final class KApp {
     swapAskRevert,
     swapRowMessage,
     swapRowDetails,
-    cardRequestsOne,
+    cardRequestsSee,
+    cardRequestsMoreOne,
+    cardRequestsMore,
     cardRequestsMany,
     cardRequestsAnswer,
     editorAskSwap,
@@ -1535,7 +1539,7 @@ abstract final class KApp {
     editorClearDayConfirm,
     calAskSwap,
     calAskSwapPick,
-    cardPendingTodayTitle,
+    cardPendingTodayLine,
     cardPendingTodayBody,
     cardPendingTodayYouStay,
     cardPendingTodayUntilYou,
@@ -2009,7 +2013,6 @@ abstract final class StringsAppPtBr {
         'Você já enviou {0} avisos hoje. O limite volta amanhã.',
     KApp.noticeSent: 'Aviso enviado.',
     KApp.noticeErrSend: 'Não foi possível enviar o aviso.',
-    KApp.noticeOpenMine: 'Seu aviso de hoje está aberto.',
     KApp.noticeCancel: 'Cancelar aviso',
     KApp.noticeCancelConfirm:
         'Cancelar este aviso? Quem recebeu será informado de que não é mais '
@@ -2411,7 +2414,9 @@ abstract final class StringsAppPtBr {
     KApp.swapAskRevert: '{0} pede para desfazer a troca {1}.',
     KApp.swapRowMessage: 'Mensagem de {0}: {1}',
     KApp.swapRowDetails: 'Detalhes',
-    KApp.cardRequestsOne: 'Um pedido espera a sua resposta',
+    KApp.cardRequestsSee: 'Ver',
+    KApp.cardRequestsMoreOne: '+1 pedido',
+    KApp.cardRequestsMore: '+{0} pedidos',
     KApp.cardRequestsMany: '{0} pedidos esperam a sua resposta',
     KApp.cardRequestsAnswer: 'Responder',
     KApp.editorAskSwap: 'Pedir para outra pessoa ficar com este dia',
@@ -2419,7 +2424,7 @@ abstract final class StringsAppPtBr {
     KApp.editorClearDayConfirm: 'Limpar este dia? O que estava planejado nele é apagado, e o Histórico guarda o registro.',
     KApp.calAskSwap: 'Pedir troca de um dia',
     KApp.calAskSwapPick: 'Qual dia?',
-    KApp.cardPendingTodayTitle: 'Pedido para hoje ainda sem resposta',
+    KApp.cardPendingTodayLine: 'Pedido de hoje sem resposta: {0}',
     KApp.cardPendingTodayBody: '{0} segue responsável até {1} responder.',
     KApp.cardPendingTodayYouStay: 'Você segue responsável até {0} responder.',
     KApp.cardPendingTodayUntilYou: '{0} segue responsável até você responder.',
@@ -2887,7 +2892,6 @@ abstract final class StringsAppEn {
         'You have already sent {0} notices today. The limit resets tomorrow.',
     KApp.noticeSent: 'Notice sent.',
     KApp.noticeErrSend: 'The notice could not be sent.',
-    KApp.noticeOpenMine: 'Your notice for today is open.',
     KApp.noticeCancel: 'Cancel notice',
     KApp.noticeCancelConfirm:
         'Cancel this notice? Whoever received it will be told it is no '
@@ -3289,7 +3293,9 @@ abstract final class StringsAppEn {
     KApp.swapAskRevert: '{0} asks to undo the swap {1}.',
     KApp.swapRowMessage: 'Message from {0}: {1}',
     KApp.swapRowDetails: 'Details',
-    KApp.cardRequestsOne: 'A request is waiting for your answer',
+    KApp.cardRequestsSee: 'See',
+    KApp.cardRequestsMoreOne: '+1 request',
+    KApp.cardRequestsMore: '+{0} requests',
     KApp.cardRequestsMany: '{0} requests are waiting for your answer',
     KApp.cardRequestsAnswer: 'Answer',
     KApp.editorAskSwap: 'Ask someone else to take this day',
@@ -3297,7 +3303,7 @@ abstract final class StringsAppEn {
     KApp.editorClearDayConfirm: 'Clear this day? What was planned on it is deleted, and the History keeps the record.',
     KApp.calAskSwap: 'Ask to swap a day',
     KApp.calAskSwapPick: 'Which day?',
-    KApp.cardPendingTodayTitle: 'Request for today still unanswered',
+    KApp.cardPendingTodayLine: 'Today\'s request unanswered: {0}',
     KApp.cardPendingTodayBody: '{0} stays responsible until {1} answers.',
     KApp.cardPendingTodayYouStay: 'You stay responsible until {0} answers.',
     KApp.cardPendingTodayUntilYou: '{0} stays responsible until you answer.',

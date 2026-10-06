@@ -212,13 +212,29 @@ void main() {
       }
     }
 
+    // Owner's QA of 3.1.10: ONE system strip at a time — the handoff nudge
+    // waits behind the notifications offer and takes its place once it is
+    // sent away.
+    testWidgets('the next system strip shows once the first is dismissed',
+        (tester) async {
+      await pumpPhone(tester, const Size(411.4, 729.5), me: _admin);
+      expect(_strip, findsOneWidget);
+      expect(find.byKey(const Key('handoff-nudge')), findsNothing);
+      await tester.tap(find.byTooltip(_pt[KApp.pushTodayDismiss]));
+      await tester.pumpAndSettle();
+      expect(_strip, findsNothing);
+      expect(find.byKey(const Key('handoff-nudge')), findsOneWidget);
+    });
+
     testWidgets("the E2E founder's calendar holds with the editor's keyboard "
         'up', (tester) async {
       await pumpPhone(tester, const Size(411.4, 729.5),
           me: _admin, keyboard: 250);
       // Every strip the lane had on — otherwise this holds about nothing.
+      // Owner's QA of 3.1.10: ONE system strip at a time, so the handoff
+      // nudge waits behind the notifications offer.
       expect(_strip, findsOneWidget);
-      expect(find.byKey(const Key('handoff-nudge')), findsOneWidget);
+      expect(find.byKey(const Key('handoff-nudge')), findsNothing);
       expect(find.byKey(CalendarScreen.planEndStripKey), findsOneWidget);
       expect(tester.takeException(), isNull,
           reason: 'the column behind the editor overflowed (run 37124944050)');
