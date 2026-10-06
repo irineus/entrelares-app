@@ -825,6 +825,7 @@ abstract final class KApp {
   static const String wizPreset321611 = 'app.wizard.preset321611';
   static const String wizAnchoredStart = 'app.wizard.anchoredStart';
   static const String wizContinues = 'app.wizard.continues';
+  static const String wizPhasedStart = 'app.wizard.phasedStart';
   static const String errHandoffParty = 'app.save.errHandoffParty';
   static const String noticeHandoffPartyOnly = 'app.notice.handoffPartyOnly';
   // Owner's QA of 3.1.10: the way out under the read-only time — the aviso
@@ -1564,6 +1565,7 @@ abstract final class KApp {
     wizPreset321611,
     wizAnchoredStart,
     wizContinues,
+    wizPhasedStart,
     errHandoffParty,
     noticeHandoffPartyOnly,
     noticeHandoffPartySend,
@@ -1992,16 +1994,15 @@ abstract final class StringsAppPtBr {
     KApp.noticeConsequenceInfo:
         'Ninguém precisa responder e o calendário não muda.',
     KApp.noticeConsequencePickup:
-        'Quem receber pode se oferecer para ajudar agora. O calendário não '
-            'muda: o dia de hoje continua sendo seu.',
+        'Quem puder buscar responde. O dia continua seu no calendário.',
     KApp.noticeConsequenceKeep:
-        'Quem receber pode se oferecer para ficar com a criança. Se alguém '
-            'aceitar, uma troca já aprovada passa o dia de hoje para essa '
-            'pessoa, sem precisar de outra confirmação sua. Você verá quem '
-            'aceitou, e a troca fica no histórico.',
+        'Se alguém aceitar, essa pessoa fica com a criança pelo resto de hoje '
+            'e o calendário já muda para ela. Você não precisa confirmar de '
+            'novo.',
     KApp.noticeConsequenceKeepClearsEta:
-        'Escolher esta opção tira a previsão de tempo: um atraso com hora '
-            'marcada não passa o dia para ninguém.',
+        'Se alguém aceitar, essa pessoa fica com a criança pelo resto de hoje '
+            'e o calendário já muda para ela. Você não precisa confirmar de '
+            'novo. A previsão de atraso sai do aviso.',
     KApp.noticeConsequenceKeepNotMyDay:
         'Só quem está com o dia de hoje pode oferecê-lo. Hoje o dia é de '
             'outra pessoa.',
@@ -2449,6 +2450,7 @@ abstract final class StringsAppPtBr {
     KApp.wizPreset321611: 'Fins de semana alternados + pernoite de quarta',
     KApp.wizAnchoredStart: 'Este modelo começa numa sexta: o início passou para {0}.',
     KApp.wizContinues: 'Continua o plano: no dia anterior a criança estava com {0}.',
+    KApp.wizPhasedStart: 'O plano começa em {0} e já entra no ritmo deste modelo, sem deixar dias vazios.',
     KApp.errHandoffParty: 'Só quem entrega ou recebe a criança neste dia pode mudar o horário da entrega.',
     KApp.noticeHandoffPartyOnly: 'O horário é de quem entrega e de quem recebe a criança.',
     KApp.noticeHandoffPartySend: 'Para avisar de um imprevisto, envie um {0}.',
@@ -2871,16 +2873,15 @@ abstract final class StringsAppEn {
     KApp.noticeConsequenceInfo:
         'Nobody has to answer, and the calendar does not change.',
     KApp.noticeConsequencePickup:
-        'Whoever receives it can offer to help now. The calendar does not '
-            'change: today stays yours.',
+        'Whoever can collect answers. Today stays yours on the calendar.',
     KApp.noticeConsequenceKeep:
-        'Whoever receives it can offer to keep the child. If someone '
-            'accepts, an already-approved swap moves today to them, with no '
-            'further confirmation from you. You will see who accepted, and '
-            'the swap stays in the history.',
+        'If someone accepts, they keep the child for the rest of today and '
+            'the calendar moves to them right away. You do not need to '
+            'confirm again.',
     KApp.noticeConsequenceKeepClearsEta:
-        'Choosing this clears the estimate: a delay with a time on it does '
-            'not hand the day to anyone.',
+        'If someone accepts, they keep the child for the rest of today and '
+            'the calendar moves to them right away. You do not need to '
+            'confirm again. The delay estimate comes off the notice.',
     KApp.noticeConsequenceKeepNotMyDay:
         'Only the carer whose day it is can offer it. Today belongs to '
             'someone else.',
@@ -3328,6 +3329,7 @@ abstract final class StringsAppEn {
     KApp.wizPreset321611: 'Alternating weekends + Wednesday overnight',
     KApp.wizAnchoredStart: 'This pattern starts on a Friday: the start moved to {0}.',
     KApp.wizContinues: 'Continues the plan: the day before, the child was with {0}.',
+    KApp.wizPhasedStart: 'The plan starts on {0}, already in step with this pattern, with no empty days.',
     KApp.errHandoffParty: 'Only who hands the child over or receives them on this day can change the handoff time.',
     KApp.noticeHandoffPartyOnly: 'The time belongs to who hands the child over and who receives them.',
     KApp.noticeHandoffPartySend: 'To tell about a change of plans, send a {0}.',

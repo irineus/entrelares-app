@@ -20,19 +20,26 @@ class CycleBlock {
 
 /// The preset ids, in menu order. The VALUES are pattern ids and never change
 /// with the language — only the labels do (U-13).
+///
+/// Owner's QA of 3.1.10 (06/10/2026): the alternating weekends come FIRST —
+/// "the plan most families will use" — and the wizard opens on it
+/// ([wizardDefaultPreset]); the rest keep their order.
 const wizardPresetIds = [
-  '7-7',
-  '14-14',
-  '1-1',
-  '5-2-2-5',
-  '2-2-3',
   // F-97 (owner, 05/10/2026): the most common Brazilian arrangement — the
   // child lives with one parent, the other has every other weekend (Fri–Sun),
   // optionally plus a Wednesday overnight. Both are 14-day cycles anchored on
   // a FRIDAY ([wizardPresetAnchor]).
   '3-11',
   '3-2-1-6-1-1',
+  '7-7',
+  '14-14',
+  '1-1',
+  '5-2-2-5',
+  '2-2-3',
 ];
+
+/// The quick model the wizard opens on (owner's QA of 3.1.10; it was 7/7).
+const wizardDefaultPreset = '3-11';
 
 /// Mirror of `ApplyPresetBlocks`: expands a preset id over the first two
 /// profiles ([profileIds] in roster order; missing slots become 0 and fail
@@ -76,10 +83,24 @@ List<CycleBlock> wizardPresetBlocks(String preset, List<int> profileIds) {
   };
 }
 
-/// F-97: the weekday a preset's cycle must start on ([DateTime.friday] for
-/// the alternating weekends), or null when any day will do.
-int? wizardPresetAnchor(String preset) =>
-    const {'3-11': DateTime.friday, '3-2-1-6-1-1': DateTime.friday}[preset];
+/// F-97: the weekday a preset's cycle must start on, or null when any day
+/// will do.
+///
+/// * the alternating weekends start on a FRIDAY (F-97);
+/// * 2-2-5-5 ('5-2-2-5') on a WEDNESDAY — its blocks only give each parent
+///   two fixed weekdays and alternate the weekends when the first five-day
+///   block runs Wednesday to Sunday (owner's QA of 3.1.10: started on a
+///   Sunday, one parent got "two weekends" and no fixed day; the landing's
+///   page already told readers to pick a Wednesday by hand);
+/// * 2/2/3 on a MONDAY — Mon–Tue, Wed–Thu, Fri–Sun, then the mirror week.
+///
+/// 7/7, 14/14 and 1/1 are the same whatever the weekday.
+int? wizardPresetAnchor(String preset) => const {
+      '3-11': DateTime.friday,
+      '3-2-1-6-1-1': DateTime.friday,
+      '5-2-2-5': DateTime.wednesday,
+      '2-2-3': DateTime.monday,
+    }[preset];
 
 /// F-97: [start] moved to the next [weekday] — or kept, when it already is
 /// one. Never earlier: a start in the past is refused anyway.
@@ -310,4 +331,59 @@ List<CycleRun> cycleStripRuns(List<GeneratedDay> days) {
     }
   }
   return runs;
+}
+
+/// Owner's QA of 3.1.14 (06/10/2026) — an anchored cycle that must start on
+/// [start] itself: CONTINUING a plan (the day after it ends) or filling a
+/// month from its 1st. Snapping to the anchor weekday there would leave the
+/// days in between with nobody; instead the cycle comes in already in step —
+/// the days before the anchor get whoever the pattern gives them (for the
+/// alternating weekends, the weekday parent) and the anchor weekday still
+/// opens a cycle.
+///
+/// A 14-day cycle can be in step in two ways (whose weekend comes first).
+/// When [previousParentId] (D-1's carer) matches the day before [start] in
+/// exactly one of them, that one wins — the plan goes on without a handoff
+/// the old one did not have. Otherwise the next anchor day opens the cycle,
+/// as a snapped start would.
+///
+/// The blocks come back turned (e.g. Ana 2 · Bruno 3 · Ana 9 for a 3/11
+/// started on a Wednesday): the same cycle, read from [start].
+List<CycleBlock> phaseAnchoredCycle(
+  List<CycleBlock> blocks, {
+  required DateTime start,
+  required int anchorWeekday,
+  int? previousParentId,
+}) {
+  final days = [
+    for (final b in blocks)
+      for (var i = 0; i < b.days; i++) b.profileId
+  ];
+  final length = days.length;
+  if (length == 0) return blocks;
+  final untilAnchor = (anchorWeekday - dateOnly(start).weekday + 7) % 7;
+  // Positions of [start] in the cycle that put the next anchor day at 0.
+  final base = (length - untilAnchor) % length;
+  final phases = <int>{
+    for (var k = 0; k < (length % 7 == 0 ? length ~/ 7 : 1); k++)
+      (base + 7 * k) % length
+  }.toList();
+  var phase = phases.first;
+  if (previousParentId != null && phases.length > 1) {
+    final matching = [
+      for (final p in phases)
+        if (days[(p - 1 + length) % length] == previousParentId) p
+    ];
+    if (matching.length == 1) phase = matching.single;
+  }
+  final turned = [...days.sublist(phase), ...days.sublist(0, phase)];
+  final result = <CycleBlock>[];
+  for (final id in turned) {
+    if (result.isNotEmpty && result.last.profileId == id) {
+      result[result.length - 1] = CycleBlock(id, result.last.days + 1);
+    } else {
+      result.add(CycleBlock(id, 1));
+    }
+  }
+  return result;
 }

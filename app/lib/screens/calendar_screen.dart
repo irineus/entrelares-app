@@ -1303,6 +1303,11 @@ class _CalendarScreenState extends State<CalendarScreen>
   DateTime? _dragAnchor;
   Set<DateTime>? _dragBase;
 
+  /// Owner's QA of 3.1.14: a press that STARTS on a day already selected
+  /// takes days out — the press alone unmarks it, and the drag unmarks the
+  /// run — the same gesture as adding, in reverse.
+  bool _dragRemoves = false;
+
   /// The last day picked by a tap or a press — where a Shift+click run
   /// starts.
   DateTime? _lastPicked;
@@ -1314,10 +1319,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     final anchor = _dragAnchor;
     final base = _dragBase;
     if (anchor == null || base == null) return;
-    final next = {
-      ...base,
-      ...selectionRange(anchor, date, horizon: _horizonDate),
-    };
+    final run = selectionRange(anchor, date, horizon: _horizonDate);
+    final next = _dragRemoves ? base.difference(run.toSet()) : {...base, ...run};
     if (next.length == _selectedDays.length && next.containsAll(_selectedDays)) {
       return;
     }
@@ -1333,6 +1336,8 @@ class _CalendarScreenState extends State<CalendarScreen>
   void _onDragEnd() {
     _dragAnchor = null;
     _dragBase = null;
+    _dragRemoves = false;
+    if (_selectedDays.isEmpty) _forgetSelectionMonths();
   }
 
   /// F-100: the days and open requests of the months the selection already
@@ -1374,7 +1379,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     });
   }
 
-  /// Mirror of LongPressDay: entering selection always ADDS the day.
+  /// Mirror of LongPressDay: a press ADDS the day — unless it is already
+  /// selected, and then it takes it out (owner's QA of 3.1.14).
   Future<void> _onDayLongPress(DateTime date) async {
     if (_iAmViewer) return;
     if (_refuseWriteInTodas()) return;
@@ -1382,10 +1388,16 @@ class _CalendarScreenState extends State<CalendarScreen>
     setState(() {
       // Owner's QA of 3.1.10: the press may become a drag — remember where
       // it started and what was selected before it.
+      final d = dateOnly(date);
       _dragBase = {..._selectedDays};
-      _dragAnchor = dateOnly(date);
-      _lastPicked = dateOnly(date);
-      _selectedDays.add(dateOnly(date));
+      _dragAnchor = d;
+      _lastPicked = d;
+      _dragRemoves = _selectedDays.contains(d);
+      if (_dragRemoves) {
+        _selectedDays.remove(d);
+      } else {
+        _selectedDays.add(d);
+      }
     });
   }
 
