@@ -189,7 +189,8 @@ void main() {
       await tester.enterText(message, 'E2E: preciso trocar');
       await tester.pumpAndSettle();
     }
-    final save = find.widgetWithText(FilledButton, l[K.commonSave]);
+    // U-60: the button that opens a request says "Enviar pedido".
+    final save = find.widgetWithText(FilledButton, l[KApp.editorSendRequest]);
     await tester.ensureVisible(save);
     await tester.pumpAndSettle();
     await tester.tap(save);
@@ -258,7 +259,7 @@ void main() {
   // drives. Approve/reject exists once; this test proves the second door into
   // it, rejecting where the other approves.
   testWidgets('the approver sees the request on the Notifications page and '
-      'rejects it from the sheet the row opens', (tester) async {
+      'rejects it from the row itself', (tester) async {
     final day = DateTime.now().add(const Duration(days: 5));
     await family.seedDay(
         date: day, scheduledParentId: family.founder.profileId);
@@ -274,7 +275,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(memberChip.last);
     await tester.pumpAndSettle();
-    final save = find.widgetWithText(FilledButton, l[K.commonSave]);
+    // U-60: the button that opens a request says "Enviar pedido".
+    final save = find.widgetWithText(FilledButton, l[KApp.editorSendRequest]);
     await tester.ensureVisible(save);
     await tester.pumpAndSettle();
     await tester.tap(save);
@@ -302,18 +304,20 @@ void main() {
             of: find.byType(AppBar),
             matching: find.text(l[K.notifPageTitle])),
         findsOneWidget);
-    // U-42 acceptance: the list carries NO action button of its own.
-    expect(find.text(l[K.frozenApprove]), findsNothing);
-    expect(find.text(l[K.frozenRejectAction]), findsNothing);
     expect(row, findsOneWidget,
         reason: 'the request awaiting this member is one row on Para você');
-
-    await tester.tap(row);
+    // U-60 (owner, 05/10/2026; supersedes U-42's "no button on the list"):
+    // the answer lives on the row itself, through the same S-25 RPCs.
+    final id = pending.single['id'];
+    final reject = find.byKey(ValueKey('swap-request-reject-$id'));
+    expect(find.descendant(of: row, matching: reject), findsOneWidget);
+    expect(
+        find.descendant(
+            of: row, matching: find.byKey(ValueKey('swap-request-approve-$id'))),
+        findsOneWidget);
+    await tester.ensureVisible(reject);
     await tester.pumpAndSettle();
-    expect(find.textContaining(l[K.frozenSwapTitle]), findsOneWidget,
-        reason: 'tapping the row opens the frozen-day sheet, the one place '
-            'to act');
-    await tester.tap(find.text(l[K.frozenRejectAction]));
+    await tester.tap(reject);
     await tester.pumpAndSettle(const Duration(seconds: 10));
 
     final requests = await family.openRequests();

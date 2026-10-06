@@ -419,7 +419,8 @@ void main() {
     await openDayEditor(tester, day);
     await tapVisible(tester, memberChip('Bruno').last);
     await tapVisible(tester, find.byKey(const ValueKey('day-also-for-11')));
-    await tapVisible(tester, find.widgetWithText(FilledButton, l[K.commonSave]));
+    await tapVisible(
+        tester, find.widgetWithText(FilledButton, l[KApp.editorSendRequest]));
     expect(ds.createdSwapRequests, hasLength(2),
         reason: "one request per child — Lia's and Theo's");
     expect({for (final r in ds.createdSwapRequests) r['proposed']}, {bruno.id});

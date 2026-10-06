@@ -486,6 +486,11 @@ regras e ~0% do visual — por um sistema de tokens. O que ela estabelece:
   F-44 ficam nela, porque a folha não abre mais para um pedido fechado). Antes eram duas
   cópias da mesma ação — o cartão com campo de texto e dois botões POR pedido, e a folha —
   que já divergiam; as duas formatavam o horário à mão, ignorando `formatTimeString`.
+  **U-60 (owner, 05/10/2026) trouxe a resposta de volta à linha de "Para você"**: uma frase
+  (`swapRequestSentence`, core — "Ana pede que você fique com a criança na qui, 08/10"), a
+  mensagem de quem pediu e *Aprovar* / *Recusar* na própria linha, chamando as MESMAS RPCs do
+  S-25 que a folha chama (sem nota nem motivo); *Detalhes* abre a folha para isso. O cartão
+  dessa linha não tem toque próprio (U-47). "Enviadas" segue como o U-42 deixou.
 - **A folha do dia abre pronta para agir, com um toque (U-56, 23/09/2026; substitui o
   padrão do U-25).** Um dia que o leitor pode mudar, hoje ou adiante, abre direto no
   formulário (`daySheetOpening`, core); no topo, as pills do U-25 (`SlotPill`, o mesmo

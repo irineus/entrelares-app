@@ -882,8 +882,6 @@ abstract final class StringsPtBr {
     K.notifEmptyHistory: 'Nenhuma notificação ainda.',
     K.notifRevertPendingBadge: 'Reversão pendente',
     K.notifPendingBadge: 'Pendente',
-    K.notifLabelRequester: 'Solicitante',
-    K.notifLabelRevertTo: 'Pede reverter para',
     K.notifLabelTo: 'Para',
     K.notifLabelProposed: 'Proposto',
     K.notifLabelYourMessage: 'Sua mensagem',

@@ -167,6 +167,11 @@ class CalendarScreen extends StatefulWidget {
   /// F-07: the lane chips.
   static const laneChipsKey = Key('lane-chips');
 
+  /// U-60: the ⋮ "Pedir troca de um dia" and the Hoje card's strip of the
+  /// requests waiting for the reader's answer.
+  static const askSwapMenuKey = Key('ask-swap-menu');
+  static const requestStripKey = Key('request-strip');
+
   const CalendarScreen(
       {super.key,
       required this.dataSource,
@@ -239,6 +244,10 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// under the Hoje card reads the OPEN ones; the closed ones are kept so a
   /// cancellation stops showing the instant the load returns.
   List<DayNotice> _todayNotices = const [];
+
+  /// U-60: every open request waiting for MY answer, any date — the Hoje
+  /// card names them (it was only a badge on the Comunicação tab).
+  List<SwapRequest> _pendingForMe = const [];
 
   /// F-52: yesterday's row, for the "who handed over today" end of the sender
   /// rule. Fetched on its own because `_upcoming` starts at today.
@@ -435,11 +444,22 @@ class _CalendarScreenState extends State<CalendarScreen>
   int _loadSeq = 0;
   int _pendingDayAfter = 0;
 
+  /// U-60: the queued day opens with the swap request armed (the ⋮ entry).
+  bool _pendingAskSwap = false;
+
   void _onDayRequest() {
     final day = widget.dayRequest?.value;
     if (day == null) return;
     widget.dayRequest!.value = null;
+    _queueDay(day);
+  }
+
+  /// Puts [day]'s month on screen and opens the day once a load that started
+  /// after this call has read it — the cited day's path (F-35), and since
+  /// U-60 the ⋮ "Pedir troca de um dia".
+  void _queueDay(DateTime day, {bool askSwap = false}) {
     _pendingDay = DateTime(day.year, day.month, day.day);
+    _pendingAskSwap = askSwap;
     _pendingDayAfter = _loadSeq;
     final month = DateTime(day.year, day.month);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -461,10 +481,12 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (day == null || !mounted || completedLoad <= _pendingDayAfter) return;
     if (!_isOnScreen(DateTime(day.year, day.month))) return;
     _pendingDay = null;
+    final askSwap = _pendingAskSwap;
+    _pendingAskSwap = false;
     // The same action a tap on the cell takes: a day with a pending request
     // opens the approval panel, anything else the day sheet.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _openDayAsTapped(day);
+      if (mounted) _openDayAsTapped(day, askSwap: askSwap);
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
@@ -874,6 +896,16 @@ class _CalendarScreenState extends State<CalendarScreen>
         children = const [];
         yesterdayRows = const [];
       }
+      // U-60: best-effort like the avisos — the strip may wait for the next
+      // load, the calendar may not.
+      var pendingForMe = _pendingForMe;
+      if (ownProfile != null && !ownProfile.isViewer) {
+        try {
+          pendingForMe = await widget.dataSource.fetchPendingForMe(ownProfile.id);
+        } catch (_) {/* keep whatever we had */}
+      } else {
+        pendingForMe = const [];
+      }
       var todayNotices = _todayNotices;
       var yesterdayRow = _yesterdayRow;
       try {
@@ -894,6 +926,10 @@ class _CalendarScreenState extends State<CalendarScreen>
         _upcomingRows = upcoming;
         _applyLaneView();
         _todayNotices = todayNotices;
+        _pendingForMe = [
+          for (final r in pendingForMe)
+            if (!dateOnly(r.scheduleDate).isBefore(dateOnly(_today))) r
+        ]..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
         _yesterdayRow = yesterdayRow;
         _lastPlannedDay = lastPlannedDay;
         _monthEvents = monthEvents;
@@ -1269,7 +1305,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   /// What a tap on [date]'s cell opens — also a day cited in the Conversa.
-  Future<void> _openDayAsTapped(DateTime date) async {
+  Future<void> _openDayAsTapped(DateTime date, {bool askSwap = false}) async {
     // F-07: in *Todas* the day is every child's — read it whole.
     if (_perChild && _lane == null) {
       await _openAllChildrenDay(date);
@@ -1282,7 +1318,24 @@ class _CalendarScreenState extends State<CalendarScreen>
       _openFrozenDay(frozen);
       return;
     }
-    _openDay(date);
+    _openDay(date, askSwap: askSwap);
+  }
+
+  /// U-60: "Pedir troca de um dia" — which day, then that day's sheet with
+  /// the request armed: the SAME sheet and field a tap on the cell opens.
+  Future<void> _askSwapFromMenu() async {
+    if (_refuseWriteOffline() || _refuseWriteInTodas()) return;
+    final l = AppL10n.of(context).l;
+    final today = dateOnly(_today);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: today,
+      firstDate: today,
+      lastDate: DateTime(today.year + 2, 12, 31),
+      helpText: l[KApp.calAskSwapPick],
+    );
+    if (picked == null || !mounted) return;
+    _queueDay(picked, askSwap: true);
   }
 
   Future<void> _openFrozenDay(SwapRequest request) async {
@@ -1881,7 +1934,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  Future<void> _openDay(DateTime date) async {
+  Future<void> _openDay(DateTime date, {bool askSwap = false}) async {
     HapticFeedback.selectionClick();
     final iso = CareSchedule.isoDate(date);
     final previousIso =
@@ -1912,6 +1965,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       childId: _perChild ? _lane : null,
       childName: _perChild ? _childName(_lane) : null,
       siblings: _daySiblings(date),
+      askSwap: askSwap,
     );
     if (outcome != null) {
       _load(silent: true);
@@ -2131,7 +2185,44 @@ class _CalendarScreenState extends State<CalendarScreen>
       onGoToToday: _goToToday,
       onInvite: _onInviteNudgeTap,
       noticeStrip: _noticeStrip(context, todayRow, nextHandoff),
+      requestStrip: _requestStrip(context),
       laneSummary: _todayLaneSummary(AppL10n.of(context).l),
+    );
+  }
+
+  /// U-60: the requests waiting for MY answer, on the card about today —
+  /// the soonest said in words, "Responder" opening its approval panel.
+  Widget? _requestStrip(BuildContext context) {
+    if (_loading || _pendingForMe.isEmpty || _ownProfile == null) return null;
+    final l = AppL10n.of(context).l;
+    final first = _pendingForMe.first;
+    final requester = _members
+            .where((m) => m.id == first.requestingProfileId)
+            .firstOrNull
+            ?.fullName
+            .trim()
+            .split(' ')
+            .first ??
+        '—';
+    final count = _pendingForMe.length;
+    return AppBanner(
+      key: CalendarScreen.requestStripKey,
+      tone: context.tokens.info,
+      icon: Icons.swap_horiz,
+      title: count == 1
+          ? l[KApp.cardRequestsOne]
+          : l.format(KApp.cardRequestsMany, [count]),
+      message: swapRequestSentence(
+        l: l,
+        requesterName: requester,
+        date: first.scheduleDate,
+        isRevert: first.isRevertPending,
+        requesterIsProposed:
+            first.proposedActualParentId == first.requestingProfileId,
+      ),
+      actionLabel: l[KApp.cardRequestsAnswer],
+      actionIcon: Icons.reply,
+      onAction: () => _openFrozenDay(first),
     );
   }
 
@@ -2621,6 +2712,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               // long-press). Once armed, tapping a day toggles its selection.
               _CalendarAction.selectDays =>
                 setState(() => _selectionArmed = true),
+              _CalendarAction.askSwap => _askSwapFromMenu(),
               _CalendarAction.notice => _openNoticeFromMenu(),
               _CalendarAction.clearMonth => _clearMonth(),
               _CalendarAction.adminMode => widget.adminMode.toggle(),
@@ -2647,6 +2739,19 @@ class _CalendarScreenState extends State<CalendarScreen>
                   title: Text(l[K.calSelectDays]),
                 ),
               ),
+              // U-60: the explicit way to ask — it lands on the day sheet's
+              // own request, never around it.
+              if (!_iAmViewer && _assignableMembers.length > 1)
+                PopupMenuItem(
+                  key: CalendarScreen.askSwapMenuKey,
+                  value: _CalendarAction.askSwap,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.swap_horiz),
+                    title: Text(l[KApp.calAskSwap]),
+                  ),
+                ),
               // F-52: offered only to one of the day's three ends, and only
               // on the month today is in — an action about today offered from
               // December reads as a bug.
@@ -2969,7 +3074,14 @@ class _CalendarScreenState extends State<CalendarScreen>
 }
 
 /// U-36 — the items of the calendar's ⋮ menu. F-51 adds `clearMonth` here.
-enum _CalendarAction { wizard, selectDays, notice, adminMode, clearMonth }
+enum _CalendarAction {
+  wizard,
+  selectDays,
+  askSwap,
+  notice,
+  adminMode,
+  clearMonth,
+}
 
 /// The today card's outline while it loads — the same card, the same two
 /// bands, the same heights, so nothing moves when the real one arrives.

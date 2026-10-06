@@ -159,6 +159,13 @@ void main() {
 
       await activate(tester);
       expect(mode.isActive, isTrue);
+      // U-60: "Limpar dia" asks before it deletes.
+      expect(ds.deleted, isEmpty);
+      await tapSheet(
+          tester,
+          find.descendant(
+              of: find.byKey(const ValueKey('day-sheet-clear-confirm')),
+              matching: find.text(pt[K.editorClearDay])));
       expect(ds.deleted, [7]);
       await settleSnack(tester);
     });

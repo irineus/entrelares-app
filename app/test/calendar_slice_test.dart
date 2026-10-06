@@ -2063,8 +2063,8 @@ int? get futureDay {
   return today.day == lastDay ? null : today.day + 1;
 }
 
-/// A member's chip in the day sheet, by the name it shows — only the chosen
-/// chip prints it; the others are the avatar (owner's validation, 25/09/2026).
+/// A member's chip in the day sheet, by the name it shows — since U-60 every
+/// chip prints it (initial and first name).
 Finder memberChip(String name) => find.byKey(ValueKey('member-chip:$name'));
 
 Future<void> openDay(WidgetTester tester, int day) async {

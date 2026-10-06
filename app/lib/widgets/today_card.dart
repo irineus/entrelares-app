@@ -50,6 +50,11 @@ class TodayCard extends StatelessWidget {
   /// already null, so the strip is the only target in it.
   final Widget? noticeStrip;
 
+  /// U-60: the swap requests waiting for the reader's answer — same place and
+  /// same rule as [noticeStrip] (drawn only on the current month, where the
+  /// card itself has no tap).
+  final Widget? requestStrip;
+
   /// F-07 (PR 4b): in a per-child plan's *Todas*, when the children are with
   /// different carers today — "Lia com Ana; Theo com Bruno" in place of the
   /// one responsible name.
@@ -68,6 +73,7 @@ class TodayCard extends StatelessWidget {
     required this.onGoToToday,
     required this.onInvite,
     this.noticeStrip,
+    this.requestStrip,
   });
 
   /// A heading starts with a capital; the date formatters lowercase because
@@ -228,6 +234,12 @@ class TodayCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                 child: noticeStrip,
+              ),
+            if (viewingCurrentMonth && requestStrip != null)
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                    12, noticeStrip == null ? 8 : 0, 12, 8),
+                child: requestStrip,
               ),
           ],
         ),

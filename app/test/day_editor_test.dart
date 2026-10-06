@@ -153,6 +153,14 @@ void main() {
     await tester.pumpAndSettle();
     await openDayEditor(tester, future);
     await tapSheet(tester, find.text(pt[K.editorClearDay]));
+    // U-60 (T-103 D10): it asks first — nothing is deleted on the first tap.
+    expect(ds.deleted, isEmpty);
+    expect(find.text(pt[KApp.editorClearDayConfirm]), findsOneWidget);
+    await tapSheet(
+        tester,
+        find.descendant(
+            of: find.byKey(const ValueKey('day-sheet-clear-confirm')),
+            matching: find.text(pt[K.editorClearDay])));
 
     expect(ds.deleted, [7]);
     expect(find.text(pt[K.toastDayCleared]), findsOneWidget);
