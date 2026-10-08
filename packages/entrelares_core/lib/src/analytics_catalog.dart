@@ -72,6 +72,15 @@ abstract final class AnalyticsEvents {
   static const playInviteOpen = 'play-invite-open'; // F-72, 27/09/2026
   static const playInviteDismiss = 'play-invite-dismiss'; // F-72, 27/09/2026
   static const inviteeWelcomeView = 'invitee-welcome-view'; // once — U-58, 28/09/2026
+  // U-61, 08/10/2026 — the founder's first run, as it is actually taken:
+  // which checklist step was tapped (`step`: plan / invite / swaps / tour),
+  // how the tour ended (`outcome`: finished / skipped) and the Hoje card's
+  // "Planejar" on a family with no plan (the F-31 nudge's sibling; from this
+  // date `invite_nudge_shown` waits behind it, so its denominator shrinks —
+  // the T-76/U-35 cliff again, read the series from here).
+  static const checklistAction = 'checklist-action';
+  static const tourEnded = 'tour-ended';
+  static const planNudgeClick = 'plan-nudge-click';
   // F-73, 28/09/2026: the app ASKED Play for the review sheet. Play decides
   // whether it shows and never says whether anyone reviewed.
   static const reviewPromptRequested = 'review-prompt-requested';
@@ -133,6 +142,9 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.playInviteOpen: {},
     AnalyticsEvents.playInviteDismiss: {},
     AnalyticsEvents.inviteeWelcomeView: {'channel', 'member'},
+    AnalyticsEvents.checklistAction: {'step'},
+    AnalyticsEvents.tourEnded: {'outcome'},
+    AnalyticsEvents.planNudgeClick: {'channel'},
     AnalyticsEvents.reviewPromptRequested: {},
     AnalyticsEvents.preferenceChanged: {'pref', 'value'},
     AnalyticsEvents.supportContactSent: {'category', 'signed_in'},

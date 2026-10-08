@@ -105,6 +105,26 @@ abstract final class ReferralRules {
   /// The `channel` the server records (its CHECK: `web` | `android`).
   static String channel({required bool isWeb}) => isWeb ? 'web' : 'android';
 
+  /// U-61 (owner, 07/10/2026) — whether the Família page OFFERS the card at
+  /// all. The audit saw "Indique uma família" on a one-member family that had
+  /// not even invited the co-parent: an ask to bring in a THIRD family from
+  /// someone whose own is not yet one. The card waits for a family that is
+  /// complete (a second live caregiver) and active (a plan exists); until
+  /// then the first run has the floor. The server's own rules — the flag, a
+  /// live non-viewer member, the code — are the caller's other inputs.
+  static bool offerCard({
+    required bool enabled,
+    required bool isActiveMember,
+    required bool isViewer,
+    required bool hasOtherActiveMember,
+    required bool hasAnyPlannedDay,
+  }) =>
+      enabled &&
+      isActiveMember &&
+      !isViewer &&
+      hasOtherActiveMember &&
+      hasAnyPlannedDay;
+
   /// What `attribute_referral` answered when it recorded the referral. The
   /// other answer, `ignored`, covers an unknown code and a family already
   /// attributed alike — on purpose.

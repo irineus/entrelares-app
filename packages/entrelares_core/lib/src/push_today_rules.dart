@@ -26,6 +26,15 @@
 /// e-mail behind it, so the reader just learned by opening the app what a
 /// phone would have told them; the moment to ask again is exactly then. A
 /// reader whose OTHER phone rings is not chased: the notice reached them.
+///
+/// **U-61 (owner, 07/10/2026): not in the first seconds.** The audit saw the
+/// strip over a founder's empty calendar — "trocas não vêm por e-mail" before
+/// any swap, or any second carer, existed. While the founder's first run is
+/// still active (`OnboardingSteps.firstRunActive`: the checklist is theirs,
+/// has work left and was not put away) the strip waits — unless a notice has
+/// already arrived for the reader, which is the moment the owner's rule above
+/// names. Finishing or dismissing the checklist ends the first run and the
+/// strip takes its turn in the one-strip queue.
 library;
 
 import 'install_hint_rules.dart';
@@ -39,8 +48,12 @@ abstract final class PushTodayRules {
     required DateTime now,
     required bool accountHasPush,
     DateTime? newestUnreadAt,
+    bool firstRunActive = false,
   }) {
     if (!step.isActionable) return false;
+    // U-61: the first run has its own asks; this one waits for a notice or
+    // for the end of the run. A notice that arrived IS the moment to ask.
+    if (firstRunActive && newestUnreadAt == null) return false;
     if (!InstallHintRules.isQuiet(dismissals, now)) return true;
     return missedSinceDismissal(
       dismissals: dismissals,

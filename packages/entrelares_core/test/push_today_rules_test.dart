@@ -116,5 +116,51 @@ void main() {
           ),
           isFalse);
     });
+
+    group('U-61 — not in the first seconds of the founder\'s first run', () {
+      test('first run on, nothing arrived yet: quiet, never dismissed or not',
+          () {
+        for (final dismissals in [
+          InstallHintDismissals.none,
+          _dismissed(1, daysAgo: 30),
+        ]) {
+          expect(
+              PushTodayRules.show(
+                step: PushNudgeStep.enable,
+                dismissals: dismissals,
+                now: _now,
+                accountHasPush: false,
+                firstRunActive: true,
+              ),
+              isFalse);
+        }
+      });
+
+      test('a notice that arrived IS the moment to ask, first run or not', () {
+        expect(
+            PushTodayRules.show(
+              step: PushNudgeStep.enable,
+              dismissals: InstallHintDismissals.none,
+              now: _now,
+              accountHasPush: false,
+              newestUnreadAt: _now,
+              firstRunActive: true,
+            ),
+            isTrue);
+      });
+
+      test('the first run over (finished or dismissed): the ordinary rhythm',
+          () {
+        expect(
+            PushTodayRules.show(
+              step: PushNudgeStep.enable,
+              dismissals: InstallHintDismissals.none,
+              now: _now,
+              accountHasPush: false,
+              firstRunActive: false,
+            ),
+            isTrue);
+      });
+    });
   });
 }

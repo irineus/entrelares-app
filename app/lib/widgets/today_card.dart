@@ -36,8 +36,14 @@ class TodayCard extends StatelessWidget {
   final DateTime? nextHandoffDate;
   final bool viewingCurrentMonth;
   final bool showInviteNudge;
+
+  /// U-61: the family has no plan at all and the founder's first run is on —
+  /// the card offers the wizard where the F-31 invite nudge would stand
+  /// (`showPlanNudge`, core). Plan first, then invite: the founder's order.
+  final bool showPlanNudge;
   final VoidCallback onGoToToday;
   final VoidCallback onInvite;
+  final VoidCallback? onPlan;
 
   /// F-52: the aviso strip — the open notice, or the way to send one. It sits
   /// INSIDE the card because an aviso is about today, and today is what this
@@ -77,8 +83,10 @@ class TodayCard extends StatelessWidget {
     required this.nextHandoffDate,
     required this.viewingCurrentMonth,
     required this.showInviteNudge,
+    this.showPlanNudge = false,
     required this.onGoToToday,
     required this.onInvite,
+    this.onPlan,
     this.noticeStrip,
     this.requestStrip,
     this.onSendNotice,
@@ -243,7 +251,13 @@ class TodayCard extends StatelessWidget {
                   ),
                 ),
               ),
-            if (showInviteNudge || !glance.hasSchedule)
+            if (showPlanNudge)
+              Container(
+                color: user.tone.container,
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                child: _planNudge(context, l),
+              )
+            else if (showInviteNudge || !glance.hasSchedule)
               Container(
                 color: user.tone.container,
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -275,6 +289,35 @@ class TodayCard extends StatelessWidget {
       ),
     );
   }
+
+  /// U-61 — "Nenhum dia planejado ainda · Planejar": the wizard is the way
+  /// out of an empty calendar, and this card is the first thing the founder
+  /// reads. The key is the test's and the tour's handle.
+  Widget _planNudge(BuildContext context, Localization l) => Row(
+        key: planNudgeKey,
+        children: [
+          Icon(Icons.auto_awesome_outlined,
+              size: 24, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l[KApp.cardPlanTitle],
+                    style: Theme.of(context).textTheme.titleSmall),
+                Text(l[KApp.cardPlanHint],
+                    style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonal(
+              onPressed: onPlan, child: Text(l[KApp.cardPlanAction])),
+        ],
+      );
+
+  /// The plan nudge's row, for tests.
+  static const planNudgeKey = Key('today-plan-nudge');
 
   Widget _inviteNudge(BuildContext context, Localization l) => Row(
         children: [

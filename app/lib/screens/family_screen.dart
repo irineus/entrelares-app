@@ -306,13 +306,34 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       // F-80 PR 2: dark, nothing is asked. A viewer reads the family, it does
       // not represent it to another one (the server refuses it too), and a
       // departed or account-less member speaks for no family.
+      // U-61: and only a family that is complete (a second live caregiver)
+      // and active (a plan exists) is asked to bring in another one — the
+      // audit saw the card on a founder alone who had not even invited the
+      // co-parent. The plan fact is one bounded read, asked only once the
+      // cheaper conditions hold; a failed read offers nothing.
       final me = results[3] as Member?;
-      final referralCode = settings.referralEnabled &&
-              me != null &&
-              me.isActiveMember &&
-              !me.isViewer
-          ? await widget.dataSource.fetchMyReferralCode()
-          : null;
+      String? referralCode;
+      if (me != null && settings.referralEnabled) {
+        final hasOther = members
+            .any((m) => m.id != me.id && m.isActiveMember && !m.isViewer);
+        var hasPlan = false;
+        if (hasOther && me.isActiveMember && !me.isViewer) {
+          try {
+            hasPlan = (await widget.dataSource.fetchOnboardingFacts(
+                    myProfileId: me.id, includeSwapParticipation: false))
+                .hasAnyPlannedDay;
+          } catch (_) {/* no answer: no card */}
+        }
+        if (ReferralRules.offerCard(
+          enabled: settings.referralEnabled,
+          isActiveMember: me.isActiveMember,
+          isViewer: me.isViewer,
+          hasOtherActiveMember: hasOther,
+          hasAnyPlannedDay: hasPlan,
+        )) {
+          referralCode = await widget.dataSource.fetchMyReferralCode();
+        }
+      }
 
       if (!mounted) return;
       setState(() {

@@ -18,6 +18,7 @@ import 'dart:io';
 import 'package:entrelares_app/screens/family_screen.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/services/analytics_service.dart';
+import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/services/install_referrer.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
@@ -309,6 +310,9 @@ void main() {
     }
 
     final card = find.byKey(const ValueKey('family-referral-card'));
+    // U-61: the card waits for a family that is complete AND active — the
+    // fixture's two caregivers plus a plan.
+    const planned = OnboardingFacts(hasAnyPlannedDay: true);
 
     testWidgets('dark: no card, and the code is never asked', (tester) async {
       final ds = fam.source();
@@ -320,7 +324,8 @@ void main() {
     });
 
     testWidgets('on: the link, the rule and Compartilhar', (tester) async {
-      final ds = fam.source(settings: const {'feature.referral': 'true'});
+      final ds = fam.source(settings: const {'feature.referral': 'true'})
+        ..onboardingFacts = planned;
       await pump(tester, ds);
 
       expect(card, findsOne);
@@ -338,14 +343,34 @@ void main() {
       final ds = fam.source(
         members: const [fam.plain, fam.admin],
         settings: const {'feature.referral': 'true'},
-      );
+      )..onboardingFacts = planned;
       await pump(tester, ds);
       expect(card, findsOne);
     });
 
+    testWidgets('U-61: a founder alone, or a family with no plan, is not '
+        'asked to bring in another family — and the code is never fetched',
+        (tester) async {
+      // The audit saw "Indique uma família" on a one-member family that had
+      // not even invited the co-parent.
+      final alone = fam.source(
+        members: const [fam.admin],
+        settings: const {'feature.referral': 'true'},
+      )..onboardingFacts = planned;
+      await pump(tester, alone);
+      expect(card, findsNothing);
+      expect(alone.referralCodeFetches, 0);
+
+      final unplanned = fam.source(settings: const {'feature.referral': 'true'});
+      await pump(tester, unplanned);
+      expect(card, findsNothing);
+      expect(unplanned.referralCodeFetches, 0);
+    });
+
     testWidgets('share: the sentence and the link go to the sheet; the event '
         'carries the channel and never the code', (tester) async {
-      final ds = fam.source(settings: const {'feature.referral': 'true'});
+      final ds = fam.source(settings: const {'feature.referral': 'true'})
+        ..onboardingFacts = planned;
       final r = await pump(tester, ds);
 
       await tester.ensureVisible(card);
@@ -379,6 +404,7 @@ void main() {
 
     testWidgets('the server refusing is no card', (tester) async {
       final ds = fam.source(settings: const {'feature.referral': 'true'})
+        ..onboardingFacts = planned
         ..myReferralCode = null;
       await pump(tester, ds);
       expect(card, findsNothing);
