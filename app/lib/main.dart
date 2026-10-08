@@ -918,8 +918,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
 
   /// F-78 — the calendar with the wizard open on today.
   void _openWizardOnToday() {
-    final now = DateTime.now();
-    _planRequest.value = DateTime(now.year, now.month, now.day);
+    _planRequest.value = FamilyTime.today();
     _router.go('/');
   }
 

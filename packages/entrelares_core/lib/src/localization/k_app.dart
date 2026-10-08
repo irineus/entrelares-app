@@ -778,6 +778,9 @@ abstract final class KApp {
   /// Share, so it could not leave the page.
   static const String famReferralCopy = 'app.fam.referralCopy';
 
+  /// T-105: beside a deadline when the device's clock is not the family's.
+  static const String familyTimeSuffix = 'app.familyTime.suffix';
+
   /// F-103: the confirmation before the S-10 password ask — what an admin can
   /// do (grant) or stops being able to do (revoke), and that the person is told.
   static const String adminConfirmGrantTitle = 'app.adminConfirm.grantTitle';
@@ -1586,6 +1589,7 @@ abstract final class KApp {
     errFamilyLoad,
     adminModeOnlyAdmins,
     famReferralCopy,
+    familyTimeSuffix,
     adminConfirmGrantTitle,
     adminConfirmRevokeTitle,
     adminConfirmGrantIntro,
@@ -2526,6 +2530,7 @@ abstract final class StringsAppPtBr {
     KApp.errFamilyLoad: 'Não foi possível carregar os dados da família.',
     KApp.adminModeOnlyAdmins: 'Somente administradores da família usam o modo administrador.',
     KApp.famReferralCopy: 'Copiar link',
+    KApp.familyTimeSuffix: '(horário de Brasília)',
     KApp.adminConfirmGrantTitle: 'Tornar {0} administrador(a)?',
     KApp.adminConfirmRevokeTitle: 'Remover a permissão de administrador(a) de {0}?',
     KApp.adminConfirmGrantIntro: 'Como administrador(a), {0} poderá:',
@@ -3459,6 +3464,7 @@ abstract final class StringsAppEn {
     KApp.errFamilyLoad: 'Could not load the family.',
     KApp.adminModeOnlyAdmins: 'Only the family\'s admins use admin mode.',
     KApp.famReferralCopy: 'Copy link',
+    KApp.familyTimeSuffix: '(Brasília time)',
     KApp.adminConfirmGrantTitle: 'Make {0} an admin?',
     KApp.adminConfirmRevokeTitle: "Remove {0}'s admin permission?",
     KApp.adminConfirmGrantIntro: 'As an admin, {0} will be able to:',

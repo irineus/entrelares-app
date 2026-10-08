@@ -195,7 +195,7 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
     final iAmRequester = widget.ownProfileId == request.requestingProfileId;
     final iAmTarget = widget.ownProfileId == request.targetProfileId;
     // F-20: computed at render time — the panel always shows a pending request.
-    final tag = request.toView().priorityTag(DateTime.now());
+    final tag = request.toView().priorityTag(FamilyTime.now());
 
     final requesterName = _nameOf(request.requestingProfileId);
     final targetName = _nameOf(request.targetProfileId);
@@ -294,7 +294,7 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                       // U-63: a day with no time "started", it is not late.
                       l[tag == SwapPriorityTag.overdue
                           ? (request.toView().dayStartedWithoutTime(
-                                  DateTime.now())
+                                  FamilyTime.now())
                               ? KApp.frozenDayStarted
                               : K.frozenOverdue)
                           : K.frozenUrgent],
@@ -382,7 +382,7 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                     // U-63: said as a person says it — "sábado, 10/10, à 0h".
                     infoRow(
                         K.frozenAutoApproval,
-                        l.formatDeadline(autoApprovalDeadline(
+                        l.formatFamilyDeadline(autoApprovalDeadline(
                             request.scheduleDate,
                             request.proposedHandoffTime))),
                   ],
