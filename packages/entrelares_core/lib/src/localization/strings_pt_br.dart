@@ -980,7 +980,7 @@ abstract final class StringsPtBr {
     K.auditBatchReplace: '<strong>{0}</strong> substituiu o plano numa ação só.',
     K.auditBatchHandoff: '<strong>{0}</strong> definiu o horário das entregas numa ação só.',
     K.handoffNudgeMessage:
-        'Entregas sem horário: prazos contam da 0h.',
+        'Entregas sem horário: prazo à meia-noite.',
     K.handoffNudgeAction: 'Definir',
     K.handoffNudgeDismiss: 'Dispensar',
     K.handoffRangeTitle: 'Horário das entregas',
