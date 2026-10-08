@@ -81,6 +81,12 @@ class NotificationsScreen extends StatefulWidget {
 
   static Key trialActionKey(int id) => Key('notif-trial-$id');
 
+  /// F-101: an expired invitation's "Compartilhar de novo" — the host opens
+  /// the Família page, where the card makes a new link. Null hides it.
+  final VoidCallback? onOpenFamily;
+
+  static Key familyActionKey(int id) => Key('notif-family-$id');
+
   /// F-81: an admin's direct change of one of my days — "Ver o dia" opens
   /// the calendar on that day's sheet. Null hides it.
   final ValueChanged<DateTime>? onOpenDay;
@@ -123,6 +129,7 @@ class NotificationsScreen extends StatefulWidget {
       this.onPlanFrom,
       this.onOpenExpenses,
       this.onOpenPlan,
+      this.onOpenFamily,
       this.onOpenDay,
       this.onOpenAuditTrail,
       this.embedded = false,
@@ -281,6 +288,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       NotificationLanding.planFirst => _Tab.history,
       NotificationLanding.day => _Tab.history,
       NotificationLanding.auditTrail => _Tab.history,
+      NotificationLanding.family => _Tab.history,
     };
   }
 
@@ -1139,6 +1147,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         detail: _planAction(notif, l) ??
             _expenseAction(notif, l) ??
             _trialAction(notif, l) ??
+            _familyAction(notif, l) ??
             _adminChangeAction(notif, l),
       ),
     );
@@ -1160,6 +1169,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         icon: const Icon(Icons.receipt_long_outlined),
         label: Text(l[KApp.expenseOpen]),
         onPressed: open,
+      ),
+    );
+  }
+
+  /// F-101: an expired invitation's row opens the Família page, where the
+  /// card's "Compartilhar de novo" makes a new link. The row only reaches the
+  /// inviter.
+  Widget? _familyAction(AppNotification notif, Localization l) {
+    final open = widget.onOpenFamily;
+    if (open == null || !PushRouting.familyTypes.contains(notif.type)) {
+      return null;
+    }
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: NotificationsScreen.familyActionKey(notif.id),
+        icon: const Icon(Icons.share_outlined),
+        label: Text(l[KApp.famShareAgain]),
+        onPressed: () {
+          _trackListOpen(notif.type);
+          open();
+        },
       ),
     );
   }

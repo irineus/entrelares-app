@@ -123,6 +123,9 @@ const CHAT_TYPES = ['chat_message'];
 // subscribe button is.
 // F-80 PR 3: so does the referral reward — the new end shows there.
 const PLAN_TYPES = ['premium_trial', 'referral_reward'];
+// F-101: the invitation the reader sent expired — the Família page is where
+// "Compartilhar de novo" makes a new link.
+const FAMILY_TYPES = ['invitation_expired'];
 // F-78: a `plan_ending` that says the plan never started opens the calendar
 // with the wizard on today (`/?plan=first`, read by the app's `/` route).
 const PLAN_FIRST_KINDS = ['unplanned'];
@@ -139,6 +142,9 @@ const ADMIN_CHANGE_TRAIL_KINDS = ['batch'];
 function landingUrl(data) {
   if (PLAN_TYPES.includes(data.type)) {
     return new URL('/family/plan', self.location.origin).href;
+  }
+  if (FAMILY_TYPES.includes(data.type)) {
+    return new URL('/family', self.location.origin).href;
   }
   if (data.type === 'plan_ending' && PLAN_FIRST_KINDS.includes(data.kind)) {
     return new URL('/?plan=first', self.location.origin).href;

@@ -105,6 +105,12 @@ export const PUSH_TYPES: readonly string[] = [
 	// and lands on it; `batch` names the first and last day and the count, and
 	// lands on Relatórios → Histórico. Never e-mail.
 	"day_admin_change",
+	// F-101. The invitation the reader sent expired unanswered — the second
+	// parent did not join, which is the activation step, and it stalled in
+	// silence. ONE per invitation, to the inviter only. States no day, so it is
+	// rendered before the date guard. Lands on Família, where "Compartilhar de
+	// novo" makes a new link. Never e-mail (F-59).
+	"invitation_expired",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -223,6 +229,7 @@ const K = {
 	dayAdminChangeBatch: "notifRender.dayAdminChange.batch",
 
 	titleMemberJoined: "notifRender.title.memberJoined",
+	titleInvitationExpired: "notifRender.title.invitationExpired",
 	titleMemberReturned: "notifRender.title.memberReturned",
 	titleMemberLeft: "notifRender.title.memberLeft",
 	titleFamilyDeletionRequested: "notifRender.title.familyDeletionRequested",
@@ -230,6 +237,7 @@ const K = {
 	titleFamilyDeletionWithdrawn: "notifRender.title.familyDeletionWithdrawn",
 	titleFamilyDeletionNear: "notifRender.title.familyDeletionNear",
 	memberJoined: "notifRender.memberJoined",
+	invitationExpired: "notifRender.invitationExpired",
 	memberReturned: "notifRender.memberReturned",
 	leaveOther: "notifRender.leave.other",
 	famDelRequestedOther: "notifRender.famDel.requestedOther",
@@ -346,6 +354,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.agendaKind.note": "Nota",
 		"notifRender.agendaKind.other": "Outro",
 		"notifRender.title.memberJoined": "Novo responsável na família",
+		"notifRender.title.invitationExpired": "O convite expirou",
 		"notifRender.title.memberReturned": "Responsável voltou à família",
 		"notifRender.title.memberLeft": "Um responsável saiu",
 		"notifRender.title.familyDeletionRequested": "Exclusão da família solicitada",
@@ -353,6 +362,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.familyDeletionWithdrawn": "Exclusão da família retirada",
 		"notifRender.title.familyDeletionNear": "Exclusão da família se aproxima",
 		"notifRender.memberJoined": "{0} juntou-se à família. Confira o calendário para incluí-lo no planejamento.",
+		"notifRender.invitationExpired": "{0} não respondeu ao convite e o link expirou. Compartilhe de novo — um link pelo WhatsApp costuma funcionar melhor.",
 		"notifRender.memberReturned": "{0} cancelou a saída e voltou à família.",
 		"notifRender.leave.other": "{0} saiu da família. Os dias futuros dessa pessoa foram liberados — verifique o calendário e reatribua o que for necessário.",
 		"notifRender.famDel.requestedOther": "{0} solicitou a exclusão da família. Se ninguém recusar até {1}, TODOS os dados (calendário, histórico e contas de todos) serão apagados definitivamente. Você pode recusar em Perfil > Exclusão da família — qualquer recusa cancela a exclusão.",
@@ -463,6 +473,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.agendaKind.note": "Note",
 		"notifRender.agendaKind.other": "Other",
 		"notifRender.title.memberJoined": "New caregiver in the family",
+		"notifRender.title.invitationExpired": "The invitation expired",
 		"notifRender.title.memberReturned": "A caregiver is back",
 		"notifRender.title.memberLeft": "A caregiver left",
 		"notifRender.title.familyDeletionRequested": "Family deletion requested",
@@ -470,6 +481,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.familyDeletionWithdrawn": "Family deletion withdrawn",
 		"notifRender.title.familyDeletionNear": "Family deletion is near",
 		"notifRender.memberJoined": "{0} joined the family. Check the calendar to include them in the planning.",
+		"notifRender.invitationExpired": "{0} did not answer the invitation and the link expired. Share it again — a WhatsApp link usually works best.",
 		"notifRender.memberReturned": "{0} cancelled their departure and is back in the family.",
 		"notifRender.leave.other": "{0} left the family. That person's future days were freed — check the calendar and reassign whatever is needed.",
 		"notifRender.famDel.requestedOther": "{0} requested the deletion of the family. If nobody refuses by {1}, EVERYONE's data (calendar, history and accounts) will be permanently erased. You can refuse under Profile > Family deletion — a single refusal cancels the deletion.",
@@ -538,6 +550,11 @@ function renderMembership(lang: Lang, type: string, params: PushParams): PushCop
 		case "member_joined":
 			if (params["name"] === undefined) return null;
 			return { title: fmt(lang, K.titleMemberJoined), body: fmt(lang, K.memberJoined, [who]) };
+		// F-101: the invitation the reader sent expired unanswered. `name` is the
+		// placeholder's name or the address; without it the row stays in-app.
+		case "invitation_expired":
+			if (params["name"] === undefined) return null;
+			return { title: fmt(lang, K.titleInvitationExpired), body: fmt(lang, K.invitationExpired, [who]) };
 		case "member_returned":
 			if (params["name"] === undefined) return null;
 			return { title: fmt(lang, K.titleMemberReturned), body: fmt(lang, K.memberReturned, [who]) };

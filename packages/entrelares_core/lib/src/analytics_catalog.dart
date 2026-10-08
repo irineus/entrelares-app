@@ -204,6 +204,7 @@ abstract final class AnalyticsCatalog {
   /// things a row in *Para você* opens.
   static const notificationTypes = {
     'plan_ending',
+    'invitation_expired',
     'premium_trial',
     'referral_reward',
     'day_admin_change',

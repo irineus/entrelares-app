@@ -7,6 +7,7 @@ import 'package:test/test.dart';
 import 'suites/account_deletion.dart';
 import 'suites/acquisition_source.dart';
 import 'suites/signup_child.dart';
+import 'suites/invitation_expiry.dart';
 import 'suites/admin_change_notice.dart';
 import 'suites/admin_override_tier.dart';
 import 'suites/admin_rpc.dart';
@@ -234,6 +235,8 @@ void main() {
   // U-61: the child's first name at sign-up — one writer for both doors,
   // stripped from the auth row, dropped when invalid, dark when the flag is.
   signupChildTests(fx);
+  // F-101: the inviting admin is told once when an invitation expires.
+  invitationExpiryTests(fx);
   // F-80: family referral — dark by flag, an opaque code, first touch wins,
   // and nothing a client can read.
   referralTests(fx);
