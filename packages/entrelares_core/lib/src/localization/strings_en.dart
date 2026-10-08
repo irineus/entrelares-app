@@ -853,6 +853,7 @@ abstract final class StringsEn {
     K.notifRenderExpenseCategoryOther: 'Other',
     K.notifRenderTitleChatMessage: 'Family chat',
     K.notifRenderChatMessage: '{0}: {1}',
+    K.notifRenderChatMessageHidden: 'New message from {0} in the chat',
     K.notifRenderTitleAgendaNotice: 'New on the agenda',
     K.notifRenderTitleAgendaReminder: 'Agenda reminder',
     K.notifRenderAgendaNotice: '{0} added to the agenda for {1}: {2}.{3}',

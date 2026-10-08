@@ -186,6 +186,33 @@ void chatTests(GateFixture fx) {
           .rpc<dynamic>('set_chat_push_muted', params: {'p_muted': false});
     });
 
+    // S-27: the push hides the text unless the reader turned the preview on.
+    test('the preview is off by default and the reader turns it on', () async {
+      Future<String?> previewOf(int id) async => ((await fx.service
+                  .from('notifications')
+                  .select()
+                  .eq('type', 'chat_message')
+                  .eq('recipient_profile_id', fam.memberProfile.id)
+                  .eq('params->>id', '$id')
+                  .limit(1))
+              .single['params'] as Map)['preview'] as String?;
+
+      final hidden = await send(fam.admin, 'Sem prévia por padrão.');
+      expect(await previewOf(hidden), '0');
+
+      await fam.member
+          .rpc<dynamic>('set_chat_push_preview', params: {'p_on': true});
+      try {
+        final shown = await send(fam.admin, 'Com prévia.');
+        expect(await previewOf(shown), '1');
+        final own = await fam.member.from('chat_prefs').select('push_preview');
+        expect(own.single['push_preview'], isTrue);
+      } finally {
+        await fam.member
+            .rpc<dynamic>('set_chat_push_preview', params: {'p_on': false});
+      }
+    });
+
     test('the operator keys: the length and the flood brake', () async {
       final maxBefore = await readFlag(fx, 'chat.message_max_chars');
       final perHourBefore = await readFlag(fx, 'chat.messages_per_hour');

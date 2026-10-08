@@ -981,6 +981,10 @@ abstract final class K {
   static const String notifRenderTitleChatMessage = 'notifRender.title.chatMessage';
   static const String notifRenderChatMessage = 'notifRender.chatMessage';
 
+  /// S-27: the Conversa push WITHOUT the text — the default for everyone; the
+  /// text reaches the lock screen only for a reader who turned the preview on.
+  static const String notifRenderChatMessageHidden = 'notifRender.chatMessage.hidden';
+
   // ── The agenda speaks (F-55 PR 4) ──
   // The kind labels repeat `KApp.agendaKind*` on purpose: the push catalog
   // in `_shared/push.ts` mirrors THIS catalog, and `agenda_rules_test` pins
@@ -2154,6 +2158,7 @@ abstract final class K {
     notifRenderExpenseCategoryOther,
     notifRenderTitleChatMessage,
     notifRenderChatMessage,
+    notifRenderChatMessageHidden,
     notifRenderTitleAgendaNotice,
     notifRenderTitleAgendaReminder,
     notifRenderAgendaNotice,

@@ -778,6 +778,13 @@ abstract final class KApp {
   /// Share, so it could not leave the page.
   static const String famReferralCopy = 'app.fam.referralCopy';
 
+  /// S-27: the Conversa's push hides the text unless the member turns the
+  /// preview on — the switch's two tooltips and its two confirmations.
+  static const String chatPreviewShow = 'app.chat.previewShow';
+  static const String chatPreviewHide = 'app.chat.previewHide';
+  static const String chatPreviewShown = 'app.chat.previewShown';
+  static const String chatPreviewHidden = 'app.chat.previewHidden';
+
   /// T-105: beside a deadline when the device's clock is not the family's.
   static const String familyTimeSuffix = 'app.familyTime.suffix';
 
@@ -1589,6 +1596,10 @@ abstract final class KApp {
     errFamilyLoad,
     adminModeOnlyAdmins,
     famReferralCopy,
+    chatPreviewShow,
+    chatPreviewHide,
+    chatPreviewShown,
+    chatPreviewHidden,
     familyTimeSuffix,
     adminConfirmGrantTitle,
     adminConfirmRevokeTitle,
@@ -2530,6 +2541,10 @@ abstract final class StringsAppPtBr {
     KApp.errFamilyLoad: 'Não foi possível carregar os dados da família.',
     KApp.adminModeOnlyAdmins: 'Somente administradores da família usam o modo administrador.',
     KApp.famReferralCopy: 'Copiar link',
+    KApp.chatPreviewShow: 'Mostrar o texto nas notificações',
+    KApp.chatPreviewHide: 'Esconder o texto nas notificações',
+    KApp.chatPreviewShown: 'As notificações da Conversa mostram o texto neste perfil.',
+    KApp.chatPreviewHidden: 'As notificações da Conversa mostram só quem escreveu.',
     KApp.familyTimeSuffix: '(horário de Brasília)',
     KApp.adminConfirmGrantTitle: 'Tornar {0} administrador(a)?',
     KApp.adminConfirmRevokeTitle: 'Remover a permissão de administrador(a) de {0}?',
@@ -3464,6 +3479,10 @@ abstract final class StringsAppEn {
     KApp.errFamilyLoad: 'Could not load the family.',
     KApp.adminModeOnlyAdmins: 'Only the family\'s admins use admin mode.',
     KApp.famReferralCopy: 'Copy link',
+    KApp.chatPreviewShow: 'Show the text in notifications',
+    KApp.chatPreviewHide: 'Hide the text in notifications',
+    KApp.chatPreviewShown: 'Chat notifications show the text on this profile.',
+    KApp.chatPreviewHidden: 'Chat notifications show only who wrote.',
     KApp.familyTimeSuffix: '(Brasília time)',
     KApp.adminConfirmGrantTitle: 'Make {0} an admin?',
     KApp.adminConfirmRevokeTitle: "Remove {0}'s admin permission?",

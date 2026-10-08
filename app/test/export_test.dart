@@ -80,6 +80,20 @@ void main() {
       expect((members.first as Map)['role'], 'Mãe');
       expect((members.last as Map)['role'], 'Pai');
     });
+
+    // S-27: the other members' e-mails are THEIR personal data — the export
+    // carries the requester's own address only; every name stays.
+    test("only the requester's e-mail leaves; the others' names stay", () {
+      final p = payload();
+      expect((p['profile'] as Map)['email'], 'ana@example.com');
+      final members = (p['family'] as Map)['members'] as List;
+      expect(members.map((m) => (m as Map)['fullName']),
+          ['Ana Souza', 'Bruno Lima']);
+      for (final m in members) {
+        expect((m as Map).containsKey('email'), isFalse);
+      }
+      expect(p.toString(), isNot(contains('bruno@x.com')));
+    });
   });
 
   group('rows', () {

@@ -72,6 +72,9 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
   List<ChatRead> _reads = const [];
   bool _muted = false;
 
+  /// S-27: this member's pushes carry the text (off by default).
+  bool _preview = false;
+
   /// T-104: the first text of the page loaded at opening. Older pages grow
   /// UPWARD from it (the sliver before the scroll view's center), so loading
   /// them never moves what the reader is looking at. Null while the Conversa
@@ -332,6 +335,9 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
         widget.dataSource
             .fetchChatPushMuted()
             .catchError((Object _) => false),
+        widget.dataSource
+            .fetchChatPushPreview()
+            .catchError((Object _) => false),
       ]);
       final page = rest[2] as List<ChatMessage>;
       final reads = await widget.dataSource.fetchChatReads(_ids(page));
@@ -349,6 +355,7 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
         _quoted = quoted;
         _reads = reads;
         _muted = rest[3] as bool;
+        _preview = rest[4] as bool;
         _loading = false;
       });
       if (_onScreen) unawaited(_markRead());
@@ -537,6 +544,24 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
     }
   }
 
+  /// S-27: the text on the lock screen is the member's choice, off by
+  /// default — a hostile message read there by the children or a new partner
+  /// was the audit's case.
+  Future<void> _togglePreview(Localization l) async {
+    final next = !_preview;
+    try {
+      await widget.dataSource.setChatPushPreview(next);
+      if (!mounted) return;
+      setState(() => _preview = next);
+      showAppSnack(
+          context, l[next ? KApp.chatPreviewShown : KApp.chatPreviewHidden]);
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(
+          context, translateSaveError(e.toString(), l[K.errSaveFailed], l));
+    }
+  }
+
   Future<void> _pickDay(Localization l) async {
     final today = widget.now();
     final picked = await showDatePicker(
@@ -638,6 +663,18 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
                 tooltip: l[_muted ? KApp.chatUnmute : KApp.chatMute],
                 onPressed: () => _toggleMute(l),
               ),
+              // S-27: only while the push rings, and not while searching —
+              // the search field needs the row.
+              if (!_muted && _query == null)
+                IconButton(
+                  key: const ValueKey('chat-preview'),
+                  icon: Icon(_preview
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined),
+                  tooltip:
+                      l[_preview ? KApp.chatPreviewHide : KApp.chatPreviewShow],
+                  onPressed: () => _togglePreview(l),
+                ),
               // U-59: the door to the EXISTING PDF, pre-filled with the
               // Conversa. A viewer exports too (F-50); the sheet gates a
               // family without Premium.
