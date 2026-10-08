@@ -248,6 +248,39 @@ void main() {
       );
     });
 
+    test('U-61: my own line says the child\'s name when there is exactly one',
+        () {
+      final mine = noticeSentence(
+          l: pt,
+          senderName: 'Ana',
+          reason: NoticeReason.delay,
+          etaMinutes: 30,
+          request: NoticeRequest.pickup,
+          mine: true,
+          childName: 'Sofia');
+      expect(mine, contains('alguém busque Sofia.'));
+      expect(mine, isNot(contains('a criança')));
+      final keep = noticeSentence(
+          l: pt,
+          senderName: 'Ana',
+          reason: NoticeReason.delay,
+          etaMinutes: null,
+          request: NoticeRequest.keep,
+          mine: true,
+          childName: 'Sofia');
+      expect(keep, contains('alguém fique com Sofia hoje.'));
+      // The others' line is the notification's text, unchanged.
+      expect(
+          noticeSentence(
+              l: pt,
+              senderName: 'Ana',
+              reason: NoticeReason.delay,
+              etaMinutes: 30,
+              request: NoticeRequest.pickup,
+              childName: 'Sofia'),
+          contains('a criança'));
+    });
+
     // The absence of an estimate is SAID, not left out: it is the fact that
     // makes the day offerable, and a reader who sees nothing cannot tell it
     // from a reader who sees "15 min".

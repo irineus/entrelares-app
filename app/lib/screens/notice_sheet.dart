@@ -33,6 +33,7 @@ Future<int?> showNoticeSheet({
   required int? dayParentId,
   required int sentToday,
   required int dailyCap,
+  String? childName,
 }) {
   return showAppSheet<int>(
     context: context,
@@ -42,6 +43,7 @@ Future<int?> showNoticeSheet({
       dayParentId: dayParentId,
       sentToday: sentToday,
       dailyCap: dailyCap,
+      childName: childName,
     ),
   );
 }
@@ -61,12 +63,17 @@ class _NoticeSheet extends StatefulWidget {
   /// T-82: the live `day_notice.daily_cap` — the number the server enforces.
   final int dailyCap;
 
+  /// U-61: the family's one child, when there is exactly one — the questions
+  /// say the name instead of "a criança".
+  final String? childName;
+
   const _NoticeSheet({
     required this.dataSource,
     required this.myProfileId,
     required this.dayParentId,
     required this.sentToday,
     required this.dailyCap,
+    this.childName,
   });
 
   @override
@@ -292,12 +299,18 @@ class _NoticeSheetState extends State<_NoticeSheet> {
         NoticeReason.other => KApp.noticeReasonOther,
       }];
 
-  String _requestLabel(Localization l, NoticeRequest request) =>
-      l[switch (request) {
-        NoticeRequest.info => KApp.noticeRequestInfo,
-        NoticeRequest.pickup => KApp.noticeRequestPickup,
-        NoticeRequest.keep => KApp.noticeRequestKeep,
-      }];
+  String _requestLabel(Localization l, NoticeRequest request) {
+    final child = widget.childName;
+    return switch (request) {
+      NoticeRequest.info => l[KApp.noticeRequestInfo],
+      NoticeRequest.pickup => child == null
+          ? l[KApp.noticeRequestPickup]
+          : l.format(KApp.noticeRequestPickupNamed, [child]),
+      NoticeRequest.keep => child == null
+          ? l[KApp.noticeRequestKeep]
+          : l.format(KApp.noticeRequestKeepNamed, [child]),
+    };
+  }
 }
 
 /// Withdrawing my own open aviso.

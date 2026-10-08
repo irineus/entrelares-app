@@ -28,6 +28,21 @@ void main() {
     });
   });
 
+  group('ChildRules.singleName (U-61)', () {
+    test('exactly one child: the name; none or several: null', () {
+      expect(ChildRules.singleName(['Sofia']), 'Sofia');
+      expect(ChildRules.singleName([' Sofia ']), 'Sofia');
+      expect(ChildRules.singleName(const []), isNull);
+      expect(ChildRules.singleName(['Sofia', 'Theo']), isNull);
+      // A blank name is no child.
+      expect(ChildRules.singleName(['Sofia', '  ']), 'Sofia');
+    });
+
+    test('the sign-up metadata key is the one the server strips', () {
+      expect(ChildRules.signupMetadataKey, 'child_first_name');
+    });
+  });
+
   group('ChildRules.joinNames', () {
     test('one, two and three names read as a sentence', () {
       expect(ChildRules.joinNames(['Lia'], and: 'e'), 'Lia');

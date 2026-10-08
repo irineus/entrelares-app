@@ -213,6 +213,18 @@ abstract final class KApp {
   static const String cardPlanTitle = 'app.card.plan.title';
   static const String cardPlanHint = 'app.card.plan.hint';
   static const String cardPlanAction = 'app.card.plan.action';
+  /// U-61: the optional child's first name on the founder's step 2 (and the
+  /// Google onboarding), and the sentences that say the name where they said
+  /// "a criança" when the family has exactly one child.
+  static const String registerChildName = 'app.register.childName';
+  static const String registerChildNameHint = 'app.register.childNameHint';
+  static const String tourTodayTitleNamed = 'app.tour.todayTitleNamed';
+  static const String swapAskKeepNamed = 'app.swap.askKeepNamed';
+  static const String swapAskTakeNamed = 'app.swap.askTakeNamed';
+  static const String noticeRequestPickupNamed = 'app.notice.requestPickupNamed';
+  static const String noticeRequestKeepNamed = 'app.notice.requestKeepNamed';
+  static const String noticeMinePickupNamed = 'app.notice.minePickupNamed';
+  static const String noticeMineKeepNamed = 'app.notice.mineKeepNamed';
 
   // ── F-56 pending member (invited, not yet joined) ──
   static const String famPendingBadge = 'app.fam.pendingBadge';
@@ -1056,6 +1068,15 @@ abstract final class KApp {
     cardPlanTitle,
     cardPlanHint,
     cardPlanAction,
+    registerChildName,
+    registerChildNameHint,
+    tourTodayTitleNamed,
+    swapAskKeepNamed,
+    swapAskTakeNamed,
+    noticeRequestPickupNamed,
+    noticeRequestKeepNamed,
+    noticeMinePickupNamed,
+    noticeMineKeepNamed,
     famPendingBadge,
     famPendingHint,
     famInviteName,
@@ -1845,6 +1866,19 @@ abstract final class StringsAppPtBr {
     KApp.cardPlanHint:
         'O assistente preenche um mês inteiro a partir de um padrão.',
     KApp.cardPlanAction: 'Planejar',
+    KApp.registerChildName: 'Primeiro nome da criança (opcional)',
+    KApp.registerChildNameHint:
+        'Só o primeiro nome. O app passa a dizer o nome no lugar de '
+            '"a criança"; dá para cadastrar depois, em Família.',
+    KApp.tourTodayTitleNamed: 'Quem está com {0} hoje',
+    KApp.swapAskKeepNamed: '{0} pede que você fique com {2} {1}.',
+    KApp.swapAskTakeNamed: '{0} pede para ficar com {2} {1}, que é seu dia.',
+    KApp.noticeRequestPickupNamed: 'Alguém pode buscar {0}?',
+    KApp.noticeRequestKeepNamed: 'Alguém pode ficar com {0} hoje?',
+    KApp.noticeMinePickupNamed:
+        'Você avisou que {0}{1} e precisa que alguém busque {3}.{2}',
+    KApp.noticeMineKeepNamed:
+        'Você avisou que {0}{1} e precisa que alguém fique com {3} hoje.{2}',
     KApp.famPendingBadge: 'Ainda não entrou',
     KApp.famPendingHint:
         'Sem conta ainda: você planeja os dias dessa pessoa, e as trocas '
@@ -2722,6 +2756,19 @@ abstract final class StringsAppEn {
     KApp.cardPlanTitle: 'No day planned yet',
     KApp.cardPlanHint: 'The wizard fills a whole month from a pattern.',
     KApp.cardPlanAction: 'Plan',
+    KApp.registerChildName: 'Child\'s first name (optional)',
+    KApp.registerChildNameHint:
+        'First name only. The app will say the name instead of "the child"; '
+            'you can add it later, under Family.',
+    KApp.tourTodayTitleNamed: 'Who has {0} today',
+    KApp.swapAskKeepNamed: '{0} asks you to keep {2} {1}.',
+    KApp.swapAskTakeNamed: '{0} asks to keep {2} {1}, which is your day.',
+    KApp.noticeRequestPickupNamed: 'Can someone collect {0}?',
+    KApp.noticeRequestKeepNamed: 'Can someone keep {0} today?',
+    KApp.noticeMinePickupNamed:
+        'You said you {0}{1} and need someone to collect {3}.{2}',
+    KApp.noticeMineKeepNamed:
+        'You said you {0}{1} and need someone to keep {3} today.{2}',
     KApp.famPendingBadge: 'Not joined yet',
     KApp.famPendingHint:
         'No account yet: you plan this person\'s days, and swaps become '

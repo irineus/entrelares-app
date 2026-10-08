@@ -237,6 +237,10 @@ void main() {
       await tester.enterText(
           find.widgetWithText(TextField, pt[K.registerFamilyName]),
           'Família Teste');
+      // U-61: the optional child field, the register form's own words.
+      await tester.enterText(
+          find.widgetWithText(TextField, pt[KApp.registerChildName]),
+          ' Theo ');
       await tester.tap(find.text('Mãe'));
       await tester.tap(find.byType(Checkbox));
       await tester.pumpAndSettle();
@@ -247,6 +251,7 @@ void main() {
       expect(ds.onboardings, hasLength(1));
       expect(ds.onboardings.single['role'], 'mother');
       expect(ds.onboardings.single['familyName'], 'Família Teste');
+      expect(ds.onboardings.single['childFirstName'], 'Theo');
       expect(completed, isTrue);
     });
 

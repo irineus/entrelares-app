@@ -14,6 +14,21 @@ abstract final class ChildRules {
   /// The column CHECK and `child_normalize_name` both say 40.
   static const int maxNameLength = 40;
 
+  /// U-61 — the key the founder's sign-up metadata carries the child's first
+  /// name under. The server (`child_name_capture_on_signup`) writes the child
+  /// and STRIPS the key before the auth row is stored; the Google door sends
+  /// the same word as `p_child_first_name`.
+  static const String signupMetadataKey = 'child_first_name';
+
+  /// U-61 (owner, 07/10/2026) — the name the app says where it said "a
+  /// criança": only when the family has EXACTLY one child. None keeps the
+  /// generic word; two or more decide by context (the lane) or stay generic,
+  /// because "Sofia" over a day that is Theo's is a wrong sentence.
+  static String? singleName(Iterable<String> names) {
+    final clean = [for (final n in names) if (n.trim().isNotEmpty) n.trim()];
+    return clean.length == 1 ? clean.single : null;
+  }
+
   /// What the server stores: trimmed, inner runs of whitespace collapsed.
   static String normalize(String? name) =>
       (name ?? '').trim().replaceAll(RegExp(r'\s+'), ' ');

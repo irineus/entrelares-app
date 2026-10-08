@@ -27,6 +27,46 @@ void main() {
         'Ana asks you to keep the child on Thu, 08 Oct.');
   });
 
+  test('U-61: with exactly one child the sentence says the name', () {
+    expect(
+        swapRequestSentence(
+            l: pt,
+            requesterName: 'Ana',
+            date: thursday,
+            isRevert: false,
+            requesterIsProposed: false,
+            childName: 'Sofia'),
+        'Ana pede que você fique com Sofia na qui, 08/10.');
+    expect(
+        swapRequestSentence(
+            l: pt,
+            requesterName: 'Ana',
+            date: thursday,
+            isRevert: false,
+            requesterIsProposed: true,
+            childName: 'Sofia'),
+        'Ana pede para ficar com Sofia na qui, 08/10, que é seu dia.');
+    expect(
+        swapRequestSentence(
+            l: en,
+            requesterName: 'Ana',
+            date: thursday,
+            isRevert: false,
+            requesterIsProposed: false,
+            childName: 'Sofia'),
+        'Ana asks you to keep Sofia on Thu, 08 Oct.');
+    // A revert names no child either way.
+    expect(
+        swapRequestSentence(
+            l: pt,
+            requesterName: 'Ana',
+            date: thursday,
+            isRevert: true,
+            requesterIsProposed: false,
+            childName: 'Sofia'),
+        'Ana pede para desfazer a troca da qui, 08/10.');
+  });
+
   test('PT-BR genders the weekday: no sábado, no domingo', () {
     expect(swapOnDay(saturday, pt), 'no sáb, 10/10');
     expect(swapOnDay(DateTime(2026, 10, 11), pt), 'no dom, 11/10');

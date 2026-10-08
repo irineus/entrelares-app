@@ -1372,8 +1372,10 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     String? referralCode,
     String? referralChannel,
     Acquisition? acquisition,
+    String? childFirstName,
   }) async {
     final AuthResponse response;
+    final childName = ChildRules.normalize(childFirstName);
     try {
       response = await _client.auth.signUp(
         email: email,
@@ -1389,6 +1391,10 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
           'family_name': familyName,
           'policy_version': PolicyVersions.current,
           'language': languageCode,
+          // U-61: the child's first name, when given — the server writes the
+          // family's first child and removes the key before the auth row is
+          // stored (a child's name never rests on auth.users).
+          if (childName.isNotEmpty) ChildRules.signupMetadataKey: childName,
           // F-80: present only when the caller saw the flag on. The server
           // removes both keys before the auth row is stored.
           if (ReferralRules.parseCode(referralCode) case final code?) ...{
@@ -1487,7 +1493,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     required String role,
     required String familyName,
     Acquisition? acquisition,
+    String? childFirstName,
   }) async {
+    final childName = ChildRules.normalize(childFirstName);
     try {
       await _client.rpc<void>('complete_oauth_onboarding', params: {
         'p_full_name': fullName,
@@ -1497,6 +1505,8 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         // refuses a mismatch, so a stale client can never stamp a consent it
         // did not display.
         'p_policy_version': PolicyVersions.current,
+        // U-61: the child's first name, when given (defaulted on the server).
+        if (childName.isNotEmpty) 'p_child_first_name': childName,
         // T-101: the family's source (null → the server reads `organic`).
         if (acquisition != null) ...{
           'p_acquisition_source': acquisition.source,

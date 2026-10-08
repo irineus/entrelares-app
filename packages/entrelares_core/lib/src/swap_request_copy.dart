@@ -30,15 +30,25 @@ String swapOfDay(DateTime date, Localization l) => l.format(
 ///   fique com a criança na qui, 08/10.";
 /// * scenario B (the requester proposes themselves on the reader's day):
 ///   "Ana pede para ficar com a criança na qui, 08/10, que é seu dia."
+///
+/// [childName] (U-61): with exactly one child in the family the sentence says
+/// the name — "Ana pede que você fique com a Sofia…" — `ChildRules.singleName`
+/// decides; null keeps "a criança".
 String swapRequestSentence({
   required Localization l,
   required String requesterName,
   required DateTime date,
   required bool isRevert,
   required bool requesterIsProposed,
+  String? childName,
 }) {
   if (isRevert) {
     return l.format(KApp.swapAskRevert, [requesterName, swapOfDay(date, l)]);
+  }
+  if (childName != null) {
+    return l.format(
+        requesterIsProposed ? KApp.swapAskTakeNamed : KApp.swapAskKeepNamed,
+        [requesterName, swapOnDay(date, l), childName]);
   }
   return l.format(requesterIsProposed ? KApp.swapAskTake : KApp.swapAskKeep,
       [requesterName, swapOnDay(date, l)]);

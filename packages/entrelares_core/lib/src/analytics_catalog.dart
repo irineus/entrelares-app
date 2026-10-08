@@ -106,7 +106,9 @@ abstract final class AnalyticsCatalog {
   static const Map<String, Set<String>> props = {
     AnalyticsEvents.signupStarted: {'type'},
     AnalyticsEvents.signupStep: {'step'},
-    AnalyticsEvents.familyCreated: {},
+    // U-61, 08/10/2026: `child` = named / none — whether the founder gave
+    // the child's first name on step 2. Never the name.
+    AnalyticsEvents.familyCreated: {'child'},
     AnalyticsEvents.inviteeJoined: {},
     AnalyticsEvents.inviteSent: {'email'},
     AnalyticsEvents.inviteNudgeShown: {'channel'},

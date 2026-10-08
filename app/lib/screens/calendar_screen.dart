@@ -904,17 +904,26 @@ class _CalendarScreenState extends State<CalendarScreen>
       } else {
         monthEvents = const [];
       }
-      // F-07: the children name the lanes; read only for a per-child plan.
+      // F-07: the children name the lanes; read for a per-child plan — and,
+      // since U-61, whenever the module is on: with exactly one child the
+      // calendar says the name where it said "a criança" (`_singleChildName`).
+      // Best-effort like the avisos.
       var children = _children;
       var yesterdayRows = _yesterdayRows;
-      if (_family?.isPerChild ?? false) {
+      final perChild = _family?.isPerChild ?? false;
+      if (perChild || _settings.childAgendaEnabled) {
         try {
           children = await widget.dataSource.fetchChildren();
+        } catch (_) {/* keep whatever we had */}
+      } else {
+        children = const [];
+      }
+      if (perChild) {
+        try {
           yesterdayRows = await widget.dataSource.fetchUpcoming(
               DateTime(_today.year, _today.month, _today.day - 1), 0);
         } catch (_) {/* keep whatever we had */}
       } else {
-        children = const [];
         yesterdayRows = const [];
       }
       // U-60: best-effort like the avisos — the strip may wait for the next
@@ -1129,8 +1138,8 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   /// The tour, counted: finished or skipped (U-61).
   Future<void> _runTour() async {
-    final finished =
-        await showGuidedTour(context: context, keys: widget.tourKeys!);
+    final finished = await showGuidedTour(
+        context: context, keys: widget.tourKeys!, childName: _singleChildName);
     final analytics = widget.analytics;
     if (analytics != null) {
       unawaited(analytics.trackEvent(AnalyticsEvents.tourEnded,
@@ -1364,6 +1373,13 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// F-50: I am a Visualizador — the calendar reads, and offers nothing to
   /// write (the server refuses it anyway).
   bool get _iAmViewer => _ownProfile?.isViewer == true;
+
+  /// U-61 (owner, 07/10/2026): the child's name where the screen said "a
+  /// criança" — only with EXACTLY one child (`ChildRules.singleName`), and
+  /// only while the module is on; otherwise null, and the generic word stays.
+  String? get _singleChildName => _settings.childAgendaEnabled
+      ? ChildRules.singleName([for (final c in _children) c.firstName])
+      : null;
 
   /// Owner's QA of 3.1.10: in selection mode a tap marks or unmarks ONE day —
   /// so alternate days are three taps. A run of days is a drag
@@ -2530,6 +2546,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               isRevert: first.isRevertPending,
               requesterIsProposed:
                   first.proposedActualParentId == first.requestingProfileId,
+              childName: _singleChildName,
             )
           : l.format(KApp.cardRequestsMany, [count]),
       actionLabel:
@@ -2618,6 +2635,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       request: request,
       note: notice.note,
       mine: mine,
+      childName: _singleChildName,
     );
   }
 
@@ -2695,6 +2713,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       dayParentId: dayParentId,
       sentToday: sentToday,
       dailyCap: _settings.dayNoticeDailyCap,
+      childName: _singleChildName,
     );
     if (id == null || !mounted) return;
     _load(silent: true);
