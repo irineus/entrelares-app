@@ -233,12 +233,47 @@ void main() {
   });
 
   group('S-10 — the password gate', () {
-    testWidgets('granting admin asks for the password FIRST', (tester) async {
+    // F-103: "Tornar admin" opens a confirmation first; "Continuar" reaches
+    // the password prompt.
+    Future<void> tapMakeAdmin(WidgetTester tester) async {
+      await tester.tap(find.text(l[K.profMakeAdmin]));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[KApp.adminConfirmContinue]));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('F-103: the confirmation says what an admin can do and that '
+        'the person is told; Cancelar asks for nothing', (tester) async {
       final ds = source();
       await pumpProfile(tester, ds, profileId: 2);
 
       await tester.tap(find.text(l[K.profMakeAdmin]));
       await tester.pumpAndSettle();
+      expect(find.text(l.format(KApp.adminConfirmGrantTitle, ['Bruno Lima'])),
+          findsOne);
+      for (final key in [
+        KApp.adminPowerInvite,
+        KApp.adminPowerAdmins,
+        KApp.adminPowerPastDays,
+        KApp.adminPowerFamily,
+        KApp.adminConfirmGrantWarning,
+      ]) {
+        expect(find.text(l[key]), findsOne, reason: key);
+      }
+      expect(find.text(l.format(KApp.adminConfirmNotice, ['Bruno Lima'])),
+          findsOne);
+
+      await tester.tap(find.text(l[K.commonCancel]).last);
+      await tester.pumpAndSettle();
+      expect(find.text(l[K.sudoTitle]), findsNothing);
+      expect(ds.adminUpdates, isEmpty);
+    });
+
+    testWidgets('granting admin asks for the password FIRST', (tester) async {
+      final ds = source();
+      await pumpProfile(tester, ds, profileId: 2);
+
+      await tapMakeAdmin(tester);
       expect(ds.adminUpdates, isEmpty, reason: 'nothing before the password');
 
       await confirmSudo(tester);
@@ -250,8 +285,7 @@ void main() {
       final ds = source();
       await pumpProfile(tester, ds, profileId: 2);
 
-      await tester.tap(find.text(l[K.profMakeAdmin]));
-      await tester.pumpAndSettle();
+      await tapMakeAdmin(tester);
       await tester.tap(find.text(l[K.commonCancel]));
       await tester.pumpAndSettle();
 
@@ -263,15 +297,13 @@ void main() {
       final ds = source();
       await pumpProfile(tester, ds, profileId: 2);
 
-      await tester.tap(find.text(l[K.profMakeAdmin]));
-      await tester.pumpAndSettle();
+      await tapMakeAdmin(tester);
       await tester.tap(find.text(l[K.commonCancel]));
       await tester.pumpAndSettle();
       expect(find.text(l.format(K.profToastNowAdmin, ['Bruno Lima'])),
           findsNothing);
 
-      await tester.tap(find.text(l[K.profMakeAdmin]));
-      await tester.pumpAndSettle();
+      await tapMakeAdmin(tester);
       await confirmSudo(tester);
       expect(find.text(l.format(K.profToastNowAdmin, ['Bruno Lima'])),
           findsOne);
@@ -285,8 +317,7 @@ void main() {
       await sudo.elevate('segredo123', l);
       await pumpProfile(tester, ds, profileId: 2, sudo: sudo);
 
-      await tester.tap(find.text(l[K.profMakeAdmin]));
-      await tester.pumpAndSettle();
+      await tapMakeAdmin(tester);
 
       expect(find.text(l[K.sudoTitle]), findsNothing);
       expect(ds.adminUpdates, [{'id': 2, 'isAdmin': true}]);

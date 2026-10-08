@@ -210,6 +210,7 @@ abstract final class AnalyticsCatalog {
   static const notificationTypes = {
     'plan_ending',
     'invitation_expired',
+    'admin_changed',
     'premium_request',
     'premium_trial',
     'referral_reward',

@@ -242,6 +242,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final target = _target;
     if (target == null) return;
     final granting = !target.isAdmin;
+    // F-103 (T-103 audit): one tap went straight to the password sheet.
+    // What an admin can do — or stops being able to do — is said first,
+    // and that the person is told; only a "Continuar" reaches S-10.
+    final go = await showAppSheet<bool>(
+      context: context,
+      builder: (_) => AdminChangeConfirmSheet(
+          name: target.fullName, granting: granting),
+    );
+    if (go != true || !mounted) return;
     try {
       final ran = await runWithSudo(
         context: context,
@@ -1144,4 +1153,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       );
+}
+
+/// F-103 — the confirmation before granting or removing admin: what the role
+/// can do, as a list, and that the person is told (`admin_changed`, push +
+/// in-app). Pops `true` on "Continuar"; the password ask (S-10) comes after.
+class AdminChangeConfirmSheet extends StatelessWidget {
+  final String name;
+  final bool granting;
+
+  const AdminChangeConfirmSheet(
+      {super.key, required this.name, required this.granting});
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context).l;
+    final theme = Theme.of(context).textTheme;
+    final who = name.trim().isEmpty ? l[KApp.chatFormerMember] : name.trim();
+    Widget power(String key) => Padding(
+          padding: const EdgeInsets.only(top: Spacing.xs),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 2, right: Spacing.sm),
+                child: Icon(Icons.check, size: 16),
+              ),
+              Expanded(child: Text(l[key], style: theme.bodyMedium)),
+            ],
+          ),
+        );
+    return AppSheetFrame(
+      title: l.format(
+          granting ? KApp.adminConfirmGrantTitle : KApp.adminConfirmRevokeTitle,
+          [who]),
+      onClose: () => Navigator.of(context).pop(false),
+      closeLabel: l[K.commonClose],
+      primaryLabel: l[KApp.adminConfirmContinue],
+      onPrimary: () => Navigator.of(context).pop(true),
+      secondaryLabel: l[K.commonCancel],
+      onSecondary: () => Navigator.of(context).pop(false),
+      children: [
+        Text(
+            l.format(
+                granting
+                    ? KApp.adminConfirmGrantIntro
+                    : KApp.adminConfirmRevokeIntro,
+                [who]),
+            style: theme.bodyMedium),
+        power(KApp.adminPowerInvite),
+        power(KApp.adminPowerAdmins),
+        power(KApp.adminPowerPastDays),
+        power(KApp.adminPowerFamily),
+        if (granting) ...[
+          const SizedBox(height: Spacing.sm),
+          Text(l[KApp.adminConfirmGrantWarning], style: theme.bodySmall),
+        ],
+        const SizedBox(height: Spacing.sm),
+        Text(l.format(KApp.adminConfirmNotice, [who]), style: theme.bodySmall),
+      ],
+    );
+  }
 }

@@ -850,6 +850,12 @@ abstract final class K {
   /// the placeholder's name or the address).
   static const String notifRenderTitleInvitationExpired = 'notifRender.title.invitationExpired';
   static const String notifRenderInvitationExpired = 'notifRender.invitationExpired';
+
+  /// F-103: an admin granted or removed the reader's admin bit (`name` = who).
+  static const String notifRenderTitleAdminGranted = 'notifRender.title.adminGranted';
+  static const String notifRenderTitleAdminRevoked = 'notifRender.title.adminRevoked';
+  static const String notifRenderAdminGranted = 'notifRender.adminGranted';
+  static const String notifRenderAdminRevoked = 'notifRender.adminRevoked';
   static const String notifRenderMemberReturned = 'notifRender.memberReturned';
   static const String notifRenderLeaveSelf = 'notifRender.leave.self';
   static const String notifRenderLeaveSelfLast = 'notifRender.leave.selfLast';
@@ -2047,6 +2053,10 @@ abstract final class K {
     notifRenderMemberReturned,
     notifRenderTitleInvitationExpired,
     notifRenderInvitationExpired,
+    notifRenderTitleAdminGranted,
+    notifRenderTitleAdminRevoked,
+    notifRenderAdminGranted,
+    notifRenderAdminRevoked,
     notifRenderLeaveSelf,
     notifRenderLeaveSelfLast,
     notifRenderLeaveOther,

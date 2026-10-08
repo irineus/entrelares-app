@@ -84,6 +84,7 @@ import 'package:entrelares_app/theme/tokens.dart';
 import 'package:entrelares_app/widgets/account_button.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/chat_view.dart';
+import 'package:entrelares_app/widgets/ui/ui.dart';
 import 'package:entrelares_app/widgets/consent_row.dart';
 import 'package:entrelares_app/widgets/google_sign_in_button.dart';
 import 'package:entrelares_core/entrelares_core.dart';
@@ -1079,6 +1080,30 @@ void main() {
 
     // F-68: "Ajuda e contato", signed out (the heavier variant: it has the
     // e-mail field), with the technical preview open and an error banner up.
+    // F-103: the confirmation before granting admin — the list of powers,
+    // the warning and the notice line, at 360 dp and 1.3×.
+    _scene('admin change confirmation', (tester, dark) async {
+      await tester.pumpWidget(_host(
+          Builder(
+              builder: (context) => Scaffold(
+                    body: Center(
+                      child: TextButton(
+                        onPressed: () => showAppSheet<bool>(
+                          context: context,
+                          builder: (_) => const AdminChangeConfirmSheet(
+                              name: 'Bruno Lima', granting: true),
+                        ),
+                        child: const Text('open'),
+                      ),
+                    ),
+                  )),
+          dark: dark));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[KApp.adminPowerFamily]), findsOneWidget);
+      await _measure(tester, 'admin change confirmation');
+    });
+
     _scene('help', (tester, dark) async {
       await tester.pumpWidget(
         _host(
