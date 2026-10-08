@@ -178,6 +178,14 @@ abstract final class InviteFormRules {
     return null;
   }
 
+  /// F-101 — the RPCs' refusal for an address that is already an active
+  /// member of SOME family (`create_invitation`, `add_pending_member`,
+  /// `create_viewer_invitation`: "Este e-mail já possui cadastro no
+  /// aplicativo."). Shown verbatim it was a dead end; the app answers it with
+  /// the way out — another e-mail keeps both families (F-30 stays deferred).
+  static bool isEmailTakenRefusal(String raw) =>
+      raw.contains('já possui cadastro');
+
   /// The name half alone — what the F-62 "add to the calendar" sheet asks of
   /// a legacy invitation, where e-mail and role are already the invitation's.
   /// Mirrors the RPCs' own floor (`length(trim(name)) >= 2`); the 80 ceiling

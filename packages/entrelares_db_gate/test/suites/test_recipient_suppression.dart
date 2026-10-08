@@ -83,6 +83,37 @@ void testRecipientSuppressionTests(GateFixture fx) {
               'Body: ${response.body}');
       expect(body['sent'], 0);
       expect(body['failed'], 0);
+
+      // F-101: the row remembers the message left — a suppressed test
+      // recipient counts as sent, because nothing failed.
+      final stamped = (await fx.service
+              .from('family_invitations')
+              .select('email_sent_at')
+              .eq('id', invitationId))
+          .single;
+      expect(stamped['email_sent_at'], isNotNull,
+          reason: 'send-swap-email did not stamp email_sent_at — the card '
+              'would say "E-mail não enviado" for a message that left');
+    });
+
+    test('F-101: a fresh invitation is NOT stamped until the function sends it',
+        () async {
+      final fam = await fx.createFamily('f101unsent');
+      await fx.service.rpc<dynamic>('set_family_plan',
+          params: {'p_family_id': fam.familyId, 'p_plan': 'premium'});
+      final rows = await fam.admin.rpc<dynamic>('create_invitation', params: {
+        'p_email': fx.testEmail('f101-unsent'),
+        'p_role_id': fx.roleId('grandmother'),
+      });
+      final invitationId = ((rows is List ? rows.first : rows)
+          as Map)['invitation_id'] as int;
+      final row = (await fx.service
+              .from('family_invitations')
+              .select('email_sent_at')
+              .eq('id', invitationId))
+          .single;
+      expect(row['email_sent_at'], isNull,
+          reason: 'the RPC must not claim an e-mail it never sent');
     });
 
     test('a swap e-mail is no longer sent at all — push and in-app only',

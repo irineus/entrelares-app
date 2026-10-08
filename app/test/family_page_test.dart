@@ -19,6 +19,7 @@ import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
 import 'package:entrelares_db_contracts/models/subscription.dart';
 import 'package:entrelares_app/screens/family_screen.dart';
+import 'package:entrelares_app/widgets/role_picker.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/services/analytics_service.dart';
 import 'package:entrelares_app/services/sudo_service.dart';
@@ -72,6 +73,7 @@ FamilyInvitation pendingInvite({
   int id = 10,
   String email = 'vovo@example.com',
   int? profileId,
+  bool emailSent = true,
 }) =>
     FamilyInvitation(
       id: id,
@@ -80,6 +82,8 @@ FamilyInvitation pendingInvite({
       token: '11111111-2222-3333-4444-555555555555',
       expiresAt: DateTime.now().toUtc().add(const Duration(days: 5)),
       profileId: profileId,
+      // F-101: the fixture's e-mail LEFT unless a test says otherwise.
+      emailSentAt: emailSent ? DateTime.now().toUtc() : null,
     );
 
 /// F-56: the form names the person before anything else.
@@ -380,9 +384,8 @@ void main() {
       await enterInviteName(tester, l);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.commonEmail]), 'vovo@example.com');
-      await tester.tap(find.byType(DropdownButtonFormField<int>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Mãe').last);
+      // F-101: the sign-up's picker (U-44) — a chip, not a 21-item dropdown.
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Mãe'));
       await tester.pumpAndSettle();
       await tester.tap(find.text(l[K.famSendInvite]));
       await tester.pumpAndSettle();
@@ -392,6 +395,45 @@ void main() {
       ]);
       expect(ds.createdInvitations, isEmpty);
       expect(ds.mailedInvitations, [42]);
+    });
+
+    testWidgets('F-101: the family\'s custom role is behind "Outro…" and maps '
+        'back to its id', (tester) async {
+      final ds = source(plan: 'premium');
+      await pumpFamily(tester, ds);
+
+      await enterInviteName(tester, l);
+      await tester.tap(find.byKey(RolePicker.otherKey));
+      await tester.pumpAndSettle();
+      expect(find.text(roleCustom.displayLabel(l.current)), findsOne);
+      await tester.tap(find.text(roleCustom.displayLabel(l.current)));
+      await tester.pumpAndSettle();
+      // The chosen custom role shows as a selected chip.
+      expect(find.widgetWithText(ChoiceChip, roleCustom.displayLabel(l.current)),
+          findsOne);
+      await tester.tap(find.text(l[KApp.famAddWithoutInvite]));
+      await tester.pumpAndSettle();
+
+      expect(ds.addedPending.single['roleId'], roleCustom.id);
+    });
+
+    testWidgets('F-101: an address that already has an account gets the way '
+        'out, not the RPC\'s dead end', (tester) async {
+      final ds = source(plan: 'premium')
+        ..throwOnFamilyWrite =
+            Exception('Este e-mail já possui cadastro no aplicativo.');
+      await pumpFamily(tester, ds);
+
+      await enterInviteName(tester, l);
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.commonEmail]), 'ex@example.com');
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Pai'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.famSendInvite]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[KApp.famInviteEmailTaken]), findsOne);
+      expect(find.textContaining('já possui cadastro'), findsNothing);
     });
 
     testWidgets('refuses a missing name before any round-trip',
@@ -417,9 +459,7 @@ void main() {
       await enterInviteName(tester, l);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.commonEmail]), 'ANA@example.com');
-      await tester.tap(find.byType(DropdownButtonFormField<int>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Mãe').last);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Mãe'));
       await tester.pumpAndSettle();
       await tester.tap(find.text(l[K.famSendInvite]));
       await tester.pumpAndSettle();
@@ -467,6 +507,21 @@ void main() {
       expect(find.text(l[K.famRevoke]), findsOne);
     });
 
+    testWidgets('F-101: an invitation whose e-mail did not leave says so and '
+        'keeps Compartilhar as the one action', (tester) async {
+      await pumpFamily(
+          tester,
+          source(
+              members: const [admin],
+              invitations: [pendingInvite(emailSent: false)],
+              plan: 'premium'));
+
+      expect(find.text(l[KApp.famInviteEmailUnsentBadge]), findsOne);
+      expect(find.text(l[K.famInviteSentBadge]), findsNothing);
+      expect(find.text(l[KApp.famInviteEmailUnsentHint]), findsOne);
+      expect(find.widgetWithText(FilledButton, l[KApp.commonShare]), findsOne);
+    });
+
     testWidgets('F-63: sharing sends the sentence with the link, in the '
         "sender's language", (tester) async {
       for (final language in AppLanguage.values) {
@@ -508,20 +563,46 @@ void main() {
       expect(find.text(l[K.famInviteExpiredBadge]), findsOne);
       expect(find.text(l[K.famInviteExpiredHint]), findsOne);
       expect(find.text(l[K.famCopyLink]), findsNothing);
-      // U-47: with no link left, resending is the primary — and the menu
-      // holds revoke alone, no copy or share for a dead link.
+      // U-47 + F-101: with no link left, "Compartilhar de novo" (a new link
+      // straight to the share sheet) is the primary; the menu holds the
+      // plain resend and revoke — no copy or share for a dead link.
       expect(
-          find.widgetWithText(FilledButton, l[K.famResendInvite]), findsOne);
+          find.widgetWithText(FilledButton, l[KApp.famShareAgain]), findsOne);
       expect(find.text(l[KApp.commonShare]), findsNothing);
+      expect(find.text(l[K.famResendInvite]), findsNothing);
 
       await openMenu(tester, FamilyScreen.invitationMenuKey(11));
       expect(find.text(l[K.famRevoke]), findsOne);
+      expect(find.text(l[K.famResendInvite]), findsOne);
       expect(find.text(l[K.famCopyLink]), findsNothing);
       expect(find.text(l[KApp.commonShare]), findsNothing);
-      expect(find.byWidgetPredicate((w) => w is PopupMenuItem), findsOne);
+      expect(find.byWidgetPredicate((w) => w is PopupMenuItem), findsNWidgets(2));
     });
 
-    testWidgets('resending re-creates for the same address and role',
+    testWidgets('F-101: "Compartilhar de novo" re-creates for the same address '
+        'and role and hands the NEW link to the share sheet', (tester) async {
+      final shared = <String>[];
+      final ds = source(
+          members: const [admin],
+          invitations: [expiredInvite()],
+          plan: 'premium');
+      await pumpFamily(tester, ds,
+          onShareInvite: (message) async => shared.add(message));
+
+      await tester.tap(find.text(l[KApp.famShareAgain]));
+      await tester.pumpAndSettle();
+
+      expect(ds.createdInvitations, [
+        {'email': 'antigo@example.com', 'roleId': 1, 'profileId': null}
+      ]);
+      expect(ds.mailedInvitations, [42]);
+      expect(shared, hasLength(1));
+      expect(shared.single,
+          endsWith('/register?invite=renewed-0000-0000-0000-000000000042'));
+      expect(shared.single, startsWith(l[K.famInviteShareText]));
+    });
+
+    testWidgets('the plain resend (behind the ⋮) re-creates and mails only',
         (tester) async {
       final ds = source(
           members: const [admin],
@@ -529,6 +610,7 @@ void main() {
           plan: 'premium');
       await pumpFamily(tester, ds);
 
+      await openMenu(tester, FamilyScreen.invitationMenuKey(11));
       await tester.tap(find.text(l[K.famResendInvite]));
       await tester.pumpAndSettle();
 
@@ -615,9 +697,7 @@ void main() {
       await enterInviteName(tester, l);
       await tester.enterText(
           find.widgetWithText(TextField, l[K.commonEmail]), 'vovo@example.com');
-      await tester.tap(find.byType(DropdownButtonFormField<int>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Mãe').last);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Mãe'));
       await tester.pumpAndSettle();
       await tester.tap(find.text(l[K.famSendInvite]));
       await tester.pumpAndSettle();
@@ -671,9 +751,7 @@ void main() {
       expect(find.text(l[K.famSendInvite]), findsNothing);
 
       await enterInviteName(tester, l);
-      await tester.tap(find.byType(DropdownButtonFormField<int>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Mãe').last);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Mãe'));
       await tester.pumpAndSettle();
       await tester.tap(find.text(l[KApp.famAddWithoutInvite]));
       await tester.pumpAndSettle();
@@ -904,7 +982,7 @@ void main() {
       // And the primary of each is the one the card's state calls for.
       expect(find.widgetWithText(FilledButton, l[KApp.commonShare]), findsOne);
       expect(
-          find.widgetWithText(FilledButton, l[K.famResendInvite]), findsOne);
+          find.widgetWithText(FilledButton, l[KApp.famShareAgain]), findsOne);
       expect(tester.takeException(), isNull,
           reason: 'no overflow on a 360 dp phone');
     });

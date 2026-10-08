@@ -307,6 +307,14 @@ void main() {
     });
 
     test('F-62: the name half alone — what the attach sheet asks', () {
+      // F-101: the RPCs' "already has an account" sentence is recognised, so
+      // the app can answer it with the way out instead of the dead end.
+      expect(
+          InviteFormRules.isEmailTakenRefusal(
+              'PostgrestException(message: Este e-mail já possui cadastro no '
+              'aplicativo., code: P0001)'),
+          isTrue);
+      expect(InviteFormRules.isEmailTakenRefusal('Papel inválido.'), isFalse);
       expect(InviteFormRules.nameErrorKey(''), KApp.inviteErrNameRequired);
       expect(InviteFormRules.nameErrorKey(' A '), KApp.inviteErrNameRequired);
       expect(InviteFormRules.nameErrorKey(' Al '), isNull);

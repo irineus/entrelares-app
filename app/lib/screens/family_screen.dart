@@ -20,6 +20,7 @@ import '../theme/tokens.dart';
 import '../widgets/account_button.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
+import '../widgets/role_picker.dart';
 import '../widgets/sudo_sheet.dart';
 
 /// U-35: the observer the Família branch's navigator reports to, so the roster
@@ -453,8 +454,43 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       setState(() => _sendingInvite = false);
       // Every cap and permission refusal is the RPC's own sentence — it says
       // exactly which limit was hit, which no generic message could.
-      showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
-          type: AppSnackType.error);
+      showAppSnack(context, _inviteErrorText(e, l), type: AppSnackType.error);
+    }
+  }
+
+  /// F-101: an address that already has an account was a dead end said
+  /// verbatim ("já possui cadastro"); the app answers it with the way out —
+  /// another e-mail keeps both families. Every other refusal stays the RPC's.
+  String _inviteErrorText(Object e, Localization l) =>
+      InviteFormRules.isEmailTakenRefusal(e.toString())
+          ? l[KApp.famInviteEmailTaken]
+          : translateSaveError(e.toString(), l[K.errSaveFailed], l);
+
+  /// F-101: the expired card's one action — a new link (the RPC revokes the
+  /// dead one, F-56 carries the placeholder) handed straight to the share
+  /// sheet. The e-mail goes out too, best-effort; the link is the point, and
+  /// a WhatsApp message from the co-parent is what actually gets opened.
+  Future<void> _resendAndShare(
+      FamilyInvitation invitation, Localization l) async {
+    try {
+      final id = await widget.dataSource.createInvitation(
+          email: invitation.email,
+          roleId: invitation.roleId,
+          profileId: invitation.profileId);
+      final mailed = await widget.dataSource.sendInvitationEmail(id);
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      final renewed = _invitations.where((i) => i.id == id).firstOrNull;
+      if (renewed != null) await _shareLink(renewed, l);
+      if (!mounted) return;
+      if (!mailed) {
+        showAppSnack(context, l[K.famInviteRenewedEmailFailed],
+            type: AppSnackType.info);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnack(context, l[K.famErrResendInvite], type: AppSnackType.error);
     }
   }
 
@@ -1015,16 +1051,17 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         _InvitationAction.revoke => _revokeInvite(invitation, l),
       },
       itemBuilder: (context) => [
-        if (!expired) ...[
+        if (!expired)
           PopupMenuItem(
             value: _InvitationAction.copyLink,
             child: _menuRow(Icons.copy, l[K.famCopyLink]),
           ),
-          PopupMenuItem(
-            value: _InvitationAction.resend,
-            child: _menuRow(Icons.refresh, l[K.famResendInvite]),
-          ),
-        ],
+        // F-101: on an expired card the primary is "Compartilhar de novo";
+        // the plain resend (a new link, e-mail only) moves behind the ⋮.
+        PopupMenuItem(
+          value: _InvitationAction.resend,
+          child: _menuRow(Icons.refresh, l[K.famResendInvite]),
+        ),
         PopupMenuItem(
           value: _InvitationAction.revoke,
           child: _menuRow(Icons.link_off, l[K.famRevoke], danger: true),
@@ -1266,11 +1303,16 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                 Expanded(child: Text(invitation.email)),
                 // U-29: a row's state is an AppBadge everywhere else in the
                 // app — this was the one place it was still a grey text run.
+                // F-101: the card used to read "Convite enviado" from the
+                // row's mere existence, beside a toast saying the e-mail had
+                // failed. The row knows now (`email_sent_at`).
                 AppBadge(
                   text: expired
                       ? l[K.famInviteExpiredBadge]
-                      : l[K.famInviteSentBadge],
-                  tone: expired
+                      : invitation.emailUnsent
+                          ? l[KApp.famInviteEmailUnsentBadge]
+                          : l[K.famInviteSentBadge],
+                  tone: expired || invitation.emailUnsent
                       ? context.tokens.warning
                       : context.tokens.info,
                 ),
@@ -1282,6 +1324,9 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             const SizedBox(height: 8),
             if (expired)
               Text(l[K.famInviteExpiredHint], style: theme.textTheme.bodySmall)
+            else if (invitation.emailUnsent)
+              Text(l[KApp.famInviteEmailUnsentHint],
+                  style: theme.textTheme.bodySmall)
             else
               Text(
                   l.format(K.famInviteValidUntil,
@@ -1311,12 +1356,14 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                           onPressed: () => _attachPending(invitation, l),
                         ),
                       if (expired)
-                        // No link left to share: resending is what changes
-                        // this card's state.
+                        // F-101: no link left to share, so the one action
+                        // makes a new one AND hands it to the share sheet —
+                        // "Reenviar" alone re-sent an e-mail that had just
+                        // gone unanswered for a week.
                         FilledButton.icon(
-                          icon: const Icon(Icons.refresh, size: 18),
-                          label: Text(l[K.famResendInvite]),
-                          onPressed: () => _resendInvite(invitation, l),
+                          icon: const Icon(Icons.share_outlined, size: 18),
+                          label: Text(l[KApp.famShareAgain]),
+                          onPressed: () => _resendAndShare(invitation, l),
                         )
                       else
                         // The native improvement over "copy and paste on
@@ -1348,6 +1395,27 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     return null;
   }
 
+  /// F-101: the picker speaks canonical names (built-ins) and `custom:<id>`
+  /// keys (F-41); the form keeps the role ID the RPC wants.
+  String? get _inviteRoleKey {
+    if (_inviteRoleId == 0) return null;
+    final role = _roles.where((r) => r.id == _inviteRoleId).firstOrNull;
+    if (role == null) return null;
+    if (role.isCustom) return 'custom:${role.id}';
+    return RoleCatalog.find(role.roleName)?.canonicalName;
+  }
+
+  int _roleIdForPickerKey(String key) {
+    if (key.startsWith('custom:')) return int.tryParse(key.substring(7)) ?? 0;
+    for (final role in _roles) {
+      if (!role.isCustom &&
+          RoleCatalog.find(role.roleName)?.canonicalName == key) {
+        return role.id;
+      }
+    }
+    return 0;
+  }
+
   Widget _inviteForm(Localization l) {
     final theme = Theme.of(context);
     return Column(
@@ -1374,20 +1442,22 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         const SizedBox(height: 4),
         Text(l[KApp.famInviteEmailOptional], style: theme.textTheme.bodySmall),
         const SizedBox(height: 12),
-        DropdownButtonFormField<int>(
-          // A name or label never pushes the field past the screen
-          // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
-          isExpanded: true,
-          initialValue: _inviteRoleId == 0 ? null : _inviteRoleId,
-          decoration: InputDecoration(labelText: l[K.famRoleInFamily]),
-          items: [
+        // F-101: the sign-up's own picker (U-44) — the six common roles as
+        // chips, the other built-ins and the family's custom roles behind
+        // "Outro…". It replaced a 21-item dropdown in no clear order (Mãe,
+        // Pai, Bisavô, Tio, Padrinho, Babá, Irmã…).
+        Text(l[K.famRoleInFamily], style: theme.textTheme.titleSmall),
+        const SizedBox(height: 8),
+        RolePicker(
+          key: const ValueKey('invite-role'),
+          selected: _inviteRoleKey,
+          extras: [
             for (final role in _roles)
-              DropdownMenuItem(
-                value: role.id,
-                child: Text(role.displayLabel(l.current)),
-              ),
+              if (role.isCustom)
+                (key: 'custom:${role.id}', label: role.displayLabel(l.current)),
           ],
-          onChanged: (value) => setState(() => _inviteRoleId = value ?? 0),
+          onSelected: (key) =>
+              setState(() => _inviteRoleId = _roleIdForPickerKey(key)),
         ),
         if (widget.onOpenCustomRoles != null)
           Align(

@@ -172,6 +172,19 @@ async function handleInvitationEmail(
     html: templateInvitation(lang, inviterName, familyName, roleName, inviteLink, expiresBr, validDays, data.profile_id != null, data.member_type === "viewer"),
   });
 
+  // F-101: the row remembers that the message LEFT — the Família card reads
+  // this column to say "E-mail não enviado" instead of "Convite enviado" after
+  // a failed send (a Resend refusal throws in sendEmail and never reaches this
+  // line). A suppressed test recipient counts as sent: nothing failed. Best-
+  // effort: a stamp that fails is logged, never a failed send.
+  const { error: stampError } = await supabase
+    .from("family_invitations")
+    .update({ email_sent_at: new Date().toISOString() })
+    .eq("id", invitationId);
+  if (stampError) {
+    console.error(`[send-swap-email] email_sent_at not stamped — ${stampError.message}`);
+  }
+
   console.log(`[send-swap-email] invitation ${delivered ? "sent" : "suppressed (test recipient)"}`);
   return jsonResponse({
     sent: delivered ? 1 : 0,
