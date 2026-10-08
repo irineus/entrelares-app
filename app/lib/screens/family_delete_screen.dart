@@ -87,7 +87,7 @@ class _FamilyDeleteScreenState extends State<FamilyDeleteScreen> {
         _loading = false;
         _loadErrorKey = isSessionExpired(e.toString())
             ? KApp.sessionExpired
-            : KApp.errCalendarLoad;
+            : KApp.errFamilyLoad;
       });
     }
   }

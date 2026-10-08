@@ -455,10 +455,10 @@ void main() {
     // F-34: what expense_notify() / settlement_notify() store, word for word.
     ('expense_changed',
         '{"kind":"added","date":"2026-09-24","amount":"123456","category":"school","name":"Ana","msg":"mensalidade"}',
-        'Ana lançou uma despesa de R\$ 1.234,56 em 24/09/2026: Escola. mensalidade'),
+        'Ana lançou uma despesa de R\$ 1.234,56 em 24/09/2026: mensalidade (Escola).'),
     ('expense_changed',
         '{"kind":"deleted","date":"2026-09-24","amount":"5","category":"food","name":"Ana","msg":"lanche"}',
-        'Ana apagou uma despesa de R\$ 0,05 em 24/09/2026: Alimentação. lanche'),
+        'Ana apagou uma despesa de R\$ 0,05 em 24/09/2026: lanche (Alimentação).'),
     ('settlement_requested', '{"date":"2026-09-24","amount":"5000","name":"Bruno"}',
         'Bruno registrou em 24/09/2026 que pagou R\$ 50,00 a você. Confirme em Despesas se recebeu.'),
     ('settlement_answered',

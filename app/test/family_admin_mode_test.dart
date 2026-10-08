@@ -108,6 +108,6 @@ void main() {
     await _pump(tester, _source(members: const [_plain, _admin]));
 
     expect(find.text(l[K.famAdminActivate]), findsNothing);
-    expect(find.text(l[K.famOnlyAdminsInvite]), findsOne);
+    expect(find.text(l[KApp.adminModeOnlyAdmins]), findsOne);
   });
 }

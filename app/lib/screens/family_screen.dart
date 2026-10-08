@@ -357,7 +357,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         _loading = false;
         _loadErrorKey = isSessionExpired(e.toString())
             ? KApp.sessionExpired
-            : KApp.errCalendarLoad;
+            : KApp.errFamilyLoad;
       });
     }
   }
@@ -587,6 +587,20 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     }
   }
 
+  /// U-67: the referral link to the clipboard — the link alone, like the
+  /// invitation's "Copiar link".
+  Future<void> _copyReferral(String code, Localization l) async {
+    try {
+      await Clipboard.setData(
+          ClipboardData(text: ReferralRules.shareLink(code)));
+      if (!mounted) return;
+      showAppSnack(context, l[K.famLinkCopied]);
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnack(context, l[K.famErrCopy], type: AppSnackType.error);
+    }
+  }
+
   /// F-80 PR 2 — "Indique uma família": the link, the share button and the
   /// rule in one sentence that types none of the operator's numbers (U-57).
   /// No counts yet (PR 3) and never another family's name.
@@ -607,10 +621,23 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             Text(ReferralRules.shareLink(code),
                 style: theme.textTheme.bodyMedium),
             const SizedBox(height: 8),
-            FilledButton.tonalIcon(
-              icon: const Icon(Icons.share_outlined, size: 18),
-              label: Text(l[KApp.commonShare]),
-              onPressed: () => _shareReferral(code, l),
+            // U-67: desktop web has no Web Share — the link can be copied.
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.tonalIcon(
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  label: Text(l[KApp.commonShare]),
+                  onPressed: () => _shareReferral(code, l),
+                ),
+                OutlinedButton.icon(
+                  key: const ValueKey('family-referral-copy'),
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: Text(l[KApp.famReferralCopy]),
+                  onPressed: () => _copyReferral(code, l),
+                ),
+              ],
             ),
           ],
         ),

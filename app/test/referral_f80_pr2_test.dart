@@ -339,6 +339,30 @@ void main() {
       expect(ds.referralCodeFetches, 1);
     });
 
+    // U-67: desktop web has no Web Share — the link alone to the clipboard.
+    testWidgets('Copiar link puts the link alone on the clipboard',
+        (tester) async {
+      final ds = fam.source(settings: const {'feature.referral': 'true'})
+        ..onboardingFacts = planned;
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+      await pump(tester, ds);
+      await tester.ensureVisible(
+          find.byKey(const ValueKey('family-referral-copy')));
+      await tester.tap(find.byKey(const ValueKey('family-referral-copy')));
+      await tester.pumpAndSettle();
+      expect(copied, 'https://entrelares.app/i/$_code');
+      expect(find.text(l[K.famLinkCopied]), findsOne);
+    });
+
     testWidgets('a plain member (not the admin) sees it too', (tester) async {
       final ds = fam.source(
         members: const [fam.plain, fam.admin],
