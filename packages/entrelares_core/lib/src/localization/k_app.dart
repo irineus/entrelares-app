@@ -765,6 +765,21 @@ abstract final class KApp {
   static const String expenseFilterPayments = 'app.expense.filterPayments';
   static const String expensePaymentRow = 'app.expense.paymentRow';
   static const String expenseYouLent = 'app.expense.youLent';
+
+  /// U-67: the load error of the family pages (Família, Plano, Modo
+  /// administrador, Excluir família) — they said "o calendário".
+  static const String errFamilyLoad = 'app.err.familyLoad';
+
+  /// U-67: a non-admin who reaches the admin mode page (a typed URL) was told
+  /// only admins can SEND INVITATIONS.
+  static const String adminModeOnlyAdmins = 'app.adminMode.onlyAdmins';
+
+  /// U-67: the referral link could only be shared; desktop web has no Web
+  /// Share, so it could not leave the page.
+  static const String famReferralCopy = 'app.fam.referralCopy';
+
+  /// U-67: the Notificações load error said "o calendário" too.
+  static const String errNotificationsLoad = 'app.err.notificationsLoad';
   static const String expenseYourShare = 'app.expense.yourShare';
   static const String expenseNotYours = 'app.expense.notYours';
   static const String expenseYouPaid = 'app.expense.youPaid';
@@ -1554,6 +1569,10 @@ abstract final class KApp {
     expenseFilterPayments,
     expensePaymentRow,
     expenseYouLent,
+    errFamilyLoad,
+    adminModeOnlyAdmins,
+    famReferralCopy,
+    errNotificationsLoad,
     expenseYourShare,
     expenseNotYours,
     expenseYouPaid,
@@ -2478,7 +2497,11 @@ abstract final class StringsAppPtBr {
     KApp.expenseFilterExpenses: 'Despesas',
     KApp.expenseFilterPayments: 'Pagamentos',
     KApp.expensePaymentRow: 'Pagamento: {0} → {1}',
-    KApp.expenseYouLent: 'você emprestou {0}',
+    KApp.expenseYouLent: 'a receber: {0}',
+    KApp.errFamilyLoad: 'Não foi possível carregar os dados da família.',
+    KApp.adminModeOnlyAdmins: 'Somente administradores da família usam o modo administrador.',
+    KApp.famReferralCopy: 'Copiar link',
+    KApp.errNotificationsLoad: 'Não foi possível carregar as notificações.',
     KApp.expenseYourShare: 'sua parte {0}',
     KApp.expenseNotYours: 'não envolve você',
     KApp.expenseYouPaid: 'você pagou',
@@ -3396,7 +3419,11 @@ abstract final class StringsAppEn {
     KApp.expenseFilterExpenses: 'Expenses',
     KApp.expenseFilterPayments: 'Payments',
     KApp.expensePaymentRow: 'Payment: {0} → {1}',
-    KApp.expenseYouLent: 'you lent {0}',
+    KApp.expenseYouLent: "you're owed {0}",
+    KApp.errFamilyLoad: 'Could not load the family.',
+    KApp.adminModeOnlyAdmins: 'Only the family\'s admins use admin mode.',
+    KApp.famReferralCopy: 'Copy link',
+    KApp.errNotificationsLoad: 'Could not load the notifications.',
     KApp.expenseYourShare: 'your share {0}',
     KApp.expenseNotYours: 'does not involve you',
     KApp.expenseYouPaid: 'you paid',

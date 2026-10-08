@@ -378,7 +378,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _loading = false;
         _loadError = isSessionExpired(e.toString())
             ? sessionExpiredMessage(l)
-            : l[KApp.errCalendarLoad];
+            : l[KApp.errNotificationsLoad];
       });
     }
   }

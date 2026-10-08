@@ -35,6 +35,17 @@ void main() {
       );
     });
 
+    // U-67 (T-103 audit): three screens showed the Blazor <title> as their
+    // AppBar title — "Perfil - Entrelares". A key an AppBar reads carries no
+    // tail; the composer's strip stays for the ones only <title> reads.
+    test('a page title an AppBar shows carries no " - Entrelares" tail', () {
+      for (final key in [K.profPageTitle, K.payPageTitle, K.leavePageTitle]) {
+        for (final l in [pt, en]) {
+          expect(l[key], isNot(contains(' - Entrelares')), reason: key);
+        }
+      }
+    });
+
     test('the splash is a gate, not a screen: the brand alone', () {
       expect(DocumentTitle.keyFor('/splash'), isNull);
       expect(DocumentTitle.compose('/splash', pt), 'Entrelares');

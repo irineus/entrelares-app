@@ -278,7 +278,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         _loading = false;
         _loadErrorKey = isSessionExpired(e.toString())
             ? KApp.sessionExpired
-            : KApp.errCalendarLoad;
+            : KApp.errFamilyLoad;
       });
     }
   }
