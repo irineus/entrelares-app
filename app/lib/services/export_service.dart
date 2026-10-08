@@ -79,8 +79,10 @@ abstract final class ExportService {
         'members': [
           for (final member in members)
             {
+              // S-27: the requester's own e-mail is in `profile`; the other
+              // members' are THEIR personal data, not the requester's — the
+              // names stay, the addresses do not.
               'fullName': member.fullName,
-              'email': member.email ?? '',
               'role': roleLabel(member.roleId),
               'isAdmin': member.isAdmin,
             },

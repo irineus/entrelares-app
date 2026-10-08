@@ -81,8 +81,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
 
   @override
   Future<List<Member>> fetchMembers() async {
-    final rows = await _client.from('profiles').select();
-    return rows.map(Member.fromJson).toList();
+    // S-27: through `family_members()`, not a select on `profiles` — a viewer
+    // reads only their own row directly, and the RPC gives them the family
+    // with every other member's e-mail left out.
+    final rows = await _client.rpc<List<dynamic>>('family_members');
+    return [
+      for (final row in rows)
+        Member.fromJson(Map<String, dynamic>.from(row as Map))
+    ];
   }
 
   @override
