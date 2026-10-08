@@ -84,6 +84,7 @@ import 'package:entrelares_app/theme/tokens.dart';
 import 'package:entrelares_app/widgets/account_button.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/chat_view.dart';
+import 'package:entrelares_app/widgets/consent_row.dart';
 import 'package:entrelares_app/widgets/google_sign_in_button.dart';
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
@@ -285,6 +286,31 @@ Future<void> _expectLabelled(WidgetTester tester, String where) async {
         '[$where] a tappable node with no label and no tooltip is what '
         'TalkBack reads as "button":\n${r.reason}',
   );
+}
+
+/// U-64 — how many lines a paragraph was actually laid out on: the distinct
+/// tops of its glyph boxes. The tap and label gates never saw "Recente / s"
+/// — a word cut across two lines is still a labelled 48 dp target.
+int _lines(RenderParagraph p) {
+  final len = p.text.toPlainText().length;
+  return p
+      .getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: len))
+      .map((b) => b.top.round())
+      .toSet()
+      .length;
+}
+
+void _expectOneLine(WidgetTester tester, Finder text, String where) {
+  for (final e in text.evaluate()) {
+    final p = e.findRenderObject() is RenderParagraph
+        ? e.findRenderObject()! as RenderParagraph
+        : tester.renderObject<RenderParagraph>(find.descendant(
+            of: find.byWidget(e.widget), matching: find.byType(RichText)));
+    expect(_lines(p), 1,
+        reason: '[$where] "${p.text.toPlainText()}" breaks across lines');
+    expect(p.didExceedMaxLines, isFalse,
+        reason: '[$where] "${p.text.toPlainText()}" is cut');
+  }
 }
 
 Future<void> _measure(WidgetTester tester, String where) async {
@@ -501,8 +527,45 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _measure(tester, 'register step 1');
+      // U-64: an empty "Continuar" names every empty field ON the field, all
+      // at once — not one sentence under the button.
+      await tester.ensureVisible(reg.continueButton(pt));
+      await tester.tap(reg.continueButton(pt));
+      await tester.pumpAndSettle();
+      for (final key in [
+        K.registerErrorNameRequired,
+        K.registerErrorEmailRequired,
+        K.registerErrorPasswordShort,
+      ]) {
+        expect(
+            find.descendant(
+                of: find.byType(TextField), matching: find.text(pt[key])),
+            findsOneWidget,
+            reason: '${pt[key]} belongs on its field');
+        final error = tester.renderObject<RenderParagraph>(find.text(pt[key]));
+        expect(error.didExceedMaxLines, isFalse,
+            reason: '"${pt[key]}" is cut on its field');
+      }
+      await _measure(tester, 'register step 1, every field refused');
       await reg.goToFamilyStep(tester);
       await _measure(tester, 'register step 2');
+      // U-64: the consent sentence is ONE paragraph with its two documents
+      // as links inside — no 48 dp button padding a line in the middle of it.
+      final consent = find.byType(ConsentRow);
+      expect(
+          find.descendant(of: consent, matching: find.byType(TextButton)),
+          findsNothing);
+      final sentence = tester.renderObject<RenderParagraph>(find.descendant(
+          of: consent,
+          matching: find.byWidgetPredicate((w) =>
+              w is RichText &&
+              w.text.toPlainText().contains(pt[K.commonTermsOfUse]))));
+      expect(sentence.text.toPlainText(),
+          contains(pt[K.commonPrivacyPolicy]));
+      if (tester.platformDispatcher.textScaleFactor == 1.0) {
+        expect(_lines(sentence), lessThanOrEqualTo(2),
+            reason: 'the consent sentence fits two lines at 360 dp');
+      }
       // The consent box names what it accepts, as one sentence.
       expect(
         find.bySemanticsLabel(
@@ -675,6 +738,27 @@ void main() {
       await tester.tap(find.text(pt[K.calWizard]));
       await tester.pumpAndSettle();
       await _measure(tester, 'wizard');
+      // U-64: the chosen model is said whole — no suffix eating it — and the
+      // block rows sit on one line each: the number, the "×" and the bin on
+      // the fields' centre, not on hand-tuned top paddings.
+      final preset = tester.renderObject<RenderParagraph>(find.descendant(
+          of: find.byKey(const Key('wizPreset')),
+          matching: find.byType(RichText)).first);
+      expect(preset.didExceedMaxLines, isFalse,
+          reason: "the model's name is cut: ${preset.text.toPlainText()}");
+      for (final mark in ['1.', '2.']) {
+        final row = find
+            .ancestor(of: find.text(mark), matching: find.byType(Row))
+            .first;
+        final field = find.descendant(
+            of: row, matching: find.byType(DropdownButtonFormField<int>));
+        expect(
+            (tester.getCenter(find.text(mark)).dy -
+                    tester.getCenter(field).dy)
+                .abs(),
+            lessThan(1.0),
+            reason: "block $mark is off its field's centre");
+      }
     });
 
     // U-55: the admin's strip on a plan born without a handoff time, and the
@@ -1055,6 +1139,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ReportsAuditTab), findsOneWidget);
       await _measure(tester, 'reports audit');
+      // U-64: four segments at 360 dp broke "Recentes" into "Recente / s".
+      for (final key in [
+        K.auditTabRecent,
+        K.repByMonth,
+        K.repByYear,
+        K.auditTabAccount,
+      ]) {
+        _expectOneLine(tester, find.text(pt[key]), 'history filter');
+      }
       await tester.tap(find.text(pt[K.repTabPdf]));
       await tester.pumpAndSettle();
       expect(find.byType(ReportsPdfTab), findsOneWidget);

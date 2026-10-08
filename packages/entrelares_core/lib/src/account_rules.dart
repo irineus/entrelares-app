@@ -12,6 +12,9 @@ import 'auth_rules.dart';
 import 'localization/k.dart';
 import 'localization/k_app.dart';
 
+/// U-64 — the four fields of the account step, in the screen's order.
+enum AccountField { name, email, password, confirmPassword }
+
 abstract final class RegisterRules {
   /// GoTrue's own minimum is configured server-side; 8 is what the web refuses
   /// upfront, and the `register-invitee` Edge Function repeats it.
@@ -61,14 +64,47 @@ abstract final class RegisterRules {
     required String password,
     required String confirmPassword,
   }) {
-    if (fullName.trim().isEmpty) return K.registerErrorNameRequired;
-    if (email.trim().isEmpty) return K.registerErrorEmailRequired;
-    if (password.length < minPasswordLength) {
-      return K.registerErrorPasswordShort;
-    }
-    if (password != confirmPassword) return K.registerErrorPasswordMismatch;
-    return null;
+    final errors = accountStepFieldErrors(
+      fullName: fullName,
+      email: email,
+      password: password,
+      confirmPassword: confirmPassword,
+    );
+    return errors.isEmpty ? null : errors.values.first;
   }
+
+  /// U-64 (T-103 audit, 07/10/2026) — EVERY failing field of the account step,
+  /// each with its catalog key, in the screen's order. An empty "Continuar"
+  /// used to say ONE sentence under the button ("Informe seu nome completo."),
+  /// and only the first: the person fixed the name, pressed again, and met
+  /// the e-mail. Each field now carries its own error, all at once.
+  /// [accountStepErrorKey] is the first of these, so the two never disagree.
+  static Map<AccountField, String> accountStepFieldErrors({
+    required String fullName,
+    required String email,
+    required String password,
+    required String confirmPassword,
+  }) => {
+    if (fullName.trim().isEmpty) AccountField.name: K.registerErrorNameRequired,
+    if (email.trim().isEmpty) AccountField.email: K.registerErrorEmailRequired,
+    if (password.length < minPasswordLength)
+      AccountField.password: K.registerErrorPasswordShort,
+    if (password != confirmPassword)
+      AccountField.confirmPassword: K.registerErrorPasswordMismatch,
+  };
+
+  /// U-64 — the account-step field an error belongs to, local check or GoTrue
+  /// refusal alike, or null for an error that is about no one field.
+  static AccountField? accountFieldFor(String errorKey) => switch (errorKey) {
+    K.registerErrorNameRequired => AccountField.name,
+    K.registerErrorEmailRequired ||
+    K.authErrAlreadyRegistered ||
+    K.authErrEmailFormat => AccountField.email,
+    K.registerErrorPasswordShort ||
+    K.authErrPasswordWeak => AccountField.password,
+    K.registerErrorPasswordMismatch => AccountField.confirmPassword,
+    _ => null,
+  };
 
   /// U-44 — every error the founder can only fix on the FIRST step: the local
   /// checks of [accountStepErrorKey] plus the GoTrue refusals about the

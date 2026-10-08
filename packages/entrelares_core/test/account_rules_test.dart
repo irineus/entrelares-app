@@ -165,6 +165,45 @@ void main() {
           ]));
     });
 
+    // U-64: an empty "Continuar" names EVERY field at once, each on itself.
+    test('every failing field of the account step, at once, in order', () {
+      final all = RegisterRules.accountStepFieldErrors(
+          fullName: ' ', email: '', password: 'curta', confirmPassword: 'x');
+      expect(all, {
+        AccountField.name: K.registerErrorNameRequired,
+        AccountField.email: K.registerErrorEmailRequired,
+        AccountField.password: K.registerErrorPasswordShort,
+        AccountField.confirmPassword: K.registerErrorPasswordMismatch,
+      });
+      expect(all.keys.toList(), AccountField.values);
+      expect(
+          RegisterRules.accountStepFieldErrors(
+              fullName: 'Ana',
+              email: 'a@b.c',
+              password: 'senha-forte',
+              confirmPassword: 'senha-forte'),
+          isEmpty);
+    });
+
+    test('every account-step error belongs to a field; step 2 errors do not',
+        () {
+      for (final key in RegisterRules.accountStepErrorKeys) {
+        expect(RegisterRules.accountFieldFor(key), isNotNull, reason: key);
+      }
+      expect(RegisterRules.accountFieldFor(K.authErrAlreadyRegistered),
+          AccountField.email);
+      expect(RegisterRules.accountFieldFor(K.authErrPasswordWeak),
+          AccountField.password);
+      for (final key in [
+        K.registerErrorFamilyRequired,
+        K.registerErrorRoleRequired,
+        K.registerErrorConsentRequired,
+        K.authErrRateLimited,
+      ]) {
+        expect(RegisterRules.accountFieldFor(key), isNull, reason: key);
+      }
+    });
+
     test('a rate limit, a trigger refusal or no network stays on step 2', () {
       for (final key in [
         K.authErrRateLimited,

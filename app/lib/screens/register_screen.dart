@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../deep_link_urls.dart';
 import 'package:entrelares_db_contracts/models/invite_info.dart';
 import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
 import '../services/install_referrer.dart';
 import '../widgets/resend_confirmation_button.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/consent_row.dart';
 import '../widgets/google_sign_in_button.dart';
 import '../widgets/role_picker.dart';
 
@@ -144,6 +144,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   /// The catalog KEY of the current error, so a language switch re-renders it.
   String? _errorKey;
+
+  /// U-64 — the account step's errors, each on its own field and all at once,
+  /// instead of the first one as a sentence under the button.
+  Map<AccountField, String> _fieldErrors = const {};
 
   /// A message the SERVER wrote (the Edge Function's PT-BR text) — shown
   /// verbatim instead of a key, never collapsed into a generic sentence.
@@ -307,6 +311,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         _errorKey = errorKey;
         _errorText = null;
+        _fieldErrors = RegisterRules.accountStepFieldErrors(
+          fullName: _fullName.text,
+          email: _email.text,
+          password: _password.text,
+          confirmPassword: _confirmPassword.text,
+        );
         _returnToAccountStepFor(errorKey);
       });
       return;
@@ -316,6 +326,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _busy = true;
       _errorKey = null;
       _errorText = null;
+      _fieldErrors = const {};
     });
 
     // T-37: funnel entry — the sign-up TYPE and nothing else.
@@ -400,18 +411,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   /// U-44 — "Continuar": the account step's own checks, and only those.
   void _continueToFamily() {
-    final errorKey = RegisterRules.accountStepErrorKey(
+    final errors = RegisterRules.accountStepFieldErrors(
       fullName: _fullName.text,
       email: _email.text,
       password: _password.text,
       confirmPassword: _confirmPassword.text,
     );
     setState(() {
-      _errorKey = errorKey;
+      _fieldErrors = errors;
+      _errorKey = null;
       _errorText = null;
-      if (errorKey == null) _step = 1;
+      if (errors.isEmpty) _step = 1;
     });
-    if (errorKey == null && !_familyStepTracked) {
+    if (errors.isEmpty && !_familyStepTracked) {
       _familyStepTracked = true;
       // T-37: where the founder funnel loses people between the two steps —
       // the step's NAME, nothing typed on it.
@@ -434,6 +446,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_isInvited && RegisterRules.accountStepErrorKeys.contains(errorKey)) {
       _step = 0;
     }
+    // U-64: an error that belongs to a field is said ON the field — a GoTrue
+    // refusal of the address on the e-mail, a short password on the password
+    // — and the sentence under the button goes.
+    final field = RegisterRules.accountFieldFor(errorKey);
+    if (field != null) {
+      _errorKey = null;
+      _fieldErrors = {..._fieldErrors, field: errorKey};
+    }
+  }
+
+  String? _fieldError(Localization l, AccountField field) {
+    final key = _fieldErrors[field];
+    return key == null ? null : l[key];
+  }
+
+  /// Typing in a field answers its error; the others stay until the next try.
+  void _clearFieldError(AccountField field) {
+    if (!_fieldErrors.containsKey(field)) return;
+    setState(() => _fieldErrors = {..._fieldErrors}..remove(field));
   }
 
   Future<void> _submitInvite(
@@ -853,6 +884,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         label: l[K.registerFullName],
         hint: l[K.registerFullNamePlaceholder],
         controller: _fullName,
+        errorText: _fieldError(l, AccountField.name),
+        onChanged: (_) => _clearFieldError(AccountField.name),
         maxLength: RegisterRules.maxNameLength,
         textCapitalization: TextCapitalization.words,
         autofillHints: const [AutofillHints.name],
@@ -863,6 +896,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         label: l[K.commonEmail],
         hint: l[K.commonEmailPlaceholder],
         controller: _email,
+        errorText: _fieldError(l, AccountField.email),
+        onChanged: (_) => _clearFieldError(AccountField.email),
         // The invitation names the address — the trigger refuses any other.
         readOnly: readOnly,
         keyboardType: TextInputType.emailAddress,
@@ -889,6 +924,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           label: l[K.commonPassword],
           hint: l[K.registerPasswordPlaceholder],
           controller: _password,
+          errorText: _fieldError(l, AccountField.password),
+          onChanged: (_) => _clearFieldError(AccountField.password),
           obscureText: _obscured,
           autofillHints: const [AutofillHints.newPassword],
           suffixIcon: IconButton(
@@ -903,6 +940,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           label: l[K.commonConfirmPassword],
           hint: l[K.registerConfirmPasswordPlaceholder],
           controller: _confirmPassword,
+          errorText: _fieldError(l, AccountField.confirmPassword),
+          onChanged: (_) => _clearFieldError(AccountField.confirmPassword),
           obscureText: _obscured,
         ),
       ];
@@ -942,43 +981,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: _acceptedTerms,
-              // U-32: the sentence beside the box is three texts and two
-              // buttons, none of them the box's own — a screen reader heard
-              // an unnamed checkbox. The box carries the whole sentence.
-              semanticLabel: '${l[K.registerConsentAccept]} '
-                  '${l[K.commonPrivacyPolicy]} '
-                  '${l[K.registerConsentAnd]} '
-                  '${l[K.commonTermsOfUse]}',
-              onChanged: (value) =>
-                  setState(() => _acceptedTerms = value ?? false),
-            ),
-            Expanded(
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(l[K.registerConsentAccept],
-                      style: theme.textTheme.bodySmall),
-                  TextButton(
-                    onPressed: () => _openWebPage(DeepLinkUrls.privacy),
-                    child: Text(l[K.commonPrivacyPolicy],
-                        style: theme.textTheme.bodySmall),
-                  ),
-                  Text(l[K.registerConsentAnd],
-                      style: theme.textTheme.bodySmall),
-                  TextButton(
-                    onPressed: () => _openWebPage(DeepLinkUrls.terms),
-                    child: Text(l[K.commonTermsOfUse],
-                        style: theme.textTheme.bodySmall),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        ConsentRow(
+          value: _acceptedTerms,
+          onChanged: (v) => setState(() => _acceptedTerms = v),
+          onOpen: _openWebPage,
         ),
         // Empty in PT-BR by construction — the binding version IS the
         // Portuguese one, so only an English reader is told so.
