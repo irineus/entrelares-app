@@ -225,6 +225,14 @@ abstract final class KApp {
   static const String noticeRequestKeepNamed = 'app.notice.requestKeepNamed';
   static const String noticeMinePickupNamed = 'app.notice.minePickupNamed';
   static const String noticeMineKeepNamed = 'app.notice.mineKeepNamed';
+  /// F-101: the invitation card's state when the e-mail did not leave, the
+  /// expired card's one action, the second-family sentence (inviter and
+  /// invitee sides).
+  static const String famInviteEmailUnsentBadge = 'app.fam.inviteEmailUnsentBadge';
+  static const String famInviteEmailUnsentHint = 'app.fam.inviteEmailUnsentHint';
+  static const String famShareAgain = 'app.fam.shareAgain';
+  static const String famInviteEmailTaken = 'app.fam.inviteEmailTaken';
+  static const String registerMigrationOtherEmail = 'app.register.migrationOtherEmail';
 
   // ── F-56 pending member (invited, not yet joined) ──
   static const String famPendingBadge = 'app.fam.pendingBadge';
@@ -1077,6 +1085,11 @@ abstract final class KApp {
     noticeRequestKeepNamed,
     noticeMinePickupNamed,
     noticeMineKeepNamed,
+    famInviteEmailUnsentBadge,
+    famInviteEmailUnsentHint,
+    famShareAgain,
+    famInviteEmailTaken,
+    registerMigrationOtherEmail,
     famPendingBadge,
     famPendingHint,
     famInviteName,
@@ -1879,12 +1892,24 @@ abstract final class StringsAppPtBr {
         'Você avisou que {0}{1} e precisa que alguém busque {3}.{2}',
     KApp.noticeMineKeepNamed:
         'Você avisou que {0}{1} e precisa que alguém fique com {3} hoje.{2}',
+    KApp.famInviteEmailUnsentBadge: 'E-mail não enviado',
+    KApp.famInviteEmailUnsentHint:
+        'O e-mail não saiu. Compartilhe o link — pelo WhatsApp costuma '
+            'funcionar melhor.',
+    KApp.famShareAgain: 'Compartilhar de novo',
+    KApp.famInviteEmailTaken:
+        'Este e-mail já tem conta em outra família do Entrelares. Cada e-mail '
+            'entra em uma família só: para participar das duas, essa pessoa '
+            'usa outro e-mail neste convite.',
+    KApp.registerMigrationOtherEmail:
+        'Para manter as duas famílias, peça um convite para outro e-mail em '
+            'vez de apagar este cadastro.',
     KApp.famPendingBadge: 'Ainda não entrou',
     KApp.famPendingHint:
         'Sem conta ainda: você planeja os dias dessa pessoa, e as trocas '
             'ficam disponíveis quando ela entrar.',
     KApp.famInviteName: 'Nome',
-    KApp.famInviteNameHint: 'Como essa pessoa aparece no calendário',
+    KApp.famInviteNameHint: 'Nome no calendário',
     KApp.famInviteEmailOptional:
         'Opcional: com o e-mail, o convite sai agora. Sem ele, você planeja '
             'os dias e convida depois.',
@@ -2769,12 +2794,24 @@ abstract final class StringsAppEn {
         'You said you {0}{1} and need someone to collect {3}.{2}',
     KApp.noticeMineKeepNamed:
         'You said you {0}{1} and need someone to keep {3} today.{2}',
+    KApp.famInviteEmailUnsentBadge: 'E-mail not sent',
+    KApp.famInviteEmailUnsentHint:
+        'The e-mail did not go out. Share the link — WhatsApp usually works '
+            'best.',
+    KApp.famShareAgain: 'Share again',
+    KApp.famInviteEmailTaken:
+        'This e-mail already has an account in another Entrelares family. '
+            'One e-mail belongs to one family: to take part in both, that '
+            'person uses another e-mail for this invitation.',
+    KApp.registerMigrationOtherEmail:
+        'To keep both families, ask for an invitation to another e-mail '
+            'instead of deleting this registration.',
     KApp.famPendingBadge: 'Not joined yet',
     KApp.famPendingHint:
         'No account yet: you plan this person\'s days, and swaps become '
             'available once they join.',
     KApp.famInviteName: 'Name',
-    KApp.famInviteNameHint: 'How this person appears on the calendar',
+    KApp.famInviteNameHint: 'Name on the calendar',
     KApp.famInviteEmailOptional:
         'Optional: with an e-mail the invitation goes out now. Without it, '
             'you plan the days and invite later.',

@@ -379,6 +379,9 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
               [_migrationFamilyName ?? '', _invite?.familyName ?? ''])),
           const SizedBox(height: 8),
           Text(l[K.registerMigrationBody2]),
+          const SizedBox(height: 8),
+          // F-101: the way to keep both families (F-30 stays deferred).
+          Text(l[KApp.registerMigrationOtherEmail]),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: _busy

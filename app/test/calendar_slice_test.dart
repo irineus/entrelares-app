@@ -1018,6 +1018,19 @@ class FakeCustodyDataSource implements CustodyDataSource {
     if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
     createdInvitations
         .add({'email': email, 'roleId': roleId, 'profileId': profileId});
+    // F-101: the renewed row is what the page re-reads and shares; the fake
+    // keeps the resend semantics (the old open one is gone).
+    invitations = [
+      for (final i in invitations) if (i.email != email) i,
+      FamilyInvitation(
+        id: 42,
+        email: email,
+        roleId: roleId,
+        token: 'renewed-0000-0000-0000-000000000042',
+        expiresAt: DateTime.now().toUtc().add(const Duration(days: 7)),
+        profileId: profileId,
+      ),
+    ];
     return 42;
   }
 

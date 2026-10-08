@@ -16,14 +16,23 @@ import 'ui/ui.dart';
 /// the answer stays on screen — a sheet that closes over a choice nobody can
 /// see reads as a choice that did not happen.
 class RolePicker extends StatelessWidget {
-  /// The canonical name of the chosen role, or null before a choice.
+  /// The canonical name of the chosen role — or an [extras] key — or null
+  /// before a choice.
   final String? selected;
   final ValueChanged<String> onSelected;
+
+  /// F-101: roles that are not built-ins — the family's custom roles (F-41) —
+  /// listed at the end of the "Outro…" sheet under their own heading. Each is
+  /// (key, label); the key is the caller's (`custom:<id>`), never a canonical
+  /// name. The invite form, which used to be a 21-item dropdown in no clear
+  /// order, asks "who is this person" the way the sign-up does.
+  final List<({String key, String label})> extras;
 
   const RolePicker({
     super.key,
     required this.selected,
     required this.onSelected,
+    this.extras = const [],
   });
 
   /// "Outro…", addressable without a localized finder.
@@ -35,6 +44,9 @@ class RolePicker extends StatelessWidget {
     final picked = selected == null ? null : RoleCatalog.find(selected!);
     final pickedOther = picked != null &&
         !RoleCatalog.signUpShortlist.contains(picked.canonicalName);
+    final pickedExtra = selected == null
+        ? null
+        : extras.where((e) => e.key == selected).firstOrNull;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -48,6 +60,12 @@ class RolePicker extends StatelessWidget {
         if (pickedOther)
           ChoiceChip(
             label: Text(picked.labelFor(l.current)),
+            selected: true,
+            onSelected: (_) => _openOthers(context),
+          ),
+        if (pickedExtra != null)
+          ChoiceChip(
+            label: Text(pickedExtra.label),
             selected: true,
             onSelected: (_) => _openOthers(context),
           ),
@@ -69,6 +87,26 @@ class RolePicker extends StatelessWidget {
         onClose: () => Navigator.of(sheetContext).pop(),
         closeLabel: l[K.commonClose],
         children: [
+          // F-101: the family's OWN roles first — they are the ones this
+          // family made on purpose, and fifteen built-ins above them would
+          // push them below the fold of the sheet.
+          if (extras.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(l[K.famCustomRolesLink],
+                  style: Theme.of(sheetContext).textTheme.labelLarge),
+            ),
+            for (final extra in extras)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(extra.label),
+                selected: selected == extra.key,
+                trailing:
+                    selected == extra.key ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(sheetContext).pop(extra.key),
+              ),
+            const Divider(),
+          ],
           for (final role in RoleCatalog.others)
             ListTile(
               contentPadding: EdgeInsets.zero,
