@@ -12,7 +12,7 @@ app's REAL screens with T-97's fictional demo family (Ana, Bruno, Lia and Theo �
 ## Regenerate
 
 ```
-cd app && fvm flutter test store_ads/      # the 18 images + the 2 closing cards (~20 s)
+cd app && fvm flutter test store_ads/      # the 18 images, the 2 closing cards and the 4 video screens
 bash store/ads/render_video.sh             # the 2 videos (ffmpeg from PATH, else Docker)
 ```
 
@@ -50,7 +50,7 @@ operator can change (U-57), no emoji (U-31), and no Premium module — the three
 | Images 1.91:1 | `img/hoje-google-1200x628.png`, `img/troca-google-1200x628.png`, `img/festas-google-1200x628.png` |
 | Images 1:1 | `img/<angle>-google-1200x1200.png` |
 | Images 4:5 | `img/<angle>-google-1200x1500.png` |
-| Videos | the two YouTube links of `video/entrelares-9x16.mp4` and `video/entrelares-1x1.mp4` — an app campaign takes video only as a YouTube URL, so the owner uploads them (unlisted) first |
+| Videos | the YouTube links of `video/entrelares-v2-16x9.mp4` and `video/entrelares-v2-9x16.mp4` (v2, below) — an app campaign takes video only as a YouTube URL, so the owner uploads them (unlisted) first |
 
 ### Google Ads — Search (responsive search ad)
 
@@ -70,11 +70,50 @@ operator can change (U-57), no emoji (U-31), and no Premium module — the three
 | Headlines, one per angle (≤ 40, `angle\|text`) | [`copy/meta-headlines.txt`](copy/meta-headlines.txt) |
 | Feed 1:1 / 4:5 | `img/<angle>-meta-1080x1080.png` / `img/<angle>-meta-1080x1350.png` |
 | Stories / Reels 9:16 | `img/<angle>-meta-1080x1920.png` (the words keep out of the top 13% and bottom 12%, where Instagram draws its bars) |
-| Video | `video/entrelares-9x16.mp4` (Stories/Reels), `video/entrelares-1x1.mp4` (feed) |
+| Video | `video/entrelares-v2-9x16.mp4` (Stories/Reels), `video/entrelares-v2-4x5.mp4` (feed) — and the `-15s-` cuts (v2, below) |
 | Website URL | `https://entrelares.app/comecar/meta?utm_campaign=primeira-turma` |
 
 The video: ~24 s, the three angles of 7 s and a closing card of 5 s with 0.6 s crossfades, H.264
-30 fps, **no audio track** (no licensed music).
+30 fps, **no audio track** (no licensed music). **Superseded by v2 below** (07/10/2026); the two
+files stay until the campaigns swap them.
+
+## The video, v2 (07/10/2026)
+
+A motion piece instead of a slideshow: the question, the month, a swap asked and approved with
+the finger on *Aprovar*, the notifications, the card. One cut, six files — the 25 s master and a
+15 s version (Meta recommends ≤ 15 s), each in 9:16 (Stories/Reels/Shorts), 4:5 (Instagram feed)
+and 16:9 (YouTube, for the Google app campaign):
+
+| File | Canvas | Where |
+|---|---|---|
+| `video/entrelares-v2-9x16.mp4` · `-15s-9x16` | 1080×1920 | Instagram Stories and Reels; YouTube Shorts |
+| `video/entrelares-v2-4x5.mp4` · `-15s-4x5` | 1080×1350 | Instagram feed |
+| `video/entrelares-v2-16x9.mp4` · `-15s-16x9` | 1920×1080 | YouTube (unlisted) → Google app campaign |
+| `video/frames/<same name>-first.png`, `-end.png` | | the first frame and the closing card, as stills |
+
+H.264, yuv420p, 30 fps, faststart, **no audio track** (owner, 04/10/2026). In 9:16 every word
+and the logo stay between y = 250 and y = 1250 with 60 px side margins (Reels draws its UI over
+the top 250 px and the bottom ~670 px); the phone may run into the bottom band. Words: the
+approved lines of `copy/` plus *"Imprevisto no dia? Mande um aviso."* and *"O essencial é
+gratuito."*, under the same rules as the images (neutral, no price, no promise of outcome,
+no operator-editable number, no emoji, no Premium module, no store badge on the card).
+
+The phone shows the app's REAL screens: `app/store_ads/video_frames_test.dart` pumps four
+states with the demo family (the month, Bruno's request open in the day sheet, the month after
+Ana approves it, the notifications on *Todas*) and writes them bare to `video/src/`. Everything
+else — captions, outline, the ring and the finger — is `video/scene.html`, one deterministic page
+(`window.seek(t)`), screenshotted frame by frame by `video/build.mjs` (Playwright on the
+installed Chrome) and encoded by ffmpeg (from the PATH, else the pinned Docker image). The
+pointers aim at boxes `video/hotspots.py` measures on the real pixels by token colour, so a
+screen that moves moves the pointer with it.
+
+```
+cd app && fvm flutter test store_ads/video_frames_test.dart   # the 4 screens (dates = today)
+cd store/ads/video && npm i --no-save playwright-core@1.56.1 && node build.mjs   # ~8 min
+```
+
+`ONLY=9x16 CUTS=25 node build.mjs` renders one file while iterating. The calendar reads the real
+clock, so **regenerate the screens, then approve what was regenerated.**
 
 The exact settings of each campaign (country, language, budget, end date) are in the handoff
 blocks of **L-31**, not here — this folder is the material, the card is the launch.
