@@ -514,6 +514,9 @@ abstract class CustodyDataSource {
     String? referralCode,
     String? referralChannel,
     Acquisition? acquisition,
+    // U-61: the child's optional first name — rides the metadata, written by
+    // the server as the family's first child and stripped from the auth row.
+    String? childFirstName,
   });
 
   // ── F-80: family referral (built dark) ────────────────────────────────────
@@ -562,6 +565,7 @@ abstract class CustodyDataSource {
     required String role,
     required String familyName,
     Acquisition? acquisition,
+    String? childFirstName,
   });
 
   /// The INVITEE half: the `claim-invitation` Edge Function attaches the

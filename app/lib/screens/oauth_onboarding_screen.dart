@@ -87,6 +87,9 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
   final _fullName = TextEditingController();
   final _familyName = TextEditingController();
 
+  /// U-61: the child's first name, OPTIONAL (the register form's field).
+  final _childName = TextEditingController();
+
   String? _role;
   bool _acceptedTerms = false;
 
@@ -131,6 +134,7 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
   void dispose() {
     _fullName.dispose();
     _familyName.dispose();
+    _childName.dispose();
     super.dispose();
   }
 
@@ -219,6 +223,18 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
   }
 
   Future<void> _submitFounder() async {
+    // U-61: optional, validated only when filled (the RPC's own sentence).
+    final childName = ChildRules.normalize(_childName.text);
+    final childError =
+        childName.isEmpty ? null : ChildRules.validateName(childName);
+    if (childError != null) {
+      setState(() {
+        _busy = false;
+        _errorText = childError;
+        _errorKey = null;
+      });
+      return;
+    }
     Acquisition? acquisition;
     try {
       acquisition =
@@ -232,11 +248,13 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
         role: _role!,
         familyName: _familyName.text.trim(),
         acquisition: acquisition,
+        childFirstName: childName.isEmpty ? null : childName,
       );
       if (!mounted) return;
       // T-37: same funnel event the register form emits — the channel is in
-      // the pageview, never a person.
-      widget.analytics?.trackEvent(AnalyticsEvents.familyCreated);
+      // the pageview, never a person. U-61: whether the child was named.
+      widget.analytics?.trackEvent(AnalyticsEvents.familyCreated,
+          props: {'child': childName.isEmpty ? 'none' : 'named'});
       // F-80: the family now exists and this session founded it — the one
       // moment `attribute_referral` accepts. Fire-and-forget by contract.
       widget.onFamilyFounded?.call();
@@ -506,6 +524,14 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
           RolePicker(
             selected: _role,
             onSelected: (role) => setState(() => _role = role),
+          ),
+          const SizedBox(height: 16),
+          // U-61: the register form's optional child field, same words.
+          AppTextField(
+            label: l[KApp.registerChildName],
+            helper: l[KApp.registerChildNameHint],
+            controller: _childName,
+            maxLength: ChildRules.maxNameLength,
           ),
         ],
         const SizedBox(height: 20),

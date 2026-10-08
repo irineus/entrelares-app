@@ -117,6 +117,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _fullName = TextEditingController();
   final _email = TextEditingController();
   final _familyName = TextEditingController();
+
+  /// U-61: the child's first name, OPTIONAL — the one child datum the policy
+  /// allows (S-15) and the field F-55's Crianças page keeps.
+  final _childName = TextEditingController();
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
 
@@ -243,6 +247,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _fullName.dispose();
     _email.dispose();
     _familyName.dispose();
+    _childName.dispose();
     _password.dispose();
     _confirmPassword.dispose();
     super.dispose();
@@ -338,6 +343,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _submitFounder(Localization l) async {
+    // U-61: an optional field, validated only when filled — the RPC's own
+    // sentence, on this step, before anything reaches the server.
+    final childName = ChildRules.normalize(_childName.text);
+    final childError =
+        childName.isEmpty ? null : ChildRules.validateName(childName);
+    if (childError != null) {
+      setState(() {
+        _busy = false;
+        _errorKey = null;
+        _errorText = childError;
+      });
+      return;
+    }
     try {
       final referral = await _referralToSend();
       final acquisition = await _acquisitionToSend();
@@ -351,10 +369,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         referralCode: referral,
         referralChannel: referral == null ? null : _referralChannel,
         acquisition: acquisition,
+        childFirstName: childName.isEmpty ? null : childName,
       );
       if (!mounted) return;
-      // T-37: a founder created a new family (activation funnel).
-      widget.analytics?.trackEvent(AnalyticsEvents.familyCreated);
+      // T-37: a founder created a new family (activation funnel). U-61:
+      // whether the child was named — never the name.
+      widget.analytics?.trackEvent(AnalyticsEvents.familyCreated,
+          props: {'child': childName.isEmpty ? 'none' : 'named'});
       // F-80: the account was created carrying a referral (the server
       // attributed it in the same transaction). The channel, never the code.
       if (referral != null) {
@@ -779,6 +800,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         RolePicker(
           selected: _role,
           onSelected: (role) => setState(() => _role = role),
+        ),
+        const SizedBox(height: 16),
+        // U-61 (owner, 07/10/2026): optional. It becomes the family's first
+        // child (F-55) and the app says the name where it said "a criança".
+        // The consent sentence below already names the first name as the
+        // only child datum — this field is exactly that datum.
+        AppTextField(
+          label: l[KApp.registerChildName],
+          helper: l[KApp.registerChildNameHint],
+          controller: _childName,
+          maxLength: ChildRules.maxNameLength,
         ),
         const SizedBox(height: 20),
         _consentBlock(l, isInvited: false),

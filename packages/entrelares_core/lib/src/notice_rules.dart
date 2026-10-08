@@ -252,6 +252,11 @@ String noticeNoteSuffix(Localization l, String? note) {
 ///
 /// [mine] (F-98): the author reads herself in the second person — "Você
 /// avisou que vai atrasar…", never her own name in the third.
+///
+/// [childName] (U-61): the author's own line says the child's name when the
+/// family has exactly one (`ChildRules.singleName`). The OTHER readers' line
+/// is the notification's text (`K.notifRender*`), shared with the stored
+/// row and left as it is.
 String noticeSentence({
   required Localization l,
   required String senderName,
@@ -260,18 +265,24 @@ String noticeSentence({
   required NoticeRequest request,
   String? note,
   bool mine = false,
+  String? childName,
 }) =>
     mine
         ? l.format(
             switch (request) {
               NoticeRequest.info => KApp.noticeMineInfo,
-              NoticeRequest.pickup => KApp.noticeMinePickup,
-              NoticeRequest.keep => KApp.noticeMineKeep,
+              NoticeRequest.pickup => childName == null
+                  ? KApp.noticeMinePickup
+                  : KApp.noticeMinePickupNamed,
+              NoticeRequest.keep => childName == null
+                  ? KApp.noticeMineKeep
+                  : KApp.noticeMineKeepNamed,
             },
             [
               noticeReasonClause(l, reason),
               noticeEtaClause(l, etaMinutes),
               noticeNoteSuffix(l, note),
+              childName ?? '',
             ],
           )
         : l.format(

@@ -279,8 +279,56 @@ void main() {
       expect(ds.signUps.single['role'], 'mother');
       expect(ds.signUps.single['familyName'], 'Souza');
       expect(ds.signUps.single['language'], AppLanguage.ptBrCode);
+      // U-61: the child's name is optional — nothing typed, nothing sent.
+      expect(ds.signUps.single['childFirstName'], isNull);
       expect(find.text(l[K.registerConfirmEmailTitle]), findsOne);
       expect(find.textContaining('ana@example.com'), findsOne);
+    });
+
+    testWidgets('U-61: the child\'s first name is offered on step 2, optional, '
+        'and travels trimmed with the sign-up', (tester) async {
+      final ds = source();
+      await pumpRegister(tester, dataSource: ds);
+      await goToFamilyStep(tester);
+
+      final field = find.widgetWithText(TextField, l[KApp.registerChildName]);
+      expect(field, findsOne);
+      expect(find.text(l[KApp.registerChildNameHint]), findsOne);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
+      await tester.enterText(field, '  Sofia  ');
+      await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
+      await acceptTerms(tester);
+      await tapVisible(tester, submitButton(l));
+      await tester.pumpAndSettle();
+
+      expect(ds.signUps, hasLength(1));
+      expect(ds.signUps.single['childFirstName'], 'Sofia');
+    });
+
+    testWidgets("U-61: the field caps the name at the server's 40 characters "
+        '— nothing longer can even be typed', (tester) async {
+      // `ChildRules.validateName` stays as the guard behind the field; the
+      // field itself (maxLength) is what keeps a 41st character out, so the
+      // sentence the RPC would answer is never needed here.
+      final ds = source();
+      await pumpRegister(tester, dataSource: ds);
+      await goToFamilyStep(tester);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
+      await tester.enterText(
+          find.widgetWithText(TextField, l[KApp.registerChildName]),
+          'A' * (ChildRules.maxNameLength + 1));
+      await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
+      await acceptTerms(tester);
+      await tapVisible(tester, submitButton(l));
+      await tester.pumpAndSettle();
+
+      expect(ds.signUps, hasLength(1));
+      expect((ds.signUps.single['childFirstName'] as String).length,
+          ChildRules.maxNameLength);
     });
 
     testWidgets('F-87: the confirm screen tells about spam and lets a '

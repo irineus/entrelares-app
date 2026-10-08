@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_app/screens/calendar_screen.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
@@ -297,6 +298,33 @@ void main() {
       expect(ds.stamps, contains(OnboardingStamp.tourSeen));
       // The hand-off: a first-run tour ends on the checklist, not on nothing.
       expect(find.text(l[K.onbChecklistIntro]), findsOne);
+    });
+
+    testWidgets('U-61: with exactly one child the first stop says the name',
+        (tester) async {
+      final ds = source()
+        ..publicSettings = const {'feature.child_agenda': 'true'}
+        ..children = const [
+          Child(id: 1, familyId: 7, firstName: 'Sofia', sortOrder: 0),
+        ];
+      await pumpCalendar(tester, ds, tourKeys: TourKeys());
+
+      expect(find.text(l.format(KApp.tourTodayTitleNamed, ['Sofia'])),
+          findsOne);
+      expect(find.text(l[K.tourTodayTitle]), findsNothing);
+    });
+
+    testWidgets('U-61: two children keep "a criança" — the lane decides, not '
+        'the tour', (tester) async {
+      final ds = source()
+        ..publicSettings = const {'feature.child_agenda': 'true'}
+        ..children = const [
+          Child(id: 1, familyId: 7, firstName: 'Sofia', sortOrder: 0),
+          Child(id: 2, familyId: 7, firstName: 'Theo', sortOrder: 1),
+        ];
+      await pumpCalendar(tester, ds, tourKeys: TourKeys());
+
+      expect(find.text(l[K.tourTodayTitle]), findsOne);
     });
 
     testWidgets('does NOT run for someone who already saw it', (tester) async {

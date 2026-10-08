@@ -268,9 +268,13 @@ Future<void> showHowSwapsWork(BuildContext context) =>
 /// Answers whether the reader reached "Concluir" (true) or left through
 /// "Pular" or the barrier (false) — U-61 counts the two apart (`tour-ended`),
 /// because a tour everybody skips is a tour to shorten.
+///
+/// [childName] (U-61): with exactly one child the first stop says the name
+/// ("Quem está com a Sofia hoje"); null keeps "a criança".
 Future<bool> showGuidedTour({
   required BuildContext context,
   required TourKeys keys,
+  String? childName,
 }) async =>
     (await showDialog<bool>(
       context: context,
@@ -282,14 +286,15 @@ Future<bool> showGuidedTour({
       // (the legend spotlight lit the weekday row). The overlay must cover
       // the whole screen so the two coordinate spaces agree.
       useSafeArea: false,
-      builder: (context) => _GuidedTour(keys: keys),
+      builder: (context) => _GuidedTour(keys: keys, childName: childName),
     )) ??
     false;
 
 class _GuidedTour extends StatefulWidget {
   final TourKeys keys;
+  final String? childName;
 
-  const _GuidedTour({required this.keys});
+  const _GuidedTour({required this.keys, this.childName});
 
   @override
   State<_GuidedTour> createState() => _GuidedTourState();
@@ -354,7 +359,13 @@ class _GuidedTourState extends State<_GuidedTour> {
                     Text(l.format(K.tourProgress, [_index + 1, TourSteps.count]),
                         style: theme.textTheme.bodySmall),
                     const SizedBox(height: 8),
-                    Text(l[step.titleKey], style: theme.textTheme.titleMedium),
+                    Text(
+                        step.target == TourTarget.todayCard &&
+                                widget.childName != null
+                            ? l.format(
+                                KApp.tourTodayTitleNamed, [widget.childName!])
+                            : l[step.titleKey],
+                        style: theme.textTheme.titleMedium),
                     const SizedBox(height: 8),
                     Text(l[step.bodyKey], style: theme.textTheme.bodyMedium),
                     const SizedBox(height: 16),
