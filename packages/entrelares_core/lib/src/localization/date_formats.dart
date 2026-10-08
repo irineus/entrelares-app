@@ -25,6 +25,8 @@
 /// and it died with the cutover.)
 library;
 
+import '../family_time.dart';
+import 'k_app.dart';
 import 'localization.dart';
 
 const _enMonthsAbbrev = [
@@ -140,9 +142,6 @@ extension DateFormats on Localization {
       ? _enWeekdaysAbbrev[weekday - 1]
       : _ptWeekdaysAbbrev[weekday - 1];
 
-  /// The Today card's date line, mirroring `TodayCard.razor`'s
-  /// `"dddd, dd 'de' MMMM"` pt-BR / `"dddd, MMMM d"` en-US:
-  /// `quarta-feira, 19 de agosto` · `Wednesday, August 19`.
   /// U-63 — a DEADLINE, as a person says it: `sábado, 10/10, à 0h` /
   /// `domingo, 11/10, às 18h30` · `Saturday, 10 Oct, at 12 AM` /
   /// `Sunday, 11 Oct, at 6:30 PM`. "10/10/2026 00:00" was a timestamp, and
@@ -164,6 +163,20 @@ extension DateFormats on Localization {
         '${_two(moment.month)}, $prep $time';
   }
 
+  /// T-105 — a deadline on the FAMILY's clock (America/Sao_Paulo, where the
+  /// server decides it), with "(horário de Brasília)" when this device reads
+  /// another clock — a parent in Manaus is otherwise an hour off without
+  /// knowing it. [deviceDiffers] defaults to this device ([FamilyTime]).
+  String formatFamilyDeadline(DateTime moment, {bool? deviceDiffers}) {
+    final base = formatDeadline(moment);
+    return (deviceDiffers ?? FamilyTime.deviceDiffers())
+        ? '$base ${this[KApp.familyTimeSuffix]}'
+        : base;
+  }
+
+  /// The Today card's date line, mirroring `TodayCard.razor`'s
+  /// `"dddd, dd 'de' MMMM"` pt-BR / `"dddd, MMMM d"` en-US:
+  /// `quarta-feira, 19 de agosto` · `Wednesday, August 19`.
   String formatTodayHeading(DateTime date) => isEnglish
       ? '${_enWeekdaysFull[date.weekday - 1]}, '
           '${_enMonthsFull[date.month - 1]} ${date.day}'

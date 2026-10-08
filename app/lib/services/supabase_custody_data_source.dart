@@ -377,8 +377,8 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     final existing = await existingDates();
     onProgress?.call(20);
 
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    // T-105: the family's day — the server refuses past days by its clock.
+    final today = FamilyTime.today();
     final toInsert = [
       for (final d in days)
         // Past days are immutable; already-assigned days are kept.
@@ -632,7 +632,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     // Tag at this instant — only for the point-in-time notification title;
     // display badges stay dynamic (F-20).
     final creationTag = computePriorityTag(
-        schedule.scheduleDate, proposedHandoffTime, DateTime.now());
+        schedule.scheduleDate, proposedHandoffTime, FamilyTime.now());
 
     // Snapshot reference (F-26): the base schedule was just upserted by the
     // caller, so the newest audit log for this date holds the pre-edit
@@ -815,7 +815,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     }
 
     final creationTag =
-        computePriorityTag(scheduleDate, currentHandoffTime, DateTime.now());
+        computePriorityTag(scheduleDate, currentHandoffTime, FamilyTime.now());
 
     final now = _nowUtcIso();
     final inserted = await _client

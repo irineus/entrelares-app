@@ -378,7 +378,9 @@ class _CalendarScreenState extends State<CalendarScreen>
   bool _entitlementFailed = false;
   PublicSettings _settings = PublicSettings.unloaded;
 
-  DateTime get _today => DateTime.now();
+  // T-105: the family's clock (America/Sao_Paulo), the one the server's day
+  // rules read — not the device's.
+  DateTime get _today => FamilyTime.now();
 
   bool get _isPremiumForPaging => _entitlementFailed ||
       Family.isPremiumFamily(_family, DateTime.now().toUtc());
@@ -3750,7 +3752,7 @@ class _MonthGrid extends StatelessWidget {
     if (frozen == null) return null;
     final awaitingMe = frozen.targetProfileId == ownProfileId;
     final overdue =
-        frozen.toView().priorityTag(DateTime.now()) == SwapPriorityTag.overdue;
+        frozen.toView().priorityTag(FamilyTime.now()) == SwapPriorityTag.overdue;
     if (awaitingMe) {
       return _FrozenMark(
         badge: Icons.notifications_active,
@@ -3758,7 +3760,7 @@ class _MonthGrid extends StatelessWidget {
         // U-63: a day with no handoff time is not "late" at 00:01.
         label: l[!overdue
             ? K.calAwaitingYou
-            : frozen.toView().dayStartedWithoutTime(DateTime.now())
+            : frozen.toView().dayStartedWithoutTime(FamilyTime.now())
                 ? KApp.calDayStartedAwaitingYou
                 : K.calOverdueAwaitingYou],
       );

@@ -343,7 +343,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         try {
           notices = [
             for (final n in await widget.dataSource
-                .fetchDayNotices(DateTime.now()))
+                .fetchDayNotices(FamilyTime.now()))
               if (n.isOpen &&
                   n.senderProfileId != me.id &&
                   NoticeRequest.fromWire(n.request) != null &&
@@ -847,7 +847,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (_incoming.isEmpty && _openNotices.isEmpty) {
       return _empty(Icons.task_alt, K.notifEmptyIncoming, l);
     }
-    final now = DateTime.now();
+    final now = FamilyTime.now();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
@@ -1021,7 +1021,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           l.format(KApp.swapRowMessage, [requester, message]),
         // F-60: a request waiting on YOU says when it stops waiting.
         '${l[K.frozenAutoApproval]}: '
-            '${l.formatDeadline(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
+            '${l.formatFamilyDeadline(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
       ],
       onTap: canAnswer ? null : () => _openRequest(req),
       actions: !canAnswer
@@ -1054,7 +1054,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Widget _sentTab(Localization l) {
     if (_sent.isEmpty) return _empty(Icons.outbox_outlined, K.notifEmptySent, l);
-    final now = DateTime.now();
+    final now = FamilyTime.now();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
@@ -1104,7 +1104,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         // do arithmetic on a window that was never measured from here.
         if (isPending)
           '${l[K.frozenAutoApproval]}: '
-              '${l.formatDeadline(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
+              '${l.formatFamilyDeadline(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
         // F-44 on a RESOLVED request: the sheet never opens for it again, so
         // the two messages live on the row — the sender's own and the
         // approver's note or rejection reason. A pending one shows them in
@@ -1351,7 +1351,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final onPlanFrom = widget.onPlanFrom;
     if (onPlanFrom == null || _ownProfile?.isViewer == true) return null;
     final start =
-        PlanEndRules.actionStart(notif.type, notif.paramsJson, DateTime.now());
+        PlanEndRules.actionStart(notif.type, notif.paramsJson, FamilyTime.now());
     if (start == null) return null;
     return Align(
       alignment: AlignmentDirectional.centerStart,
