@@ -97,6 +97,11 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
   bool _socketConnected = false;
   Timer? _changeDebounce;
   Timer? _pollTimer;
+
+  /// U-66: the text a jump landed on, tinted for a moment so the eye finds
+  /// it among its neighbours.
+  int? _highlightId;
+  Timer? _highlightTimer;
   ValueListenable<TickerModeData>? _activeBranch;
 
   @override
@@ -199,6 +204,7 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
     _unwatch?.call();
     _changeDebounce?.cancel();
     _pollTimer?.cancel();
+    _highlightTimer?.cancel();
     _search.dispose();
     _composer.dispose();
     _scroll.dispose();
@@ -403,6 +409,64 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
     });
   }
 
+  /// U-66 (T-103 audit) — a lawyer asks what was said AFTER the school-fee
+  /// text in March: search found it in isolation and a tap did nothing. A
+  /// jump clears the filter, loads older pages until the text is in (bounded),
+  /// and moves the thread's CENTER (T-104's anchor) to it, so it opens at the
+  /// top of the viewport with what came after it below — without estimating
+  /// the height of a lazy list. Then a brief tint.
+  Future<void> _jumpTo(int id) async {
+    var pages = 0;
+    while (!_messages.any((m) => m.id == id) && _hasOlder && pages++ < 50) {
+      await _loadOlder();
+      if (!mounted) return;
+    }
+    if (!_messages.any((m) => m.id == id)) return;
+    _highlightTimer?.cancel();
+    setState(() {
+      _query = null;
+      _search.clear();
+      _anchorId = id;
+      _highlightId = id;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients) return;
+      final p = _scroll.position;
+      _scroll.jumpTo(0.0.clamp(p.minScrollExtent, p.maxScrollExtent));
+    });
+    _highlightTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _highlightId = null);
+    });
+  }
+
+  /// U-66 — "Ir para a data": the first text on or after the chosen day
+  /// (older pages loaded as needed); past the last text, the last one.
+  Future<void> _goToDate(Localization l) async {
+    final now = widget.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: today,
+      firstDate: DateTime(2020),
+      lastDate: today,
+      helpText: l[KApp.chatGoToDate],
+    );
+    if (picked == null || !mounted) return;
+    var pages = 0;
+    while (_hasOlder &&
+        _messages.isNotEmpty &&
+        !_messages.first.createdAt.toLocal().isBefore(picked) &&
+        pages++ < 50) {
+      await _loadOlder();
+      if (!mounted) return;
+    }
+    if (_messages.isEmpty) return;
+    final target = _messages.firstWhere(
+        (m) => !m.createdAt.toLocal().isBefore(picked),
+        orElse: () => _messages.last);
+    await _jumpTo(target.id);
+  }
+
   bool get _canWrite {
     final me = _me;
     if (me == null || me.isViewer || me.hasLeft) return false;
@@ -543,6 +607,13 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
                         onChanged: (v) => setState(() => _query = v),
                       ),
               ),
+              if (_query != null)
+                IconButton(
+                  key: const ValueKey('chat-go-to-date'),
+                  icon: const Icon(Icons.event_outlined),
+                  tooltip: l[KApp.chatGoToDate],
+                  onPressed: () => _goToDate(l),
+                ),
               IconButton(
                 key: const ValueKey('chat-search'),
                 icon: Icon(_query == null ? Icons.search : Icons.close),
@@ -741,7 +812,11 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
         constraints: const BoxConstraints(maxWidth: 520),
         child: Card(
           key: ValueKey('chat-message-${m.id}'),
-          color: mine ? tokens.accent.container : null,
+          color: m.id == _highlightId
+              ? tokens.warning.container
+              : mine
+                  ? tokens.accent.container
+                  : null,
           margin: const EdgeInsets.symmetric(vertical: Spacing.xs),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
@@ -767,25 +842,38 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
                   ],
                 ),
                 if (quoted != null)
-                  Container(
-                    key: ValueKey('chat-quote-${m.id}'),
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(right: 8, bottom: 4),
-                    padding: const EdgeInsets.all(Spacing.sm),
-                    decoration: BoxDecoration(
-                      border: BorderDirectional(
-                          start: BorderSide(
-                              color: tokens.outline, width: 3)),
-                    ),
-                    child: Text(
-                      '${_name(quoted.authorProfileId, l)}: '
-                      '${ChatRules.snippet(quoted.body)}',
-                      style: textTheme.bodySmall,
+                  // U-66: the quote is a way to the text it quotes.
+                  Semantics(
+                    button: true,
+                    hint: l[KApp.chatOpenQuoted],
+                    child: InkWell(
+                      key: ValueKey('chat-quote-${m.id}'),
+                      onTap: () => _jumpTo(quoted.id),
+                      child: Container(
+                        width: double.infinity,
+                        constraints: const BoxConstraints(minHeight: 48),
+                        margin: const EdgeInsets.only(right: 8, bottom: 4),
+                        padding: const EdgeInsets.all(Spacing.sm),
+                        decoration: BoxDecoration(
+                          border: BorderDirectional(
+                              start: BorderSide(
+                                  color: tokens.outline, width: 3)),
+                        ),
+                        child: Text(
+                          '${_name(quoted.authorProfileId, l)}: '
+                          '${ChatRules.snippet(quoted.body)}',
+                          style: textTheme.bodySmall,
+                        ),
+                      ),
                     ),
                   ),
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: SelectableText(m.body),
+                  // U-66: still selectable (a parent copies what was said),
+                  // but no longer a 20 dp unlabelled tap target — the U-32
+                  // walk found SelectableText's own node the first time a
+                  // scene carried texts.
+                  child: SelectionArea(child: Text(m.body)),
                 ),
                 if (m.quotedDay != null)
                   Padding(
@@ -807,6 +895,18 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
                       style: textTheme.bodySmall
                           ?.copyWith(color: tokens.textMuted)),
                 ),
+                // U-66: a search result leads back into the thread, where
+                // what was said around it is.
+                if (_searching)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      key: ValueKey('chat-show-${m.id}'),
+                      icon: const Icon(Icons.forum_outlined, size: 18),
+                      label: Text(l[KApp.chatShowInThread]),
+                      onPressed: () => _jumpTo(m.id),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -905,6 +1005,9 @@ class _ChatViewState extends State<ChatView> with WidgetsBindingObserver {
                   child: AppTextField(
                     key: const ValueKey('chat-composer'),
                     label: l[KApp.chatHint],
+                    // U-66: the opening notice scrolls away once the thread
+                    // has history; the permanence is said where one writes.
+                    helper: l[KApp.chatComposerPermanent],
                     controller: _composer,
                     // One line that grows to five as the text wraps: fixed at
                     // five, the field alone filled a phone's space above the
