@@ -824,6 +824,14 @@ abstract final class StringsPtBr {
     // (U-13). Names no family; "um mês" is the reward's unit, not a setting.
     K.notifRenderTitleReferralReward: 'Um mês de Premium pela indicação',
     K.notifRenderReferralReward: 'Uma família que vocês indicaram assinou o Premium: a sua família ganhou um mês de Premium.',
+    K.notifRenderTitlePremiumRequest: 'Pedido de Premium',
+    K.notifRenderPremiumRequest: '{0} quer o Premium para {1}.',
+    K.notifRenderPremiumGateChat: 'escrever na Conversa',
+    K.notifRenderPremiumGateChatExport: 'exportar a Conversa em PDF',
+    K.notifRenderPremiumGateAgenda: "a agenda da criança",
+    K.notifRenderPremiumGateExpenses: 'as despesas',
+    K.notifRenderPremiumGatePdf: 'o relatório em PDF',
+    K.notifRenderPremiumGateFamily: 'a família',
     // F-81: byte-identical to what flush_admin_change_notices() stores (U-13).
     // {0} is the admin's own name; the count is a value, never a setting.
     K.notifRenderTitleDayAdminChangeSingle: 'Dia alterado no calendário',

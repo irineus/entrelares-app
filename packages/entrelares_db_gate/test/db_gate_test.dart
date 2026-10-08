@@ -8,6 +8,7 @@ import 'suites/account_deletion.dart';
 import 'suites/acquisition_source.dart';
 import 'suites/signup_child.dart';
 import 'suites/invitation_expiry.dart';
+import 'suites/premium_request.dart';
 import 'suites/admin_change_notice.dart';
 import 'suites/admin_override_tier.dart';
 import 'suites/admin_rpc.dart';
@@ -237,6 +238,8 @@ void main() {
   signupChildTests(fx);
   // F-101: the inviting admin is told once when an invitation expires.
   invitationExpiryTests(fx);
+  // F-102: a member's ask for Premium — to the admins, once a day.
+  premiumRequestTests(fx);
   // F-80: family referral — dark by flag, an opaque code, first touch wins,
   // and nothing a client can read.
   referralTests(fx);

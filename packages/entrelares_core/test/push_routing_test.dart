@@ -88,6 +88,11 @@ void main() {
           NotificationLanding.plan);
     });
 
+    test('a member\'s ask for Premium opens the plan page (F-102)', () {
+      expect(PushRouting.landingFor('premium_request', kind: 'ask'),
+          NotificationLanding.plan);
+    });
+
     test('an expired invitation opens the Família page (F-101)', () {
       expect(PushRouting.landingFor('invitation_expired', kind: 'expired'),
           NotificationLanding.family);

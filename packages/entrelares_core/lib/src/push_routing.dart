@@ -121,7 +121,11 @@ abstract final class PushRouting {
 
   /// F-77: the types that open the plan page.
   /// F-80 PR 3: the referral reward too — the new end shows there.
-  static const Set<String> planTypes = {'premium_trial', 'referral_reward'};
+  static const Set<String> planTypes = {'premium_trial', 'referral_reward',
+    // F-102: a member's ask for Premium — the plan page is where the
+    // admin answers it.
+    'premium_request',
+  };
   static const Set<String> _plan = planTypes;
 
   /// F-101: the types that open the Família page.

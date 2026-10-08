@@ -233,6 +233,13 @@ abstract final class KApp {
   static const String famShareAgain = 'app.fam.shareAgain';
   static const String famInviteEmailTaken = 'app.fam.inviteEmailTaken';
   static const String registerMigrationOtherEmail = 'app.register.migrationOtherEmail';
+  /// F-102: the plan page for a member who is not an admin — who can
+  /// subscribe, by name, and the one thing they can do about it.
+  static const String premAdminNamedOne = 'app.prem.adminNamedOne';
+  static const String premAdminNamedMany = 'app.prem.adminNamedMany';
+  static const String premAskAdmin = 'app.prem.askAdmin';
+  static const String premAskAdmins = 'app.prem.askAdmins';
+  static const String premAskAdminSent = 'app.prem.askAdminSent';
 
   // ── F-56 pending member (invited, not yet joined) ──
   static const String famPendingBadge = 'app.fam.pendingBadge';
@@ -1090,6 +1097,11 @@ abstract final class KApp {
     famShareAgain,
     famInviteEmailTaken,
     registerMigrationOtherEmail,
+    premAdminNamedOne,
+    premAdminNamedMany,
+    premAskAdmin,
+    premAskAdmins,
+    premAskAdminSent,
     famPendingBadge,
     famPendingHint,
     famInviteName,
@@ -1904,6 +1916,11 @@ abstract final class StringsAppPtBr {
     KApp.registerMigrationOtherEmail:
         'Para manter as duas famílias, peça um convite para outro e-mail em '
             'vez de apagar este cadastro.',
+    KApp.premAdminNamedOne: '{0} pode assinar o Premium pela família.',
+    KApp.premAdminNamedMany: '{0} podem assinar o Premium pela família.',
+    KApp.premAskAdmin: 'Pedir ao administrador',
+    KApp.premAskAdmins: 'Pedir aos administradores',
+    KApp.premAskAdminSent: 'Pedido enviado para {0}.',
     KApp.famPendingBadge: 'Ainda não entrou',
     KApp.famPendingHint:
         'Sem conta ainda: você planeja os dias dessa pessoa, e as trocas '
@@ -2806,6 +2823,11 @@ abstract final class StringsAppEn {
     KApp.registerMigrationOtherEmail:
         'To keep both families, ask for an invitation to another e-mail '
             'instead of deleting this registration.',
+    KApp.premAdminNamedOne: '{0} can take out Premium for the family.',
+    KApp.premAdminNamedMany: '{0} can take out Premium for the family.',
+    KApp.premAskAdmin: 'Ask the administrator',
+    KApp.premAskAdmins: 'Ask the administrators',
+    KApp.premAskAdminSent: 'Request sent to {0}.',
     KApp.famPendingBadge: 'Not joined yet',
     KApp.famPendingHint:
         'No account yet: you plan this person\'s days, and swaps become '

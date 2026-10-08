@@ -886,6 +886,13 @@ abstract class CustodyDataSource {
   /// debt is not open or inside `expenses.reminder_cooldown_hours`.
   Future<void> remindSettlement({int? childId, required int toProfileId});
 
+  /// F-102: a member who is not an admin tells the family's admins they
+  /// want Premium (`request_premium_from_admin`): push + in-app to each
+  /// live admin, once per requester per day — the server judges. [gate] is
+  /// the F-79 token of the gate met, or `premium`. Returns how many admins
+  /// were told; a refusal is the RPC's own PT-BR sentence.
+  Future<int> requestPremiumFromAdmin({required String gate});
+
   /// Listens for expense, share and settle-up changes, so both phones see a
   /// payment and its confirmation as they happen (owner's validation,
   /// 25/09/2026). [onStatus] as in [watchChanges].

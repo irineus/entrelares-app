@@ -111,6 +111,12 @@ export const PUSH_TYPES: readonly string[] = [
 	// rendered before the date guard. Lands on Família, where "Compartilhar de
 	// novo" makes a new link. Never e-mail (F-59).
 	"invitation_expired",
+	// F-102. A member who is not an admin met a Premium gate and asked: "Bruno
+	// quer o Premium para a agenda da criança" — to the family's admins, at most
+	// once per requester per day (the RPC's guard). States no day, so it is
+	// rendered before the date guard. Lands on the plan page, where the
+	// subscribe button is. Never e-mail (F-59).
+	"premium_request",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -223,6 +229,14 @@ const K = {
 	trialEnded: "notifRender.trialEnded",
 	titleReferralReward: "notifRender.title.referralReward",
 	referralReward: "notifRender.referralReward",
+	titlePremiumRequest: "notifRender.title.premiumRequest",
+	premiumRequest: "notifRender.premiumRequest",
+	premiumGateChat: "notifRender.premiumGate.chat",
+	premiumGateChatExport: "notifRender.premiumGate.chatExport",
+	premiumGateAgenda: "notifRender.premiumGate.agenda",
+	premiumGateExpenses: "notifRender.premiumGate.expenses",
+	premiumGatePdf: "notifRender.premiumGate.pdf",
+	premiumGateFamily: "notifRender.premiumGate.family",
 	titleDayAdminChangeSingle: "notifRender.title.dayAdminChange.single",
 	titleDayAdminChangeBatch: "notifRender.title.dayAdminChange.batch",
 	dayAdminChangeSingle: "notifRender.dayAdminChange.single",
@@ -313,6 +327,14 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.trialEnded": "A avaliação Premium da família terminou em {0}. A família segue no plano gratuito, e o Premium pode ser assinado a qualquer momento.",
 		"notifRender.title.referralReward": "Um mês de Premium pela indicação",
 		"notifRender.referralReward": "Uma família que vocês indicaram assinou o Premium: a sua família ganhou um mês de Premium.",
+		"notifRender.title.premiumRequest": "Pedido de Premium",
+		"notifRender.premiumRequest": "{0} quer o Premium para {1}.",
+		"notifRender.premiumGate.chat": "escrever na Conversa",
+		"notifRender.premiumGate.chatExport": "exportar a Conversa em PDF",
+		"notifRender.premiumGate.agenda": "a agenda da criança",
+		"notifRender.premiumGate.expenses": "as despesas",
+		"notifRender.premiumGate.pdf": "o relatório em PDF",
+		"notifRender.premiumGate.family": "a família",
 		"notifRender.title.dayAdminChange.single": "Dia alterado no calendário",
 		"notifRender.title.dayAdminChange.batch": "Dias alterados no calendário",
 		"notifRender.dayAdminChange.single": "{0} alterou o dia {1} no calendário.",
@@ -432,6 +454,14 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.trialEnded": "Your family's Premium trial ended on {0}. The family stays on the free plan, and Premium can be subscribed at any time.",
 		"notifRender.title.referralReward": "A month of Premium for your referral",
 		"notifRender.referralReward": "A family you referred subscribed to Premium: your family got one month of Premium.",
+		"notifRender.title.premiumRequest": "Premium request",
+		"notifRender.premiumRequest": "{0} wants Premium for {1}.",
+		"notifRender.premiumGate.chat": "writing in the chat",
+		"notifRender.premiumGate.chatExport": "exporting the chat as PDF",
+		"notifRender.premiumGate.agenda": "the child's agenda",
+		"notifRender.premiumGate.expenses": "the expenses",
+		"notifRender.premiumGate.pdf": "the PDF report",
+		"notifRender.premiumGate.family": "the family",
 		"notifRender.title.dayAdminChange.single": "Day changed on the calendar",
 		"notifRender.title.dayAdminChange.batch": "Days changed on the calendar",
 		"notifRender.dayAdminChange.single": "{0} changed {1} on the calendar.",
@@ -620,6 +650,24 @@ export function renderPush(
 	if (type === "referral_reward") {
 		if (params["kind"] !== "granted") return null;
 		return { title: fmt(lang, K.titleReferralReward), body: fmt(lang, K.referralReward) };
+	}
+
+	// F-102: a member asked the admins for Premium. States no day; `gate` is the
+	// F-79 token, rendered through a closed map — an unknown one reads as the
+	// generic words, never a hole.
+	if (type === "premium_request") {
+		if (params["kind"] !== "ask" || params["name"] === undefined) return null;
+		const gate = params["gate"];
+		const gateKey = gate === "chat" ? K.premiumGateChat
+			: gate === "chat-export" ? K.premiumGateChatExport
+			: gate === "agenda" ? K.premiumGateAgenda
+			: gate === "expenses" ? K.premiumGateExpenses
+			: gate === "pdf" ? K.premiumGatePdf
+			: K.premiumGateFamily;
+		return {
+			title: fmt(lang, K.titlePremiumRequest),
+			body: fmt(lang, K.premiumRequest, [params["name"], fmt(lang, gateKey)]),
+		};
 	}
 
 	const isoDate = params["date"];

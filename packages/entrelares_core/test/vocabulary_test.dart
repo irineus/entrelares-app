@@ -167,6 +167,8 @@ void main() {
     // F-55 PR 4: the notice and the reminder name the agenda too.
     'notifRender.agenda',
     'notifRender.title.agenda',
+    // F-102: a member's ask for Premium names the gate it met — the agenda.
+    'notifRender.premiumGate.agenda',
     // F-50: the viewer is told it reads the agenda.
     'app.viewer.',
   ];

@@ -122,7 +122,8 @@ const CHAT_TYPES = ['chat_message'];
 // F-77: a notice about the Premium trial's end opens the plan page, where the
 // subscribe button is.
 // F-80 PR 3: so does the referral reward — the new end shows there.
-const PLAN_TYPES = ['premium_trial', 'referral_reward'];
+// F-102: a member's ask for Premium lands there too.
+const PLAN_TYPES = ['premium_trial', 'referral_reward', 'premium_request'];
 // F-101: the invitation the reader sent expired — the Família page is where
 // "Compartilhar de novo" makes a new link.
 const FAMILY_TYPES = ['invitation_expired'];

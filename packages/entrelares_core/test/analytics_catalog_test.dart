@@ -26,7 +26,8 @@ void main() {
         'invitee-welcome-view', 'checklist-action', 'tour-ended',
         'plan-nudge-click', 'review-prompt-requested',
         'preference-changed', 'support-contact-sent', 'premium-gate-click',
-        'premium-paywall-view', 'premium-interest', 'premium-checkout-start',
+        'premium-paywall-view', 'premium-ask-admin', 'premium-interest',
+        'premium-checkout-start',
         'premium-checkout-return', 'premium-checkout-outcome',
         'premium-cancel', 'premium-reactivate',
       });
