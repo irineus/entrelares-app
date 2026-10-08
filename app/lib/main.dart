@@ -731,6 +731,16 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                         // Histórico when it was several.
                         onOpenDay: _openDay,
                         onOpenAuditTrail: (id) => _openAuditTrail('$id'),
+                        // U-65: "Abrir a Conversa" — the Comunicação's own
+                        // tab, re-applied by a fresh nonce.
+                        onOpenChat: embedded
+                            ? () => _router.go(Uri(
+                                  path: '/notifications',
+                                  queryParameters: {
+                                    'tab': 'chat',
+                                    'n': '${DateTime.now().millisecondsSinceEpoch}',
+                                  }).toString())
+                            : null,
                         onApprovalSeen: () =>
                             unawaited(_reviewPrompt.approvalSeen()),
                         embedded: embedded,
@@ -1062,6 +1072,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         _router.go('/family');
         return;
       }
+      // U-65: a settle-up to confirm, its reminder or an expense — Despesas,
+      // where the answer is, not a row in "Todas" with a second tap.
+      if (landing == NotificationLanding.expenses) {
+        _router.go('/expenses');
+        return;
+      }
       // F-78: a family that never planned is taken to the wizard on today.
       if (landing == NotificationLanding.planFirst) {
         _openWizardOnToday();
@@ -1069,7 +1085,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       }
       // F-81: an admin changed one of my days — that day; several — the
       // Histórico. A `single` with no real day falls to "Todas" below, the
-      // same fallback the web worker takes.
+      // same fallback the web worker takes. U-65: an agenda notice or
+      // reminder opens its day the same way.
       if (landing == NotificationLanding.day) {
         final day = AdminChangeRules.parseIsoDay(data['date']);
         if (day != null) {
@@ -1091,6 +1108,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           NotificationLanding.day => 'history',
           NotificationLanding.auditTrail => 'history',
           NotificationLanding.family => 'history',
+          NotificationLanding.expenses => 'history',
         },
         if ((data['notificationId'] ?? '').isNotEmpty)
           'n': data['notificationId']!,
@@ -1231,6 +1249,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _activity.reset();
       _idleTimeout = InactivityPolicy.timeout;
       _expensesTab.value = false;
+      _badge.expensesOn = false;
       _chatTab.value = false;
       _badge.chatOn = false;
       _purchases?.deactivate();
@@ -1529,6 +1548,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       final me = await _dataSource.fetchOwnProfile();
       if (_phase == _AuthPhase.authed) {
         _expensesTab.value = me != null && !me.isViewer;
+        // U-65: the tab's badge counts the settle-ups waiting for me.
+        _badge.expensesOn = _expensesTab.value;
+        if (_badge.expensesOn) unawaited(_badge.refresh());
       }
     } catch (_) {/* the tab stays hidden */}
   }

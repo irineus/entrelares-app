@@ -802,6 +802,18 @@ abstract final class KApp {
   static const String expenseChangeUpdated = 'app.expense.changeUpdated';
   static const String expenseChangeDeleted = 'app.expense.changeDeleted';
   static const String expenseOpen = 'app.expense.open';
+
+  /// U-65: Conversa rows left "Todas" (one per text flooded the newest 100);
+  /// one line at the top says how many are unread and opens the Conversa.
+  static const String notifChatUnreadOne = 'app.notif.chatUnread.one';
+  static const String notifChatUnreadMany = 'app.notif.chatUnread.many';
+  static const String notifOpenChat = 'app.notif.openChat';
+
+  /// U-65: an agenda row's way into its day.
+  static const String notifAgendaSeeDay = 'app.notif.agenda.seeDay';
+
+  /// U-65: the Despesas tab's badge, read out — settle-ups waiting for me.
+  static const String expenseNavPending = 'app.expense.navPending';
   static const String expenseFormerMember = 'app.expense.formerMember';
   static const String expensePdfSection = 'app.expense.pdfSection';
   static const String expensePdfLead = 'app.expense.pdfLead';
@@ -1566,6 +1578,11 @@ abstract final class KApp {
     expenseChangeUpdated,
     expenseChangeDeleted,
     expenseOpen,
+    notifChatUnreadOne,
+    notifChatUnreadMany,
+    notifOpenChat,
+    notifAgendaSeeDay,
+    expenseNavPending,
     expenseFormerMember,
     expensePdfSection,
     expensePdfLead,
@@ -2482,6 +2499,11 @@ abstract final class StringsAppPtBr {
     KApp.expenseChangeUpdated: '{0} alterou em {1}',
     KApp.expenseChangeDeleted: '{0} apagou em {1}',
     KApp.expenseOpen: 'Abrir Despesas',
+    KApp.notifChatUnreadOne: '1 mensagem nova na Conversa',
+    KApp.notifChatUnreadMany: '{0} mensagens novas na Conversa',
+    KApp.notifOpenChat: 'Abrir a Conversa',
+    KApp.notifAgendaSeeDay: 'Ver o dia',
+    KApp.expenseNavPending: '{0}, pagamentos para confirmar: {1}',
     KApp.expenseFormerMember: 'Ex-membro',
     KApp.expensePdfSection: '{0}. Despesas',
     KApp.expensePdfLead: 'O que a família lançou como despesa da criança no período, quem pagou e a parte de cada um. Um pagamento entre responsáveis só entra no saldo depois que quem recebeu confirmou; os não confirmados ficam listados à parte.',
@@ -3391,6 +3413,11 @@ abstract final class StringsAppEn {
     KApp.expenseChangeUpdated: '{0} changed it on {1}',
     KApp.expenseChangeDeleted: '{0} deleted it on {1}',
     KApp.expenseOpen: 'Open Expenses',
+    KApp.notifChatUnreadOne: '1 new message in the Chat',
+    KApp.notifChatUnreadMany: '{0} new messages in the Chat',
+    KApp.notifOpenChat: 'Open the Chat',
+    KApp.notifAgendaSeeDay: 'See the day',
+    KApp.expenseNavPending: '{0}, payments to confirm: {1}',
     KApp.expenseFormerMember: 'Former member',
     KApp.expensePdfSection: '{0}. Expenses',
     KApp.expensePdfLead: 'What the family added as the child\'s expenses in the period, who paid and each one\'s share. A payment between caregivers enters the balance only after the receiver confirmed it; the unconfirmed ones are listed apart.',

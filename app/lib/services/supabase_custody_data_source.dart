@@ -1102,10 +1102,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   @override
   Future<List<AppNotification>> fetchNotifications(int myProfileId) async {
     // Newest 100 — the history tab is a recent-activity view (web parity).
+    // U-65: without the Conversa's rows — one per text, so a 60-text argument
+    // pushed yesterday's approval out of the newest 100. The Conversa has its
+    // own counter, and "Todas" one line pointing at it.
     final rows = await _client
         .from('notifications')
         .select()
         .eq('recipient_profile_id', myProfileId)
+        .not('type', 'in', '(${PushRouting.chatTypes.join(',')})')
         .order('created_at', ascending: false)
         .limit(100);
     // F-55 PR 4: a "phone only" agenda row exists for the push to render

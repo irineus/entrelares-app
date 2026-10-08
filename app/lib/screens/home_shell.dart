@@ -362,8 +362,10 @@ class HomeShell extends StatelessWidget {
                 if (withExpenses)
                   NavigationDestination(
                       key: const ValueKey('nav-expenses'),
-                      icon: const Icon(Icons.receipt_long_outlined),
-                      selectedIcon: const Icon(Icons.receipt_long),
+                      icon: _expensesIcon(
+                          const Icon(Icons.receipt_long_outlined), l),
+                      selectedIcon:
+                          _expensesIcon(const Icon(Icons.receipt_long), l),
                       label: l[KApp.expenseNav]),
                 NavigationDestination(
                     icon: const Icon(Icons.bar_chart_outlined),
@@ -621,6 +623,24 @@ class HomeShell extends StatelessWidget {
             : l.format(KApp.chatNewMany, [badge.chatUnread]),
     ];
     return parts.isEmpty ? null : parts.join(', ');
+  }
+
+  /// U-65: settle-ups waiting for my "Recebi / Não recebi", on the tab where
+  /// the answer is — they used to be counted nowhere.
+  Widget _expensesIcon(Icon icon, Localization l) {
+    final n = badge.settlementsToConfirm;
+    return Semantics(
+      label: n > 0
+          ? l.format(KApp.expenseNavPending, [l[KApp.expenseNav], n])
+          : l[KApp.expenseNav],
+      excludeSemantics: true,
+      child: Badge(
+        key: const ValueKey('nav-expenses-badge'),
+        isLabelVisible: n > 0,
+        label: Text(bellBadgeText(n)),
+        child: icon,
+      ),
+    );
   }
 
   Widget _bellIcon(Icon icon, Localization l) => Semantics(

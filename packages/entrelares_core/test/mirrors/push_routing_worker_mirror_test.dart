@@ -64,6 +64,8 @@ void main() {
   late List<String> adminChangeTypesInJs;
   late List<String> adminChangeDayKindsInJs;
   late List<String> adminChangeTrailKindsInJs;
+  late List<String> expenseInJs;
+  late List<String> agendaInJs;
 
   setUp(() {
     worker = repoFile(_worker);
@@ -118,12 +120,27 @@ void main() {
       RegExp(r'const ADMIN_CHANGE_TRAIL_KINDS = \[([^\]]*)\]'),
       _worker,
     );
+    // U-65: Despesas, and the agenda's day.
+    expenseInJs = _stringList(
+      worker,
+      RegExp(r'const EXPENSE_TYPES = \[([^\]]*)\]'),
+      _worker,
+    );
+    agendaInJs = _stringList(
+      worker,
+      RegExp(r'const AGENDA_TYPES = \[([^\]]*)\]'),
+      _worker,
+    );
   });
 
   /// What the JS would decide for a payload, read from the worker's own lists.
   NotificationLanding jsLanding(String type, String? kind) =>
       chatInJs.contains(type)
           ? NotificationLanding.chat
+          : expenseInJs.contains(type)
+          ? NotificationLanding.expenses
+          : agendaInJs.contains(type)
+          ? NotificationLanding.day
           : planInJs.contains(type)
           ? NotificationLanding.plan
           : familyInJs.contains(type)
@@ -235,6 +252,11 @@ void main() {
     expect(worker, contains('/reports?tab=history'));
     // F-101: the Família page, for an expired invitation.
     expect(worker, contains("'/family'"));
+    // U-65: Despesas, the route main.dart declares.
+    expect(worker, contains("'/expenses'"));
+    expect(repoFile('app/lib/main.dart'), contains("path: '/expenses'"));
+    expect(PushRouting.expenseTypes.toSet(), expenseInJs.toSet());
+    expect(PushRouting.agendaTypes.toSet(), agendaInJs.toSet());
     final main = repoFile('app/lib/main.dart');
     expect(main, contains("queryParameters['day']"));
     expect(main, contains("'/reports'"));

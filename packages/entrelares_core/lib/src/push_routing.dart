@@ -16,6 +16,10 @@
 /// and every type it may push later.
 library;
 
+import 'dart:convert';
+
+import 'admin_change_rules.dart';
+
 /// The tab the Notificações screen should open on.
 enum NotificationLanding {
   /// "Para você" — there is something here for this person to DO.
@@ -53,6 +57,11 @@ enum NotificationLanding {
   /// expired, and the card there is where "Compartilhar de novo" makes a new
   /// link. The row stays in "Todas" with the same way in.
   family,
+
+  /// U-65 — Despesas (`/expenses`): "Pedro diz que pagou R$ 300 a você" asks
+  /// the reader to confirm, and the answer lives on the Despesas tab, not on
+  /// a row in "Todas" with a second "Abrir Despesas" to tap (T-103 audit).
+  expenses,
 }
 
 abstract final class PushRouting {
@@ -93,6 +102,10 @@ abstract final class PushRouting {
   static NotificationLanding landingFor(String? type, {String? kind}) =>
       _chat.contains(type)
           ? NotificationLanding.chat
+          : expenseTypes.contains(type)
+          ? NotificationLanding.expenses
+          : agendaTypes.contains(type)
+          ? NotificationLanding.day
           : _plan.contains(type)
               ? NotificationLanding.plan
               : familyTypes.contains(type)
@@ -117,7 +130,8 @@ abstract final class PushRouting {
   static const Set<String> adminChangeTrailKinds = {'batch'};
 
   /// F-35: the types that open the Conversa.
-  static const Set<String> _chat = {'chat_message'};
+  static const Set<String> chatTypes = {'chat_message'};
+  static const Set<String> _chat = chatTypes;
 
   /// F-77: the types that open the plan page.
   /// F-80 PR 3: the referral reward too — the new end shows there.
@@ -130,6 +144,35 @@ abstract final class PushRouting {
 
   /// F-101: the types that open the Família page.
   static const Set<String> familyTypes = {'invitation_expired'};
+
+  /// U-65: the types that open Despesas — an expense the reader takes part in
+  /// changed, a settle-up waits for the reader's confirmation, or the one who
+  /// is owed reminded them. `settlement_answered` is a receipt of the
+  /// reader's own settle-up and stays in "Todas".
+  static const Set<String> expenseTypes = {
+    'expense_changed',
+    'settlement_requested',
+    'settlement_reminder',
+  };
+
+  /// U-65: the agenda's notice and reminder open the calendar on the item's
+  /// day — the payload carries `date` (F-55's params). Without a real day the
+  /// tap falls to "Todas", the same fallback F-81's single change takes.
+  static const Set<String> agendaTypes = {'agenda_notice', 'agenda_reminder'};
+
+  /// U-65: an agenda row's day, read from its stored params — the same
+  /// `date` the push payload carries. Null for any other type or a row
+  /// whose params do not hold a real day: the row still renders, without
+  /// the way in.
+  static DateTime? agendaDayOf(String type, String? paramsJson) {
+    if (!agendaTypes.contains(type) || paramsJson == null) return null;
+    try {
+      final p = jsonDecode(paramsJson);
+      return p is Map ? AdminChangeRules.parseIsoDay(p['date']) : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   static NotificationLanding _landingForNotice(String? type, {String? kind}) =>
       _actionable.contains(type) ||
