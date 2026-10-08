@@ -749,6 +749,8 @@ abstract final class StringsEn {
     K.notifRenderTitleFamilyDeletionWithdrawn: 'Family deletion withdrawn',
     K.notifRenderTitleFamilyDeletionNear: 'Family deletion is near',
     K.notifRenderMemberJoined: '{0} joined the family. Check the calendar to include them in the planning.',
+    K.notifRenderTitleInvitationExpired: 'The invitation expired',
+    K.notifRenderInvitationExpired: '{0} did not answer the invitation and the link expired. Share it again — a WhatsApp link usually works best.',
     K.notifRenderMemberReturned: '{0} cancelled their departure and is back in the family.',
     K.notifRenderLeaveOther: '{0} left the family. That person\'s future days were freed — check the calendar and reassign whatever is needed.',
     K.notifRenderFamDelAgreed: '{0} agreed to delete the family.',

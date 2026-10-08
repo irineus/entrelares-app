@@ -846,6 +846,10 @@ abstract final class K {
   static const String notifRenderTitleFamilyDeletionWithdrawn = 'notifRender.title.familyDeletionWithdrawn';
   static const String notifRenderTitleFamilyDeletionNear = 'notifRender.title.familyDeletionNear';
   static const String notifRenderMemberJoined = 'notifRender.memberJoined';
+  /// F-101: the invitation the reader sent expired unanswered (`name` =
+  /// the placeholder's name or the address).
+  static const String notifRenderTitleInvitationExpired = 'notifRender.title.invitationExpired';
+  static const String notifRenderInvitationExpired = 'notifRender.invitationExpired';
   static const String notifRenderMemberReturned = 'notifRender.memberReturned';
   static const String notifRenderLeaveSelf = 'notifRender.leave.self';
   static const String notifRenderLeaveSelfLast = 'notifRender.leave.selfLast';
@@ -2031,6 +2035,8 @@ abstract final class K {
     notifRenderTitleFamilyDeletionNear,
     notifRenderMemberJoined,
     notifRenderMemberReturned,
+    notifRenderTitleInvitationExpired,
+    notifRenderInvitationExpired,
     notifRenderLeaveSelf,
     notifRenderLeaveSelfLast,
     notifRenderLeaveOther,

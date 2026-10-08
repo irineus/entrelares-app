@@ -48,6 +48,11 @@ enum NotificationLanding {
   /// days in one action, and the Histórico is where that action reads as one
   /// entry (F-51's fold) with every day in it.
   auditTrail,
+
+  /// F-101 — the Família page (`/family`): the invitation the reader sent
+  /// expired, and the card there is where "Compartilhar de novo" makes a new
+  /// link. The row stays in "Todas" with the same way in.
+  family,
 }
 
 abstract final class PushRouting {
@@ -90,6 +95,8 @@ abstract final class PushRouting {
           ? NotificationLanding.chat
           : _plan.contains(type)
               ? NotificationLanding.plan
+              : familyTypes.contains(type)
+              ? NotificationLanding.family
               : type == 'plan_ending' && planFirstKinds.contains(kind)
                   ? NotificationLanding.planFirst
                   : type == adminChangeType && adminChangeDayKinds.contains(kind)
@@ -116,6 +123,9 @@ abstract final class PushRouting {
   /// F-80 PR 3: the referral reward too — the new end shows there.
   static const Set<String> planTypes = {'premium_trial', 'referral_reward'};
   static const Set<String> _plan = planTypes;
+
+  /// F-101: the types that open the Família page.
+  static const Set<String> familyTypes = {'invitation_expired'};
 
   static NotificationLanding _landingForNotice(String? type, {String? kind}) =>
       _actionable.contains(type) ||

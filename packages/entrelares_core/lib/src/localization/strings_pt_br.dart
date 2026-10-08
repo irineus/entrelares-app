@@ -751,6 +751,8 @@ abstract final class StringsPtBr {
     K.notifRenderTitleFamilyDeletionWithdrawn: 'Exclusão da família retirada',
     K.notifRenderTitleFamilyDeletionNear: 'Exclusão da família se aproxima',
     K.notifRenderMemberJoined: '{0} juntou-se à família. Confira o calendário para incluí-lo no planejamento.',
+    K.notifRenderTitleInvitationExpired: 'O convite expirou',
+    K.notifRenderInvitationExpired: '{0} não respondeu ao convite e o link expirou. Compartilhe de novo — um link pelo WhatsApp costuma funcionar melhor.',
     K.notifRenderMemberReturned: '{0} cancelou a saída e voltou à família.',
     K.notifRenderLeaveOther: '{0} saiu da família. Os dias futuros dessa pessoa foram liberados — verifique o calendário e reatribua o que for necessário.',
     K.notifRenderFamDelAgreed: '{0} concordou com a exclusão da família.',

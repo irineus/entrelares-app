@@ -720,6 +720,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                         },
                         onOpenExpenses: () => _router.go('/expenses'),
                         onOpenPlan: () => _router.go('/family/plan'),
+                        // F-101: an expired invitation's "Compartilhar de
+                        // novo" lives on the Família card.
+                        onOpenFamily: () => _router.go('/family'),
                         // F-81: an admin's direct change — the day, or the
                         // Histórico when it was several.
                         onOpenDay: _openDay,
@@ -1049,6 +1052,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         _router.go('/family/plan');
         return;
       }
+      // F-101: the invitation expired — the Família page, where the card
+      // offers "Compartilhar de novo".
+      if (landing == NotificationLanding.family) {
+        _router.go('/family');
+        return;
+      }
       // F-78: a family that never planned is taken to the wizard on today.
       if (landing == NotificationLanding.planFirst) {
         _openWizardOnToday();
@@ -1077,6 +1086,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           NotificationLanding.planFirst => 'history',
           NotificationLanding.day => 'history',
           NotificationLanding.auditTrail => 'history',
+          NotificationLanding.family => 'history',
         },
         if ((data['notificationId'] ?? '').isNotEmpty)
           'n': data['notificationId']!,

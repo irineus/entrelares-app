@@ -182,6 +182,10 @@ abstract final class NotificationRenderer {
       case 'member_joined' when name != null:
         return l.format(K.notifRenderMemberJoined, [name]);
 
+      // F-101: the invitation the reader sent expired unanswered.
+      case 'invitation_expired' when name != null:
+        return l.format(K.notifRenderInvitationExpired, [name]);
+
       case 'member_returned' when name != null:
         return l.format(K.notifRenderMemberReturned, [name]);
 
@@ -531,6 +535,8 @@ abstract final class NotificationRenderer {
       'revert_rejected' => K.notifRenderTitleRevertRejected,
       'revert_cancelled' => K.notifRenderTitleRevertCancelled,
       'member_joined' => K.notifRenderTitleMemberJoined,
+      'invitation_expired' =>
+        p['name'] == null ? null : K.notifRenderTitleInvitationExpired,
       'member_returned' => K.notifRenderTitleMemberReturned,
       'email_cap_last' => K.notifRenderTitleEmailCapLast,
       'email_cap_80' => K.notifRenderTitleEmailCap80,

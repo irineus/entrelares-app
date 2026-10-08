@@ -59,6 +59,7 @@ void main() {
   late List<String> actionableKindsInJs;
   late List<String> chatInJs;
   late List<String> planInJs;
+  late List<String> familyInJs;
   late List<String> planFirstKindsInJs;
   late List<String> adminChangeTypesInJs;
   late List<String> adminChangeDayKindsInJs;
@@ -94,6 +95,12 @@ void main() {
       RegExp(r'const PLAN_FIRST_KINDS = \[([^\]]*)\]'),
       _worker,
     );
+    // F-101: the fourth destination — the Família page.
+    familyInJs = _stringList(
+      worker,
+      RegExp(r'const FAMILY_TYPES = \[([^\]]*)\]'),
+      _worker,
+    );
     // F-81: an admin's direct change — one day opens it, several open the
     // Histórico.
     adminChangeTypesInJs = _stringList(
@@ -119,6 +126,8 @@ void main() {
           ? NotificationLanding.chat
           : planInJs.contains(type)
           ? NotificationLanding.plan
+          : familyInJs.contains(type)
+          ? NotificationLanding.family
           : type == 'plan_ending' && planFirstKindsInJs.contains(kind)
           ? NotificationLanding.planFirst
           : adminChangeTypesInJs.contains(type) &&
@@ -224,6 +233,8 @@ void main() {
   test('F-81 · the worker opens the day and the Histórico the app reads', () {
     expect(worker, contains('/?day=\${data.date}'));
     expect(worker, contains('/reports?tab=history'));
+    // F-101: the Família page, for an expired invitation.
+    expect(worker, contains("'/family'"));
     final main = repoFile('app/lib/main.dart');
     expect(main, contains("queryParameters['day']"));
     expect(main, contains("'/reports'"));

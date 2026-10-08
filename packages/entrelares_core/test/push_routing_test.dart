@@ -88,6 +88,13 @@ void main() {
           NotificationLanding.plan);
     });
 
+    test('an expired invitation opens the Família page (F-101)', () {
+      expect(PushRouting.landingFor('invitation_expired', kind: 'expired'),
+          NotificationLanding.family);
+      expect(PushRouting.landingFor('invitation_expired'),
+          NotificationLanding.family);
+    });
+
     test("the Premium trial's end opens the plan page (F-77)", () {
       expect(PushRouting.landingFor('premium_trial', kind: 'ending'),
           NotificationLanding.plan);

@@ -115,6 +115,8 @@ void main() {
       'send_chat_message',
       // F-81: an admin's direct change, one per action and recipient.
       'flush_admin_change_notices',
+      // F-101: the inviting admin is told once when an invitation expires.
+      'invitation_expiry_notices_due',
     ]) {
       expect(writers, contains(expected));
     }
