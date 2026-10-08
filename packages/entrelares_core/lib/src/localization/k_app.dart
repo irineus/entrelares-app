@@ -704,6 +704,11 @@ abstract final class KApp {
   static const String agendaRemindAtStart = 'app.agenda.remindAtStart';
   static const String agendaRemindBefore = 'app.agenda.remindBefore';
   static const String agendaRemindNeedsStart = 'app.agenda.remindNeedsStart';
+
+  /// F-105: the reminders that reach the evening before.
+  static const String agendaRemindHoursBefore = 'app.agenda.remindHoursBefore';
+  static const String agendaRemindDayBefore = 'app.agenda.remindDayBefore';
+  static const String agendaRemindEve = 'app.agenda.remindEve';
   static const String agendaRepeat = 'app.agenda.repeat';
   static const String agendaRepeatLead = 'app.agenda.repeatLead';
   static const String agendaRepeatDays = 'app.agenda.repeatDays';
@@ -1534,6 +1539,9 @@ abstract final class KApp {
     agendaRemindAtStart,
     agendaRemindBefore,
     agendaRemindNeedsStart,
+    agendaRemindHoursBefore,
+    agendaRemindDayBefore,
+    agendaRemindEve,
     agendaRepeat,
     agendaRepeatLead,
     agendaRepeatDays,
@@ -2478,6 +2486,9 @@ abstract final class StringsAppPtBr {
     KApp.agendaRemindNone: 'Sem lembrete',
     KApp.agendaRemindAtStart: 'Na hora',
     KApp.agendaRemindBefore: '{0} min antes',
+    KApp.agendaRemindHoursBefore: '{0} h antes',
+    KApp.agendaRemindDayBefore: '1 dia antes',
+    KApp.agendaRemindEve: 'Na véspera, 19h',
     KApp.agendaRemindNeedsStart: 'Para ter lembrete, escolha o horário de início.',
     KApp.agendaRepeat: 'Repetir toda semana',
     KApp.agendaRepeatLead: 'De {0} até o último dia planejado do calendário, nos dias marcados.',
@@ -3416,6 +3427,9 @@ abstract final class StringsAppEn {
     KApp.agendaRemindNone: 'No reminder',
     KApp.agendaRemindAtStart: 'At the time',
     KApp.agendaRemindBefore: '{0} min before',
+    KApp.agendaRemindHoursBefore: '{0} h before',
+    KApp.agendaRemindDayBefore: '1 day before',
+    KApp.agendaRemindEve: 'The day before, 19h',
     KApp.agendaRemindNeedsStart: 'To get a reminder, set a start time.',
     KApp.agendaRepeat: 'Repeat every week',
     KApp.agendaRepeatLead: 'From {0} to the calendar\'s last planned day, on the days marked.',
