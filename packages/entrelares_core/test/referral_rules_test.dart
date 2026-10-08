@@ -162,6 +162,43 @@ void main() {
     );
   });
 
+  group('U-61 — ReferralRules.offerCard', () {
+    test('a complete, active family is offered the card', () {
+      expect(
+          ReferralRules.offerCard(
+              enabled: true,
+              isActiveMember: true,
+              isViewer: false,
+              hasOtherActiveMember: true,
+              hasAnyPlannedDay: true),
+          isTrue);
+    });
+
+    test('a founder alone, or a family with no plan, is not — nor a viewer, '
+        'a departed member, or anyone while the flag is dark', () {
+      bool offer({
+        bool enabled = true,
+        bool active = true,
+        bool viewer = false,
+        bool other = true,
+        bool plan = true,
+      }) =>
+          ReferralRules.offerCard(
+              enabled: enabled,
+              isActiveMember: active,
+              isViewer: viewer,
+              hasOtherActiveMember: other,
+              hasAnyPlannedDay: plan);
+      expect(offer(other: false), isFalse,
+          reason: 'the audit saw the card on a one-member family that had '
+              'not even invited the co-parent');
+      expect(offer(plan: false), isFalse);
+      expect(offer(viewer: true), isFalse);
+      expect(offer(active: false), isFalse);
+      expect(offer(enabled: false), isFalse);
+    });
+  });
+
   group('F-80 PR 2 — ReferralRules.codeFromInstallReferrer', () {
     test('reads ref from the referrer string Play hands back', () {
       expect(

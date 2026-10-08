@@ -1,16 +1,36 @@
 /// U-23 — the steps of the "Primeiros passos" activation checklist. Mirror of
 /// `entrelares-app` `Entrelares/Helpers/OnboardingSteps.cs`.
 ///
-/// Order is the order a first session should take them, and it is not
-/// arbitrary: inviting comes first because the swap workflow — the whole
-/// product — needs two people, and a tester who never reaches the second
-/// parent never sees it at all.
+/// Order is the order a first session should take them, and it is the
+/// FOUNDER's order (U-61, owner, 07/10/2026): plan first, because a family that
+/// never plans never invites the other carer either (20 of 30 families on
+/// 23/09 had never planned a day, all single-member — F-78's finding); then
+/// invite; then understand the swap. The checklist is the founder's: an
+/// invitee arrives into a family that already exists and gets U-58's welcome
+/// instead — see [OnboardingSteps.shouldShowChecklist].
+///
+/// **Exactly three steps, and the intro says "três".** The push ask used to be
+/// a fourth step here AND the F-59 strip under the Hoje card — the same
+/// one-shot OS dialog offered twice in the first seconds, over a card whose
+/// intro counted three. The strip is the one ask now, and
+/// [OnboardingSteps.firstRunActive] holds it back until the first run is over
+/// or a notice has actually arrived (`PushTodayRules`).
 library;
 
 import 'localization/k.dart';
 import 'localization/k_app.dart';
 
 enum OnboardingStep {
+  /// Plan days — any day at all, usually through the wizard. First: it is
+  /// what turns an empty account into a calendar, and the Hoje card without a
+  /// plan points here too (`showPlanNudge`).
+  planTheDays(
+    titleKey: K.onbStepPlanTitle,
+    hintKey: K.onbStepPlanHint,
+    doneHintKey: K.onbStepPlanDoneHint,
+    actionKey: K.onbStepPlanAction,
+  ),
+
   /// Invite the co-caregiver (F-31's invite loop).
   inviteCoCaregiver(
     titleKey: K.onbStepInviteTitle,
@@ -19,32 +39,12 @@ enum OnboardingStep {
     actionKey: K.onbStepInviteAction,
   ),
 
-  /// Plan days — any day at all, usually through the 🗓️ wizard.
-  planTheDays(
-    titleKey: K.onbStepPlanTitle,
-    hintKey: K.onbStepPlanHint,
-    doneHintKey: K.onbStepPlanDoneHint,
-    actionKey: K.onbStepPlanAction,
-  ),
-
   /// Read what a swap request is and why the other parent must accept.
   understandSwaps(
     titleKey: K.onbStepSwapTitle,
     hintKey: K.onbStepSwapHint,
     doneHintKey: K.onbStepSwapDoneHint,
     actionKey: K.onbStepSwapAction,
-  ),
-
-  /// F-09 — turn on the phone alerts. LAST on purpose: it is the only step
-  /// that asks for something from OUTSIDE the product (an OS permission), and
-  /// it only makes sense once there is a second caregiver who might ask for a
-  /// swap. Offering it first would spend the one-shot Android dialog on
-  /// someone who has not yet seen why they would want it.
-  enablePush(
-    titleKey: KApp.onbStepPushTitle,
-    hintKey: KApp.onbStepPushHint,
-    doneHintKey: KApp.onbStepPushDoneHint,
-    actionKey: KApp.onbStepPushAction,
   );
 
   const OnboardingStep({
@@ -94,15 +94,10 @@ class OnboardingSignals {
   /// This member put the card away (`profiles.onboarding_dismissed_at`).
   final bool checklistDismissed;
 
-  /// F-09: whether this BUILD can push at all. False on the web channel, which
-  /// has no transport — see [visibleIn] for why that has to gate the step and
-  /// not merely grey it out.
-  final bool pushSupported;
-
-  /// F-09: a device is registered AND the OS permits notifications. Real state
-  /// on both halves: a stored flag would keep claiming push was on after the
-  /// permission was revoked in Settings.
-  final bool hasPushEnabled;
+  /// U-61: this member came in through an invitation (`profiles.
+  /// joined_via_invite`, S-15 — stamped by trigger, immutable). The checklist
+  /// is the founder's first run; the invitee's is U-58's welcome.
+  final bool joinedByInvitation;
 
   const OnboardingSignals({
     this.hasOtherActiveMember = false,
@@ -112,8 +107,7 @@ class OnboardingSignals {
     this.hasOpenedSwapExplanation = false,
     this.hasTakenPartInASwap = false,
     this.checklistDismissed = false,
-    this.pushSupported = false,
-    this.hasPushEnabled = false,
+    this.joinedByInvitation = false,
   });
 
   /// The web's `with { HasAnyPlannedDay = … }` — Home ORs the loaded signal
@@ -126,8 +120,7 @@ class OnboardingSignals {
     bool? hasOpenedSwapExplanation,
     bool? hasTakenPartInASwap,
     bool? checklistDismissed,
-    bool? pushSupported,
-    bool? hasPushEnabled,
+    bool? joinedByInvitation,
   }) =>
       OnboardingSignals(
         hasOtherActiveMember: hasOtherActiveMember ?? this.hasOtherActiveMember,
@@ -138,8 +131,7 @@ class OnboardingSignals {
             hasOpenedSwapExplanation ?? this.hasOpenedSwapExplanation,
         hasTakenPartInASwap: hasTakenPartInASwap ?? this.hasTakenPartInASwap,
         checklistDismissed: checklistDismissed ?? this.checklistDismissed,
-        pushSupported: pushSupported ?? this.pushSupported,
-        hasPushEnabled: hasPushEnabled ?? this.hasPushEnabled,
+        joinedByInvitation: joinedByInvitation ?? this.joinedByInvitation,
       );
 }
 
@@ -158,26 +150,13 @@ class OnboardingSignals {
 /// real state and is why the second signal exists.
 abstract final class OnboardingSteps {
   /// Every step this product has, in the order the checklist renders them.
-  /// Rendering and counting use [visibleIn] instead — see there.
   static const List<OnboardingStep> all = OnboardingStep.values;
 
-  /// The steps that belong on THIS build's checklist.
-  ///
-  /// **Why a step can be absent rather than merely unfinished.** The checklist
-  /// hides itself when everything is done, so a step that CANNOT be finished
-  /// keeps it on screen forever. On the web channel there is no push transport
-  /// at all — [OnboardingStep.enablePush] would sit at "3 de 4" for the rest
-  /// of that person's life, on a card whose whole claim is that it describes
-  /// their family and is nearly done. Greying it out has the same effect on
-  /// the count, which is the number people actually read.
-  ///
-  /// Marking it "done" instead would be worse: it would tell someone they had
-  /// finished something they never did, which is the exact failure the file's
-  /// header rules out.
-  static List<OnboardingStep> visibleIn(OnboardingSignals signals) => [
-        for (final step in all)
-          if (step != OnboardingStep.enablePush || signals.pushSupported) step,
-      ];
+  /// The steps that belong on the checklist. Since U-61 every step can be
+  /// finished on every build (the push step, which the web channel could
+  /// never finish, left the checklist for the F-59 strip), so this is [all];
+  /// the seam stays because rendering and counting go through it.
+  static List<OnboardingStep> visibleIn(OnboardingSignals signals) => all;
 
   /// The line under a DONE step. One step says something different depending
   /// on HOW it was done: "the other person was invited" is false when the
@@ -210,12 +189,6 @@ abstract final class OnboardingSteps {
 
         OnboardingStep.understandSwaps =>
           signals.hasOpenedSwapExplanation || signals.hasTakenPartInASwap,
-
-        // F-09: real state on both halves — a registered device AND an OS that
-        // still permits notifications. This is the record's own rule for the
-        // step: it closes when THIS DEVICE has a `push_subscriptions` row,
-        // never when a sheet was shown.
-        OnboardingStep.enablePush => signals.hasPushEnabled,
       };
 
   /// How many steps are done (the "2 de 3" the card shows).
@@ -233,15 +206,31 @@ abstract final class OnboardingSteps {
   /// guide that cannot be reopened is a guide you can only read once, by
   /// accident.
   ///
-  /// The invitee's case falls out of this for free: they arrive into a family
-  /// that already has a second member and a plan, so two steps are already
-  /// ticked and the card renders nearly-done — which is exactly their
-  /// situation.
+  /// **The invitee never gets it on their own (U-61, owner, 07/10/2026).**
+  /// Before, they arrived with two steps "already ticked" — "a outra pessoa
+  /// já foi convidada", "já existem dias planejados" — for things the FOUNDER
+  /// did, on top of the request that was actually waiting for their answer
+  /// (T-103, seen on the device). Their first run is U-58's welcome; the
+  /// Hoje card names the request that waits for them (U-60/F-94).
   ///
-  /// [reopened] overrides both, because the two states that would otherwise
-  /// keep the card hidden are precisely the two an explicit "show it again" is
-  /// asking about.
+  /// [reopened] overrides all three, because the states that would otherwise
+  /// keep the card hidden are precisely what an explicit "show it again" from
+  /// the profile is asking about — the invitee included.
   static bool shouldShowChecklist(OnboardingSignals signals,
           {bool reopened = false}) =>
-      reopened || (!signals.checklistDismissed && !allDone(signals));
+      reopened ||
+      (!signals.joinedByInvitation &&
+          !signals.checklistDismissed &&
+          !allDone(signals));
+
+  /// U-61 — whether the founder is still inside the first run: the checklist
+  /// is theirs, has work left and was not put away. While it is true the
+  /// other first-session asks wait their turn — the F-59 push strip
+  /// (`PushTodayRules.show`) and the F-31 invite nudge behind the plan nudge
+  /// (`showPlanNudge`) — so the first screen is the calendar, the plan and one
+  /// thing to do, not four strips over a week of the month.
+  static bool firstRunActive(OnboardingSignals signals) =>
+      !signals.joinedByInvitation &&
+      !signals.checklistDismissed &&
+      !allDone(signals);
 }

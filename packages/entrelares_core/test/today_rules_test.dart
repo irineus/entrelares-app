@@ -141,6 +141,52 @@ void main() {
     });
   });
 
+  group('showPlanNudge — U-61', () {
+    test('a founder inside the first run, with no day anywhere, is pointed at '
+        'the wizard', () {
+      expect(
+          showPlanNudge(
+              isLoading: false,
+              firstRunActive: true,
+              hasAnyPlannedDay: false,
+              isViewer: false),
+          isTrue);
+    });
+
+    test('never while loading, once a day exists, after the first run, or '
+        'for a viewer', () {
+      expect(
+          showPlanNudge(
+              isLoading: true,
+              firstRunActive: true,
+              hasAnyPlannedDay: false,
+              isViewer: false),
+          isFalse);
+      expect(
+          showPlanNudge(
+              isLoading: false,
+              firstRunActive: true,
+              hasAnyPlannedDay: true,
+              isViewer: false),
+          isFalse);
+      // U-40's empty-month strip keeps saying it after the first run.
+      expect(
+          showPlanNudge(
+              isLoading: false,
+              firstRunActive: false,
+              hasAnyPlannedDay: false,
+              isViewer: false),
+          isFalse);
+      expect(
+          showPlanNudge(
+              isLoading: false,
+              firstRunActive: true,
+              hasAnyPlannedDay: false,
+              isViewer: true),
+          isFalse);
+    });
+  });
+
   group('showInviteNudge — F-31 + T-76', () {
     test('admin alone in the family, nobody invited yet, sees the nudge', () {
       expect(

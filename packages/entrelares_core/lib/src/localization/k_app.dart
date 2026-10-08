@@ -207,10 +207,12 @@ abstract final class KApp {
   static const String pushToastOn = 'app.push.toastOn';
   static const String pushToastOff = 'app.push.toastOff';
   static const String pushErrEnable = 'app.push.errEnable';
-  static const String onbStepPushTitle = 'app.onbStep.push.title';
-  static const String onbStepPushHint = 'app.onbStep.push.hint';
-  static const String onbStepPushDoneHint = 'app.onbStep.push.doneHint';
-  static const String onbStepPushAction = 'app.onbStep.push.action';
+  /// U-61: the Hoje card of a family with no plan at all points at the
+  /// wizard (`showPlanNudge`) — the founder's first step, where the F-31
+  /// invite nudge used to stand.
+  static const String cardPlanTitle = 'app.card.plan.title';
+  static const String cardPlanHint = 'app.card.plan.hint';
+  static const String cardPlanAction = 'app.card.plan.action';
 
   // ── F-56 pending member (invited, not yet joined) ──
   static const String famPendingBadge = 'app.fam.pendingBadge';
@@ -1051,10 +1053,9 @@ abstract final class KApp {
     pushToastOn,
     pushToastOff,
     pushErrEnable,
-    onbStepPushTitle,
-    onbStepPushHint,
-    onbStepPushDoneHint,
-    onbStepPushAction,
+    cardPlanTitle,
+    cardPlanHint,
+    cardPlanAction,
     famPendingBadge,
     famPendingHint,
     famInviteName,
@@ -1840,13 +1841,10 @@ abstract final class StringsAppPtBr {
     KApp.pushErrEnable:
         'Não foi possível ativar as notificações agora. Você continua recebendo '
             'tudo nesta tela e por e-mail.',
-    KApp.onbStepPushTitle: 'Ativar notificações no celular',
-    KApp.onbStepPushHint:
-        'Uma troca costuma ser pedida em cima da hora. Com as notificações ligadas '
-            'você fica sabendo na mesma hora, mesmo com o app fechado.',
-    KApp.onbStepPushDoneHint:
-        'Este aparelho notifica você sobre pedidos de troca e prazos.',
-    KApp.onbStepPushAction: 'Ativar notificações',
+    KApp.cardPlanTitle: 'Nenhum dia planejado ainda',
+    KApp.cardPlanHint:
+        'O assistente preenche um mês inteiro a partir de um padrão.',
+    KApp.cardPlanAction: 'Planejar',
     KApp.famPendingBadge: 'Ainda não entrou',
     KApp.famPendingHint:
         'Sem conta ainda: você planeja os dias dessa pessoa, e as trocas '
@@ -2721,13 +2719,9 @@ abstract final class StringsAppEn {
     KApp.pushErrEnable:
         'Could not turn notifications on right now. You still get everything on this '
             'screen and by e-mail.',
-    KApp.onbStepPushTitle: 'Turn on phone notifications',
-    KApp.onbStepPushHint:
-        'A swap is usually asked for at short notice. With notifications on you hear '
-            'about it right away, even with the app closed.',
-    KApp.onbStepPushDoneHint:
-        'This device notifies you about swap requests and deadlines.',
-    KApp.onbStepPushAction: 'Turn notifications on',
+    KApp.cardPlanTitle: 'No day planned yet',
+    KApp.cardPlanHint: 'The wizard fills a whole month from a pattern.',
+    KApp.cardPlanAction: 'Plan',
     KApp.famPendingBadge: 'Not joined yet',
     KApp.famPendingHint:
         'No account yet: you plan this person\'s days, and swaps become '

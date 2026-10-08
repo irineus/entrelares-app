@@ -51,6 +51,8 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:entrelares_app/screens/calendar_screen.dart';
+import 'package:entrelares_app/widgets/today_card.dart';
+import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/services/onboarding_service.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_account_reply.dart';
@@ -525,6 +527,31 @@ void main() {
       await _measure(tester, 'day sheet editor');
     });
 
+    // U-61: the founder's first run — the Hoje card pointing at the wizard,
+    // the first-steps strip over the calendar and the checklist sheet, its
+    // actions under the text and its two exits pinned (U-38's shape).
+    _scene('first steps: plan nudge, launcher and checklist sheet',
+        (tester, dark) async {
+      final ds = cal.FakeCustodyDataSource(members: [cal.ana], days: []);
+      await tester.pumpWidget(
+        _host(
+          CalendarScreen(
+              dataSource: ds,
+              adminMode: AdminMode(),
+              onboarding: OnboardingService(ds),
+              onOpenMember: (_, _) {}),
+          dark: dark,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(TodayCard.planNudgeKey), findsOneWidget);
+      await _measure(tester, 'calendar on the first run');
+      await tester.tap(find.text(pt[K.onbChecklistTitle]));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[K.onbChecklistReplayTour]), findsOneWidget);
+      await _measure(tester, 'first steps sheet');
+    });
+
     // Owner's validation, 25/09/2026: the agenda mark on the worst cells —
     // two-digit days, two-letter avatars, a handoff time, a frozen day, more
     // than one item — and the compact day sheet over them.
@@ -789,7 +816,9 @@ void main() {
     // F-80 PR 2: the "Indique uma família" card, with the module on — the
     // link line, the rule sentence and Compartilhar at 360 dp and 1,3×.
     _scene('family referral card', (tester, dark) async {
-      final ds = fam.source(settings: const {'feature.referral': 'true'});
+      // U-61: offered only to a complete, active family.
+      final ds = fam.source(settings: const {'feature.referral': 'true'})
+        ..onboardingFacts = const OnboardingFacts(hasAnyPlannedDay: true);
       await tester.pumpWidget(
         _host(
           FamilyScreen(

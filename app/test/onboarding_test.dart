@@ -41,14 +41,23 @@ FakeCustodyDataSource source({
 }) =>
     FakeCustodyDataSource(members: members, days: days.toList());
 
+/// U-61: a member who came in through an invitation (`joined_via_invite`).
+const invitee = Member(
+    id: 1,
+    fullName: 'Bruno Lima',
+    userId: 'u1',
+    colorSlot: 2,
+    joinedViaInvite: true);
+
 Future<void> pumpCalendar(
   WidgetTester tester,
   FakeCustodyDataSource ds, {
   OnboardingService? onboarding,
   TourKeys? tourKeys,
   VoidCallback? onOpenFamily,
+  Size size = const Size(600, 1200),
 }) async {
-  await tester.binding.setSurfaceSize(const Size(600, 1200));
+  await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(AppL10n(
     l: Localization(AppLanguage.ptBr),
@@ -77,8 +86,8 @@ void main() {
       expect(find.text(l.format(K.onbChecklistProgress, [0, 3])), findsOne);
     });
 
-    testWidgets('an invitee arrives with 2 de 3 — it falls out of reading real '
-        'state, not a special case', (tester) async {
+    testWidgets('a founder whose family already has a member and a plan sees '
+        '2 de 3 — it falls out of reading real state', (tester) async {
       final ds = source(
         members: const [fresh, bruno],
         days: [
@@ -94,6 +103,30 @@ void main() {
       await pumpCalendar(tester, ds);
 
       expect(find.text(l.format(K.onbChecklistProgress, [2, 3])), findsOne);
+    });
+
+    testWidgets('U-61: an invitee gets no checklist — the ticks would be the '
+        'founder\'s, not theirs', (tester) async {
+      final ds = source(
+        members: const [invitee, bruno],
+        days: [
+          CareSchedule(
+            id: 1,
+            scheduleDate: DateTime.now(),
+            scheduledParentId: 2,
+            revision: 1,
+            revisionToken: 't',
+          ),
+        ],
+      );
+      await pumpCalendar(tester, ds, tourKeys: TourKeys());
+
+      expect(find.text(l[K.onbChecklistTitle]), findsNothing);
+      // Nor the founder's tour: it is one tap away on the profile, and the
+      // stamp says it was offered.
+      expect(find.text(l[K.tourTodayTitle]), findsNothing);
+      expect(ds.stamps, contains(OnboardingStamp.tourSeen));
+      expect(ds.stamps, isNot(contains(OnboardingStamp.dismissed)));
     });
 
     testWidgets('finishing everything removes the card', (tester) async {
@@ -136,7 +169,8 @@ void main() {
   });
 
   group('the checklist sheet', () {
-    testWidgets('lists the three steps with their marks', (tester) async {
+    testWidgets('lists the three steps with their marks, plan first (U-61)',
+        (tester) async {
       await pumpCalendar(tester, source());
 
       await tester.tap(find.text(l[K.onbChecklistTitle]));
@@ -146,6 +180,33 @@ void main() {
       expect(find.text(l[K.onbStepPlanTitle]), findsOne);
       expect(find.text(l[K.onbStepSwapTitle]), findsOne);
       expect(find.byIcon(Icons.radio_button_unchecked), findsNWidgets(3));
+      expect(tester.getTopLeft(find.text(l[K.onbStepPlanTitle])).dy,
+          lessThan(tester.getTopLeft(find.text(l[K.onbStepInviteTitle])).dy));
+    });
+
+    testWidgets('U-61: on a 360 dp phone the actions sit under their text '
+        'and the two exits are pinned, never scrolled to', (tester) async {
+      await pumpCalendar(tester, source(), size: const Size(360, 640));
+
+      await tester.tap(find.text(l[K.onbChecklistTitle]));
+      await tester.pumpAndSettle();
+
+      final title = tester.getRect(find.text(l[K.onbStepPlanTitle]));
+      final action = tester.getRect(find.text(l[K.onbStepPlanAction]));
+      expect(action.top, greaterThan(title.bottom),
+          reason: 'the action used to sit in a trailing column beside the '
+              'title, squeezing the hint into six lines');
+      expect(action.left, lessThan(title.left + 24),
+          reason: 'the action starts under the text, not at the far edge');
+
+      final screen = tester.getRect(find.byType(MaterialApp));
+      for (final exit in [K.onbChecklistReplayTour, K.commonClose]) {
+        final rect = tester.getRect(find.text(l[exit]));
+        expect(rect.bottom, lessThanOrEqualTo(screen.bottom),
+            reason: '${l[exit]} was clipped under the bottom bar on the '
+                'audit\'s phone');
+        expect(rect.top, greaterThanOrEqualTo(screen.top));
+      }
     });
 
     testWidgets('the invite step navigates to the family page', (tester) async {
@@ -281,9 +342,9 @@ void main() {
     OnboardingService withWelcome(FakeCustodyDataSource ds) =>
         OnboardingService(ds)..pendingInviteeWelcome = welcome;
 
-    testWidgets('right after the claim it comes FIRST, and the tour follows',
-        (tester) async {
-      final ds = source();
+    testWidgets('right after the claim it comes FIRST — and it is the whole '
+        'first run: no founder\'s tour after it (U-61)', (tester) async {
+      final ds = source(members: const [invitee, bruno]);
       await pumpCalendar(tester, ds,
           onboarding: withWelcome(ds), tourKeys: TourKeys());
 
@@ -292,14 +353,17 @@ void main() {
       for (final key in InviteeWelcomeRules.pointKeys(viewer: false)) {
         expect(find.text(l[key]), findsOne);
       }
-      // The tour waits for the sheet.
       expect(find.text(l[K.tourTodayTitle]), findsNothing);
 
       await tester.tap(find.text(l[KApp.welcomeAction]));
       await tester.pumpAndSettle();
 
       expect(find.text(l.format(KApp.welcomeTitle, ['Souza'])), findsNothing);
-      expect(find.text(l[K.tourTodayTitle]), findsOne);
+      // Before U-61 the founder's four-stop tour and checklist followed the
+      // welcome, with steps ticked for things the invitee never did.
+      expect(find.text(l[K.tourTodayTitle]), findsNothing);
+      expect(find.text(l[K.onbChecklistTitle]), findsNothing);
+      expect(ds.stamps, contains(OnboardingStamp.tourSeen));
     });
 
     testWidgets('a Visualizador reads the viewer lines, never the caregiver ones',

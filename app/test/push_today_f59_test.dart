@@ -4,6 +4,7 @@
 // the rhythm says, once a notice reached nobody (owner, 02/10/2026).
 import 'package:entrelares_app/screens/calendar_screen.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
+import 'package:entrelares_app/services/onboarding_service.dart';
 import 'package:entrelares_app/services/push_messaging.dart';
 import 'package:entrelares_app/services/push_service.dart';
 import 'package:entrelares_app/services/push_today_prefs.dart';
@@ -153,6 +154,75 @@ void main() {
   // swap message, and with the keyboard up the column behind the editor
   // overflowed by 20 px. Measured with Inter and the product theme: the test
   // font draws every glyph as a square, and a line height is the question.
+  // U-61 (owner, 07/10/2026): the audit saw the strip over a founder's empty
+  // calendar in the first seconds — "trocas não vêm por e-mail" before any
+  // swap, or any second carer, existed. The founder's first run has the
+  // floor; the strip takes its turn when it ends, or when a notice arrives.
+  group('U-61 — the founder\'s first run comes first', () {
+    const founder = Member(
+        id: 1, fullName: 'Ana Souza', colorSlot: 1, userId: 'u1', familyId: 7);
+    const invitee = Member(
+        id: 1,
+        fullName: 'Ana Souza',
+        colorSlot: 1,
+        userId: 'u1',
+        familyId: 7,
+        joinedViaInvite: true);
+
+    Future<void> pump(WidgetTester tester, FakeCustodyDataSource ds) async {
+      final push = await _push(ds, PushPermission.notAsked);
+      await tester.pumpWidget(AppL10n(
+        l: _pt,
+        setLanguage: (_) async {},
+        child: MaterialApp(
+          home: CalendarScreen(
+            dataSource: ds,
+            adminMode: AdminMode(),
+            push: push,
+            onboarding: OnboardingService(ds),
+            onOpenNotifications: () {},
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a fresh founder sees the first steps, not the strip — and '
+        'the strip takes its turn once they are put away', (tester) async {
+      final ds = FakeCustodyDataSource(members: const [founder], days: []);
+      await pump(tester, ds);
+
+      expect(_strip, findsNothing);
+      expect(find.text(_pt[K.onbChecklistTitle]), findsOneWidget);
+
+      await tester.tap(find.byTooltip(_pt[K.onbChecklistDismissAria]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(_pt[K.onbChecklistTitle]), findsNothing);
+      expect(_strip, findsOneWidget);
+    });
+
+    testWidgets('a notice that arrived IS the moment to ask — the strip comes '
+        'first in the one-strip queue', (tester) async {
+      final ds = FakeCustodyDataSource(members: const [founder], days: [])
+        ..newestUnreadAt = DateTime.now();
+      await pump(tester, ds);
+
+      expect(_strip, findsOneWidget);
+      expect(find.text(_pt[K.onbChecklistTitle]), findsNothing);
+    });
+
+    testWidgets('an invitee has no founder\'s first run in the way',
+        (tester) async {
+      final ds = FakeCustodyDataSource(
+          members: const [invitee, _other], days: [row(100, today, 2)]);
+      await pump(tester, ds);
+
+      expect(_strip, findsOneWidget);
+      expect(find.text(_pt[K.onbChecklistTitle]), findsNothing);
+    });
+  });
+
   group('on a phone', () {
     setUpAll(() async {
       final inter = FontLoader('Inter')

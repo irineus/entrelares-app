@@ -95,11 +95,13 @@ class OnboardingLauncher extends StatelessWidget {
                 ]),
                 style: theme.textTheme.bodySmall,
               ),
+              // U-61: the full 48 dp target (U-32) — the compact density left
+              // the only way to put the strip away at 40 dp, and the row is
+              // 48 tall anyway, like the F-59 strip beside it in the queue.
               IconButton(
                 tooltip: l[K.onbChecklistDismissAria],
                 icon: const Icon(Icons.close, size: 18),
                 onPressed: onDismiss,
-                visualDensity: VisualDensity.compact,
               ),
             ],
           ),
@@ -111,7 +113,7 @@ class OnboardingLauncher extends StatelessWidget {
 
 /// What the checklist asked for. The action survives completion on purpose —
 /// "Convidar" is still useful after the first invitation went out.
-enum OnboardingAction { invite, plan, explainSwaps, enablePush, replayTour }
+enum OnboardingAction { invite, plan, explainSwaps, replayTour }
 
 Future<OnboardingAction?> showOnboardingChecklist({
   required BuildContext context,
@@ -122,37 +124,24 @@ Future<OnboardingAction?> showOnboardingChecklist({
       builder: (context) {
         final l = AppL10n.of(context).l;
         final theme = Theme.of(context);
-        // Scrolls like its sibling below: four steps with two-line hints do
-        // not fit a small phone, and a Column that cannot scroll overflowed
-        // by one hint line the day the invite hint grew (F-56 QA).
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(l[K.onbChecklistTitle],
-                    style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(l[K.onbChecklistIntro],
-                    style: theme.textTheme.bodySmall),
-                const SizedBox(height: 16),
-                for (final step in OnboardingSteps.visibleIn(signals))
-                  _StepTile(step: step, signals: signals),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () =>
-                      Navigator.of(context).pop(OnboardingAction.replayTour),
-                  child: Text(l[K.onbChecklistReplayTour]),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(l[K.commonClose]),
-                ),
-              ],
-            ),
-          ),
+        // U-61: the U-28 frame — the steps scroll, the two ways out are
+        // PINNED. Before, "Ver o tour de novo" and "Fechar" sat at the end of
+        // the scroll and the audit found them clipped under the bottom bar
+        // on a 360 dp phone; a sheet whose exits must be scrolled to has no
+        // exits (U-38's rule for every pinned action).
+        return AppSheetFrame(
+          title: l[K.onbChecklistTitle],
+          primaryLabel: l[K.commonClose],
+          onPrimary: () => Navigator.of(context).pop(),
+          secondaryLabel: l[K.onbChecklistReplayTour],
+          onSecondary: () =>
+              Navigator.of(context).pop(OnboardingAction.replayTour),
+          children: [
+            Text(l[K.onbChecklistIntro], style: theme.textTheme.bodySmall),
+            const SizedBox(height: 16),
+            for (final step in OnboardingSteps.visibleIn(signals))
+              _StepTile(step: step, signals: signals),
+          ],
         );
       },
     );
@@ -171,7 +160,6 @@ class _StepTile extends StatelessWidget {
       OnboardingStep.inviteCoCaregiver => OnboardingAction.invite,
       OnboardingStep.planTheDays => OnboardingAction.plan,
       OnboardingStep.understandSwaps => OnboardingAction.explainSwaps,
-      OnboardingStep.enablePush => OnboardingAction.enablePush,
     };
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -204,12 +192,20 @@ class _StepTile extends StatelessWidget {
                         ? OnboardingSteps.doneHintKeyFor(step, signals)
                         : step.hintKey],
                     style: Theme.of(context).textTheme.bodySmall),
+                // U-61: the action UNDER the text, not in a trailing column —
+                // at 360 dp the column squeezed every hint into six or seven
+                // lines, and the button sat beside the first of them.
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8)),
+                    onPressed: () => Navigator.of(context).pop(action),
+                    child: Text(l[step.actionKey]),
+                  ),
+                ),
               ],
             ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(action),
-            child: Text(l[step.actionKey]),
           ),
         ],
       ),
@@ -268,11 +264,15 @@ Future<void> showHowSwapsWork(BuildContext context) =>
 /// bottom itself — step 4 spotlights the notifications tab in the bottom
 /// navigation — where the card flips to the top instead of covering the very
 /// thing it is describing (U-29, owner-reported, round 3).
-Future<void> showGuidedTour({
+///
+/// Answers whether the reader reached "Concluir" (true) or left through
+/// "Pular" or the barrier (false) — U-61 counts the two apart (`tour-ended`),
+/// because a tour everybody skips is a tour to shorten.
+Future<bool> showGuidedTour({
   required BuildContext context,
   required TourKeys keys,
-}) =>
-    showDialog<void>(
+}) async =>
+    (await showDialog<bool>(
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.transparent,
@@ -283,7 +283,8 @@ Future<void> showGuidedTour({
       // the whole screen so the two coordinate spaces agree.
       useSafeArea: false,
       builder: (context) => _GuidedTour(keys: keys),
-    );
+    )) ??
+    false;
 
 class _GuidedTour extends StatefulWidget {
   final TourKeys keys;
@@ -360,9 +361,10 @@ class _GuidedTourState extends State<_GuidedTour> {
                     Row(
                       children: [
                         TextButton(
-                          // Skipping and finishing are the same fact: the tour
-                          // was offered, and it does not come back on its own.
-                          onPressed: () => Navigator.of(context).pop(),
+                          // Skipping and finishing are the same fact for the
+                          // stamp: the tour was offered, and it does not come
+                          // back on its own. They differ for the count.
+                          onPressed: () => Navigator.of(context).pop(false),
                           child: Text(l[K.tourSkip]),
                         ),
                         const Spacer(),
@@ -374,7 +376,7 @@ class _GuidedTourState extends State<_GuidedTour> {
                         const SizedBox(width: 8),
                         FilledButton(
                           onPressed: isLast
-                              ? () => Navigator.of(context).pop()
+                              ? () => Navigator.of(context).pop(true)
                               : () => setState(() => _index++),
                           child: Text(l[isLast ? K.tourFinish : K.tourNext]),
                         ),

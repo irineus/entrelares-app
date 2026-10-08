@@ -989,12 +989,11 @@ class _CalendarScreenState extends State<CalendarScreen>
       // the one loop that brings a new adult into the product unmeasured.
       // Fired where the answer is KNOWN (never from `build`) and once per app
       // session, the scope the pre-cutover series was counted in.
-      if (nudgeApplies && !openInvitation) {
-        final analytics = widget.analytics;
-        if (analytics != null) {
-          unawaited(analytics.trackEventOnce(AnalyticsEvents.inviteNudgeShown,
-              props: analyticsFunnelProps(channel: analytics.channel)));
-        }
+      // U-61: the plan nudge stands in front of it while the first run is on,
+      // and that is only known once the onboarding signals have landed — so
+      // with a service in play [_refreshOnboarding] fires it, after them.
+      if (widget.onboarding == null || _onboardingSignals != null) {
+        _trackInviteNudgeShown();
       }
     } catch (e) {
       if (!mounted) return;
@@ -1071,6 +1070,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         await onboarding.loadSignals(me: me, members: members);
     if (!mounted) return;
     setState(() => _onboardingSignals = signals);
+    _trackInviteNudgeShown();
 
     // U-58: the invitee's welcome comes FIRST, only in the session where the
     // invitation was claimed (taken once), and the tour follows it. While it
@@ -1094,6 +1094,20 @@ class _CalendarScreenState extends State<CalendarScreen>
       if (!mounted) return;
     }
 
+    // U-61 (owner, 07/10/2026): ONE first run per role. The invitee's is the
+    // welcome above — what they see, what the others see, what the record
+    // holds — and the Hoje card names the request waiting for them; the
+    // founder's tour ("é por aqui que se sai de um calendário vazio") and
+    // checklist are not theirs. The tour stays one tap away on the profile,
+    // so the stamp is written as if it had been offered — which it was.
+    if (me.joinedViaInvite) {
+      if (!_tourShown && me.onboardingTourSeenAt == null) {
+        _tourShown = true;
+        await onboarding.markTourSeen();
+      }
+      return;
+    }
+
     // The tour runs ONCE, on the first authenticated session, and hands over
     // to the checklist when it ends — the web's FinishTour does the same.
     // (Explicit replays arrive through [_onTourReplayRequested] now.)
@@ -1107,10 +1121,73 @@ class _CalendarScreenState extends State<CalendarScreen>
       // the frame settle first, or the holes light where things WERE.
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
-      await showGuidedTour(context: context, keys: widget.tourKeys!);
+      await _runTour();
       await onboarding.markTourSeen();
       if (mounted && _showChecklist) await _openChecklist();
     }
+  }
+
+  /// The tour, counted: finished or skipped (U-61).
+  Future<void> _runTour() async {
+    final finished =
+        await showGuidedTour(context: context, keys: widget.tourKeys!);
+    final analytics = widget.analytics;
+    if (analytics != null) {
+      unawaited(analytics.trackEvent(AnalyticsEvents.tourEnded,
+          props: {'outcome': finished ? 'finished' : 'skipped'}));
+    }
+  }
+
+  /// U-61 — the F-31 impression, from the state the card is drawn from, once
+  /// per session (`trackEventOnce`). The plan nudge in front of it is part of
+  /// that state, so a founder who sees "Planejar" is not counted as having
+  /// seen "Convidar".
+  void _trackInviteNudgeShown() {
+    final analytics = widget.analytics;
+    if (analytics == null || !_inviteNudgeShowing) return;
+    unawaited(analytics.trackEventOnce(AnalyticsEvents.inviteNudgeShown,
+        props: analyticsFunnelProps(channel: analytics.channel)));
+  }
+
+  /// U-61: the founder is still inside the first run (core rule) — the
+  /// push strip and the invite nudge wait behind the plan. Never a viewer's.
+  bool get _firstRunActive {
+    final signals = _effectiveSignals;
+    return signals != null &&
+        !_iAmViewer &&
+        OnboardingSteps.firstRunActive(signals);
+  }
+
+  bool get _planNudgeShowing => showPlanNudge(
+        isLoading: _loading,
+        firstRunActive: _firstRunActive,
+        // No signals yet reads as "planned": the nudge waits for the facts
+        // rather than flashing over a family that has a plan.
+        hasAnyPlannedDay: _effectiveSignals?.hasAnyPlannedDay ?? true,
+        isViewer: _iAmViewer,
+      );
+
+  bool get _inviteNudgeShowing =>
+      !_planNudgeShowing &&
+      showInviteNudge(
+        isLoading: _loading,
+        isAdmin: _ownProfile?.isAdmin ?? false,
+        // F-56: a pending member counts — the nudge is "reach out", and a
+        // caregiver already on the calendar was reached.
+        activeMemberCount: _assignableMembers.length,
+        // T-76: so was somebody with an invitation still in their inbox.
+        hasOpenInvitation: _openInvitation,
+      );
+
+  /// U-61 — the Hoje card's "Planejar": the wizard, counted apart from the
+  /// menu's and the empty-month strip's door (`plan-nudge-click`).
+  void _onPlanNudgeTap() {
+    final analytics = widget.analytics;
+    if (analytics != null) {
+      unawaited(analytics.trackEvent(AnalyticsEvents.planNudgeClick,
+          props: analyticsFunnelProps(channel: analytics.channel)));
+    }
+    unawaited(_openWizard());
   }
 
   /// One listener, two requests — each guarded by its own flag, so a ping for
@@ -1164,7 +1241,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     // Let the navigation back to this tab land before measuring targets.
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    await showGuidedTour(context: context, keys: widget.tourKeys!);
+    await _runTour();
     await onboarding.markTourSeen();
   }
 
@@ -1174,6 +1251,18 @@ class _CalendarScreenState extends State<CalendarScreen>
     final action =
         await showOnboardingChecklist(context: context, signals: signals);
     if (!mounted || action == null) return;
+    // U-61: which step the first run is actually taken through.
+    final analytics = widget.analytics;
+    if (analytics != null) {
+      unawaited(analytics.trackEvent(AnalyticsEvents.checklistAction, props: {
+        'step': switch (action) {
+          OnboardingAction.invite => 'invite',
+          OnboardingAction.plan => 'plan',
+          OnboardingAction.explainSwaps => 'swaps',
+          OnboardingAction.replayTour => 'tour',
+        },
+      }));
+    }
     switch (action) {
       case OnboardingAction.invite:
         widget.onOpenFamily?.call();
@@ -1181,11 +1270,9 @@ class _CalendarScreenState extends State<CalendarScreen>
         await _openWizard();
       case OnboardingAction.explainSwaps:
         await _explainSwaps();
-      case OnboardingAction.enablePush:
-        widget.onOpenNotifications?.call();
       case OnboardingAction.replayTour:
         if (widget.tourKeys == null) return;
-        await showGuidedTour(context: context, keys: widget.tourKeys!);
+        await _runTour();
     }
   }
 
@@ -1729,6 +1816,8 @@ class _CalendarScreenState extends State<CalendarScreen>
       // Unknown reads as "has push": a failed read never chases the reader.
       accountHasPush: _pushReach?.accountHasPush ?? true,
       newestUnreadAt: _pushReach?.newestUnreadAt,
+      // U-61: not in the first seconds of a founder's first run.
+      firstRunActive: _firstRunActive,
     );
   }
 
@@ -2306,19 +2395,15 @@ class _CalendarScreenState extends State<CalendarScreen>
       today: _today,
       nextHandoffDate: nextHandoff,
       viewingCurrentMonth: isCurrentMonth(_visibleMonth, _today),
-      showInviteNudge: showInviteNudge(
-        isLoading: _loading,
-        isAdmin: _ownProfile?.isAdmin ?? false,
-        // F-56: a pending member counts — the nudge is "reach out", and a
-        // caregiver already on the calendar was reached.
-        activeMemberCount: _assignableMembers.length,
-        // T-76: so was somebody with an invitation still in their inbox.
-        hasOpenInvitation: _openInvitation,
-      ),
+      showInviteNudge: _inviteNudgeShowing,
+      // U-61: plan first — the wizard where the invite used to be, while the
+      // family has no day at all and the first run is on.
+      showPlanNudge: _planNudgeShowing,
       responsibleRole: _roleLabelFor(
           todayRow?.effectiveParentId, AppL10n.of(context).l.current),
       onGoToToday: _goToToday,
       onInvite: _onInviteNudgeTap,
+      onPlan: _onPlanNudgeTap,
       noticeStrip: _noticeStrip(context, todayRow, nextHandoff),
       requestStrip: _requestStrips(context),
       onSendNotice: _canOfferNotice ? _openNoticeFromMenu : null,
@@ -3847,10 +3932,10 @@ class EmptyMonthStrip extends StatelessWidget {
                     style: style,
                   ),
                 ),
+                // U-61: the full 48 dp target (U-32) — a first run's only
+                // door to the wizard measured 40 dp under the compact density.
                 TextButton(
                   key: planKey,
-                  style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact),
                   onPressed: onPlan,
                   child: Text(l[K.calEmptyMonthPlan]),
                 ),

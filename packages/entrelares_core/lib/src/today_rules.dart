@@ -163,6 +163,24 @@ bool showInviteNudge({
     ) &&
     !hasOpenInvitation;
 
+/// U-61 (owner, 07/10/2026) — the Hoje card of a family with NO plan points
+/// at the wizard, not at a day cell. The audit's founder read "Toque em um dia
+/// no calendário para definir" (the slow path, one day at a time) while
+/// "Planejar o mês" sat at the bottom edge of the screen; and the F-31 invite
+/// nudge was drawn before anything had been planned. The founder's order is
+/// plan → invite (`OnboardingStep`), so while the first run is active and no
+/// day exists anywhere, the card says so and offers the wizard; the invite
+/// nudge takes the slot once a plan exists. Never for a viewer (F-50: reads,
+/// never writes) and never once the first run is over — U-40's empty-month
+/// strip under the grid keeps saying it, month by month, for everyone.
+bool showPlanNudge({
+  required bool isLoading,
+  required bool firstRunActive,
+  required bool hasAnyPlannedDay,
+  required bool isViewer,
+}) =>
+    !isLoading && firstRunActive && !hasAnyPlannedDay && !isViewer;
+
 /// Web: `IsViewingCurrentMonth` — the card is tappable ("back to today") only
 /// when the visible month is NOT today's.
 bool isCurrentMonth(DateTime visibleMonth, DateTime today) =>
