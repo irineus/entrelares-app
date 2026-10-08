@@ -1053,6 +1053,11 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (_showPushToday) return _SystemStrip.pushToday;
     if (_showChecklist) return _SystemStrip.checklist;
     if (_showHandoffNudge) return _SystemStrip.handoffNudge;
+    // U-62: the plan's end is a STATE, but it is also a push + in-app notice
+    // (F-70, D-30/D-7/ended), so it takes its turn in the one slot rather
+    // than a second row over the month. LAST: it has no ✕ and stays until the
+    // family plans further, so anything ahead of it would never show.
+    if (_planEndKind != null) return _SystemStrip.planEnd;
     return null;
   }
 
@@ -1961,20 +1966,88 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  Widget _handoffNudge(Localization l) => Padding(
+  /// U-62: the one-row shape of the F-59 strip — the mark, the sentence, a
+  /// short action and the ✕ at its 48 dp — instead of the AppBanner, which
+  /// measured ~140 dp on a 360 dp phone and alone took two weeks off the
+  /// month. Same key, same actions.
+  Widget _handoffNudge(Localization l) => _oneRowStrip(
         key: const Key('handoff-nudge'),
-        padding: const EdgeInsets.fromLTRB(
-            Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
-        child: AppBanner(
-          tone: context.tokens.info,
-          icon: Icons.schedule_outlined,
-          message: l[K.handoffNudgeMessage],
-          actionLabel: l[K.handoffNudgeAction],
-          onAction: _openHandoffRange,
-          onClose: _dismissHandoffNudge,
-          closeTooltip: l[K.handoffNudgeDismiss],
-        ),
+        icon: Icons.schedule_outlined,
+        message: l[K.handoffNudgeMessage],
+        actionLabel: l[K.handoffNudgeAction],
+        onAction: _openHandoffRange,
+        onDismiss: _dismissHandoffNudge,
+        dismissTooltip: l[K.handoffNudgeDismiss],
       );
+
+  /// U-62: a viewer's standing note, one row, no button.
+  Widget _viewerLine(Localization l) => _oneRowStrip(
+        key: const ValueKey('viewer-read-only'),
+        icon: Icons.visibility_outlined,
+        message: l[KApp.viewerReadOnly],
+      );
+
+  /// The one-row tinted strip every system line over the month uses (F-59's
+  /// `_pushToday` is its origin): no taller than its 48 dp action, and never
+  /// an `AppBanner`, which is a page-level message (U-49) and costs the grid
+  /// a week. [onDismiss] draws the ✕; [actionLabel] the short action.
+  Widget _oneRowStrip({
+    required Key key,
+    required IconData icon,
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+    VoidCallback? onDismiss,
+    String? dismissTooltip,
+  }) {
+    final tone = context.tokens.info;
+    return Padding(
+      key: key,
+      padding: const EdgeInsets.fromLTRB(
+          Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 36),
+        padding: EdgeInsetsDirectional.only(
+            start: Spacing.sm, end: onDismiss == null ? Spacing.sm : 0),
+        decoration: BoxDecoration(
+          color: tone.container,
+          borderRadius: BorderRadius.circular(Radii.md),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: tone.onContainer),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: tone.onContainer),
+              ),
+            ),
+            if (actionLabel != null && onAction != null)
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: tone.onContainer,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                ),
+                onPressed: onAction,
+                child: Text(actionLabel),
+              ),
+            if (onDismiss != null)
+              IconButton(
+                onPressed: onDismiss,
+                tooltip: dismissTooltip,
+                color: tone.onContainer,
+                icon: const Icon(Icons.close, size: 18),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _openWizard({DateTime? start}) async {
     if (_refuseWriteOffline()) return;
@@ -3231,18 +3304,11 @@ class _CalendarScreenState extends State<CalendarScreen>
                 child: _todayCard(context)),
           if (strip == _SystemStrip.pushToday) _pushToday(l),
           if (strip == _SystemStrip.handoffNudge) _handoffNudge(l),
-          if (_iAmViewer)
-            Padding(
-              key: const ValueKey('viewer-read-only'),
-              padding: const EdgeInsets.fromLTRB(
-                  Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
-              child: AppBanner(
-                tone: context.tokens.info,
-                icon: Icons.visibility_outlined,
-                message: l[KApp.viewerReadOnly],
-              ),
-            ),
-          if (_planEndKind case final kind?) _planEndStrip(l, kind),
+          if (strip == _SystemStrip.planEnd) _planEndStrip(l, _planEndKind!),
+          // U-62: a viewer's standing note is ONE tinted row (the F-59 strip's
+          // shape, no button) — the AppBanner took ~70 dp of a 360 dp phone
+          // for a sentence the reader sees on every opening.
+          if (_iAmViewer) _viewerLine(l),
           _monthBar(context, l),
           if (_members.isEmpty && _loading)
             const _LegendSkeleton()
@@ -4485,4 +4551,4 @@ class _SplitColumns extends StatelessWidget {
 }
 
 /// Owner's QA of 3.1.10 — the system strips the calendar queues, in order.
-enum _SystemStrip { pushToday, checklist, handoffNudge }
+enum _SystemStrip { pushToday, checklist, planEnd, handoffNudge }

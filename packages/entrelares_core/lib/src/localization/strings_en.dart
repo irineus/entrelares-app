@@ -967,9 +967,8 @@ abstract final class StringsEn {
     K.auditBatchReplace: '<strong>{0}</strong> replaced the plan in one action.',
     K.auditBatchHandoff:
         '<strong>{0}</strong> set the handover time in one action.',
-    K.handoffNudgeMessage:
-        'Handovers have no time: deadlines and lateness count from midnight.',
-    K.handoffNudgeAction: 'Set the time',
+    K.handoffNudgeMessage: 'Handoffs have no time: deadlines count from midnight.',
+    K.handoffNudgeAction: 'Set',
     K.handoffNudgeDismiss: 'Dismiss',
     K.handoffRangeTitle: 'Handover time',
     K.handoffRangeIntro:
