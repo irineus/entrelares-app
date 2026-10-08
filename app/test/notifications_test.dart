@@ -252,7 +252,7 @@ void main() {
     // opening anything.
     expect(
         find.textContaining(
-            '${pt[K.frozenAutoApproval]}: ${pt.formatDateTime(deadline)}'),
+            '${pt[K.frozenAutoApproval]}: ${pt.formatDeadline(deadline)}'),
         findsOneWidget);
 
     // "Enviadas": so does the one who asked — same clock, no arithmetic.
@@ -261,7 +261,7 @@ void main() {
     final sentDeadline = deadline.add(const Duration(days: 1));
     expect(
         find.textContaining(
-            '${pt[K.frozenAutoApproval]}: ${pt.formatDateTime(sentDeadline)}'),
+            '${pt[K.frozenAutoApproval]}: ${pt.formatDeadline(sentDeadline)}'),
         findsOneWidget);
   });
 

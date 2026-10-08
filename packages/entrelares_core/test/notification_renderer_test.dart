@@ -70,12 +70,12 @@ void main() {
       const json = '{"date":"2026-08-31","deadline":"2026-09-02T00:00"}';
       expect(
           NotificationRenderer.message('auto_reminder', json, 'x', ptBr),
-          'A solicitação do dia 31/08/2026 será aprovada automaticamente em '
-              '02/09/2026 às 00:00 se não houver resposta.');
+          'A solicitação do dia 31/08/2026 será aprovada automaticamente se '
+              'não houver resposta até quarta-feira, 02/09, à 0h.');
       expect(
           NotificationRenderer.message('auto_reminder', json, 'x', en),
-          'The request for 31 Aug 2026 will be approved automatically on '
-              '02 Sep 2026 at 12:00 AM if nobody replies.');
+          'The request for 31 Aug 2026 will be approved automatically if '
+              'nobody replies by Wednesday, 02 Sep, at 12 AM.');
     });
 
     test('no deadline: the window-free sentence, still in the reader language',
@@ -363,8 +363,8 @@ void main() {
     // F-60: the reminder's stored sentence names the instant, and the
     // catalog rebuilds it character for character from `params`.
     ('auto_reminder', '{"date":"04/08","deadline":"2026-08-06T00:00"}',
-        'A solicitação do dia 04/08 será aprovada automaticamente em '
-            '06/08/2026 às 00:00 se não houver resposta.'),
+        'A solicitação do dia 04/08 será aprovada automaticamente se não '
+            'houver resposta até quinta-feira, 06/08, à 0h.'),
     ('swap_family_info',
         '{"date":"04/08","kind":"auto_swap","name":"Ana"}',
         'Ana ficará com a criança no dia 04/08 (troca aprovada automaticamente por falta de resposta).'),

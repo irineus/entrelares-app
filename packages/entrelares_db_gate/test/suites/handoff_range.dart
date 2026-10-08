@@ -95,7 +95,7 @@ void handoffRangeTests(GateFixture fx) {
       final from = addDays(today(), 170);
       await expectRejected(
         () => setRange(f.member, from, addDays(from, 3), sixThirtyPm),
-        contains: 'Só um administrador define o horário de troca',
+        contains: 'Só um administrador define o horário de entrega',
       );
     });
 
@@ -188,7 +188,7 @@ void handoffRangeTests(GateFixture fx) {
           'p_to': null,
           'p_time': null,
         }),
-        contains: 'Informe o horário da troca',
+        contains: 'Informe o horário de entrega',
       );
       await expectRejected(
         () => setRange(f.admin, from, addDays(from, -1), sixThirtyPm),

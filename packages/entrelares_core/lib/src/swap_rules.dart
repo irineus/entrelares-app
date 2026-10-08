@@ -214,6 +214,13 @@ class SwapRequestView {
   /// A revert-flavored request (`FrozenDayPanel.isRevert`).
   bool get isRevertPending => status == 'revert_pending';
 
+  /// U-63: the day has no handoff time and the clock reached it — the
+  /// overdue tag of a day anchored at 00:00. Said "o dia já começou", never
+  /// "o horário de entrega já passou": there was no such time.
+  bool dayStartedWithoutTime(DateTime now) =>
+      parseTimeOfDay(proposedHandoffTime) == null &&
+      priorityTag(now) == SwapPriorityTag.overdue;
+
   SwapPriorityTag priorityTag(DateTime now) => swapRequestPriorityTag(
         scheduleDate: scheduleDate,
         proposedHandoffTime: proposedHandoffTime,

@@ -310,6 +310,29 @@ void main() {
     expect(find.byIcon(Icons.check), findsNothing);
   });
 
+  testWidgets('U-63: a request the batch could not process is "não '
+      'processada", with its day — never "ignorada"', (tester) async {
+    final days = twoFutureDays;
+    if (days == null) return;
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: [])
+      ..frozenRequests = [swapReq(10, dayOfMonth(days.$1))]
+      ..alreadyAnswered.add(10);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    await longPressDay(tester, days.$1);
+    await tester.tap(find.text(pt.format(K.selectionResolve, [1])));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(pt.format(K.wfApprove, [1])));
+    await tester.pumpAndSettle();
+
+    final day = pt.formatDateShort(dayOfMonth(days.$1));
+    expect(
+        find.textContaining(pt.format(K.sumIgnoredOne, [1, day])),
+        findsOneWidget);
+    expect(find.textContaining('ignorada'), findsNothing);
+  });
+
   testWidgets('Resolver: approved-swap days offer the batch revert',
       (tester) async {
     final day = futureDay;

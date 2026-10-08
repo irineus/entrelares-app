@@ -3755,7 +3755,12 @@ class _MonthGrid extends StatelessWidget {
       return _FrozenMark(
         badge: Icons.notifications_active,
         overdue: overdue,
-        label: l[overdue ? K.calOverdueAwaitingYou : K.calAwaitingYou],
+        // U-63: a day with no handoff time is not "late" at 00:01.
+        label: l[!overdue
+            ? K.calAwaitingYou
+            : frozen.toView().dayStartedWithoutTime(DateTime.now())
+                ? KApp.calDayStartedAwaitingYou
+                : K.calOverdueAwaitingYou],
       );
     }
     String? targetName;

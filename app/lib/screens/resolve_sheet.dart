@@ -155,7 +155,7 @@ class _ResolveSheetState extends State<_ResolveSheet> {
     });
     try {
       var succeeded = 0;
-      var failed = 0;
+      final failedDays = <DateTime>[];
       for (var i = 0; i < items.length; i++) {
         setState(() {
           _progress = i / items.length;
@@ -166,14 +166,26 @@ class _ResolveSheetState extends State<_ResolveSheet> {
           await action(items[i]);
           succeeded++;
         } catch (_) {
-          // Partial failure: skip this item and keep going.
-          failed++;
+          // Partial failure: keep going, and remember WHICH day — U-63: "1
+          // ignorada" read as if the reader had skipped it; the summary says
+          // it was not processed, and on which day, so it can be tried again.
+          final item = items[i];
+          final day = item is SwapRequest
+              ? item.scheduleDate
+              : item is CareSchedule
+                  ? item.scheduleDate
+                  : null;
+          if (day != null) failedDays.add(day);
         }
       }
+      final failed = items.length - succeeded;
       final parts = [
         bulkPluralize(l, succeeded, successSingularKey, successPluralKey),
         if (failed > 0)
-          bulkPluralize(l, failed, K.sumIgnoredOne, K.sumIgnoredMany),
+          l.format(failed == 1 ? K.sumIgnoredOne : K.sumIgnoredMany, [
+            failed,
+            [for (final d in failedDays) l.formatDateShort(d)].join(', '),
+          ]),
       ];
       if (mounted) Navigator.of(context).pop(parts.join(' · '));
     } catch (e) {

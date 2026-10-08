@@ -136,7 +136,12 @@ void autoApprovalTests(GateFixture fx) {
       // The stored PT-BR sentence is the fallback record, and it says the same
       // instant — a reader whose row predates the client update must not be
       // told a number that was never true.
-      expect(reminder.message, contains(' será aprovada automaticamente em '));
+      expect(reminder.message,
+          contains(' será aprovada automaticamente se não houver resposta até '));
+      // U-63: the deadline said as a person says it — a weekday, never a
+      // DD/MM/YYYY timestamp.
+      expect(reminder.message, matches(RegExp(
+          r'até (segunda|terça|quarta|quinta|sexta)-feira|até sábado|até domingo')));
       for (final window in ['24h', '48h', '24 horas', '48 horas']) {
         expect(reminder.message, isNot(contains(window)),
             reason: 'the reminder quotes a window again');

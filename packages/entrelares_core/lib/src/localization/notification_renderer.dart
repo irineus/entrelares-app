@@ -87,8 +87,10 @@ abstract final class NotificationRenderer {
       case 'auto_reminder' when date != null:
         final deadline = _parseDeadline(p['deadline']);
         if (deadline == null) return l.format(K.notifRenderAutoReminder, [date]);
+        // U-63: "até sábado, 10/10, à 0h" — the deadline said as a person
+        // says it, in the reader's language (`formatDeadline`).
         return l.format(K.notifRenderAutoReminderDeadline,
-            [date, l.formatDate(deadline), l.formatTime(deadline)]);
+            [date, l.formatDeadline(deadline)]);
 
       case 'auto_approved' when date != null:
         return l.format(
