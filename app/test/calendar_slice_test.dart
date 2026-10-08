@@ -1617,6 +1617,17 @@ class FakeCustodyDataSource implements CustodyDataSource {
     expenseWrites.add('remind:$toProfileId');
   }
 
+  /// F-102: the gates the page asked the admins about, in order.
+  final List<String> premiumAsks = [];
+  Object? throwOnPremiumAsk;
+
+  @override
+  Future<int> requestPremiumFromAdmin({required String gate}) async {
+    if (throwOnPremiumAsk != null) throw throwOnPremiumAsk!;
+    premiumAsks.add(gate);
+    return 1;
+  }
+
   /// The expense channel's listener, so a test can deliver a change.
   void Function()? expenseListener;
 

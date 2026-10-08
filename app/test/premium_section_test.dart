@@ -168,6 +168,7 @@ Future<void> _pump(
   AppLanguage language = AppLanguage.ptBr,
   _Funnel? funnel,
   List<String>? opened,
+  String? gate,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 3000));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -179,6 +180,7 @@ Future<void> _pump(
         dataSource: ds,
         isStoreChannel: store,
         analytics: funnel?.service,
+        gate: gate,
         openExternal: opened == null
             ? (_) async {}
             : (url) async => opened.add(url),
@@ -540,10 +542,69 @@ void main() {
           findsOne);
     });
 
-    testWidgets('a member who is not admin is told who can pay', (tester) async {
+    testWidgets('a member who is not admin is told who can pay — by name '
+        '(F-102)', (tester) async {
       await _pump(tester, _source(members: const [_plain, _admin]));
 
-      expect(_text(l[K.premAdminOnly]), findsOne);
+      expect(_text(l.format(KApp.premAdminNamedOne, ['Ana'])), findsOne);
+      expect(_text(l[K.premAdminOnly]), findsNothing);
+      expect(find.byKey(FamilyPlanScreen.askAdminKey), findsOne);
+      expect(_text(l[KApp.premAskAdmin]), findsOne);
+    });
+
+    testWidgets('F-102: "Avisar o administrador" asks once, with the gate it '
+        'came from, and says who was told', (tester) async {
+      final ds = _source(members: const [_plain, _admin]);
+      final funnel = _Funnel();
+      await _pump(tester, ds, funnel: funnel, gate: 'agenda');
+
+      await tester.tap(find.byKey(FamilyPlanScreen.askAdminKey));
+      await tester.pumpAndSettle();
+
+      expect(ds.premiumAsks, ['agenda']);
+      expect(_text(l.format(KApp.premAskAdminSent, ['Ana'])), findsOne);
+      expect(
+          funnel.payloads
+              .where((p) => p['name'] == 'premium-ask-admin')
+              .map((p) => p['data']),
+          [{'gate': 'agenda'}]);
+      // Once per visit on the client; the server guards the day.
+      expect(
+          tester
+              .widget<FilledButton>(find.byKey(FamilyPlanScreen.askAdminKey))
+              .onPressed,
+          isNull);
+    });
+
+    testWidgets('F-102: two admins are named together, and the button is '
+        'plural', (tester) async {
+      const secondAdmin = Member(
+          id: 3,
+          fullName: 'Carla Dias',
+          colorSlot: 3,
+          userId: 'u3',
+          isAdmin: true);
+      await _pump(
+          tester, _source(members: const [_plain, _admin, secondAdmin]));
+
+      expect(_text(l.format(KApp.premAdminNamedMany, ['Ana e Carla'])),
+          findsOne);
+      expect(_text(l[KApp.premAskAdmins]), findsOne);
+    });
+
+    testWidgets('F-102: the server\'s refusal (one a day) is shown in its own '
+        'words', (tester) async {
+      final ds = _source(members: const [_plain, _admin])
+        ..throwOnPremiumAsk = Exception(
+            '{"code":"P0001","message":"Você já pediu o Premium hoje. Dá para '
+            'pedir de novo amanhã."}');
+      await _pump(tester, ds);
+
+      await tester.tap(find.byKey(FamilyPlanScreen.askAdminKey));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('já pediu o Premium hoje'), findsOne);
+      expect(ds.premiumAsks, isEmpty);
     });
 
     testWidgets('F-46: paying during the trial starts the cycle at trial end',
@@ -912,7 +973,7 @@ void main() {
         (tester) async {
       await _pump(tester, _source(members: const [_plain, _admin]));
 
-      expect(top(tester, _text(l[K.premAdminOnly])),
+      expect(top(tester, _text(l.format(KApp.premAdminNamedOne, ['Ana']))),
           lessThan(top(tester, benefits)));
       expect(_priceCard, findsNothing);
       expect(_avulso, findsNothing);

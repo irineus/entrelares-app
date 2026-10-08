@@ -90,6 +90,10 @@ abstract final class AnalyticsEvents {
   // ── Monetization (T-37/F-48, 19/08/2026; paywall-view moved with U-35) ──
   static const premiumGateClick = 'premium-gate-click';
   static const premiumPaywallView = 'premium-paywall-view';
+  // F-102, 08/10/2026: a member who cannot pay told the admins they want
+  // Premium (`gate` = the F-79 token, or `premium`). The server allows one
+  // a day; a refused tap is not counted.
+  static const premiumAskAdmin = 'premium-ask-admin';
   static const premiumInterest = 'premium-interest';
   static const premiumCheckoutStart = 'premium-checkout-start';
   static const premiumCheckoutReturn = 'premium-checkout-return';
@@ -156,6 +160,7 @@ abstract final class AnalyticsCatalog {
     // every view counted as a buyer, the member who can only ask an
     // administrator and the store build with nothing on sale included.
     AnalyticsEvents.premiumPaywallView: {'channel', 'admin', 'buyable'},
+    AnalyticsEvents.premiumAskAdmin: {'gate'},
     AnalyticsEvents.premiumInterest: {'source', 'trial'},
     AnalyticsEvents.premiumCheckoutStart: _funnel,
     AnalyticsEvents.premiumCheckoutReturn: _funnel,
@@ -205,6 +210,7 @@ abstract final class AnalyticsCatalog {
   static const notificationTypes = {
     'plan_ending',
     'invitation_expired',
+    'premium_request',
     'premium_trial',
     'referral_reward',
     'day_admin_change',

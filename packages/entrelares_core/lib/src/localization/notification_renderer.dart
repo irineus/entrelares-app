@@ -32,6 +32,7 @@ import '../expense_rules.dart';
 import '../notice_rules.dart';
 import 'date_formats.dart';
 import 'k.dart';
+import '../premium_ask_rules.dart';
 import 'localization.dart';
 
 abstract final class NotificationRenderer {
@@ -309,6 +310,14 @@ abstract final class NotificationRenderer {
       // No day and no name: the referred family is never identified.
       case 'referral_reward' when kind == 'granted':
         return l[K.notifRenderReferralReward];
+
+      // F-102: a member asked the admins for Premium; the gate names what
+      // for, through a closed map (an unknown token reads as "a família").
+      case 'premium_request' when kind == 'ask' && name != null:
+        return l.format(K.notifRenderPremiumRequest, [
+          name,
+          l[PremiumAskRules.gateLabelKey(p['gate'])],
+        ]);
 
       // ── An admin changed the reader's days directly (F-81) ──
       // One day names it; several name the first, the last and how many. The
@@ -601,6 +610,9 @@ abstract final class NotificationRenderer {
       // F-80 PR 3: the heading only for the kind the body rebuilds.
       'referral_reward' =>
         kind == 'granted' ? K.notifRenderTitleReferralReward : null,
+      'premium_request' => kind == 'ask' && p['name'] != null
+          ? K.notifRenderTitlePremiumRequest
+          : null,
       // F-81: the heading only where the body is rebuilt too.
       'day_admin_change' => p['date'] == null
           ? null

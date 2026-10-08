@@ -930,6 +930,16 @@ abstract final class K {
   // ── Referral reward (F-80 PR 3) ──
   static const String notifRenderTitleReferralReward = 'notifRender.title.referralReward';
   static const String notifRenderReferralReward = 'notifRender.referralReward';
+  /// F-102: a member asked the admins for Premium; `gate` names what the
+  /// Premium gate guarded (the F-79 token), through a closed map.
+  static const String notifRenderTitlePremiumRequest = 'notifRender.title.premiumRequest';
+  static const String notifRenderPremiumRequest = 'notifRender.premiumRequest';
+  static const String notifRenderPremiumGateChat = 'notifRender.premiumGate.chat';
+  static const String notifRenderPremiumGateChatExport = 'notifRender.premiumGate.chatExport';
+  static const String notifRenderPremiumGateAgenda = 'notifRender.premiumGate.agenda';
+  static const String notifRenderPremiumGateExpenses = 'notifRender.premiumGate.expenses';
+  static const String notifRenderPremiumGatePdf = 'notifRender.premiumGate.pdf';
+  static const String notifRenderPremiumGateFamily = 'notifRender.premiumGate.family';
 
   // ── An admin changed the reader's days directly (F-81) ──
   static const String notifRenderTitleDayAdminChangeSingle = 'notifRender.title.dayAdminChange.single';
@@ -2097,6 +2107,14 @@ abstract final class K {
     notifTrialAction,
     notifRenderTitleReferralReward,
     notifRenderReferralReward,
+    notifRenderTitlePremiumRequest,
+    notifRenderPremiumRequest,
+    notifRenderPremiumGateChat,
+    notifRenderPremiumGateChatExport,
+    notifRenderPremiumGateAgenda,
+    notifRenderPremiumGateExpenses,
+    notifRenderPremiumGatePdf,
+    notifRenderPremiumGateFamily,
     notifRenderTitleDayAdminChangeSingle,
     notifRenderTitleDayAdminChangeBatch,
     notifRenderDayAdminChangeSingle,

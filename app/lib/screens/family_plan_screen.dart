@@ -68,6 +68,11 @@ class FamilyPlanScreen extends StatefulWidget {
   /// the plugin channel does not exist in a widget test.
   final Future<void> Function(String url)? openExternal;
 
+  /// F-102: the F-79 gate token the reader came from (`/family/plan?gate=…`),
+  /// so a member's "Avisar o administrador" says WHAT they wanted. Null is the
+  /// generic ask.
+  final String? gate;
+
   const FamilyPlanScreen({
     super.key,
     required this.dataSource,
@@ -76,7 +81,11 @@ class FamilyPlanScreen extends StatefulWidget {
     this.openExternal,
     this.storeBilling,
     this.purchases,
+    this.gate,
   });
+
+  /// F-102: the member's "Avisar o administrador", for tests.
+  static const askAdminKey = Key('plan-ask-admin');
 
   @override
   State<FamilyPlanScreen> createState() => _FamilyPlanScreenState();
@@ -89,6 +98,11 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   Family? _family;
   Member? _me;
   PublicSettings _settings = PublicSettings.unloaded;
+
+  /// F-102: the roster, for the admins' names under the member's offer.
+  List<Member> _members = const [];
+  bool _asking = false;
+  bool _askedThisVisit = false;
 
   // F-32/T-39 premium. `_subscription` is bookkeeping only — entitlement
   // always comes from the family row through the mirror, never from here.
@@ -198,9 +212,12 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         widget.dataSource.fetchOwnFamily(),
         widget.dataSource.fetchOwnProfile(),
         widget.dataSource.fetchPublicSettings(),
+        // F-102: who can subscribe, by name.
+        widget.dataSource.fetchMembers(),
       ]);
       final family = results[0] as Family?;
       final settings = PublicSettings(results[2] as Map<String, String>);
+      final members = results[3] as List<Member>;
 
       // T-39: the subscription row only matters while billing is on — with the
       // master switch off the section short-circuits to the F-32 waitlist, and
@@ -232,6 +249,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         _hasPremiumInterest = interest;
         _family = family;
         _me = results[1] as Member?;
+        _members = members;
         _settings = settings;
         _loading = false;
       });
@@ -527,6 +545,67 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
 
   /// U-31: a status line's mark is a vector icon in front of the sentence —
   /// it used to be an emoji INSIDE the catalog string.
+  /// F-102 (owner, 07/10/2026) — what a member who is NOT an admin reads
+  /// under the offer: WHO can subscribe, by name, and "Avisar o
+  /// administrador". The audit's father read "feita por um administrador" —
+  /// no name, no next step — and the server still refuses his checkout (who
+  /// may pay does not change). With no live admin to name (never, by the
+  /// ≥1-admin invariant — but a roster still loading) the old sentence stays.
+  List<Widget> _memberNotice(Localization l) {
+    final names = PremiumAskRules.adminFirstNames([
+      for (final m in _members)
+        (fullName: m.fullName, isAdmin: m.isAdmin, isActive: m.isActiveMember),
+    ]);
+    final joined = PremiumAskRules.joinNames(names, and: l[KApp.childAnd]);
+    if (joined == null) {
+      return [
+        _marked(Icons.info_outline, context.tokens.textMuted,
+            RichLabel.of(l, K.premAdminOnly)),
+      ];
+    }
+    return [
+      _marked(
+          Icons.info_outline,
+          context.tokens.textMuted,
+          Text(l.format(PremiumAskRules.sentenceKey(names.length), [joined]))),
+      const SizedBox(height: Spacing.sm),
+      Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: FilledButton.tonalIcon(
+          key: FamilyPlanScreen.askAdminKey,
+          icon: const Icon(Icons.campaign_outlined, size: 18),
+          label: Text(l[PremiumAskRules.askKey(names.length)]),
+          onPressed:
+              _asking || _askedThisVisit ? null : () => _askAdmin(l, joined),
+        ),
+      ),
+    ];
+  }
+
+  /// One push + in-app to the admins; the server allows one a day and says so
+  /// in its own words when it refuses.
+  Future<void> _askAdmin(Localization l, String joined) async {
+    final gate = PremiumAskRules.normalizeGate(widget.gate);
+    setState(() => _asking = true);
+    try {
+      await widget.dataSource.requestPremiumFromAdmin(gate: gate);
+      if (!mounted) return;
+      widget.analytics
+          ?.trackEvent(AnalyticsEvents.premiumAskAdmin, props: {'gate': gate});
+      setState(() {
+        _asking = false;
+        _askedThisVisit = true;
+      });
+      showAppSnack(context, l.format(KApp.premAskAdminSent, [joined]),
+          type: AppSnackType.success);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _asking = false);
+      showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
+  }
+
   Widget _marked(IconData icon, Color color, Widget label) => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -953,8 +1032,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                   args: [daysLeft])),
       ],
       if (!_isAdmin)
-        _marked(Icons.info_outline, context.tokens.textMuted,
-            RichLabel.of(l, K.premAdminOnly))
+        ..._memberNotice(l)
       else ...[
         if (canReactivate(
           subscriptionStatus: subscription?.status,
@@ -1116,12 +1194,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   }
 
   List<Widget> _storeOffer(Localization l) {
-    if (!_isAdmin) {
-      return [
-        _marked(Icons.info_outline, context.tokens.textMuted,
-            RichLabel.of(l, K.premAdminOnly))
-      ];
-    }
+    if (!_isAdmin) return _memberNotice(l);
     // A selected cycle the store did not answer for falls back to whatever it
     // did — the card never shows a price for a product that does not exist.
     final cycles = _storeCycles;

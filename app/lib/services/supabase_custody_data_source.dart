@@ -2231,6 +2231,13 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<int> requestPremiumFromAdmin({required String gate}) async {
+    final told = await _client.rpc<dynamic>('request_premium_from_admin',
+        params: {'p_gate': PremiumAskRules.normalizeGate(gate)});
+    return told is int ? told : 0;
+  }
+
+  @override
   Future<void Function()> watchExpenseChanges(void Function() onChange,
       {void Function(bool connected)? onStatus}) async {
     var channel = _client.channel('expense_changes_${_channelSeq++}');

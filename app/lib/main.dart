@@ -543,7 +543,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   tourKeys: _tourKeys,
                   onOpenFamily: () => _router.go('/family'),
                   onOpenNotifications: () => _router.go('/notifications'),
-                  onOpenPlan: () => _router.go('/family/plan'),
+                  onOpenPlan: () => _router.go('/family/plan?gate=agenda'),
                   onOpenChildren: () => _router.go('/family/children'),
                   onOpenHistory: () => _openAuditTrail(
                       '${DateTime.now().millisecondsSinceEpoch}'),
@@ -608,11 +608,15 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                 // U-35: what used to be three sections of the Família scroll.
                 GoRoute(
                   path: 'plan',
-                  builder: (_, _) => FamilyPlanScreen(
+                  // F-102: `?gate=<token>` says which Premium gate brought the
+                  // reader, so a member's "Avisar o administrador" says what
+                  // they wanted.
+                  builder: (_, state) => FamilyPlanScreen(
                     dataSource: _dataSource,
                     analytics: _analytics,
                     storeBilling: _storeBilling,
                     purchases: _purchases,
+                    gate: state.uri.queryParameters['gate'],
                   ),
                 ),
                 GoRoute(
@@ -741,7 +745,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                           landingNonce: '${landing?.name}:$nonce',
                           chat: ChatView(
                             dataSource: _dataSource,
-                            onOpenPlan: () => _router.go('/family/plan'),
+                            onOpenPlan: () => _router.go('/family/plan?gate=chat'),
                             onOpenDay: (day) {
                               _dayRequest.value = day;
                               _router.go('/');
@@ -762,7 +766,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
               path: '/expenses',
               builder: (_, _) => ExpensesScreen(
                   dataSource: _dataSource,
-                  onOpenPlan: () => _router.go('/family/plan')),
+                  onOpenPlan: () => _router.go('/family/plan?gate=expenses')),
             ),
           ]),
           StatefulShellBranch(routes: [
@@ -786,7 +790,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                     _router.go('/');
                   },
                   // F-79: the PDF upsell's "Ver o Premium".
-                  onOpenPlan: () => _router.go('/family/plan')),
+                  onOpenPlan: () => _router.go('/family/plan?gate=pdf')),
             ),
           ]),
         ],
