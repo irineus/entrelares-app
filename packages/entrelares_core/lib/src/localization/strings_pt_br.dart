@@ -984,8 +984,8 @@ abstract final class StringsPtBr {
     K.auditBatchHandoff:
         '<strong>{0}</strong> definiu o horário das trocas numa ação só.',
     K.handoffNudgeMessage:
-        'As trocas não têm horário: prazos e atrasos contam da meia-noite.',
-    K.handoffNudgeAction: 'Definir horário',
+        'Trocas sem horário: prazos contam da meia-noite.',
+    K.handoffNudgeAction: 'Definir',
     K.handoffNudgeDismiss: 'Dispensar',
     K.handoffRangeTitle: 'Horário das trocas',
     K.handoffRangeIntro:

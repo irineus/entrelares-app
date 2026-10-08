@@ -366,42 +366,40 @@ class TodayCard extends StatelessWidget {
                   style: textTheme.labelSmall?.copyWith(color: on)),
               // U-28 QA: one line at `titleSmall`. At `titleMedium` over two
               // lines this single field was costing the grid a whole week.
-              Text(
-                  laneSummary ??
-                      glance.responsibleName ??
-                      l[K.homeNotDefined],
-                  key: laneSummary == null
-                      ? null
-                      : const ValueKey('today-lane-summary'),
-                  style: textTheme.titleSmall?.copyWith(color: on),
-                  maxLines: laneSummary == null ? 1 : 2,
-                  overflow: TextOverflow.ellipsis),
+              // U-62: the pills share the name's line while they fit (a Wrap
+              // breaks them onto a second one only when they do not) — the
+              // band lost its third line, ~20 dp of the month on every phone.
               // Web: both badges can appear — swapped and the handoff time are
               // independent. U-28 adds the ROLE, which the port had dropped.
-              if (responsibleRole != null ||
-                  glance.isSwapped ||
-                  glance.handoffTime != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: Spacing.xs),
-                  child: Wrap(
-                    spacing: Spacing.sm,
-                    runSpacing: Spacing.xs,
-                    children: [
-                      if (responsibleRole != null)
-                        _pill(context, responsibleRole!, responsible),
-                      if (glance.isSwapped)
-                        _pill(context, l[K.cardSwappedBadge],
-                            context.tokens.swapped,
-                            icon: Icons.swap_horiz),
-                      if (glance.handoffTime != null)
-                        _pill(
-                            context,
-                            l.formatTimeString(glance.handoffTime!),
-                            responsible,
-                            icon: Icons.schedule),
-                    ],
-                  ),
-                ),
+              Wrap(
+                spacing: Spacing.sm,
+                runSpacing: Spacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                      laneSummary ??
+                          glance.responsibleName ??
+                          l[K.homeNotDefined],
+                      key: laneSummary == null
+                          ? null
+                          : const ValueKey('today-lane-summary'),
+                      style: textTheme.titleSmall?.copyWith(color: on),
+                      maxLines: laneSummary == null ? 1 : 2,
+                      overflow: TextOverflow.ellipsis),
+                  if (responsibleRole != null)
+                    _pill(context, responsibleRole!, responsible),
+                  if (glance.isSwapped)
+                    _pill(context, l[K.cardSwappedBadge],
+                        context.tokens.swapped,
+                        icon: Icons.swap_horiz),
+                  if (glance.handoffTime != null)
+                    _pill(
+                        context,
+                        l.formatTimeString(glance.handoffTime!),
+                        responsible,
+                        icon: Icons.schedule),
+                ],
+              ),
             ],
           ),
         ),
@@ -431,11 +429,18 @@ class TodayCard extends StatelessWidget {
               Icon(icon, size: 12, color: slot.tone.onContainer),
               const SizedBox(width: Spacing.xs / 2),
             ],
-            Text(text,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: slot.tone.onContainer)),
+            // U-62: the pill shares the name's line now, beside a one-line
+            // handoff box — on a narrow phone it shrinks with an ellipsis
+            // rather than overflowing the band.
+            Flexible(
+              child: Text(text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(color: slot.tone.onContainer)),
+            ),
           ],
         ),
       );
@@ -496,18 +501,29 @@ class TodayCard extends StatelessWidget {
                   .textTheme
                   .labelSmall
                   ?.copyWith(color: slot.tone.onContainer)),
-          Text(formatHandoffDate(date, l),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(
-                      color: slot.tone.onContainer,
-                      fontWeight: FontWeight.w600)),
-          Text(daysUntilLabel(date, today, l),
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: urgencyColor, fontWeight: FontWeight.w600)),
+          // U-62: the date and the countdown on ONE line — the box lost its
+          // third line, and with it the band's extra height on a 360 dp phone.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(formatHandoffDate(date, l),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(
+                          color: slot.tone.onContainer,
+                          fontWeight: FontWeight.w600)),
+              const SizedBox(width: Spacing.xs),
+              Text(daysUntilLabel(date, today, l),
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(
+                          color: urgencyColor, fontWeight: FontWeight.w600)),
+            ],
+          ),
         ],
       ),
     );

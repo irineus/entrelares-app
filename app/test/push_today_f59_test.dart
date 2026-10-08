@@ -302,10 +302,11 @@ void main() {
           me: _admin, keyboard: 250);
       // Every strip the lane had on — otherwise this holds about nothing.
       // Owner's QA of 3.1.10: ONE system strip at a time, so the handoff
-      // nudge waits behind the notifications offer.
+      // nudge waits behind the notifications offer — and since U-62 so does
+      // the plan-end state, which joined the same slot.
       expect(_strip, findsOneWidget);
       expect(find.byKey(const Key('handoff-nudge')), findsNothing);
-      expect(find.byKey(CalendarScreen.planEndStripKey), findsOneWidget);
+      expect(find.byKey(CalendarScreen.planEndStripKey), findsNothing);
       expect(tester.takeException(), isNull,
           reason: 'the column behind the editor overflowed (run 37124944050)');
     });
