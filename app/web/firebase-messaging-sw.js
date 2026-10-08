@@ -136,6 +136,12 @@ const PLAN_FIRST_KINDS = ['unplanned'];
 const ADMIN_CHANGE_TYPES = ['day_admin_change'];
 const ADMIN_CHANGE_DAY_KINDS = ['single'];
 const ADMIN_CHANGE_TRAIL_KINDS = ['batch'];
+// U-65: a settle-up to confirm, a reminder of one, or an expense the reader
+// takes part in opens Despesas (`/expenses`), where the answer is.
+const EXPENSE_TYPES = ['expense_changed', 'settlement_requested', 'settlement_reminder'];
+// U-65: the agenda's notice and reminder open the calendar on the item's day
+// (`/?day=YYYY-MM-DD`); without a real day they fall to "Todas".
+const AGENDA_TYPES = ['agenda_notice', 'agenda_reminder'];
 
 /// Where a tapped notification lands — the same URL `main.dart` builds for the
 /// Android tap, which is what makes the two channels agree: the Notificações
@@ -146,6 +152,13 @@ function landingUrl(data) {
   }
   if (FAMILY_TYPES.includes(data.type)) {
     return new URL('/family', self.location.origin).href;
+  }
+  if (EXPENSE_TYPES.includes(data.type)) {
+    return new URL('/expenses', self.location.origin).href;
+  }
+  if (AGENDA_TYPES.includes(data.type) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(data.date || '')) {
+    return new URL(`/?day=${data.date}`, self.location.origin).href;
   }
   if (data.type === 'plan_ending' && PLAN_FIRST_KINDS.includes(data.kind)) {
     return new URL('/?plan=first', self.location.origin).href;

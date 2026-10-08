@@ -98,6 +98,16 @@ class NotificationsScreen extends StatefulWidget {
 
   static Key adminChangeActionKey(int id) => Key('notif-admin-change-$id');
 
+  /// U-65: an agenda row's "Ver o dia" — through [onOpenDay].
+  static Key agendaActionKey(int id) => Key('notif-agenda-$id');
+
+  /// U-65: the Conversa's rows left "Todas"; while it has unread texts, one
+  /// line at the top says how many and opens it. Null (no Conversa here)
+  /// hides the line.
+  final VoidCallback? onOpenChat;
+
+  static const Key chatPointerKey = Key('notif-chat-pointer');
+
   /// The notification types whose row opens Despesas.
   static const Set<String> expenseTypes = {
     'expense_changed',
@@ -132,6 +142,7 @@ class NotificationsScreen extends StatefulWidget {
       this.onOpenFamily,
       this.onOpenDay,
       this.onOpenAuditTrail,
+      this.onOpenChat,
       this.embedded = false,
       this.onApprovalSeen,
       this.landing,
@@ -289,6 +300,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       NotificationLanding.day => _Tab.history,
       NotificationLanding.auditTrail => _Tab.history,
       NotificationLanding.family => _Tab.history,
+      NotificationLanding.expenses => _Tab.history,
     };
   }
 
@@ -350,7 +362,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _incoming = incoming;
         _openNotices = notices;
         _sent = sent;
-        _history = history;
+        // U-65: the Conversa's rows are not "Todas"'s (the read already
+        // leaves them out; this holds for any source).
+        _history = [
+          for (final n in history)
+            if (!PushRouting.chatTypes.contains(n.type)) n
+        ];
         _loading = false;
         _loadError = null;
       });
@@ -1108,15 +1125,64 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // ── "Todas" ────────────────────────────────────────────────────────────
 
   Widget _historyTab(Localization l) {
-    if (_history.isEmpty) return _empty(Icons.notifications_none, K.notifEmptyHistory, l);
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        for (final notif in _history) _historyItem(notif, l),
-        const SizedBox(height: 12),
-        ..._pushFooter(l),
-      ],
+    return ListenableBuilder(
+      listenable: widget.badge,
+      builder: (context, _) {
+        final pointer = _chatPointer(l);
+        if (_history.isEmpty && pointer == null) {
+          return _empty(Icons.notifications_none, K.notifEmptyHistory, l);
+        }
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            ?pointer,
+            ..._historyRows(l),
+          ],
+        );
+      },
     );
+  }
+
+  /// U-65 — "N mensagens novas na Conversa · Abrir a Conversa", the one line
+  /// that replaced a row per text.
+  Widget? _chatPointer(Localization l) {
+    final open = widget.onOpenChat;
+    final unread = widget.badge.chatUnread;
+    if (open == null || !widget.badge.chatOn || unread <= 0) return null;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          Spacing.md, Spacing.sm, Spacing.md, Spacing.xs),
+      child: AppCard(
+        child: Row(
+          children: [
+            Icon(Icons.forum_outlined, color: context.tokens.accent.solid),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                unread == 1
+                    ? l[KApp.notifChatUnreadOne]
+                    : l.format(KApp.notifChatUnreadMany, [unread]),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            TextButton(
+              key: NotificationsScreen.chatPointerKey,
+              onPressed: open,
+              child: Text(l[KApp.notifOpenChat]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _historyRows(Localization l) {
+    if (_history.isEmpty) return const [];
+    return [
+      for (final notif in _history) _historyItem(notif, l),
+      const SizedBox(height: 12),
+      ..._pushFooter(l),
+    ];
   }
 
   Widget _historyItem(AppNotification notif, Localization l) {
@@ -1157,7 +1223,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             _expenseAction(notif, l) ??
             _trialAction(notif, l) ??
             _familyAction(notif, l) ??
-            _adminChangeAction(notif, l),
+            _adminChangeAction(notif, l) ??
+            _agendaAction(notif, l),
       ),
     );
   }
@@ -1253,6 +1320,26 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         onPressed: () {
           _trackListOpen(notif.type);
           onPressed();
+        },
+      ),
+    );
+  }
+
+  /// U-65: an agenda notice or reminder opens its day — the payload already
+  /// carried the date; the row did not use it (T-103 audit).
+  Widget? _agendaAction(AppNotification notif, Localization l) {
+    final open = widget.onOpenDay;
+    final day = PushRouting.agendaDayOf(notif.type, notif.paramsJson);
+    if (open == null || day == null) return null;
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: NotificationsScreen.agendaActionKey(notif.id),
+        icon: const Icon(Icons.event_outlined),
+        label: Text(l[KApp.notifAgendaSeeDay]),
+        onPressed: () {
+          _trackListOpen(notif.type);
+          open(day);
         },
       ),
     );

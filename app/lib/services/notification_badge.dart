@@ -17,6 +17,14 @@ class NotificationBadge extends ChangeNotifier {
   int chatUnread = 0;
   bool chatOn = false;
 
+  /// U-65 (T-103 audit): settle-ups addressed to me that wait for my "Recebi /
+  /// Não recebi" — counted nowhere before, so "Pedro diz que pagou" lived only
+  /// in a push and a row of "Todas". Counted only while [expensesOn] (the
+  /// module's tab is on for this member, set by the app) and shown on the
+  /// Despesas tab, where the answer is — not in the bell.
+  int settlementsToConfirm = 0;
+  bool expensesOn = false;
+
   int get total => count + chatUnread;
   void Function()? _unwatch;
   void Function()? _unwatchChat;
@@ -45,7 +53,7 @@ class NotificationBadge extends ChangeNotifier {
     _unwatch = null;
     _unwatchChat?.call();
     _unwatchChat = null;
-    _set(0, 0);
+    _set(0, 0, 0);
   }
 
   /// Best-effort: a failed read keeps the last known count (web parity — the
@@ -54,7 +62,7 @@ class NotificationBadge extends ChangeNotifier {
     try {
       final me = await _dataSource.fetchOwnProfile();
       if (me == null) {
-        _set(0, 0);
+        _set(0, 0, 0);
         return;
       }
       final pending = await _dataSource.fetchPendingForMe(me.id);
@@ -64,14 +72,30 @@ class NotificationBadge extends ChangeNotifier {
           unread = await _dataSource.fetchChatUnreadCount(me.id);
         } catch (_) {/* the pending count still stands */}
       }
-      _set(pending.length, unread);
+      var settlements = settlementsToConfirm;
+      if (expensesOn) {
+        try {
+          settlements = (await _dataSource.fetchSettlements())
+              .where((s) => s.isPending && s.toProfile == me.id)
+              .length;
+        } catch (_) {/* keep the last settle-up count */}
+      } else {
+        settlements = 0;
+      }
+      _set(pending.length, unread, settlements);
     } catch (_) {/* keep the last count */}
   }
 
-  void _set(int value, int unread) {
-    if (_disposed || (value == count && unread == chatUnread)) return;
+  void _set(int value, int unread, int settlements) {
+    if (_disposed ||
+        (value == count &&
+            unread == chatUnread &&
+            settlements == settlementsToConfirm)) {
+      return;
+    }
     count = value;
     chatUnread = unread;
+    settlementsToConfirm = settlements;
     notifyListeners();
   }
 

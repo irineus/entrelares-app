@@ -107,6 +107,40 @@ void main() {
           NotificationLanding.plan);
     });
 
+    // U-65 (T-103 audit): "Pedro diz que pagou R$ 300 a você" opened
+    // Todas, and a second tap on "Abrir Despesas" reached the answer.
+    test('a settle-up to confirm, its reminder and an expense open Despesas',
+        () {
+      for (final type in [
+        'settlement_requested',
+        'settlement_reminder',
+        'expense_changed',
+      ]) {
+        expect(PushRouting.landingFor(type), NotificationLanding.expenses,
+            reason: type);
+      }
+      expect(PushRouting.landingFor('settlement_answered'),
+          NotificationLanding.history,
+          reason: 'the answer to MY settle-up is a receipt');
+    });
+
+    test("the agenda's notice and reminder open the day (U-65)", () {
+      expect(PushRouting.landingFor('agenda_notice', kind: 'medical'),
+          NotificationLanding.day);
+      expect(PushRouting.landingFor('agenda_reminder'), NotificationLanding.day);
+    });
+
+    test("an agenda row's day is read from its params (U-65)", () {
+      expect(
+          PushRouting.agendaDayOf(
+              'agenda_reminder', '{"date":"2026-10-10","kind":"medical"}'),
+          DateTime(2026, 10, 10));
+      expect(PushRouting.agendaDayOf('agenda_notice', '{"kind":"x"}'), isNull);
+      expect(PushRouting.agendaDayOf('agenda_notice', 'not json'), isNull);
+      expect(PushRouting.agendaDayOf('swap_approved', '{"date":"2026-10-10"}'),
+          isNull);
+    });
+
     test('an unknown or missing type falls to "Todas"', () {
       // A future writer's notice is a receipt until somebody decides
       // otherwise, and the wrong guess this way shows a full list rather than
