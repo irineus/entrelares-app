@@ -816,6 +816,12 @@ abstract class CustodyDataSource {
 
   Future<void> setChatPushMuted(bool muted);
 
+  /// S-27: whether this member's Conversa pushes carry the text (default
+  /// false: "Nova mensagem de Nome na Conversa").
+  Future<bool> fetchChatPushPreview();
+
+  Future<void> setChatPushPreview(bool on);
+
   /// How many texts of others arrived after the newest one [profileId] read
   /// (capped at 100 — the badge prints "99+" past that).
   Future<int> fetchChatUnreadCount(int profileId);

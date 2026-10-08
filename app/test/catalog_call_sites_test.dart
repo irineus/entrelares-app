@@ -100,6 +100,15 @@ const _appHasItsOwnPhrase = <String>{
   'KApp.sheetWhoQuestion',
 };
 
+/// The sentence exists for the PUSH, which `_shared/push.ts` builds on the
+/// server; the Dart catalog holds it so `push_notification_mirror_test` can
+/// compare the two string by string. The app's own row says more, because the
+/// reader is already inside the app.
+const _pushOnly = <String>{
+  // S-27: the Conversa push without the text — the in-app row keeps it.
+  'K.notifRenderChatMessageHidden',
+};
+
 /// Honest debt: a sentence the web distinguishes and this app does not (yet).
 /// Nothing here is a wrong screen — it is a screen that says something more
 /// generic than it could. Shrinking this list is cheap, one key at a time.
@@ -134,7 +143,12 @@ void main() {
     final declared = _declaredKeys();
     final used = _usedKeys();
     final orphans = declared.difference(used);
-    final classified = {..._webOnly, ..._appHasItsOwnPhrase, ..._notWiredYet};
+    final classified = {
+      ..._webOnly,
+      ..._appHasItsOwnPhrase,
+      ..._notWiredYet,
+      ..._pushOnly,
+    };
 
     expect(
       orphans.difference(classified),

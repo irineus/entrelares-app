@@ -1468,6 +1468,15 @@ class FakeCustodyDataSource implements CustodyDataSource {
     chatPushMuted = muted;
   }
 
+  /// S-27: the Conversa push preview switch.
+  bool chatPushPreview = false;
+
+  @override
+  Future<bool> fetchChatPushPreview() async => chatPushPreview;
+
+  @override
+  Future<void> setChatPushPreview(bool on) async => chatPushPreview = on;
+
   // ── F-34: shared expenses ──
   List<Expense> expenses = [];
   List<ExpenseHistoryEntry> expenseHistory = [];

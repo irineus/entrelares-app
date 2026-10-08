@@ -866,6 +866,7 @@ abstract final class StringsPtBr {
     K.notifRenderExpenseCategoryOther: 'Outros',
     K.notifRenderTitleChatMessage: 'Conversa da família',
     K.notifRenderChatMessage: '{0}: {1}',
+    K.notifRenderChatMessageHidden: 'Nova mensagem de {0} na Conversa',
     // F-55 PR 4: byte-identical to what agenda_notify() stores (U-13).
     K.notifRenderTitleAgendaNotice: 'Novo na agenda',
     K.notifRenderTitleAgendaReminder: 'Lembrete da agenda',

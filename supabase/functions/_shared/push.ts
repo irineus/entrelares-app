@@ -214,6 +214,7 @@ const K = {
 	expenseCategoryOther: "notifRender.expenseCategory.other",
 	titleChatMessage: "notifRender.title.chatMessage",
 	chatMessage: "notifRender.chatMessage",
+	chatMessageHidden: "notifRender.chatMessage.hidden",
 	titleAgendaNotice: "notifRender.title.agendaNotice",
 	titleAgendaReminder: "notifRender.title.agendaReminder",
 	agendaNotice: "notifRender.agendaNotice",
@@ -371,6 +372,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.expenseCategory.other": "Outros",
 		"notifRender.title.chatMessage": "Conversa da família",
 		"notifRender.chatMessage": "{0}: {1}",
+		"notifRender.chatMessage.hidden": "Nova mensagem de {0} na Conversa",
 		"notifRender.title.agendaNotice": "Novo na agenda",
 		"notifRender.title.agendaReminder": "Lembrete da agenda",
 		"notifRender.agendaNotice": "{0} adicionou à agenda de {1}: {2}.{3}",
@@ -502,6 +504,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.expenseCategory.other": "Other",
 		"notifRender.title.chatMessage": "Family chat",
 		"notifRender.chatMessage": "{0}: {1}",
+		"notifRender.chatMessage.hidden": "New message from {0} in the chat",
 		"notifRender.title.agendaNotice": "New on the agenda",
 		"notifRender.title.agendaReminder": "Agenda reminder",
 		"notifRender.agendaNotice": "{0} added to the agenda for {1}: {2}.{3}",
@@ -1044,10 +1047,17 @@ export function renderPush(
 		}
 
 		// F-35. Who wrote and the text (the server already cut it at 140).
+		// S-27: the text only for a reader who turned the preview on
+		// (`params.preview === "1"`); everyone else, and every row written
+		// before the switch existed, reads who wrote — never what.
 		case "chat_message": {
-			if (msg === undefined) return null;
 			titleKey = K.titleChatMessage;
-			body = fmt(lang, K.chatMessage, [name ?? otherCap(), msg]);
+			if (params["preview"] === "1") {
+				if (msg === undefined) return null;
+				body = fmt(lang, K.chatMessage, [name ?? otherCap(), msg]);
+			} else {
+				body = fmt(lang, K.chatMessageHidden, [name ?? otherCap()]);
+			}
 			break;
 		}
 

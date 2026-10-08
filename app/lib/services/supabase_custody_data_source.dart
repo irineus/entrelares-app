@@ -2065,6 +2065,19 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<bool> fetchChatPushPreview() async {
+    final rows =
+        await _client.from('chat_prefs').select('push_preview').limit(1);
+    return rows.isNotEmpty && rows.first['push_preview'] == true;
+  }
+
+  @override
+  Future<void> setChatPushPreview(bool on) async {
+    await _client
+        .rpc<dynamic>('set_chat_push_preview', params: {'p_on': on});
+  }
+
+  @override
   Future<int> fetchChatUnreadCount(int profileId) async {
     // postgrest-dart orders DESCENDING unless told; the newest mark is wanted.
     final last = await _client
