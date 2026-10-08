@@ -778,6 +778,20 @@ abstract final class KApp {
   /// Share, so it could not leave the page.
   static const String famReferralCopy = 'app.fam.referralCopy';
 
+  /// F-103: the confirmation before the S-10 password ask — what an admin can
+  /// do (grant) or stops being able to do (revoke), and that the person is told.
+  static const String adminConfirmGrantTitle = 'app.adminConfirm.grantTitle';
+  static const String adminConfirmRevokeTitle = 'app.adminConfirm.revokeTitle';
+  static const String adminConfirmGrantIntro = 'app.adminConfirm.grantIntro';
+  static const String adminConfirmRevokeIntro = 'app.adminConfirm.revokeIntro';
+  static const String adminPowerInvite = 'app.adminPower.invite';
+  static const String adminPowerAdmins = 'app.adminPower.admins';
+  static const String adminPowerPastDays = 'app.adminPower.pastDays';
+  static const String adminPowerFamily = 'app.adminPower.family';
+  static const String adminConfirmGrantWarning = 'app.adminConfirm.grantWarning';
+  static const String adminConfirmNotice = 'app.adminConfirm.notice';
+  static const String adminConfirmContinue = 'app.adminConfirm.continue';
+
   /// U-67: the Notificações load error said "o calendário" too.
   static const String errNotificationsLoad = 'app.err.notificationsLoad';
   static const String expenseYourShare = 'app.expense.yourShare';
@@ -1572,6 +1586,17 @@ abstract final class KApp {
     errFamilyLoad,
     adminModeOnlyAdmins,
     famReferralCopy,
+    adminConfirmGrantTitle,
+    adminConfirmRevokeTitle,
+    adminConfirmGrantIntro,
+    adminConfirmRevokeIntro,
+    adminPowerInvite,
+    adminPowerAdmins,
+    adminPowerPastDays,
+    adminPowerFamily,
+    adminConfirmGrantWarning,
+    adminConfirmNotice,
+    adminConfirmContinue,
     errNotificationsLoad,
     expenseYourShare,
     expenseNotYours,
@@ -2501,6 +2526,17 @@ abstract final class StringsAppPtBr {
     KApp.errFamilyLoad: 'Não foi possível carregar os dados da família.',
     KApp.adminModeOnlyAdmins: 'Somente administradores da família usam o modo administrador.',
     KApp.famReferralCopy: 'Copiar link',
+    KApp.adminConfirmGrantTitle: 'Tornar {0} administrador(a)?',
+    KApp.adminConfirmRevokeTitle: 'Remover a permissão de administrador(a) de {0}?',
+    KApp.adminConfirmGrantIntro: 'Como administrador(a), {0} poderá:',
+    KApp.adminConfirmRevokeIntro: '{0} deixará de poder:',
+    KApp.adminPowerInvite: 'convidar pessoas para a família',
+    KApp.adminPowerAdmins: 'dar e tirar a permissão de administrador(a) de outras pessoas',
+    KApp.adminPowerPastDays: 'alterar dias que já passaram, pelo modo administrador',
+    KApp.adminPowerFamily: 'renomear a família e pedir a exclusão dela',
+    KApp.adminConfirmGrantWarning: 'Isso inclui tirar a sua permissão de administrador(a).',
+    KApp.adminConfirmNotice: '{0} recebe uma notificação no aplicativo.',
+    KApp.adminConfirmContinue: 'Continuar',
     KApp.errNotificationsLoad: 'Não foi possível carregar as notificações.',
     KApp.expenseYourShare: 'sua parte {0}',
     KApp.expenseNotYours: 'não envolve você',
@@ -3423,6 +3459,17 @@ abstract final class StringsAppEn {
     KApp.errFamilyLoad: 'Could not load the family.',
     KApp.adminModeOnlyAdmins: 'Only the family\'s admins use admin mode.',
     KApp.famReferralCopy: 'Copy link',
+    KApp.adminConfirmGrantTitle: 'Make {0} an admin?',
+    KApp.adminConfirmRevokeTitle: "Remove {0}'s admin permission?",
+    KApp.adminConfirmGrantIntro: 'As an admin, {0} will be able to:',
+    KApp.adminConfirmRevokeIntro: '{0} will no longer be able to:',
+    KApp.adminPowerInvite: 'invite people to the family',
+    KApp.adminPowerAdmins: 'grant and remove the admin permission of other people',
+    KApp.adminPowerPastDays: 'change days that have passed, through admin mode',
+    KApp.adminPowerFamily: 'rename the family and ask for its deletion',
+    KApp.adminConfirmGrantWarning: 'That includes removing yours.',
+    KApp.adminConfirmNotice: '{0} gets a notification in the app.',
+    KApp.adminConfirmContinue: 'Continue',
     KApp.errNotificationsLoad: 'Could not load the notifications.',
     KApp.expenseYourShare: 'your share {0}',
     KApp.expenseNotYours: 'does not involve you',

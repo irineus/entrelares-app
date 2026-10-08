@@ -119,6 +119,8 @@ void main() {
       'invitation_expiry_notices_due',
       // F-102: a member's ask for Premium, to the admins.
       'request_premium_from_admin',
+      // F-103: the member whose admin bit changed.
+      'set_member_admin',
     ]) {
       expect(writers, contains(expected));
     }

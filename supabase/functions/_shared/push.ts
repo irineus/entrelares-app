@@ -117,6 +117,11 @@ export const PUSH_TYPES: readonly string[] = [
 	// rendered before the date guard. Lands on the plan page, where the
 	// subscribe button is. Never e-mail (F-59).
 	"premium_request",
+	// F-103. An admin granted or removed the reader's admin bit — the person
+	// it happened to used to find out when "Convidar" refused them. States no
+	// day, so it is rendered before the date guard. Lands on "Todas". Never
+	// e-mail (F-59).
+	"admin_changed",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -252,6 +257,10 @@ const K = {
 	titleFamilyDeletionNear: "notifRender.title.familyDeletionNear",
 	memberJoined: "notifRender.memberJoined",
 	invitationExpired: "notifRender.invitationExpired",
+	titleAdminGranted: "notifRender.title.adminGranted",
+	titleAdminRevoked: "notifRender.title.adminRevoked",
+	adminGranted: "notifRender.adminGranted",
+	adminRevoked: "notifRender.adminRevoked",
 	memberReturned: "notifRender.memberReturned",
 	leaveOther: "notifRender.leave.other",
 	famDelRequestedOther: "notifRender.famDel.requestedOther",
@@ -385,6 +394,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.familyDeletionNear": "Exclusão da família se aproxima",
 		"notifRender.memberJoined": "{0} juntou-se à família. Confira o calendário para incluí-lo no planejamento.",
 		"notifRender.invitationExpired": "{0} não respondeu ao convite e o link expirou. Compartilhe de novo — um link pelo WhatsApp costuma funcionar melhor.",
+		"notifRender.title.adminGranted": "Você agora é administrador(a)",
+		"notifRender.title.adminRevoked": "Você deixou de ser administrador(a)",
+		"notifRender.adminGranted": "{0} tornou você administrador(a) da família.",
+		"notifRender.adminRevoked": "{0} removeu a sua permissão de administrador(a) da família.",
 		"notifRender.memberReturned": "{0} cancelou a saída e voltou à família.",
 		"notifRender.leave.other": "{0} saiu da família. Os dias futuros dessa pessoa foram liberados — verifique o calendário e reatribua o que for necessário.",
 		"notifRender.famDel.requestedOther": "{0} solicitou a exclusão da família. Se ninguém recusar até {1}, TODOS os dados (calendário, histórico e contas de todos) serão apagados definitivamente. Você pode recusar em Perfil > Exclusão da família — qualquer recusa cancela a exclusão.",
@@ -512,6 +525,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.familyDeletionNear": "Family deletion is near",
 		"notifRender.memberJoined": "{0} joined the family. Check the calendar to include them in the planning.",
 		"notifRender.invitationExpired": "{0} did not answer the invitation and the link expired. Share it again — a WhatsApp link usually works best.",
+		"notifRender.title.adminGranted": "You are now an admin",
+		"notifRender.title.adminRevoked": "You are no longer an admin",
+		"notifRender.adminGranted": "{0} made you an admin of the family.",
+		"notifRender.adminRevoked": "{0} removed your admin permission in the family.",
 		"notifRender.memberReturned": "{0} cancelled their departure and is back in the family.",
 		"notifRender.leave.other": "{0} left the family. That person's future days were freed — check the calendar and reassign whatever is needed.",
 		"notifRender.famDel.requestedOther": "{0} requested the deletion of the family. If nobody refuses by {1}, EVERYONE's data (calendar, history and accounts) will be permanently erased. You can refuse under Profile > Family deletion — a single refusal cancels the deletion.",
@@ -675,6 +692,20 @@ export function renderPush(
 	if (type === "referral_reward") {
 		if (params["kind"] !== "granted") return null;
 		return { title: fmt(lang, K.titleReferralReward), body: fmt(lang, K.referralReward) };
+	}
+
+	// F-103: an admin granted or removed the reader's admin bit. States no day.
+	// An unknown kind is a future writer's shape — no push, never a guess.
+	if (type === "admin_changed") {
+		const name = params["name"];
+		if (name === undefined) return null;
+		if (params["kind"] === "granted") {
+			return { title: fmt(lang, K.titleAdminGranted), body: fmt(lang, K.adminGranted, [name]) };
+		}
+		if (params["kind"] === "revoked") {
+			return { title: fmt(lang, K.titleAdminRevoked), body: fmt(lang, K.adminRevoked, [name]) };
+		}
+		return null;
 	}
 
 	// F-102: a member asked the admins for Premium. States no day; `gate` is the

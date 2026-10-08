@@ -189,6 +189,12 @@ abstract final class NotificationRenderer {
       case 'invitation_expired' when name != null:
         return l.format(K.notifRenderInvitationExpired, [name]);
 
+      // F-103: an admin granted or removed the reader's admin bit.
+      case 'admin_changed' when name != null && kind == 'granted':
+        return l.format(K.notifRenderAdminGranted, [name]);
+      case 'admin_changed' when name != null && kind == 'revoked':
+        return l.format(K.notifRenderAdminRevoked, [name]);
+
       case 'member_returned' when name != null:
         return l.format(K.notifRenderMemberReturned, [name]);
 
@@ -548,6 +554,11 @@ abstract final class NotificationRenderer {
       'member_joined' => K.notifRenderTitleMemberJoined,
       'invitation_expired' =>
         p['name'] == null ? null : K.notifRenderTitleInvitationExpired,
+      'admin_changed' => switch (kind) {
+          'granted' => K.notifRenderTitleAdminGranted,
+          'revoked' => K.notifRenderTitleAdminRevoked,
+          _ => null,
+        },
       'member_returned' => K.notifRenderTitleMemberReturned,
       'email_cap_last' => K.notifRenderTitleEmailCapLast,
       'email_cap_80' => K.notifRenderTitleEmailCap80,
