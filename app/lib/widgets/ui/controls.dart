@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import 'fit.dart';
 import 'sheets.dart';
 
 /// A text field with a label that is always visible.
@@ -105,6 +106,9 @@ class AppTextField extends StatelessWidget {
         helperText: helper,
         helperMaxLines: helperMaxLines,
         errorText: errorText,
+        // U-64: a field error is a sentence ("A senha precisa ter pelo menos 8
+        // caracteres.") — one line cut it at "caracter…" on a 360 dp phone.
+        errorMaxLines: 3,
         suffixIcon: suffixIcon,
         counterText: showCounter || maxLength == null ? null : '',
       ),
@@ -145,8 +149,28 @@ class AppSegmented<T> extends StatelessWidget {
     final button = SegmentedButton<T>(
       segments: [
         for (final o in options)
-          ButtonSegment(value: o.value, label: Text(o.label)),
+          ButtonSegment(
+            value: o.value,
+            // U-64 (T-103 audit): four segments at 360 dp broke "Recentes"
+            // into "Recente / s" at the DEFAULT scale. A label is one line:
+            // it shrinks to the U-48 floor and, past it, ellipsizes — never
+            // a word cut across two lines.
+            label: AppShrinkToFit(
+              alignment: Alignment.center,
+              child: Text(
+                o.label,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
       ],
+      // The default 12 dp each side spent a whole label's width on air across
+      // four segments; 8 keeps the pill's shape and gives it back.
+      style: const ButtonStyle(
+        padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 8)),
+      ),
       selected: {selected},
       // The check mark eats the label's room on a phone, and the fill already
       // says which one is chosen.

@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../deep_link_urls.dart';
 import 'package:entrelares_db_contracts/models/invite_info.dart';
 import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/consent_row.dart';
 import '../widgets/role_picker.dart';
 import '../widgets/ui/ui.dart';
 
@@ -577,43 +577,10 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: _acceptedTerms,
-              // U-32: the sentence beside the box is three texts and two
-              // buttons, none of them the box's own — a screen reader heard
-              // an unnamed checkbox. The box carries the whole sentence.
-              semanticLabel: '${l[K.registerConsentAccept]} '
-                  '${l[K.commonPrivacyPolicy]} '
-                  '${l[K.registerConsentAnd]} '
-                  '${l[K.commonTermsOfUse]}',
-              onChanged: (value) =>
-                  setState(() => _acceptedTerms = value ?? false),
-            ),
-            Expanded(
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(l[K.registerConsentAccept],
-                      style: theme.textTheme.bodySmall),
-                  TextButton(
-                    onPressed: () => _openWebPage(DeepLinkUrls.privacy),
-                    child: Text(l[K.commonPrivacyPolicy],
-                        style: theme.textTheme.bodySmall),
-                  ),
-                  Text(l[K.registerConsentAnd],
-                      style: theme.textTheme.bodySmall),
-                  TextButton(
-                    onPressed: () => _openWebPage(DeepLinkUrls.terms),
-                    child: Text(l[K.commonTermsOfUse],
-                        style: theme.textTheme.bodySmall),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        ConsentRow(
+          value: _acceptedTerms,
+          onChanged: (v) => setState(() => _acceptedTerms = v),
+          onOpen: _openWebPage,
         ),
         // Empty in PT-BR by construction — the binding version IS the
         // Portuguese one, so only an English reader is told so.

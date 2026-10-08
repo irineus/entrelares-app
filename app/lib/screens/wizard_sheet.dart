@@ -654,12 +654,18 @@ class _WizardSheetState extends State<_WizardSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
       AppFieldLabel(l[K.wizCycleBlocks]),
+      // U-64 (T-103 audit): the number, the "×" and the bin sat on hand-tuned
+      // top paddings (20, 20, 12) that matched neither field — rows 1 and 2
+      // read misaligned. Everything is centred on the row now, and the rows
+      // are spaced alike.
       for (final (index, block) in _blocks.indexed)
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Padding(
+          padding: const EdgeInsets.only(bottom: Spacing.xs),
+          child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 20, right: Spacing.sm),
+              padding: const EdgeInsets.only(right: Spacing.sm),
               child: Text('${index + 1}.'),
             ),
             Expanded(
@@ -683,8 +689,7 @@ class _WizardSheetState extends State<_WizardSheet> {
               ),
             ),
             const Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: Spacing.xs, vertical: 20),
+              padding: EdgeInsets.symmetric(horizontal: Spacing.xs),
               child: Text('×'),
             ),
             SizedBox(
@@ -705,17 +710,15 @@ class _WizardSheetState extends State<_WizardSheet> {
             ),
             // F-28: any non-empty cycle is valid — only the last block stays.
             if (_blocks.length > 1)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: IconButton(
-                  tooltip: l[K.wizRemoveBlock],
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  onPressed: _generating
-                      ? null
-                      : () => setState(() => _blocks.removeAt(index)),
-                ),
+              IconButton(
+                tooltip: l[K.wizRemoveBlock],
+                icon: const Icon(Icons.delete_outline, size: 18),
+                onPressed: _generating
+                    ? null
+                    : () => setState(() => _blocks.removeAt(index)),
               ),
           ],
+          ),
         ),
       const SizedBox(height: Spacing.xs),
       // U-28 QA: a full-width outlined action, as the web draws it. A bare

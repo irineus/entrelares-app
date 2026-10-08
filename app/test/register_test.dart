@@ -167,6 +167,31 @@ void main() {
       expect(ds.signUps, isEmpty);
     });
 
+    // U-64 (T-103 audit): an empty Continuar said ONE sentence under the
+    // button, and only the first. Every empty field says it, on itself; typing
+    // answers that field alone.
+    testWidgets('an empty Continuar names every field on the field itself',
+        (tester) async {
+      await pumpRegister(tester, dataSource: source());
+      await tapVisible(tester, continueButton(l));
+      await tester.pumpAndSettle();
+
+      Finder onField(String label, String key) => find.descendant(
+          of: find.widgetWithText(TextField, label),
+          matching: find.text(l[key]));
+      expect(onField(l[K.registerFullName], K.registerErrorNameRequired),
+          findsOne);
+      expect(onField(l[K.commonEmail], K.registerErrorEmailRequired), findsOne);
+      expect(onField(l[K.commonPassword], K.registerErrorPasswordShort),
+          findsOne);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFullName]), 'Ana');
+      await tester.pump();
+      expect(find.text(l[K.registerErrorNameRequired]), findsNothing);
+      expect(find.text(l[K.registerErrorEmailRequired]), findsOne);
+    });
+
     testWidgets('a valid account moves on without touching the server',
         (tester) async {
       final ds = source();
