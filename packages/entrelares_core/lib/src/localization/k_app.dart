@@ -931,6 +931,19 @@ abstract final class KApp {
   static const String chatReadEntry = 'app.chat.readEntry';
   static const String chatSearch = 'app.chat.search';
   static const String chatSearchClose = 'app.chat.searchClose';
+
+  /// U-66: the permanence the opening notice states, said again where the
+  /// text is written — the notice scrolls away once the thread has history.
+  static const String chatComposerPermanent = 'app.chat.composerPermanent';
+
+  /// U-66: a search result's way back into the thread, around it.
+  static const String chatShowInThread = 'app.chat.showInThread';
+
+  /// U-66: a quote's way to the text it quotes (read by a screen reader).
+  static const String chatOpenQuoted = 'app.chat.openQuoted';
+
+  /// U-66: "Ir para a data" in the search bar.
+  static const String chatGoToDate = 'app.chat.goToDate';
   static const String chatSearchEmpty = 'app.chat.searchEmpty';
   static const String chatLoadOlder = 'app.chat.loadOlder';
   static const String premMethodPlay = 'app.billing.methodPlay';
@@ -1693,6 +1706,10 @@ abstract final class KApp {
     chatReadEntry,
     chatSearch,
     chatSearchClose,
+    chatComposerPermanent,
+    chatShowInThread,
+    chatOpenQuoted,
+    chatGoToDate,
     chatSearchEmpty,
     chatLoadOlder,
     premMethodPlay,
@@ -2614,6 +2631,10 @@ abstract final class StringsAppPtBr {
     KApp.chatReadEntry: '{0} ({1})',
     KApp.chatSearch: 'Buscar na conversa',
     KApp.chatSearchClose: 'Fechar a busca',
+    KApp.chatComposerPermanent: 'Permanente: não se edita nem se apaga.',
+    KApp.chatShowInThread: 'Ver na conversa',
+    KApp.chatOpenQuoted: 'Ir para a mensagem citada',
+    KApp.chatGoToDate: 'Ir para a data',
     KApp.chatSearchEmpty: 'Nada encontrado para "{0}".',
     KApp.chatLoadOlder: 'Mostrar mensagens anteriores',
     KApp.premMethodPlay: 'Google Play',
@@ -3528,6 +3549,10 @@ abstract final class StringsAppEn {
     KApp.chatReadEntry: '{0} ({1})',
     KApp.chatSearch: 'Search the chat',
     KApp.chatSearchClose: 'Close the search',
+    KApp.chatComposerPermanent: 'Permanent: cannot be edited or deleted.',
+    KApp.chatShowInThread: 'See in the chat',
+    KApp.chatOpenQuoted: 'Go to the quoted message',
+    KApp.chatGoToDate: 'Go to a date',
     KApp.chatSearchEmpty: 'Nothing found for "{0}".',
     KApp.chatLoadOlder: 'Show earlier messages',
     KApp.premMethodPlay: 'Google Play',

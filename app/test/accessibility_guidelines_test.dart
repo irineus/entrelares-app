@@ -1247,6 +1247,32 @@ void main() {
       });
     }
 
+    // U-66: the composer with its permanence line, a quote that is a way
+    // to the quoted text, and the search bar with "Ir para a data" and each
+    // result's "Ver na conversa" — at 360 dp and 1.3×.
+    _scene('chat thread, quote and search', (tester, dark) async {
+      final ds = chat.source()
+        ..chatMessages = [
+          chat.text(1, chat.bruno.id, 'A mensalidade da escola subiu'),
+          chat.text(2, chat.ana.id, 'Vamos conversar', quote: 1),
+        ];
+      await tester.pumpWidget(_host(
+          Scaffold(
+              body: ChatView(
+                  dataSource: ds, onOpenPlan: () {}, now: () => chat.today)),
+          dark: dark));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[KApp.chatComposerPermanent]), findsOneWidget);
+      await _measure(tester, 'chat thread with a quote');
+      await tester.tap(find.byKey(const ValueKey('chat-search')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byKey(const ValueKey('chat-search-field')), 'mensalidade');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('chat-show-1')), findsOneWidget);
+      await _measure(tester, 'chat search with results');
+    });
+
     _scene('custom roles', (tester, dark) async {
       await tester.pumpWidget(
         _host(CustomRolesScreen(dataSource: roles.source()), dark: dark),
