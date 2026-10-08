@@ -985,9 +985,7 @@ class _AgendaEventSheetState extends State<AgendaEventSheet> {
               for (final m in AgendaNotify.remindOffsets)
                 ChoiceChip(
                   key: ValueKey('agenda-remind-$m'),
-                  label: Text(m == 0
-                      ? l[KApp.agendaRemindAtStart]
-                      : l.format(KApp.agendaRemindBefore, [m])),
+                  label: Text(AgendaNotify.remindLabel(l, m)),
                   selected: _remind == m,
                   onSelected: _busy ? null : (_) => pick(() => _remind = m),
                 ),

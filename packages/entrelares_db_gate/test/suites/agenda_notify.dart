@@ -209,6 +209,39 @@ void agendaNotifyTests(GateFixture fx) {
       expect((await eventRow(later))['reminded_at'], isNull);
     });
 
+    // F-105: 2 h, 1 day before, and "na véspera às 19h" (-1) — each due
+    // already, each sent once.
+    test('F-105 · the new offsets and the eve at 19h fire once each',
+        () async {
+      Future<int> armed(int minutesFromNow, int remind, String body) async {
+        final at = spIn(minutesFromNow);
+        return add(fam.admin, DateTime(at.year, at.month, at.day), 'note',
+            body: body, start: hm(at), notifyTo: 'self', remind: remind);
+      }
+
+      // Due 10 min ago: start in 110 min, reminded 120 before.
+      final twoHours = await armed(110, 120, 'f105 duas horas');
+      // Due 5 min ago: start tomorrow, 5 min earlier than now, a day before.
+      final dayBefore = await armed(24 * 60 - 5, 1440, 'f105 um dia');
+      // The eve of an item 30 min from now was yesterday at 19h — due.
+      final eve = await armed(30, -1, 'f105 véspera');
+      // A day before an item two days away is not due yet.
+      final notYet = await armed(2 * 24 * 60, 1440, 'f105 ainda não');
+
+      for (var i = 0; i < 2; i++) {
+        await fx.service.rpc<dynamic>('agenda_reminders_due',
+            params: {'p_family_id': fam.familyId});
+      }
+      for (final id in [twoHours, dayBefore, eve]) {
+        expect((await eventRow(id))['reminded_at'], isNotNull, reason: '$id');
+      }
+      expect((await eventRow(notYet))['reminded_at'], isNull);
+      final sent = (await inbox(fam.adminProfile.id, 'agenda_reminder'))
+          .where((n) => '${n['message']}'.contains('f105'))
+          .toList();
+      expect(sent, hasLength(3), reason: 'once each');
+    });
+
     test('moving the moment re-arms the reminder', () async {
       final at = spIn(5);
       final day = DateTime(at.year, at.month, at.day);

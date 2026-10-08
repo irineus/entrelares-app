@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:test/test.dart';
 
@@ -220,5 +222,45 @@ void main() {
         expect(l[key], l[kind.labelKey], reason: '$lang ${kind.wire}');
       }
     }
+  });
+
+  // F-105: the reminders reach the evening before — a closed catalogue that
+  // the server's CHECK repeats (migration 20261008180000).
+  group('F-105 · reminders', () {
+    final pt = Localization(AppLanguage.ptBr);
+    test('the catalogue and its words', () {
+      expect(AgendaNotify.remindOffsets,
+          [0, 15, 30, 60, 120, 180, 1440, AgendaNotify.eveAt19]);
+      expect(
+          [for (final m in AgendaNotify.remindOffsets)
+            AgendaNotify.remindLabel(pt, m)],
+          ['Na hora', '15 min antes', '30 min antes', '60 min antes',
+           '2 h antes', '3 h antes', '1 dia antes', 'Na véspera, 19h']);
+    });
+
+    test('every catalogue value is accepted; anything else is not', () {
+      for (final m in AgendaNotify.remindOffsets) {
+        expect(
+            AgendaNotify(to: AgendaAudience.family, remindMinutes: m)
+                .validate(start: '08:00'),
+            isNull,
+            reason: '$m');
+      }
+      expect(
+          AgendaNotify(to: AgendaAudience.family, remindMinutes: 45)
+              .validate(start: '08:00'),
+          contains('Escolha um lembrete da lista'));
+    });
+
+    test('the server says the same sentence', () {
+      final sql = File('../../supabase/migrations/'
+              '20261008180000_f105_agenda_eve_reminders.sql')
+          .readAsStringSync();
+      expect(
+          sql,
+          contains(AgendaNotify(to: AgendaAudience.family, remindMinutes: 45)
+              .validate(start: '08:00')!));
+      expect(sql, contains('IN (0, 15, 30, 60, 120, 180, 1440, -1)'));
+    });
   });
 }
