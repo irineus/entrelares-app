@@ -291,8 +291,12 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                   const SizedBox(width: Spacing.sm),
                   Flexible(
                     child: Text(
+                      // U-63: a day with no time "started", it is not late.
                       l[tag == SwapPriorityTag.overdue
-                          ? K.frozenOverdue
+                          ? (request.toView().dayStartedWithoutTime(
+                                  DateTime.now())
+                              ? KApp.frozenDayStarted
+                              : K.frozenOverdue)
                           : K.frozenUrgent],
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -375,9 +379,10 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                     // (`expiry + 48h`, the F-24 anchor) and never a window
                     // measured from the request — which is what the old
                     // "em 24h" copy described and no request ever had.
+                    // U-63: said as a person says it — "sábado, 10/10, à 0h".
                     infoRow(
                         K.frozenAutoApproval,
-                        l.formatDateTime(autoApprovalDeadline(
+                        l.formatDeadline(autoApprovalDeadline(
                             request.scheduleDate,
                             request.proposedHandoffTime))),
                   ],

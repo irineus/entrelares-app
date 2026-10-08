@@ -113,6 +113,14 @@ void main() {
               'sending the sentence with no instant, for every request.');
       expect(source, contains('notifRender.autoReminder.deadline'),
           reason: 'the deadline sentence is gone from the push catalog.');
+      // U-63: the instant is said as a person says it, by the twin of
+      // Dart's `formatDeadline` — the weekday tables and the à/às rule.
+      expect(source, contains('formatDeadlineIn(lang, deadline)'));
+      for (final day in ['segunda-feira', 'terça-feira', 'quarta-feira',
+          'quinta-feira', 'sexta-feira', 'sábado', 'domingo']) {
+        expect(source, contains('"$day"'));
+      }
+      expect(source, contains('h <= 1 ? "à" : "às"'));
       expect(source, contains('fmt(lang, K.autoReminder, [date])'),
           reason: 'a row written before F-60 carries no deadline and must '
               'still render — in the reader language, not in stored PT-BR.');
@@ -125,6 +133,9 @@ void main() {
       expect(body, contains("'deadline', deadline_iso"),
           reason: 'the reminder no longer carries the instant, so every '
               'reader falls back to the sentence without one.');
+      // U-63: the stored PT-BR instant is `pt_deadline_words`, the SQL twin
+      // of Dart's `formatDeadline`.
+      expect(body, contains('public.pt_deadline_words(deadline AT TIME ZONE tz)'));
       expect(body, contains("'YYYY-MM-DD\"T\"HH24:MI'"),
           reason: 'the deadline must be the wall clock the clients parse; '
               'any other shape is refused by both renderers and silently '

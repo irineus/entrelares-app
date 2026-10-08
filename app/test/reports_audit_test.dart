@@ -324,7 +324,7 @@ void main() {
         source(logs: [stamped(3, 28), stamped(2, 21), stamped(1, 14)]),
       );
 
-      expect(find.textContaining('definiu o horário das trocas'),
+      expect(find.textContaining('definiu o horário das entregas'),
           findsOneWidget);
       expect(find.textContaining('limpou o plano'), findsNothing);
       expect(find.text('3 dias atualizados'), findsOneWidget);

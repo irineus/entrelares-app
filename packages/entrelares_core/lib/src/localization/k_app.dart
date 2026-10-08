@@ -240,6 +240,12 @@ abstract final class KApp {
   static const String premAskAdmin = 'app.prem.askAdmin';
   static const String premAskAdmins = 'app.prem.askAdmins';
   static const String premAskAdminSent = 'app.prem.askAdminSent';
+  /// U-63: a day with NO handoff time is anchored at 00:00, so its request
+  /// read "ATRASADO — o horário de entrega já passou" at 00:01 — a time that
+  /// never existed. The state is said as what it is: the day has started.
+  static const String frozenDayStarted = 'app.frozen.dayStarted';
+  static const String calDayStartedAwaitingYou = 'app.cal.dayStartedAwaitingYou';
+  static const String notifTagDayStartedShort = 'app.notif.tagDayStartedShort';
 
   // ── F-56 pending member (invited, not yet joined) ──
   static const String famPendingBadge = 'app.fam.pendingBadge';
@@ -1102,6 +1108,9 @@ abstract final class KApp {
     premAskAdmin,
     premAskAdmins,
     premAskAdminSent,
+    frozenDayStarted,
+    calDayStartedAwaitingYou,
+    notifTagDayStartedShort,
     famPendingBadge,
     famPendingHint,
     famInviteName,
@@ -1740,7 +1749,7 @@ abstract final class StringsAppPtBr {
     KApp.errCalendarLoad: 'Não foi possível carregar o calendário.',
     KApp.sheetNoResponsible: 'Dia sem responsável definido.',
     KApp.sheetPlanned: 'Planejado: {0}',
-    KApp.sheetHandoffAt: 'Troca às {0}',
+    KApp.sheetHandoffAt: 'Entrega às {0}',
     KApp.sheetNote: 'Observação: {0}',
     KApp.sheetWhoQuestion: 'Quem fica com a criança neste dia?',
     KApp.sheetSave: 'Salvar',
@@ -1921,6 +1930,10 @@ abstract final class StringsAppPtBr {
     KApp.premAskAdmin: 'Pedir ao administrador',
     KApp.premAskAdmins: 'Pedir aos administradores',
     KApp.premAskAdminSent: 'Pedido enviado para {0}.',
+    KApp.frozenDayStarted:
+        'O DIA JÁ COMEÇOU — sem horário de entrega, o prazo conta da meia-noite',
+    KApp.calDayStartedAwaitingYou: 'O dia já começou. Aguardando sua resposta',
+    KApp.notifTagDayStartedShort: 'DIA INICIADO',
     KApp.famPendingBadge: 'Ainda não entrou',
     KApp.famPendingHint:
         'Sem conta ainda: você planeja os dias dessa pessoa, e as trocas '
@@ -2652,7 +2665,7 @@ abstract final class StringsAppEn {
     KApp.errCalendarLoad: 'Could not load the calendar.',
     KApp.sheetNoResponsible: 'No caregiver assigned to this day.',
     KApp.sheetPlanned: 'Planned: {0}',
-    KApp.sheetHandoffAt: 'Handoff at {0}',
+    KApp.sheetHandoffAt: 'Handover at {0}',
     KApp.sheetNote: 'Note: {0}',
     KApp.sheetWhoQuestion: 'Who has the child on this day?',
     KApp.sheetSave: 'Save',
@@ -2828,6 +2841,10 @@ abstract final class StringsAppEn {
     KApp.premAskAdmin: 'Ask the administrator',
     KApp.premAskAdmins: 'Ask the administrators',
     KApp.premAskAdminSent: 'Request sent to {0}.',
+    KApp.frozenDayStarted:
+        'THE DAY HAS STARTED — with no handover time, the deadline counts from midnight',
+    KApp.calDayStartedAwaitingYou: 'The day has started. Awaiting your reply',
+    KApp.notifTagDayStartedShort: 'DAY STARTED',
     KApp.famPendingBadge: 'Not joined yet',
     KApp.famPendingHint:
         'No account yet: you plan this person\'s days, and swaps become '
@@ -3430,7 +3447,7 @@ abstract final class StringsAppEn {
     KApp.wizAnchoredStart: 'This pattern starts on a Friday: the start moved to {0}.',
     KApp.wizContinues: 'Continues the plan: the day before, the child was with {0}.',
     KApp.wizPhasedStart: 'The plan starts on {0}, already in step with this pattern, with no empty days.',
-    KApp.errHandoffParty: 'Only who hands the child over or receives them on this day can change the handoff time.',
+    KApp.errHandoffParty: 'Only who hands the child over or receives them on this day can change the handover time.',
     KApp.noticeHandoffPartyOnly: 'The time belongs to who hands the child over and who receives them.',
     KApp.noticeHandoffPartySend: 'To tell about a change of plans, send a {0}.',
     KApp.noticeHandoffPartySendLink: 'notice',

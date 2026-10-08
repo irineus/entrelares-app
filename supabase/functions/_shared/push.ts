@@ -277,7 +277,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.revertRejected": "Reversão recusada",
 		"notifRender.title.revertCancelled": "Pedido de reversão cancelado",
 		"notifRender.autoReminder": "A solicitação do dia {0} será aprovada automaticamente se não houver resposta.",
-		"notifRender.autoReminder.deadline": "A solicitação do dia {0} será aprovada automaticamente em {1} às {2} se não houver resposta.",
+		"notifRender.autoReminder.deadline": "A solicitação do dia {0} será aprovada automaticamente se não houver resposta até {1}.",
 		"notifRender.title.autoReminder.eve": "Pedido para amanhã sem resposta",
 		"notifRender.autoReminder.eve": "{0} fez um pedido para amanhã, {1}, que ainda espera a sua resposta.",
 		"notifRender.autoApproved.requester": "A solicitação do dia {0} foi aprovada automaticamente por falta de resposta.",
@@ -404,7 +404,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.revertRejected": "Revert declined",
 		"notifRender.title.revertCancelled": "Revert request cancelled",
 		"notifRender.autoReminder": "The request for {0} will be approved automatically if nobody replies.",
-		"notifRender.autoReminder.deadline": "The request for {0} will be approved automatically on {1} at {2} if nobody replies.",
+		"notifRender.autoReminder.deadline": "The request for {0} will be approved automatically if nobody replies by {1}.",
 		"notifRender.title.autoReminder.eve": "Request for tomorrow still unanswered",
 		"notifRender.autoReminder.eve": "{0} made a request for tomorrow, {1}, that is still waiting for your answer.",
 		"notifRender.autoApproved.requester": "The request for {0} was approved automatically for lack of a reply.",
@@ -543,6 +543,31 @@ function splitDeadline(value: string | undefined): { date: string; time: string 
 		at.getUTCHours() !== h || at.getUTCMinutes() !== mi
 	) return null;
 	return { date: `${match[1]}-${match[2]}-${match[3]}`, time: `${match[4]}:${match[5]}` };
+}
+
+/// U-63: the deadline as a person says it — the twin of Dart's
+/// `formatDeadline` (core `date_formats.dart`) and of SQL's
+/// `pt_deadline_words`: "sábado, 10/10, à 0h" / "domingo, 11/10, às 18h30" ·
+/// "Saturday, 10 Oct, at 12 AM" / "Sunday, 11 Oct, at 6:30 PM". PT-BR says "à"
+/// for the singular hours (0h, 1h) and "às" for the rest.
+const PT_WEEKDAYS_FULL = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+const EN_WEEKDAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const EN_MONTHS_ABBREV = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function formatDeadlineIn(lang: Lang, deadline: { date: string; time: string }): string {
+	const [y, mo, d] = deadline.date.split("-").map(Number) as [number, number, number];
+	const [h, mi] = deadline.time.split(":").map(Number) as [number, number];
+	const weekday = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+	const dd = String(d).padStart(2, "0");
+	const mm = String(mi).padStart(2, "0");
+	if (lang === "en") {
+		const h12 = h % 12 === 0 ? 12 : h % 12;
+		const ampm = h < 12 ? "AM" : "PM";
+		const time = mi === 0 ? `${h12} ${ampm}` : `${h12}:${mm} ${ampm}`;
+		return `${EN_WEEKDAYS_FULL[weekday]}, ${dd} ${EN_MONTHS_ABBREV[mo - 1]}, at ${time}`;
+	}
+	const prep = h <= 1 ? "à" : "às";
+	const time = mi === 0 ? `${h}h` : `${h}h${mm}`;
+	return `${PT_WEEKDAYS_FULL[weekday]}, ${dd}/${String(mo).padStart(2, "0")}, ${prep} ${time}`;
 }
 
 /// F-34: "R$ 1.234,56" / "R$1,234.56" from integer cents (a string in params).
@@ -705,11 +730,7 @@ export function renderPush(
 			const deadline = splitDeadline(params["deadline"]);
 			body = deadline === null
 				? fmt(lang, K.autoReminder, [date])
-				: fmt(lang, K.autoReminderDeadline, [
-					date,
-					formatDateIn(lang, deadline.date),
-					formatTimeIn(lang, deadline.time) ?? deadline.time,
-				]);
+				: fmt(lang, K.autoReminderDeadline, [date, formatDeadlineIn(lang, deadline)]);
 			break;
 		}
 

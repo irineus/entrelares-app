@@ -131,6 +131,22 @@ void main() {
           SwapPriorityTag.overdue);
     });
 
+    test('U-63: overdue on a day with NO time is "the day started"; with a '
+        'time it is late', () {
+      SwapRequestView view(String? time) => SwapRequestView(
+          id: 1,
+          scheduleDate: _day,
+          status: 'pending',
+          requestingProfileId: 1,
+          targetProfileId: 2,
+          proposedHandoffTime: time);
+      final earlyOnTheDay = DateTime(2026, 7, 20, 1);
+      expect(view(null).dayStartedWithoutTime(earlyOnTheDay), isTrue);
+      expect(view('00:30:00').dayStartedWithoutTime(earlyOnTheDay), isFalse);
+      expect(view(null).dayStartedWithoutTime(DateTime(2026, 7, 19, 23)),
+          isFalse, reason: 'not overdue yet');
+    });
+
     test('the "HH:mm:ss" wire form parses like "HH:mm"', () {
       expect(computePriorityTag(_day, '12:00:00', DateTime(2026, 7, 20, 12)),
           SwapPriorityTag.overdue);

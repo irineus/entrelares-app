@@ -750,9 +750,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// F-20 urgency as a pill. The banner it replaces took a full line per card;
   /// on a row the state is a badge beside the date, and the sheet still says
   /// the whole sentence.
-  Widget _tagBadge(SwapPriorityTag tag, Localization l) => _statusBadge(
+  Widget _tagBadge(SwapPriorityTag tag, Localization l,
+          {bool dayStarted = false}) =>
+      _statusBadge(
+        // U-63: a day with no handoff time "started" — it is not late.
         l[tag == SwapPriorityTag.overdue
-            ? K.notifTagOverdueShort
+            ? (dayStarted
+                ? KApp.notifTagDayStartedShort
+                : K.notifTagOverdueShort)
             : K.notifTagUrgentShort],
         tone: tag == SwapPriorityTag.overdue
             ? context.tokens.danger
@@ -980,7 +985,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           l[isRevert ? K.notifRevertPendingBadge : K.notifPendingBadge],
           tone: isRevert ? context.tokens.accent : context.tokens.warning,
         ),
-        if (tag != SwapPriorityTag.none) _tagBadge(tag, l),
+        if (tag != SwapPriorityTag.none)
+          _tagBadge(tag, l,
+              dayStarted: req.toView().dayStartedWithoutTime(now)),
       ],
       // U-60: a sentence, not "Solicitante: · Proposto:" to decode — who
       // asks, what for, and the weekday; then the message and the deadline.
@@ -997,7 +1004,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           l.format(KApp.swapRowMessage, [requester, message]),
         // F-60: a request waiting on YOU says when it stops waiting.
         '${l[K.frozenAutoApproval]}: '
-            '${l.formatDateTime(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
+            '${l.formatDeadline(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
       ],
       onTap: canAnswer ? null : () => _openRequest(req),
       actions: !canAnswer
@@ -1063,7 +1070,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             semantics: l[K.notifResolvedStateTitle],
           ),
         _statusBadge(statusKey == null ? req.status : l[statusKey]),
-        if (isPending && tag != SwapPriorityTag.none) _tagBadge(tag, l),
+        if (isPending && tag != SwapPriorityTag.none)
+          _tagBadge(tag, l,
+              dayStarted: req.toView().dayStartedWithoutTime(now)),
         // F-24: resolved by the 48h server cron.
         if (req.isAutoResolved)
           _statusBadge(l[K.notifAutoBadge],
@@ -1078,7 +1087,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         // do arithmetic on a window that was never measured from here.
         if (isPending)
           '${l[K.frozenAutoApproval]}: '
-              '${l.formatDateTime(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
+              '${l.formatDeadline(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
         // F-44 on a RESOLVED request: the sheet never opens for it again, so
         // the two messages live on the row — the sender's own and the
         // approver's note or rejection reason. A pending one shows them in

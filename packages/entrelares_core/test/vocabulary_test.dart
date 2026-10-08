@@ -217,6 +217,47 @@ void main() {
     expect(pt[KApp.sumPlannedRemaining], 'Planejado restante');
   });
 
+  // U-63 (owner, 07/10/2026): the handoff — the hour the child changes hands —
+  // is an "entrega"; "troca" is a SWAP and nothing else. The audit saw
+  // "Trocado" beside "Troca às 18:00" on one screen, and "Próxima troca" for
+  // the next handoff on the Hoje card.
+  test('the handoff is an "entrega"; "troca" never names it', () {
+    final pt = catalogs['pt-BR']!;
+    final handoffAsTroca = RegExp(
+        r'hor[aá]rios? d[aeo]s? trocas?|trocas? às|pr[oó]xima troca|'
+        r'dias? de troca\b|trocas? com hor[aá]rio|trocas? sem hor[aá]rio',
+        caseSensitive: false);
+    for (final key in [...K.allKeys, ...KApp.allKeys]) {
+      expect(handoffAsTroca.hasMatch(pt[key]), isFalse,
+          reason: '$key says "${pt[key]}"');
+    }
+    expect(pt[K.cardNextHandoff], 'Próxima entrega');
+    expect(pt[K.editorHandoffTime], 'Horário de entrega');
+    expect(pt[KApp.sheetHandoffAt], 'Entrega às {0}');
+  });
+
+  // U-63: "agendamento"/"agendar" are gone from what the app says — the trail
+  // read "atualizou o agendamento" for an edit of the PLAN (U-34: planejado).
+  test('no "agendamento" and no "agendar" in either catalog', () {
+    final pt = catalogs['pt-BR']!;
+    final word = RegExp(r'agendament|agendar|reagend', caseSensitive: false);
+    for (final key in [...K.allKeys, ...KApp.allKeys]) {
+      expect(word.hasMatch(pt[key]), isFalse,
+          reason: '$key says "${pt[key]}"');
+    }
+  });
+
+  // U-63: a batch failure is "não processada (DD/MM)", never "ignorada" — the
+  // reader did not skip it — and the kept days say "com pedido pendente",
+  // never the internal "congelados".
+  test('batch results speak the reader\'s words', () {
+    final pt = catalogs['pt-BR']!;
+    expect(pt[K.sumIgnoredOne], '{0} não processada ({1})');
+    expect(pt[K.sumIgnoredMany], '{0} não processadas ({1})');
+    expect(pt[K.sumKeptFrozenOne], contains('com pedido pendente'));
+    expect(pt[K.bulkErrNoEligibleDays], isNot(contains('congelad')));
+  });
+
   test('EN: what the system sends is a "notification", never an "alert"', () {
     // "System alert" is the heading of an operator banner, not a push.
     const survivors = {K.homeSystemAlert};
