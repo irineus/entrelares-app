@@ -308,9 +308,32 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// what it always had: its rows are all in the family lane.
   void _applyLaneView() {
     final lane = _perChild ? _lane : null;
+    final view = _laneViewOf(_monthRows, _monthFrozen, _monthEvents);
+    final upcoming = LaneViewRules.view<CareSchedule>(
+      rows: _upcomingRows,
+      isoOf: (d) => CareSchedule.isoDate(d.scheduleDate),
+      childOf: (d) => d.childId,
+      effectiveOf: (d) => d.effectiveParentId,
+      lane: lane,
+      childOrder: [for (final c in _children) c.id],
+    );
+    _daysByIso = view.days;
+    _divergentByIso = view.divergent;
+    _agendaByIso = view.agenda;
+    _frozenByIso = view.frozen;
+    _upcoming = upcoming.byIso.values.toList()
+      ..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
+  }
+
+  /// The grid's maps for one month's reads, in the lane on screen — the
+  /// visible month's ([_applyLaneView]) and, since T-106, a cached
+  /// neighbour's while the finger drags it in ([_neighbourView]).
+  _MonthView _laneViewOf(List<CareSchedule> rows, List<SwapRequest> frozenRows,
+      List<ChildEvent> events) {
+    final lane = _perChild ? _lane : null;
     final order = [for (final c in _children) c.id];
     final days = LaneViewRules.view<CareSchedule>(
-      rows: _monthRows,
+      rows: rows,
       isoOf: (d) => CareSchedule.isoDate(d.scheduleDate),
       childOf: (d) => d.childId,
       effectiveOf: (d) => d.effectiveParentId,
@@ -320,32 +343,37 @@ class _CalendarScreenState extends State<CalendarScreen>
     // Web parity (Home's frozenRequests.First per day): one request per date
     // and lane — the DB's one-pending-per-date-per-lane index guarantees it.
     final frozen = LaneViewRules.view<SwapRequest>(
-      rows: _monthFrozen,
+      rows: frozenRows,
       isoOf: (r) => CareSchedule.isoDate(r.scheduleDate),
       childOf: (r) => r.childId,
       effectiveOf: (r) => r.proposedActualParentId,
       lane: lane,
       childOrder: order,
     );
-    final upcoming = LaneViewRules.view<CareSchedule>(
-      rows: _upcomingRows,
-      isoOf: (d) => CareSchedule.isoDate(d.scheduleDate),
-      childOf: (d) => d.childId,
-      effectiveOf: (d) => d.effectiveParentId,
-      lane: lane,
-      childOrder: order,
+    return _MonthView(
+      days: days.byIso,
+      divergent: _perChild && lane == null ? days.divergent : const {},
+      // F-07 (owner's QA, 29/09/2026): a child's lane marks only that child's
+      // items and the family's notes; Todas marks them all.
+      agenda: _groupAgenda([
+        for (final e in events)
+          if (lane == null || e.childId == null || e.childId == lane) e,
+      ]),
+      frozen: frozen.byIso,
     );
-    _daysByIso = days.byIso;
-    _divergentByIso = _perChild && lane == null ? days.divergent : const {};
-    // F-07 (owner's QA, 29/09/2026): a child's lane marks only that child's
-    // items and the family's notes; Todas marks them all.
-    _agendaByIso = _groupAgenda([
-      for (final e in _monthEvents)
-        if (lane == null || e.childId == null || e.childId == lane) e,
-    ]);
-    _frozenByIso = frozen.byIso;
-    _upcoming = upcoming.byIso.values.toList()
-      ..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
+  }
+
+  /// T-106: a cached month's view for a page that is not the visible one —
+  /// derived once per lane, so a repaint during the drag costs nothing.
+  _MonthView _neighbourView(DateTime month) {
+    final data = _monthCache[_monthKey(month)];
+    if (data == null) return _MonthView.empty;
+    final key = '$_perChild|$_lane|${[for (final c in _children) c.id]}';
+    if (data.viewKey != key) {
+      data.view = _laneViewOf(data.rows, data.frozen, data.events);
+      data.viewKey = key;
+    }
+    return data.view!;
   }
 
   bool _loading = true;
@@ -622,6 +650,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         _monthFrozen = snap.frozen;
         _loadedMonth = month;
         _loading = false;
+        _monthLoading = false;
         _loadError = null;
       }
       _applyLaneView();
@@ -729,9 +758,11 @@ class _CalendarScreenState extends State<CalendarScreen>
           _settingsRead = true;
         }
       });
-      if ((agendaTurnedOn || modeChanged) && _loadedMonth != null) {
-        _load(silent: true);
-      }
+      // T-106: the load reads every month half the moment it starts, so one
+      // already started read without the flag even when it has not landed —
+      // the old `_loadedMonth != null` guard only held while the reads ran
+      // one after another and reached the agenda after this answer.
+      if (agendaTurnedOn || modeChanged) _load(silent: true);
     } finally {
       _horizonInFlight = false;
       if (mounted) {
@@ -840,6 +871,185 @@ class _CalendarScreenState extends State<CalendarScreen>
   DateTime _monthForPage(int page) =>
       DateTime(_anchorMonth.year, _anchorMonth.month + (page - _basePage), 1);
 
+  // ── T-106: the month half and the context half of a load ────────────────
+  //
+  // A swipe used to run every read the screen has, one after another, each a
+  // round trip through the gateway — 10 to 14 of them, 2–3 s, when only the
+  // three month reads change with the month. Now a swipe reads the month
+  // alone (cached months paint at once and are re-read in silence), every
+  // other reload reads both halves, and inside each half the reads run side
+  // by side. The context (members, today, the strips) stays fresh through
+  // Realtime, resume, the poll, every write and pull-to-refresh (owner,
+  // 09/10/2026).
+
+  /// The months read so far, by [_monthKey] — memory only: the device copy
+  /// stays T-18's, the current month in the cache directory.
+  final Map<int, _MonthData> _monthCache = {};
+
+  /// Months whose prefetch is in flight.
+  final Set<int> _prefetching = {};
+
+  /// A read numbered below this started before the last full reload and may
+  /// predate a change that reload was asked for: it does not enter the cache.
+  int _cacheFloor = 0;
+
+  /// The number of the load whose month rows are on screen, and of the load
+  /// whose context is — a load older than either writes nothing over it.
+  int _shownSeq = 0;
+  int _contextSeq = 0;
+
+  /// The visible month's rows are still being read (a swipe to a month not
+  /// in the cache). Only the grid waits on it; the strips do not blink.
+  bool _monthLoading = false;
+
+  static int _monthKey(DateTime month) => month.year * 12 + month.month - 1;
+
+  /// A best-effort read: its failure keeps [fallback] and never fails the
+  /// load around it.
+  static Future<T> _orKeep<T>(Future<T> Function() read, T fallback) async {
+    try {
+      return await read();
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  /// The three reads that change with the month, side by side.
+  Future<_MonthData> _readMonth(DateTime month) async {
+    final ds = widget.dataSource;
+    final rowsF = ds.fetchMonth(month.year, month.month);
+    final frozenF = ds.fetchFrozenRequestsForMonth(month.year, month.month);
+    // F-55: the month's agenda marks. Best-effort like the avisos, and asked
+    // only while the module is on for this family.
+    final keep = _monthCache[_monthKey(month)]?.events ??
+        (_isOnScreen(month) ? _monthEvents : const <ChildEvent>[]);
+    final eventsF = _settings.childAgendaEnabled
+        ? _orKeep(
+            () => ds.fetchChildEvents(DateTime(month.year, month.month, 1),
+                DateTime(month.year, month.month + 1, 0)),
+            keep)
+        : Future.value(const <ChildEvent>[]);
+    await Future.wait([rowsF, frozenF, eventsF]);
+    return _MonthData(
+        rows: await rowsF, frozen: await frozenF, events: await eventsF);
+  }
+
+  /// Everything the screen reads that does not depend on the month, in two
+  /// waves: the invite nudge and the pending list need the members and the
+  /// reader's profile first.
+  Future<_ContextData> _readContext() async {
+    final ds = widget.dataSource;
+    final membersF = ds.fetchMembers();
+    final ownProfileF = ds.fetchOwnProfile();
+    final upcomingF = ds.fetchUpcoming(_today, nextHandoffWindowDays + 1);
+    // Best-effort: a family whose roles fail to load still gets its
+    // calendar, just without the "(Mãe)" suffix.
+    final rolesF = _orKeep(ds.fetchRoles, _roles);
+    // F-70: the plan-end strip's one fact. Best-effort like the avisos: a
+    // calendar must not fail to draw because the strip could not decide.
+    final lastPlannedDayF = _orKeep(ds.fetchLastPlannedDay, _lastPlannedDay);
+    // F-07: the children name the lanes; read for a per-child plan — and,
+    // since U-61, whenever the module is on: with exactly one child the
+    // calendar says the name where it said "a criança" (`_singleChildName`).
+    // Best-effort like the avisos.
+    final perChild = _family?.isPerChild ?? false;
+    final childrenF = perChild || _settings.childAgendaEnabled
+        ? _orKeep(ds.fetchChildren, _children)
+        : Future.value(const <Child>[]);
+    final yesterday = DateTime(_today.year, _today.month, _today.day - 1);
+    final yesterdayRowsF = perChild
+        ? _orKeep(() => ds.fetchUpcoming(yesterday, 0), _yesterdayRows)
+        : Future.value(const <CareSchedule>[]);
+    // F-52: today's avisos, and yesterday's row — the second end of a
+    // handover happening today. `_upcoming` starts at today, so yesterday is
+    // in `_daysByIso` on most days and MISSING on the 1st of a month; a
+    // carer whose eligibility depends on it would silently lose the action
+    // once a month, which is exactly the kind of defect nobody reports.
+    // Both reads are best-effort: a calendar must not fail to draw because
+    // an aviso could not be counted.
+    final todayNoticesF =
+        _orKeep(() => ds.fetchDayNotices(_today), _todayNotices);
+    final yesterdayRowF = _orKeep(() => ds.fetchDay(yesterday), _yesterdayRow);
+    await Future.wait([
+      membersF,
+      ownProfileF,
+      upcomingF,
+      rolesF,
+      lastPlannedDayF,
+      childrenF,
+      yesterdayRowsF,
+      todayNoticesF,
+      yesterdayRowF,
+    ]);
+    final members = await membersF;
+    final ownProfile = await ownProfileF;
+
+    // T-76: the nudge's own fact, asked only when the nudge could show at
+    // all — a family whose second seat is filled never pays for the read.
+    // It rides INSIDE the load for the same reason the rule refuses to run
+    // while loading: an answer that arrives after the frame is a prompt
+    // that blinks.
+    final nudgeApplies = inviteNudgeApplies(
+      isLoading: false,
+      isAdmin: ownProfile?.isAdmin ?? false,
+      activeMemberCount: members.where((m) => !m.hasLeft).length,
+    );
+    // Best-effort, and it fails towards SHOWING: the growth loop's only
+    // prompt must not disappear because one bounded read did. The worst case
+    // is an admin told to invite somebody they already invited.
+    final openInvitationF = nudgeApplies
+        ? _orKeep(ds.hasOpenInvitation, false)
+        : Future.value(false);
+    // U-60: best-effort like the avisos — the strip may wait for the next
+    // load, the calendar may not.
+    final pendingForMeF = ownProfile != null && !ownProfile.isViewer
+        ? _orKeep(() => ds.fetchPendingForMe(ownProfile.id), _pendingForMe)
+        : Future.value(const <SwapRequest>[]);
+    await Future.wait([openInvitationF, pendingForMeF]);
+
+    return _ContextData(
+      members: members,
+      roles: await rolesF,
+      ownProfile: ownProfile,
+      upcoming: await upcomingF,
+      openInvitation: await openInvitationF,
+      lastPlannedDay: await lastPlannedDayF,
+      children: await childrenF,
+      yesterdayRows: await yesterdayRowsF,
+      pendingForMe: await pendingForMeF,
+      todayNotices: await todayNoticesF,
+      yesterdayRow: await yesterdayRowF,
+    );
+  }
+
+  /// Keeps [data] for [month] unless a newer read of it is already kept, or
+  /// the read started before the last full reload.
+  void _storeMonth(DateTime month, _MonthData data, int seq) {
+    if (seq < _cacheFloor) return;
+    final key = _monthKey(month);
+    final kept = _monthCache[key];
+    if (kept != null && kept.seq > seq) return;
+    _monthCache[key] = data..seq = seq;
+  }
+
+  /// Whether a read of [month] numbered [seq] may replace the rows on screen:
+  /// the month is still the visible one and nothing newer is shown.
+  bool _mayShow(DateTime month, int seq) =>
+      month.year == _visibleMonth.year &&
+      month.month == _visibleMonth.month &&
+      seq > _shownSeq;
+
+  /// Puts [data] on screen as [month]'s rows. Call inside setState.
+  void _showMonthData(DateTime month, _MonthData data, int seq) {
+    _monthRows = data.rows;
+    _monthFrozen = data.frozen;
+    _monthEvents = data.events;
+    _loadedMonth = month;
+    _shownSeq = seq;
+    _monthLoading = false;
+  }
+
+  /// The full reload: both halves, side by side. Every caller but the swipe.
   Future<void> _load({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
     final seq = ++_loadSeq;
@@ -847,153 +1057,59 @@ class _CalendarScreenState extends State<CalendarScreen>
     // as another's.
     final month = _visibleMonth;
     if (!_settingsRead) unawaited(_loadHorizonInputs());
+    // T-106: whatever asked for this reload (a write, a Realtime event, the
+    // poll) may have changed any month — the others are read again, never
+    // served from before it.
+    _cacheFloor = seq;
+    _monthCache.removeWhere((key, _) => key != _monthKey(month));
     try {
-      final members = await widget.dataSource.fetchMembers();
-      // Best-effort: a family whose roles fail to load still gets its
-      // calendar, just without the "(Mãe)" suffix.
-      List<Role> roles = _roles;
-      try {
-        roles = await widget.dataSource.fetchRoles();
-      } catch (_) {/* keep whatever we had */}
-      final days = await widget.dataSource.fetchMonth(month.year, month.month);
-      final frozen = await widget.dataSource
-          .fetchFrozenRequestsForMonth(month.year, month.month);
-      final ownProfile = await widget.dataSource.fetchOwnProfile();
-      final upcoming = await widget.dataSource
-          .fetchUpcoming(_today, nextHandoffWindowDays + 1);
-      // T-76: the nudge's own fact, asked only when the nudge could show at
-      // all — a family whose second seat is filled never pays for the read.
-      // It rides INSIDE the load for the same reason the rule refuses to run
-      // while loading: an answer that arrives after the frame is a prompt
-      // that blinks.
-      final nudgeApplies = inviteNudgeApplies(
-        isLoading: false,
-        isAdmin: ownProfile?.isAdmin ?? false,
-        activeMemberCount: members.where((m) => !m.hasLeft).length,
-      );
-      var openInvitation = false;
-      if (nudgeApplies) {
-        try {
-          openInvitation = await widget.dataSource.hasOpenInvitation();
-        } catch (_) {
-          // Best-effort, and it fails towards SHOWING: the growth loop's only
-          // prompt must not disappear because one bounded read did. The worst
-          // case is an admin told to invite somebody they already invited.
-        }
-      }
-      // F-52: today's avisos, and yesterday's row — the second end of a
-      // handover happening today. `_upcoming` starts at today, so yesterday is
-      // in `_daysByIso` on most days and MISSING on the 1st of a month; a
-      // carer whose eligibility depends on it would silently lose the action
-      // once a month, which is exactly the kind of defect nobody reports.
-      // Both reads are best-effort: a calendar must not fail to draw because
-      // an aviso could not be counted.
-      // F-70: the plan-end strip's one fact. Best-effort like the avisos: a
-      // calendar must not fail to draw because the strip could not decide.
-      var lastPlannedDay = _lastPlannedDay;
-      try {
-        lastPlannedDay = await widget.dataSource.fetchLastPlannedDay();
-      } catch (_) {/* keep whatever we had */}
-      // F-55: the month's agenda marks. Best-effort like the avisos, and
-      // asked only while the module is on for this family.
-      var monthEvents = _monthEvents;
-      if (_settings.childAgendaEnabled) {
-        try {
-          monthEvents = await widget.dataSource.fetchChildEvents(
-              DateTime(month.year, month.month, 1),
-              DateTime(month.year, month.month + 1, 0));
-        } catch (_) {/* keep whatever we had */}
-      } else {
-        monthEvents = const [];
-      }
-      // F-07: the children name the lanes; read for a per-child plan — and,
-      // since U-61, whenever the module is on: with exactly one child the
-      // calendar says the name where it said "a criança" (`_singleChildName`).
-      // Best-effort like the avisos.
-      var children = _children;
-      var yesterdayRows = _yesterdayRows;
-      final perChild = _family?.isPerChild ?? false;
-      if (perChild || _settings.childAgendaEnabled) {
-        try {
-          children = await widget.dataSource.fetchChildren();
-        } catch (_) {/* keep whatever we had */}
-      } else {
-        children = const [];
-      }
-      if (perChild) {
-        try {
-          yesterdayRows = await widget.dataSource.fetchUpcoming(
-              DateTime(_today.year, _today.month, _today.day - 1), 0);
-        } catch (_) {/* keep whatever we had */}
-      } else {
-        yesterdayRows = const [];
-      }
-      // U-60: best-effort like the avisos — the strip may wait for the next
-      // load, the calendar may not.
-      var pendingForMe = _pendingForMe;
-      if (ownProfile != null && !ownProfile.isViewer) {
-        try {
-          pendingForMe = await widget.dataSource.fetchPendingForMe(ownProfile.id);
-        } catch (_) {/* keep whatever we had */}
-      } else {
-        pendingForMe = const [];
-      }
-      var todayNotices = _todayNotices;
-      var yesterdayRow = _yesterdayRow;
-      try {
-        todayNotices = await widget.dataSource.fetchDayNotices(_today);
-        yesterdayRow = await widget.dataSource
-            .fetchDay(DateTime(_today.year, _today.month, _today.day - 1));
-      } catch (_) {/* keep whatever we had */}
+      final monthF = _readMonth(month);
+      final contextF = _readContext();
+      await Future.wait([monthF, contextF]);
+      final data = await monthF;
+      final ctx = await contextF;
       if (!mounted) return;
+      _storeMonth(month, data, seq);
+      final showMonth = _mayShow(month, seq);
+      final showContext = seq > _contextSeq;
+      if (!showMonth && !showContext) return;
+      if (showContext) _contextSeq = seq;
       setState(() {
-        _members = members;
-        _roles = roles;
-        _monthRows = days;
-        _monthFrozen = frozen;
-        _children = children;
-        _yesterdayRows = yesterdayRows;
-        if (_lane != null && !children.any((c) => c.id == _lane)) _lane = null;
-        _ownProfile = ownProfile;
-        _upcomingRows = upcoming;
+        if (showContext) {
+          _members = ctx.members;
+          _roles = ctx.roles;
+          _children = ctx.children;
+          _yesterdayRows = ctx.yesterdayRows;
+          if (_lane != null && !ctx.children.any((c) => c.id == _lane)) {
+            _lane = null;
+          }
+          _ownProfile = ctx.ownProfile;
+          _upcomingRows = ctx.upcoming;
+          _todayNotices = ctx.todayNotices;
+          _pendingForMe = [
+            for (final r in ctx.pendingForMe)
+              if (!dateOnly(r.scheduleDate).isBefore(dateOnly(_today))) r
+          ]..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
+          _yesterdayRow = ctx.yesterdayRow;
+          _lastPlannedDay = ctx.lastPlannedDay;
+          _openInvitation = ctx.openInvitation;
+        }
+        if (showMonth) _showMonthData(month, data, seq);
         _applyLaneView();
-        _todayNotices = todayNotices;
-        _pendingForMe = [
-          for (final r in pendingForMe)
-            if (!dateOnly(r.scheduleDate).isBefore(dateOnly(_today))) r
-        ]..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
-        _yesterdayRow = yesterdayRow;
-        _lastPlannedDay = lastPlannedDay;
-        _monthEvents = monthEvents;
-        _applyLaneView();
-        _loadedMonth = month;
-        _openInvitation = openInvitation;
         _loading = false;
         _loadError = null;
       });
       _openPendingPlan();
-      _openPendingDay(seq);
-      final readAt = DateTime.now();
-      widget.connectivity?.loadedData(readAt);
-      // T-18: only the CURRENT month is worth a device copy — the door-of-the-
-      // school moment is today and this week, and one month keeps the copy
-      // small and its purpose obvious.
-      if (isCurrentMonth(month, _today)) {
-        unawaited(widget.offlineCache?.save(OfflineCalendarSnapshot(
-          savedAt: readAt,
-          month: month,
-          members: members,
-          roles: roles,
-          days: days,
-          frozen: frozen,
-          ownProfile: ownProfile,
-          upcoming: upcoming,
-        )));
+      if (showMonth) {
+        _openPendingDay(seq);
+        _afterMonthRead(month);
       }
+      if (!showContext) return;
+      final ownProfile = ctx.ownProfile;
       // U-28: the account button in every tab's app bar wears this.
       AccountScope.identityOf(context)?.adopt(
           fullName: ownProfile?.fullName, colorSlot: ownProfile?.colorSlot);
-      unawaited(_refreshOnboarding(ownProfile, members));
+      unawaited(_refreshOnboarding(ownProfile, ctx.members));
       if (ownProfile != null) unawaited(_loadPushReach(ownProfile.id));
       // T-76 — the impression the Flutter port lost: `invite_nudge_shown` fed
       // Umami until the 23/08/2026 cutover and then simply stopped, leaving
@@ -1008,31 +1124,137 @@ class _CalendarScreenState extends State<CalendarScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      final l = AppL10n.of(context).l;
-      final raw = e.toString();
-      final offline = isNetworkFailure(raw);
-      var monthOnScreen = _isOnScreen(month);
-      if (offline && !monthOnScreen) {
-        monthOnScreen = await _adoptCopyOf(month);
-        if (!mounted) return;
-      }
-      setState(() {
-        _loading = false;
-        // T-18: before, the F-23 poll's first failure with no signal replaced
-        // a perfectly good month with an error banner — the calendar went
-        // blank at the exact moment the reader needed it. What was read stays;
-        // the shell's strip says how old it is.
-        if (offline && monthOnScreen) {
-          _loadError = null;
-          return;
-        }
-        _loadError = isSessionExpired(raw)
-            ? sessionExpiredMessage(l)
-            : offline
-                ? l[KApp.offlineMonthNotLoaded]
-                : l[KApp.errCalendarLoad];
-      });
+      // T-106: a failure is news only for the month still on screen, and
+      // only while nothing newer has answered for it.
+      if (!_mayShow(month, seq)) return;
+      await _loadFailed(e, month);
     }
+  }
+
+  /// The swipe's load: the month alone. A cached month is on screen in the
+  /// same frame and re-read in silence (owner, 09/10/2026); any other waits
+  /// one parallel round trip under the grid's skeleton.
+  Future<void> _loadMonth(DateTime month) async {
+    final seq = ++_loadSeq;
+    final cached = _monthCache[_monthKey(month)];
+    setState(() {
+      if (cached != null) {
+        _showMonthData(month, cached, cached.seq);
+        _applyLaneView();
+        _loadError = null;
+      } else {
+        // Nothing of this month is on screen yet: any read of it may show.
+        _shownSeq = 0;
+        _monthLoading = true;
+      }
+    });
+    try {
+      final data = await _readMonth(month);
+      if (!mounted) return;
+      _storeMonth(month, data, seq);
+      if (!_mayShow(month, seq)) return;
+      setState(() {
+        _showMonthData(month, data, seq);
+        _applyLaneView();
+        _loadError = null;
+      });
+      _openPendingDay(seq);
+      _afterMonthRead(month);
+    } catch (e) {
+      if (!mounted || !_mayShow(month, seq)) return;
+      await _loadFailed(e, month);
+    }
+  }
+
+  /// What every successful read of the month on screen does after painting
+  /// it: date the strip, keep T-18's device copy, read the neighbours.
+  void _afterMonthRead(DateTime month) {
+    final readAt = DateTime.now();
+    widget.connectivity?.loadedData(readAt);
+    // T-18: only the CURRENT month is worth a device copy — the door-of-the-
+    // school moment is today and this week, and one month keeps the copy
+    // small and its purpose obvious.
+    if (isCurrentMonth(month, _today) && _isOnScreen(month)) {
+      unawaited(widget.offlineCache?.save(OfflineCalendarSnapshot(
+        savedAt: readAt,
+        month: month,
+        members: _members,
+        roles: _roles,
+        days: _monthRows,
+        frozen: _monthFrozen,
+        ownProfile: _ownProfile,
+        upcoming: _upcomingRows,
+      )));
+    }
+    _prefetchAround(month);
+  }
+
+  /// T-106: the months either side of [month], read ahead so the next swipe
+  /// paints at once — never past the F-39 horizon, never twice at a time.
+  void _prefetchAround(DateTime month) {
+    for (final step in const [-1, 1]) {
+      final next = DateTime(month.year, month.month + step);
+      final key = _monthKey(next);
+      if (_monthCache.containsKey(key) || _prefetching.contains(key)) continue;
+      if (!canPageToMonth(next, _horizonDate)) continue;
+      unawaited(_prefetch(next));
+    }
+  }
+
+  Future<void> _prefetch(DateTime month) async {
+    final key = _monthKey(month);
+    _prefetching.add(key);
+    final seq = ++_loadSeq;
+    try {
+      final data = await _readMonth(month);
+      if (!mounted) return;
+      _storeMonth(month, data, seq);
+      // The neighbour page paints from the cache while the finger drags it
+      // in — and a swipe that landed on this month before its own read
+      // answered gets these rows in the meantime.
+      setState(() {
+        if (_mayShow(month, seq)) {
+          _showMonthData(month, data, seq);
+          _applyLaneView();
+        }
+      });
+    } catch (_) {
+      // A prefetch is a guess: the swipe reads the month for itself.
+    } finally {
+      _prefetching.remove(key);
+    }
+  }
+
+  /// A load that failed for [month]. T-18: offline, the month keeps what is
+  /// on screen (the strip dates it) or the device's copy; anything else says
+  /// so.
+  Future<void> _loadFailed(Object e, DateTime month) async {
+    final l = AppL10n.of(context).l;
+    final raw = e.toString();
+    final offline = isNetworkFailure(raw);
+    var monthOnScreen = _isOnScreen(month);
+    if (offline && !monthOnScreen) {
+      monthOnScreen = await _adoptCopyOf(month);
+      if (!mounted) return;
+    }
+    setState(() {
+      _loading = false;
+      // T-18: before, the F-23 poll's first failure with no signal replaced
+      // a perfectly good month with an error banner — the calendar went
+      // blank at the exact moment the reader needed it. What was read stays;
+      // the shell's strip says how old it is.
+      if (offline && monthOnScreen) {
+        _monthLoading = false;
+        _loadError = null;
+        return;
+      }
+      _monthLoading = false;
+      _loadError = isSessionExpired(raw)
+          ? sessionExpiredMessage(l)
+          : offline
+              ? l[KApp.offlineMonthNotLoaded]
+              : l[KApp.errCalendarLoad];
+    });
   }
 
   // ── U-23: first-run onboarding ──────────────────────────────────────────
@@ -1346,7 +1568,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       _selectionFrozen.addAll(_frozenByIso);
     }
     setState(() => _visibleMonth = month);
-    _load();
+    _loadMonth(month);
   }
 
   /// The F-39 tier message — the paging bounce's snack, and the sentence the
@@ -1365,7 +1587,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         today: _today,
         horizonDate: _horizonDate,
         hasPlannedDays: _daysByIso.isNotEmpty,
-        loading: _loading,
+        loading: _loading || _monthLoading,
       );
 
   List<MemberView> get _memberViews =>
@@ -3340,6 +3562,10 @@ class _CalendarScreenState extends State<CalendarScreen>
                 final month = _monthForPage(page);
                 final isVisible = month.year == _visibleMonth.year &&
                     month.month == _visibleMonth.month;
+                // T-106: a neighbour page paints the month the cache holds
+                // for it — the drag shows the plan, not an empty grid.
+                final neighbour =
+                    isVisible ? _MonthView.empty : _neighbourView(month);
                 return LayoutBuilder(builder: (context, box) {
                   return RefreshIndicator(
                   onRefresh: _load,
@@ -3364,19 +3590,22 @@ class _CalendarScreenState extends State<CalendarScreen>
                         ])
                       : _MonthGrid(
                           month: month,
-                          daysByIso: isVisible ? _daysByIso : const {},
-                          divergentByIso:
-                              isVisible ? _divergentByIso : const {},
+                          daysByIso: isVisible ? _daysByIso : neighbour.days,
+                          divergentByIso: isVisible
+                              ? _divergentByIso
+                              : neighbour.divergent,
                           laneNames: {
                             for (final c in _children) c.id: c.firstName
                           },
                           laneInitials: _childInitials,
-                          frozenByIso: isVisible ? _frozenByIso : const {},
-                          agendaByIso: isVisible ? _agendaByIso : const {},
+                          frozenByIso:
+                              isVisible ? _frozenByIso : neighbour.frozen,
+                          agendaByIso:
+                              isVisible ? _agendaByIso : neighbour.agenda,
                           ownProfileId: _ownProfile?.id,
                           views: views,
                           today: _today,
-                          loading: _loading && isVisible,
+                          loading: (_loading || _monthLoading) && isVisible,
                           selectedIso: {
                             for (final d in _selectedDays)
                               CareSchedule.isoDate(d)
@@ -4559,3 +4788,66 @@ class _SplitColumns extends StatelessWidget {
 
 /// Owner's QA of 3.1.10 — the system strips the calendar queues, in order.
 enum _SystemStrip { pushToday, checklist, planEnd, handoffNudge }
+
+/// T-106: one month's own reads, as the cache keeps them.
+class _MonthData {
+  _MonthData({required this.rows, required this.frozen, required this.events});
+
+  final List<CareSchedule> rows;
+  final List<SwapRequest> frozen;
+  final List<ChildEvent> events;
+
+  /// The number of the load that read it — a newer read always wins.
+  int seq = 0;
+
+  /// The lane view last derived from it, and the lane it was derived for.
+  _MonthView? view;
+  String? viewKey;
+}
+
+/// T-106: the grid's four maps for one month in one lane.
+class _MonthView {
+  const _MonthView({
+    required this.days,
+    required this.divergent,
+    required this.agenda,
+    required this.frozen,
+  });
+
+  static const empty =
+      _MonthView(days: {}, divergent: {}, agenda: {}, frozen: {});
+
+  final Map<String, CareSchedule> days;
+  final Map<String, List<CareSchedule>> divergent;
+  final Map<String, List<ChildEvent>> agenda;
+  final Map<String, SwapRequest> frozen;
+}
+
+/// T-106: everything a full load reads that does not change with the month.
+class _ContextData {
+  const _ContextData({
+    required this.members,
+    required this.roles,
+    required this.ownProfile,
+    required this.upcoming,
+    required this.openInvitation,
+    required this.lastPlannedDay,
+    required this.children,
+    required this.yesterdayRows,
+    required this.pendingForMe,
+    required this.todayNotices,
+    required this.yesterdayRow,
+  });
+
+  final List<Member> members;
+  final List<Role> roles;
+  final Member? ownProfile;
+  final List<CareSchedule> upcoming;
+  final bool openInvitation;
+  final DateTime? lastPlannedDay;
+  final List<Child> children;
+  final List<CareSchedule> yesterdayRows;
+  final List<SwapRequest> pendingForMe;
+  final List<DayNotice> todayNotices;
+  final CareSchedule? yesterdayRow;
+}
