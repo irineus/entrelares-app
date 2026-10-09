@@ -61,6 +61,10 @@ class FakeCustodyDataSource implements CustodyDataSource {
   void Function()? realtimeCallback;
   int monthFetches = 0;
 
+  /// T-106: every month read, in order — a swipe reads only the month, and
+  /// the neighbours are read ahead.
+  final List<(int, int)> monthReads = [];
+
   FakeCustodyDataSource({required this.members, required this.days});
 
   /// Lote 6: a roster read that fails — the reports screen maps it through the
@@ -210,6 +214,7 @@ class FakeCustodyDataSource implements CustodyDataSource {
   @override
   Future<List<CareSchedule>> fetchMonth(int year, int month) async {
     monthFetches++;
+    monthReads.add((year, month));
     return days
         .where((d) =>
             d.scheduleDate.year == year && d.scheduleDate.month == month)
@@ -2344,6 +2349,8 @@ void main() {
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
     final before = ds.monthFetches;
+    final readsBefore = ds.monthReads.length;
+    final today = FamilyTime.today();
 
     for (var i = 0; i < 30; i++) {
       ds.realtimeCallback!();
@@ -2353,7 +2360,14 @@ void main() {
     expect(ds.monthFetches, before);
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
-    expect(ds.monthFetches, before + 1);
+    // T-106: the reload reads the month on screen once; the months either
+    // side are read ahead again (the reload may have changed them).
+    expect(
+        ds.monthReads
+            .skip(readsBefore)
+            .where((m) => m == (today.year, today.month)),
+        hasLength(1));
+    expect(ds.monthReads.length - readsBefore, lessThanOrEqualTo(3));
   });
 
   // U-13/U-24 — the proof the pilot never gave: the SAME slice, English
