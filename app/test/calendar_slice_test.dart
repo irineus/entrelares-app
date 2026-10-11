@@ -38,6 +38,7 @@ import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/services/analytics_service.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
+import 'package:entrelares_app/widgets/today_card.dart';
 
 class FakeCustodyDataSource implements CustodyDataSource {
   /// T-78: set by a test that asserts an event fired from a sheet.
@@ -2223,7 +2224,15 @@ void main() {
 
     expect(find.text('Ana'), findsOneWidget);
     expect(find.text('Bruno'), findsOneWidget);
-    expect(find.text('Trocado'), findsOneWidget);
+    // The legend's "Trocado". When day 11 falls inside the Hoje card's window
+    // (on the 11th, say) the card wears the same word as its badge — counted
+    // apart, or the test reads the calendar's date instead of the legend.
+    final inTodayCard = find.descendant(
+        of: find.byType(TodayCard), matching: find.text('Trocado'));
+    expect(
+        find.text('Trocado').evaluate().length -
+            inTodayCard.evaluate().length,
+        1);
     // Day 10 belongs to Ana ("A"); day 11 is swapped to Bruno ("B").
     expect(inGrid('A'), findsWidgets);
     expect(inGrid('B'), findsWidgets);
