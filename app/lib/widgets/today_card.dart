@@ -36,8 +36,14 @@ class TodayCard extends StatelessWidget {
   final DateTime? nextHandoffDate;
   final bool viewingCurrentMonth;
   final bool showInviteNudge;
+
+  /// U-61: the family has no plan at all and the founder's first run is on —
+  /// the card offers the wizard where the F-31 invite nudge would stand
+  /// (`showPlanNudge`, core). Plan first, then invite: the founder's order.
+  final bool showPlanNudge;
   final VoidCallback onGoToToday;
   final VoidCallback onInvite;
+  final VoidCallback? onPlan;
 
   /// F-52: the aviso strip — the open notice, or the way to send one. It sits
   /// INSIDE the card because an aviso is about today, and today is what this
@@ -50,18 +56,41 @@ class TodayCard extends StatelessWidget {
   /// already null, so the strip is the only target in it.
   final Widget? noticeStrip;
 
+  /// U-60: the swap requests waiting for the reader's answer — same place and
+  /// same rule as [noticeStrip] (drawn only on the current month, where the
+  /// card itself has no tap).
+  final Widget? requestStrip;
+
+  /// Owner's QA of 3.1.10: "Avisar", as an icon in the header — null when
+  /// the reader may not send an aviso today. It was a line of its own under
+  /// the responsible row, and the calendar paid for it on every opening.
+  /// Drawn only on the current month, for [noticeStrip]'s reason.
+  final VoidCallback? onSendNotice;
+  final Key? sendNoticeKey;
+
+  /// F-07 (PR 4b): in a per-child plan's *Todas*, when the children are with
+  /// different carers today — "Lia com Ana; Theo com Bruno" in place of the
+  /// one responsible name.
+  final String? laneSummary;
+
   const TodayCard({
     super.key,
     required this.glance,
     required this.userFullName,
     this.responsibleRole,
+    this.laneSummary,
     required this.today,
     required this.nextHandoffDate,
     required this.viewingCurrentMonth,
     required this.showInviteNudge,
+    this.showPlanNudge = false,
     required this.onGoToToday,
     required this.onInvite,
+    this.onPlan,
     this.noticeStrip,
+    this.requestStrip,
+    this.onSendNotice,
+    this.sendNoticeKey,
   });
 
   /// A heading starts with a capital; the date formatters lowercase because
@@ -76,6 +105,8 @@ class TodayCard extends StatelessWidget {
   /// leaves "Olá, Ana" its room; past that the date shrinks to its floor and
   /// then ellipsizes, never the reader's font setting.
   static const double _dateShare = 0.7;
+
+  bool get _sendsNotice => viewingCurrentMonth && onSendNotice != null;
 
   String get _firstName {
     final parts = userFullName.trim().split(' ');
@@ -109,7 +140,8 @@ class TodayCard extends StatelessWidget {
           children: [
             Container(
               color: user.tone.container,
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+              padding: EdgeInsets.fromLTRB(12, _sendsNotice ? 0 : 4,
+                  _sendsNotice ? 0 : 12, _sendsNotice ? 0 : 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -159,24 +191,41 @@ class TodayCard extends StatelessWidget {
                         // inside it would have nothing to align against; the
                         // box takes its whole share and puts the date at the
                         // end of it, which is what "right-aligned" means.
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                              maxWidth: box.maxWidth * _dateShare),
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: Spacing.sm),
-                            child: AppShrinkToFit(
-                              alignment: Alignment.centerRight,
-                              child: Text(
-                                _capitalize(l.formatTodayHeading(today)),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: user.tone.onContainer),
+                        // Owner's QA of 3.1.10: the date and the aviso icon
+                        // are ONE group at the right edge — three children
+                        // under `spaceBetween` put the date in the middle.
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                  maxWidth: box.maxWidth * _dateShare),
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: Spacing.sm),
+                                child: AppShrinkToFit(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    _capitalize(l.formatTodayHeading(today)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: user.tone.onContainer),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            if (_sendsNotice)
+                              IconButton(
+                                key: sendNoticeKey,
+                                onPressed: onSendNotice,
+                                tooltip: l[KApp.noticeQuickAction],
+                                color: user.tone.onContainer,
+                                icon: const Icon(Icons.campaign_outlined,
+                                    size: 20),
+                              ),
+                          ],
                         ),
                       ],
                     ),
@@ -202,7 +251,13 @@ class TodayCard extends StatelessWidget {
                   ),
                 ),
               ),
-            if (showInviteNudge || !glance.hasSchedule)
+            if (showPlanNudge)
+              Container(
+                color: user.tone.container,
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                child: _planNudge(context, l),
+              )
+            else if (showInviteNudge || !glance.hasSchedule)
               Container(
                 color: user.tone.container,
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -223,11 +278,46 @@ class TodayCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                 child: noticeStrip,
               ),
+            if (viewingCurrentMonth && requestStrip != null)
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                    12, noticeStrip == null ? 8 : 0, 12, 8),
+                child: requestStrip,
+              ),
           ],
         ),
       ),
     );
   }
+
+  /// U-61 — "Nenhum dia planejado ainda · Planejar": the wizard is the way
+  /// out of an empty calendar, and this card is the first thing the founder
+  /// reads. The key is the test's and the tour's handle.
+  Widget _planNudge(BuildContext context, Localization l) => Row(
+        key: planNudgeKey,
+        children: [
+          Icon(Icons.auto_awesome_outlined,
+              size: 24, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l[KApp.cardPlanTitle],
+                    style: Theme.of(context).textTheme.titleSmall),
+                Text(l[KApp.cardPlanHint],
+                    style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonal(
+              onPressed: onPlan, child: Text(l[KApp.cardPlanAction])),
+        ],
+      );
+
+  /// The plan nudge's row, for tests.
+  static const planNudgeKey = Key('today-plan-nudge');
 
   Widget _inviteNudge(BuildContext context, Localization l) => Row(
         children: [
@@ -276,36 +366,40 @@ class TodayCard extends StatelessWidget {
                   style: textTheme.labelSmall?.copyWith(color: on)),
               // U-28 QA: one line at `titleSmall`. At `titleMedium` over two
               // lines this single field was costing the grid a whole week.
-              Text(glance.responsibleName ?? l[K.homeNotDefined],
-                  style: textTheme.titleSmall?.copyWith(color: on),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              // U-62: the pills share the name's line while they fit (a Wrap
+              // breaks them onto a second one only when they do not) — the
+              // band lost its third line, ~20 dp of the month on every phone.
               // Web: both badges can appear — swapped and the handoff time are
               // independent. U-28 adds the ROLE, which the port had dropped.
-              if (responsibleRole != null ||
-                  glance.isSwapped ||
-                  glance.handoffTime != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: Spacing.xs),
-                  child: Wrap(
-                    spacing: Spacing.sm,
-                    runSpacing: Spacing.xs,
-                    children: [
-                      if (responsibleRole != null)
-                        _pill(context, responsibleRole!, responsible),
-                      if (glance.isSwapped)
-                        _pill(context, l[K.cardSwappedBadge],
-                            context.tokens.swapped,
-                            icon: Icons.swap_horiz),
-                      if (glance.handoffTime != null)
-                        _pill(
-                            context,
-                            l.formatTimeString(glance.handoffTime!),
-                            responsible,
-                            icon: Icons.schedule),
-                    ],
-                  ),
-                ),
+              Wrap(
+                spacing: Spacing.sm,
+                runSpacing: Spacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                      laneSummary ??
+                          glance.responsibleName ??
+                          l[K.homeNotDefined],
+                      key: laneSummary == null
+                          ? null
+                          : const ValueKey('today-lane-summary'),
+                      style: textTheme.titleSmall?.copyWith(color: on),
+                      maxLines: laneSummary == null ? 1 : 2,
+                      overflow: TextOverflow.ellipsis),
+                  if (responsibleRole != null)
+                    _pill(context, responsibleRole!, responsible),
+                  if (glance.isSwapped)
+                    _pill(context, l[K.cardSwappedBadge],
+                        context.tokens.swapped,
+                        icon: Icons.swap_horiz),
+                  if (glance.handoffTime != null)
+                    _pill(
+                        context,
+                        l.formatTimeString(glance.handoffTime!),
+                        responsible,
+                        icon: Icons.schedule),
+                ],
+              ),
             ],
           ),
         ),
@@ -335,11 +429,18 @@ class TodayCard extends StatelessWidget {
               Icon(icon, size: 12, color: slot.tone.onContainer),
               const SizedBox(width: Spacing.xs / 2),
             ],
-            Text(text,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: slot.tone.onContainer)),
+            // U-62: the pill shares the name's line now, beside a one-line
+            // handoff box — on a narrow phone it shrinks with an ellipsis
+            // rather than overflowing the band.
+            Flexible(
+              child: Text(text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(color: slot.tone.onContainer)),
+            ),
           ],
         ),
       );
@@ -400,18 +501,29 @@ class TodayCard extends StatelessWidget {
                   .textTheme
                   .labelSmall
                   ?.copyWith(color: slot.tone.onContainer)),
-          Text(formatHandoffDate(date, l),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(
-                      color: slot.tone.onContainer,
-                      fontWeight: FontWeight.w600)),
-          Text(daysUntilLabel(date, today, l),
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: urgencyColor, fontWeight: FontWeight.w600)),
+          // U-62: the date and the countdown on ONE line — the box lost its
+          // third line, and with it the band's extra height on a 360 dp phone.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(formatHandoffDate(date, l),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(
+                          color: slot.tone.onContainer,
+                          fontWeight: FontWeight.w600)),
+              const SizedBox(width: Spacing.xs),
+              Text(daysUntilLabel(date, today, l),
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(
+                          color: urgencyColor, fontWeight: FontWeight.w600)),
+            ],
+          ),
         ],
       ),
     );

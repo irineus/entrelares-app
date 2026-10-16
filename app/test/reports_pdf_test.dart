@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'package:entrelares_db_contracts/models/activity_log.dart';
+import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
@@ -21,6 +22,7 @@ import 'package:entrelares_app/services/report_pdf.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 
 import 'calendar_slice_test.dart' show FakeCustodyDataSource;
+import 'family_page_test.dart' show FakeFunnel;
 
 const roleMother = Role(id: 1, roleName: 'mother');
 const roleFather = Role(id: 2, roleName: 'father');
@@ -61,6 +63,7 @@ Future<void> pumpPdf(
   AppLanguage language = AppLanguage.ptBr,
   void Function(Uint8List bytes, String fileName)? onShare,
   void Function(Uint8List bytes, String fileName)? onPrint,
+  VoidCallback? onOpenPlan,
 }) async {
   await tester.binding.setSurfaceSize(const Size(800, 2000));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -78,6 +81,7 @@ Future<void> pumpPdf(
           onPrint: onPrint == null
               ? null
               : (b, f) async => onPrint(b, f),
+          onOpenPlan: onOpenPlan,
         ),
       ),
     ),
@@ -95,8 +99,25 @@ void main() {
 
       expect(find.text(l[K.pdfUpsellTitle]), findsOne);
       expect(find.text(l[K.pdfGenerate]), findsNothing);
-      // T-38: the neutral paywall carries NO checkout affordance.
+      // T-38: the neutral paywall carries NO checkout affordance — and with
+      // no plan route handed in, no button at all.
       expect(find.text(l[K.pdfUpsellButton]), findsNothing);
+    });
+
+    testWidgets('F-79: the upsell opens the plan page and counts the click',
+        (tester) async {
+      final funnel = FakeFunnel();
+      final ds = source(plan: 'free')..analytics = funnel.service;
+      var opened = 0;
+      await pumpPdf(tester, ds, onOpenPlan: () => opened++);
+
+      await tester.tap(find.text(l[K.pdfUpsellButton]));
+      await tester.pumpAndSettle();
+
+      expect(opened, 1);
+      expect(funnel.dataOf('premium-gate-click'), {'gate': 'pdf'});
+      // Still neutral: the door is the app's own plan page, never a price.
+      expect(find.textContaining('R\$'), findsNothing);
     });
 
     testWidgets('a family inside its trial is premium', (tester) async {
@@ -172,6 +193,24 @@ void main() {
       expect(String.fromCharCodes(printed!.take(5)), '%PDF-');
     });
 
+    // F-96: the registered children are picked, never typed again.
+    testWidgets('registered children are a picker, and the header follows it',
+        (tester) async {
+      final ds = source()
+        ..children = [
+          Child(id: 1, familyId: 7, firstName: 'Lia', sortOrder: 0),
+          Child(id: 2, familyId: 7, firstName: 'Theo', sortOrder: 1),
+        ];
+      await pumpPdf(tester, ds);
+      expect(find.byKey(const ValueKey('pdf-children-picker')), findsOne);
+      expect(find.text(l[K.pdfChildPlaceholder]), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('pdf-child-2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[K.pdfGenerate]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pdf-children-picker')), findsOne);
+    });
+
     testWidgets('a custom period ending before it starts is refused',
         (tester) async {
       final ds = source();
@@ -195,14 +234,22 @@ void main() {
       expect(ds.periodReads.length, readsBefore);
     });
 
-    testWidgets('a failure propagates the server text', (tester) async {
-      final ds = source()..throwOnMembers = 'boom';
+    // F-96: errors are catalogued — a server sentence (PT-BR, accented)
+    // reaches the reader; anything else is the catalog's, never raw text.
+    testWidgets('a server sentence reaches the reader, raw text never does',
+        (tester) async {
+      final ds = source()..throwOnMembers = 'PostgrestException(boom P0001)';
       await pumpPdf(tester, ds);
-
       await tester.tap(find.text(l[K.pdfGenerate]));
       await tester.pumpAndSettle();
+      expect(find.textContaining('boom'), findsNothing);
+      expect(find.text(l[K.pdfErrGenerate]), findsOne);
 
-      expect(find.textContaining('boom'), findsOne);
+      ds.throwOnMembers =
+          '{"code":"P0001","message":"Você não pode gerar este relatório agora."}';
+      await tester.tap(find.text(l[K.pdfGenerate]));
+      await tester.pumpAndSettle();
+      expect(find.text('Você não pode gerar este relatório agora.'), findsOne);
     });
   });
 
@@ -231,6 +278,8 @@ void main() {
       List<AuditLogView> logs = const [],
       Localization? localization,
       List<ReportDayAccount> dayAccounts = const [],
+      ReportExpenses? expenses,
+      List<ReportChatLine>? chat,
     }) {
       final loc = localization ?? l;
       return buildCustodyReport(
@@ -267,8 +316,124 @@ void main() {
         resolutionOrigins: origins,
         includeAcceptedFutureSwaps: future,
         dayAccounts: dayAccounts,
+        expenses: expenses,
+        chat: chat,
       );
     }
+
+    // F-93: the record holds up — a refused payment stays on paper, apart
+    // from the confirmed ones, with the receiver's comment and the payer's
+    // reference; an edited split prints the parts, not just the amount.
+    // English, because the test faces drop accents.
+    // F-96: the read marks the product sells, the split and the child of
+    // each expense — as real text on the page.
+    test('F-96: read marks, split and child columns reach the page', () async {
+      final en = Localization(AppLanguage.en);
+      final text = await render(
+          report(
+            localization: en,
+            expenses: ReportExpenses(lines: [
+              ReportExpenseLine(
+                  date: DateTime(2026, 8, 10),
+                  description: 'School fee',
+                  categoryLabel: 'School',
+                  amountCents: 120000,
+                  paidByName: 'Ana Souza',
+                  childName: 'Lia',
+                  splitText: 'Ana R\$360.00; Bruno R\$840.00'),
+            ]),
+            chat: [
+              ReportChatLine(
+                  atLocal: DateTime(2026, 8, 11, 9),
+                  authorName: 'Ana Souza',
+                  body: 'Combinado',
+                  readLine: 'Read by Bruno Lima (11 Aug 9:30 AM)'),
+              ReportChatLine(
+                  atLocal: DateTime(2026, 8, 12, 9),
+                  authorName: 'Bruno Lima',
+                  body: 'Ok',
+                  readLine: en[KApp.chatPdfNotRead]),
+            ],
+          ),
+          en);
+      final page = RegExp(r'\(((?:[^()\\]|\\.)*)\)')
+          .allMatches(text)
+          .map((m) => m.group(1))
+          .join(' ');
+      expect(page, contains('Child'));
+      expect(page, contains('Lia'));
+      expect(page, contains('Ana R\$360.00; Bruno R\$840.00'));
+      expect(page, contains('Read by Bruno Lima'));
+      expect(page, contains('Not read before this report was issued'));
+    });
+
+    test('F-93: a refused payment and an edited split reach the page',
+        () async {
+      final en = Localization(AppLanguage.en);
+      String name(int id) => id == 1 ? 'Ana Souza' : 'Bruno Lima';
+      final split = ExpenseDiff.describe(
+          ExpenseDiff.between({
+            'paid_by': 1,
+            'shares': [
+              {'profile_id': 1, 'share_cents': 3000},
+              {'profile_id': 2, 'share_cents': 7000},
+            ],
+          }, {
+            'paid_by': 1,
+            'shares': [
+              {'profile_id': 1, 'share_cents': 5000},
+              {'profile_id': 2, 'share_cents': 5000},
+            ],
+          }),
+          en,
+          name);
+      final text = await render(
+          report(
+              localization: en,
+              expenses: ReportExpenses(
+                payments: [
+                  ReportExpensePayment(
+                      date: DateTime(2026, 8, 20),
+                      fromName: 'Bruno Lima',
+                      toName: 'Ana Souza',
+                      amountCents: 2000,
+                      reference: 'PIX-OK-1'),
+                ],
+                unconfirmed: [
+                  ReportExpenseUnconfirmed(
+                      recordedAt: DateTime(2026, 8, 21, 9),
+                      answeredAt: DateTime(2026, 8, 22, 18),
+                      fromName: 'Bruno Lima',
+                      toName: 'Ana Souza',
+                      amountCents: 70000,
+                      state: ReportPaymentState.rejected,
+                      reference: 'PIX-REFUSED-7',
+                      note: 'only part of it arrived'),
+                ],
+                changes: [
+                  ReportExpenseChange(
+                      atLocal: DateTime(2026, 8, 23, 10),
+                      actorName: 'Bruno Lima',
+                      text: en.format(
+                          KApp.expensePdfUpdated, ['School fee', split.single])),
+                ],
+              )),
+          en);
+      // Each word is its own text object on the page: read them in order.
+      final page = RegExp(r'\(((?:[^()\\]|\\.)*)\)')
+          .allMatches(text)
+          .map((m) => m.group(1))
+          .join(' ');
+
+      expect(page, contains('Confirmed payments'));
+      expect(page, contains('Reference: PIX-OK-1'));
+      expect(page, contains('Recorded payments not confirmed'));
+      expect(page, contains('Ana Souza said it was not received'));
+      expect(page, contains('Reference: PIX-REFUSED-7'));
+      expect(page, contains('Comment from Ana Souza: only part of it arrived'));
+      expect(page, contains('Split: Ana Souza'));
+      expect(page, contains('Bruno Lima from R\$70.00 to R\$50.00'));
+    });
 
     // F-67: section 4 prints both dates, the author and the text; a corrected
     // relato keeps its text and says when it was corrected.

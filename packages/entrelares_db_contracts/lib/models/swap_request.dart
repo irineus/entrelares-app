@@ -8,6 +8,10 @@ class SwapRequest {
   final int id;
   final DateTime scheduleDate; // date-only; ISO yyyy-MM-dd on the wire
   final int? scheduleId;
+
+  /// F-07: the lane of the day, stamped by the server from [scheduleId] —
+  /// the client never sends it.
+  final int? childId;
   final int requestingProfileId;
   final int targetProfileId;
   final int? previousActualParentId;
@@ -35,6 +39,7 @@ class SwapRequest {
     required this.id,
     required this.scheduleDate,
     this.scheduleId,
+    this.childId,
     required this.requestingProfileId,
     required this.targetProfileId,
     this.previousActualParentId,
@@ -79,6 +84,7 @@ class SwapRequest {
         id: json['id'] as int,
         scheduleDate: _parseDate(json['schedule_date'] as String),
         scheduleId: json['schedule_id'] as int?,
+        childId: json['child_id'] as int?,
         requestingProfileId: json['requesting_profile_id'] as int,
         targetProfileId: json['target_profile_id'] as int,
         previousActualParentId: json['previous_actual_parent_id'] as int?,
@@ -111,6 +117,7 @@ class SwapRequest {
             '${scheduleDate.month.toString().padLeft(2, '0')}-'
             '${scheduleDate.day.toString().padLeft(2, '0')}',
         'schedule_id': scheduleId,
+        'child_id': childId,
         'requesting_profile_id': requestingProfileId,
         'target_profile_id': targetProfileId,
         'previous_actual_parent_id': previousActualParentId,

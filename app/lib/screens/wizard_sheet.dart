@@ -40,6 +40,7 @@ Future<bool?> showWizardSheet({
   AdminModeOfferer? adminOffer,
   AnalyticsService? analytics,
   DateTime? initialStart,
+  int? childId,
 }) {
   return showAppSheet<bool>(
     context: context,
@@ -53,6 +54,7 @@ Future<bool?> showWizardSheet({
       adminOffer: adminOffer,
       analytics: analytics,
       initialStart: initialStart,
+      childId: childId,
     ),
   );
 }
@@ -82,6 +84,11 @@ class _WizardSheet extends StatefulWidget {
   /// behind it would be a value the field could show but never pick.
   final DateTime? initialStart;
 
+  /// F-07: the lane this plan is for — null in a single-plan family, the
+  /// child the calendar is showing in a per-child one. Every generated day
+  /// carries it, and a replace clears only that lane.
+  final int? childId;
+
   const _WizardSheet({
     required this.activeMembers,
     required this.today,
@@ -92,6 +99,7 @@ class _WizardSheet extends StatefulWidget {
     this.adminOffer,
     this.analytics,
     this.initialStart,
+    this.childId,
   });
 
   @override
@@ -101,13 +109,33 @@ class _WizardSheet extends StatefulWidget {
 class _MutableBlock {
   int profileId;
   int days;
+
+  /// Owner's QA of 3.1.10: the row's fields are keyed by THIS, never by their
+  /// position — a field keyed by index kept showing the previous model's
+  /// numbers (7 and 7 under "Fins de semana alternados") while the plan was
+  /// generated from the new ones (3 and 11).
+  final int uid = _nextUid++;
+  static int _nextUid = 0;
+
   _MutableBlock(this.profileId, this.days);
 }
 
 class _WizardSheetState extends State<_WizardSheet> {
-  String _preset = '7-7';
+  String _preset = wizardDefaultPreset;
   List<_MutableBlock> _blocks = [];
+
+  /// Owner's QA of 3.1.10: the two people a quick model alternates, once the
+  /// user picked them ([_renameInPreset]) — so re-applying the model (a new
+  /// start, a new D-1) keeps them. Null: the roster's first two.
+  List<int>? _presetPeople;
   late DateTime _startDate;
+
+  /// Owner's QA of 3.1.14: the day the reader ASKED for (today, the month's
+  /// 1st, or a day picked on the calendar). An anchored model moves the start
+  /// from here to its weekday; a free one gives this day back — opening on
+  /// the alternating weekends and switching to 7/7 used to leave the start on
+  /// the Friday for no reason.
+  late DateTime _requestedStart;
   int _durationMonths = 3;
   /// U-37: one value, picked by the platform; null is "no handoff time".
   TimeOfDay? _handoff;
@@ -140,6 +168,27 @@ class _WizardSheetState extends State<_WizardSheet> {
   /// bar runs indeterminate while it lasts.
   bool _indeterminate = false;
 
+  /// F-97: D-1's effective carer — the plan this one continues. Null while
+  /// unread, or when the day before the start has nothing planned.
+  int? _prevParent;
+  DateTime? _prevDate;
+
+  /// F-97: the start was moved to the cycle's anchor weekday — the sheet
+  /// says so, next to the date.
+  bool _startSnapped = false;
+
+  /// Owner's QA of 3.1.14: the wizard was opened to CONTINUE a plan or fill a
+  /// month ([_WizardSheet.initialStart]) — an anchored model then starts on
+  /// that very day, in step ([phaseAnchoredCycle]), instead of jumping to its
+  /// weekday and leaving the days in between empty. Picking a date by hand
+  /// is a fresh start again (snapped).
+  late bool _continuing;
+  bool _startPhased = false;
+
+  /// F-97: planned days the range already holds (null = not read yet). The
+  /// "substituir" box has nothing to replace on an empty range and hides.
+  int? _plannedInRange;
+
   List<int> get _profileIds =>
       [for (final m in widget.activeMembers) m.id];
 
@@ -163,16 +212,122 @@ class _WizardSheetState extends State<_WizardSheet> {
         Future<void>.value());
     final floor = dateOnly(widget.today);
     final wanted = widget.initialStart;
-    _startDate =
+    _requestedStart =
         wanted == null || wanted.isBefore(floor) ? floor : dateOnly(wanted);
-    _applyPreset('7-7');
+    _continuing = wanted != null;
+    _startDate = _requestedStart;
+    _applyPreset(wizardDefaultPreset);
+    unawaited(_readContext());
   }
 
+  /// F-97: a preset's blocks, its anchor weekday applied to the start and —
+  /// when the start follows planned days — turned so the cycle continues.
   void _applyPreset(String preset) {
-    _blocks = [
-      for (final b in wizardPresetBlocks(preset, _profileIds))
-        _MutableBlock(b.profileId, b.days),
-    ];
+    final anchor = wizardPresetAnchor(preset);
+    final base = wizardPresetBlocks(preset, _presetPeople ?? _profileIds);
+    _startPhased = false;
+    if (anchor != null && _continuing) {
+      _startSnapped = false;
+      _startDate = _requestedStart;
+      _startPhased = _startDate.weekday != anchor;
+      final phased = phaseAnchoredCycle(base,
+          start: _startDate,
+          anchorWeekday: anchor,
+          previousParentId: _prevParent);
+      _blocks = [for (final b in phased) _MutableBlock(b.profileId, b.days)];
+      return;
+    }
+    if (anchor != null) {
+      final snapped = snapToWeekday(_requestedStart, anchor);
+      _startSnapped = snapped != _requestedStart;
+      _startDate = snapped;
+    } else {
+      _startSnapped = false;
+      _startDate = _requestedStart;
+    }
+    final blocks = continueCycle(base,
+        previousParentId: _prevParent, anchored: anchor != null);
+    _blocks = [for (final b in blocks) _MutableBlock(b.profileId, b.days)];
+  }
+
+  static String _presetLabel(String id) => switch (id) {
+        '3-11' => KApp.wizPreset311,
+        '3-2-1-6-1-1' => KApp.wizPreset321611,
+        '7-7' => K.wizPreset77,
+        '14-14' => K.wizPreset1414,
+        '1-1' => K.wizPreset11,
+        '5-2-2-5' => K.wizPreset5225,
+        '2-2-3' => K.wizPreset223,
+        _ => K.wizPresetCustom,
+      };
+
+  /// F-97: D-1's carer by first name ("—" for one the roster no longer has).
+  String get _prevName =>
+      widget.activeMembers
+          .where((m) => m.id == _prevParent)
+          .firstOrNull
+          ?.fullName
+          .split(' ')
+          .first ??
+      '—';
+
+  /// F-97: what the start and the range already hold — D-1 (to continue the
+  /// plan and give its first day the handoff) and the planned days the
+  /// "substituir" box would rewrite. Best-effort: a failed read leaves the
+  /// sheet as it was before this item.
+  Future<void> _readContext() async {
+    final start = _startDate;
+    final before = DateTime(start.year, start.month, start.day - 1);
+    int? prev;
+    try {
+      final day =
+          await widget.dataSource.fetchDay(before, childId: widget.childId);
+      final p = day?.effectiveParentId;
+      prev = (p == null || p == 0) ? null : p;
+    } catch (_) {
+      prev = null;
+    }
+    int? planned;
+    if (_bypass || widget.adminOffer != null) {
+      try {
+        final end = addMonthsClamped(start, _durationMonths);
+        final rows = await widget.dataSource
+            .fetchUpcoming(start, end.difference(start).inDays);
+        planned = rows
+            .where((d) => d.childId == widget.childId && d.scheduledParentId != 0)
+            .length;
+      } catch (_) {
+        planned = null;
+      }
+    }
+    if (!mounted || start != _startDate) return;
+    setState(() {
+      final changed = prev != _prevParent;
+      _prevParent = prev;
+      _prevDate = prev == null ? null : before;
+      _plannedInRange = planned;
+      if (changed && _preset.isNotEmpty) _applyPreset(_preset);
+    });
+  }
+
+  /// Owner's QA of 3.1.10: changing WHO is in a block does not turn a quick
+  /// model into "Personalizado" — the pattern is the model, the names are the
+  /// family's. In a model the person is renamed in every block of theirs (and
+  /// two people trade places when one is picked over the other), so the
+  /// pattern stays the model's. Days, added and removed blocks still make it
+  /// custom; so does clearing a block's person.
+  void _setBlockPerson(_MutableBlock block, int person) {
+    final old = block.profileId;
+    if (_preset.isEmpty || person == 0 || old == 0) {
+      block.profileId = person;
+      if (person == 0) _preset = '';
+      return;
+    }
+    int swap(int id) => id == old ? person : (id == person ? old : id);
+    for (final b in _blocks) {
+      b.profileId = swap(b.profileId);
+    }
+    _presetPeople = [for (final id in _presetPeople ?? _profileIds) swap(id)];
   }
 
   List<CycleBlock> get _cycleBlocks =>
@@ -243,6 +398,7 @@ class _WizardSheetState extends State<_WizardSheet> {
         end: clampResult.end,
         blocks: _cycleBlocks,
         handoffTime: _handoffTime,
+        previousParentId: _prevParent,
       );
       final rows = [
         for (final g in generated)
@@ -254,6 +410,7 @@ class _WizardSheetState extends State<_WizardSheet> {
                 ? null
                 : '${g.handoffTime!.hour.toString().padLeft(2, '0')}:'
                     '${g.handoffTime!.minute.toString().padLeft(2, '0')}:00',
+            childId: widget.childId,
           ),
       ];
 
@@ -277,8 +434,10 @@ class _WizardSheetState extends State<_WizardSheet> {
           // month — the question may over-count by those, never under.
           final count = plannedDaysInRange([
             for (final d in existing)
-              if (d.actualParentId == null ||
-                  d.actualParentId == d.scheduledParentId)
+              // F-07: only this plan's lane is rewritten.
+              if (d.childId == widget.childId &&
+                  (d.actualParentId == null ||
+                      d.actualParentId == d.scheduledParentId))
                 d.scheduleDate,
           ], replaceRange);
           if (count > 0) {
@@ -294,7 +453,8 @@ class _WizardSheetState extends State<_WizardSheet> {
         _replaceConfirmed = false;
         setState(() => _indeterminate = true);
         final result = await widget.dataSource.replaceScheduleRange(
-            replaceRange.from, replaceRange.to, rows);
+            replaceRange.from, replaceRange.to, rows,
+            childId: widget.childId);
         created = result.inserted;
         message = wizardReplaceSummary(l, result);
       } else {
@@ -422,13 +582,19 @@ class _WizardSheetState extends State<_WizardSheet> {
     // generation runs, cut to two cycles — so what is previewed is what is
     // written. It follows every setState the form already does.
     final stripLength = cycleStripLength(summary.cycleDays);
-    final stripDays = generateRotation(
-      start: _startDate,
-      end: DateTime(
-          _startDate.year, _startDate.month, _startDate.day + stripLength),
-      blocks: _cycleBlocks,
-      handoffTime: _handoffTime,
-    );
+    final stripDays = [
+      // F-97: the day the plan continues from, painted first.
+      if (_prevParent != null && _prevDate != null)
+        GeneratedDay(_prevDate!, _prevParent!, null),
+      ...generateRotation(
+        start: _startDate,
+        end: DateTime(
+            _startDate.year, _startDate.month, _startDate.day + stripLength),
+        blocks: _cycleBlocks,
+        handoffTime: _handoffTime,
+        previousParentId: _prevParent,
+      ),
+    ];
     return [
       // ── Preset shortcuts (the VALUES are pattern ids, never localized) ──
       //
@@ -444,26 +610,38 @@ class _WizardSheetState extends State<_WizardSheet> {
       DropdownButtonFormField<String>(
         key: const Key('wizPreset'),
         isExpanded: true,
-        decoration: InputDecoration(
-          labelText: l[K.wizPreset],
-          suffixText: l[K.commonOptional],
-        ),
+        // Owner's QA of 3.1.14: the chosen model's NAME is the point of the
+        // field — "Fins de semana alternados (sex–dom)" was cut to "Fins de
+        // semana" by an "opcional" suffix (the "— Personalizado —" item says
+        // the model is optional), and it may take two lines when closed.
+        decoration: InputDecoration(labelText: l[K.wizPreset]),
+        itemHeight: null,
+        isDense: false,
+        selectedItemBuilder: (context) => [
+          Text(l[K.wizPresetCustom], maxLines: 2),
+          for (final id in wizardPresetIds)
+            Text(l[_presetLabel(id)],
+                maxLines: 2, overflow: TextOverflow.ellipsis),
+        ],
         initialValue: _preset,
+        // The menu follows [wizardPresetIds] — one order, in core.
         items: [
           DropdownMenuItem(value: '', child: Text(l[K.wizPresetCustom])),
-          DropdownMenuItem(value: '7-7', child: Text(l[K.wizPreset77])),
-          DropdownMenuItem(value: '14-14', child: Text(l[K.wizPreset1414])),
-          DropdownMenuItem(value: '1-1', child: Text(l[K.wizPreset11])),
-          DropdownMenuItem(
-              value: '5-2-2-5', child: Text(l[K.wizPreset5225])),
-          DropdownMenuItem(value: '2-2-3', child: Text(l[K.wizPreset223])),
+          for (final id in wizardPresetIds)
+            DropdownMenuItem(value: id, child: Text(l[_presetLabel(id)])),
         ],
         onChanged: _generating
             ? null
-            : (v) => setState(() {
+            : (v) {
+                final before = _startDate;
+                setState(() {
                   _preset = v ?? '';
                   if (_preset.isNotEmpty) _applyPreset(_preset);
-                }),
+                });
+                // A model with another anchor moved the start: D-1 and the
+                // planned days are read again for the new one.
+                if (_startDate != before) unawaited(_readContext());
+              },
       ),
           ],
         ),
@@ -476,17 +654,23 @@ class _WizardSheetState extends State<_WizardSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
       AppFieldLabel(l[K.wizCycleBlocks]),
+      // U-64 (T-103 audit): the number, the "×" and the bin sat on hand-tuned
+      // top paddings (20, 20, 12) that matched neither field — rows 1 and 2
+      // read misaligned. Everything is centred on the row now, and the rows
+      // are spaced alike.
       for (final (index, block) in _blocks.indexed)
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Padding(
+          padding: const EdgeInsets.only(bottom: Spacing.xs),
+          child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 20, right: Spacing.sm),
+              padding: const EdgeInsets.only(right: Spacing.sm),
               child: Text('${index + 1}.'),
             ),
             Expanded(
               child: DropdownButtonFormField<int>(
-                key: Key('wizBlockParent$index'),
+                key: ValueKey('wizBlockParent${block.uid}'),
                 isExpanded: true,
                 decoration:
                     InputDecoration(labelText: l[K.wizBlockParentLabel]),
@@ -501,21 +685,17 @@ class _WizardSheetState extends State<_WizardSheet> {
                 ],
                 onChanged: _generating
                     ? null
-                    : (v) => setState(() {
-                          block.profileId = v ?? 0;
-                          _preset = '';
-                        }),
+                    : (v) => setState(() => _setBlockPerson(block, v ?? 0)),
               ),
             ),
             const Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: Spacing.xs, vertical: 20),
+              padding: EdgeInsets.symmetric(horizontal: Spacing.xs),
               child: Text('×'),
             ),
             SizedBox(
               width: 88,
               child: TextFormField(
-                key: Key('wizBlockDays$index'),
+                key: ValueKey('wizBlockDays${block.uid}'),
                 initialValue: '${block.days}',
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -530,17 +710,15 @@ class _WizardSheetState extends State<_WizardSheet> {
             ),
             // F-28: any non-empty cycle is valid — only the last block stays.
             if (_blocks.length > 1)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: IconButton(
-                  tooltip: l[K.wizRemoveBlock],
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  onPressed: _generating
-                      ? null
-                      : () => setState(() => _blocks.removeAt(index)),
-                ),
+              IconButton(
+                tooltip: l[K.wizRemoveBlock],
+                icon: const Icon(Icons.delete_outline, size: 18),
+                onPressed: _generating
+                    ? null
+                    : () => setState(() => _blocks.removeAt(index)),
               ),
           ],
+          ),
         ),
       const SizedBox(height: Spacing.xs),
       // U-28 QA: a full-width outlined action, as the web draws it. A bare
@@ -583,10 +761,51 @@ class _WizardSheetState extends State<_WizardSheet> {
                   lastDate: DateTime(widget.today.year + 3),
                 );
                 if (picked != null) {
-                  setState(() => _startDate = dateOnly(picked));
+                  setState(() {
+                    _requestedStart = dateOnly(picked);
+                    _continuing = false;
+                    _startPhased = false;
+                    _startDate = _requestedStart;
+                    _startSnapped = false;
+                    // F-97: an anchored cycle keeps its weekday.
+                    final anchor = wizardPresetAnchor(_preset);
+                    if (anchor != null) {
+                      final snapped = snapToWeekday(_startDate, anchor);
+                      _startSnapped = snapped != _startDate;
+                      _startDate = snapped;
+                    }
+                  });
+                  unawaited(_readContext());
                 }
               },
       ),
+      if (_startPhased)
+        Padding(
+          padding: const EdgeInsets.only(top: Spacing.xs),
+          child: Text(
+            l.format(KApp.wizPhasedStart, [formatHandoffDate(_startDate, l)]),
+            key: const Key('wizPhasedStart'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      if (_startSnapped)
+        Padding(
+          padding: const EdgeInsets.only(top: Spacing.xs),
+          child: Text(
+            l.format(KApp.wizAnchoredStart, [formatHandoffDate(_startDate, l)]),
+            key: const Key('wizAnchoredStart'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      if (_prevParent != null)
+        Padding(
+          padding: const EdgeInsets.only(top: Spacing.xs),
+          child: Text(
+            l.format(KApp.wizContinues, [_prevName]),
+            key: const Key('wizContinues'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
       const SizedBox(height: Spacing.md),
       DropdownButtonFormField<int>(
         key: const Key('wizDuration'),
@@ -603,7 +822,10 @@ class _WizardSheetState extends State<_WizardSheet> {
         ],
         onChanged: _generating
             ? null
-            : (v) => setState(() => _durationMonths = v ?? 3),
+            : (v) {
+                setState(() => _durationMonths = v ?? 3);
+                unawaited(_readContext());
+              },
       ),
       const SizedBox(height: Spacing.md),
 
@@ -663,7 +885,8 @@ class _WizardSheetState extends State<_WizardSheet> {
       // that rewrite planned days look like one feature. The hint says what
       // is kept, because the server keeps it whatever the box says.
       // F-67 Part B: an admin with the mode off sees it too — ticking it asks.
-      if (_bypass || widget.adminOffer != null) ...[
+      // F-97: nothing planned in the range → nothing to replace, no box.
+      if ((_bypass || widget.adminOffer != null) && _plannedInRange != 0) ...[
         AppCard(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,

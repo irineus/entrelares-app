@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/family.dart';
+import 'package:entrelares_db_contracts/models/family_invitation.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
 import 'package:entrelares_app/screens/family_screen.dart';
@@ -101,6 +102,32 @@ void main() {
       await tester.pumpAndSettle();
       expect(ds.viewerWrites, ['invite:cida@example.com:3']);
       expect(ds.mailedInvitations, [901]);
+    });
+
+    testWidgets('F-91: the caregiver seats full, the viewer invitations '
+        'still show — the expired one with its badge', (tester) async {
+      final now = DateTime.now().toUtc();
+      final ds = source(members: const [admin, plain, vo], plan: 'premium')
+        ..invitations = [
+          FamilyInvitation(
+              id: 51,
+              email: 'avo@example.com',
+              roleId: 3,
+              token: 't51',
+              expiresAt: now.add(const Duration(days: 3)),
+              memberType: 'viewer'),
+          FamilyInvitation(
+              id: 52,
+              email: 'tio@example.com',
+              roleId: 3,
+              token: 't52',
+              expiresAt: now.subtract(const Duration(days: 1)),
+              memberType: 'viewer'),
+        ];
+      await pumpFamily(tester, ds);
+      expect(find.text('avo@example.com'), findsOne);
+      expect(find.text('tio@example.com'), findsOne);
+      expect(find.text(l[K.famInviteExpiredBadge]), findsOne);
     });
 
     testWidgets('promoting asks first, then promotes', (tester) async {

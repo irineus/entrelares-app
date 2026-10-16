@@ -142,6 +142,97 @@ class AppBanner extends StatelessWidget {
   }
 }
 
+/// Owner's QA of 3.1.10 (06/10/2026) — a strip that costs ONE line of the
+/// screen it sits on: the mark, the sentence and the one action on the SAME
+/// row. The sentence may take three lines — the height of the action's own
+/// 48 dp target, so the third line costs nothing — and is never cut shorter:
+/// at two lines a 360 dp phone lost the DATE of a swap request to the
+/// ellipsis, the one fact the line is for. [AppBanner] stacks a title, the message and the
+/// action, and three of them over the calendar left it a single week of
+/// space on a first opening. No title and no heavy border: the sentence says
+/// it, and the tone says what kind of thing it is.
+///
+/// A strip that only informs ("Só avisando") has no [actionLabel].
+/// [extraLabel]/[onExtra] is the second, smaller way out under the sentence
+/// ("+2 pedidos") — for the one case where two things would otherwise stack.
+class AppStripLine extends StatelessWidget {
+  final ToneColors tone;
+  final IconData icon;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final String? extraLabel;
+  final VoidCallback? onExtra;
+
+  const AppStripLine({
+    super.key,
+    required this.tone,
+    required this.icon,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+    this.extraLabel,
+    this.onExtra,
+  })  : assert((actionLabel == null) == (onAction == null),
+            'actionLabel and onAction come together'),
+        assert((extraLabel == null) == (onExtra == null),
+            'extraLabel and onExtra come together');
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          Spacing.sm + Spacing.xs, Spacing.xs, Spacing.xs, Spacing.xs),
+      decoration: BoxDecoration(
+        color: tone.container,
+        borderRadius: BorderRadius.circular(Radii.md),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: tone.onContainer),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  message,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      textTheme.bodySmall?.copyWith(color: tone.onContainer),
+                ),
+                if (extraLabel != null)
+                  TextButton(
+                    onPressed: onExtra,
+                    style: TextButton.styleFrom(
+                      foregroundColor: tone.onContainer,
+                      padding: EdgeInsets.zero,
+                      alignment: AlignmentDirectional.centerStart,
+                    ),
+                    child: Text(extraLabel!),
+                  ),
+              ],
+            ),
+          ),
+          if (actionLabel != null)
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(foregroundColor: tone.onContainer),
+              child: Text(actionLabel!),
+            )
+          else
+            // No action: the sentence keeps a breath from the edge.
+            const SizedBox(width: Spacing.xs),
+        ],
+      ),
+    );
+  }
+}
+
 /// A pill: one short word about ONE row — pending, urgent, automatic, created.
 class AppBadge extends StatelessWidget {
   final String text;

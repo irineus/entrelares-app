@@ -14,6 +14,7 @@ void main() {
       expect(AnalyticsCatalog.names, {
         'signup_started', 'signup_step', 'family_created', 'invitee_joined',
         'invite_sent', 'invite_nudge_shown', 'invite_nudge_click',
+        'referral-signup', 'referral-share',
         'wizard-started', 'wizard_completed', 'swap_requested', 'swap-answered',
         'day-note-saved', 'day-sheet-closed', 'day-notice-sent',
         'day-notice-answered',
@@ -22,9 +23,11 @@ void main() {
         'push-nudge-view', 'push-nudge-click', 'push-enable-result',
         'install-hint-view', 'install-hint-open', 'install-hint-dismiss',
         'play-invite-view', 'play-invite-open', 'play-invite-dismiss',
-        'invitee-welcome-view', 'review-prompt-requested',
+        'invitee-welcome-view', 'checklist-action', 'tour-ended',
+        'plan-nudge-click', 'review-prompt-requested',
         'preference-changed', 'support-contact-sent', 'premium-gate-click',
-        'premium-paywall-view', 'premium-interest', 'premium-checkout-start',
+        'premium-paywall-view', 'premium-ask-admin', 'premium-interest',
+        'premium-checkout-start',
         'premium-checkout-return', 'premium-checkout-outcome',
         'premium-cancel', 'premium-reactivate',
       });
@@ -83,6 +86,18 @@ void main() {
     test('an unknown event carries nothing', () {
       expect(AnalyticsCatalog.filterProps('made-up', {'a': 'b'}), isNull);
       expect(AnalyticsCatalog.isKnown('made-up'), isFalse);
+    });
+
+    test('F-79: the paywall view keeps its channel and says who saw it', () {
+      expect(
+          AnalyticsCatalog.filterProps(AnalyticsEvents.premiumPaywallView,
+              {'channel': 'web', 'admin': true, 'buyable': false}),
+          {'channel': 'web', 'admin': true, 'buyable': false});
+      // The series' one original prop still travels alone.
+      expect(
+          AnalyticsCatalog.filterProps(
+              AnalyticsEvents.premiumPaywallView, {'channel': 'store'}),
+          {'channel': 'store'});
     });
 
     test('every existing funnel prop still passes (no series loses a prop)',

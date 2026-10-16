@@ -67,6 +67,9 @@ class PublicSettings {
   // F-50: the viewer caps, outside the caregiver seats.
   int get freeViewers => _int('free_viewers', 1);
   int get maxViewers => _int('max_viewers', 4);
+  // F-07: the children caps — the free plan's, and the ceiling for all.
+  int get childrenFreeMax => _int('children.free_max', 1);
+  int get childrenMaxPerFamily => _int('children.max_per_family', 6);
   int get overrideFreeDays => _int('override_free_days', 7);
   int get overridePremiumMonths => _int('override_premium_months', 6);
 
@@ -103,6 +106,16 @@ class PublicSettings {
       parseBoolSetting(values, 'report_attestation.premium_only', true);
   bool get childAgendaEnabled =>
       parseBoolSetting(values, 'feature.child_agenda', false);
+
+  /// F-07 — the plan per child (`set_schedule_mode`).
+  bool get perChildScheduleEnabled =>
+      parseBoolSetting(values, 'feature.per_child_schedule', false);
+
+  /// F-80 — family referral (`my_referral_code`, `attribute_referral`). Dark
+  /// in production until the policy 2.1 ships with the flip; the server
+  /// refuses both RPCs and drops a sign-up's code while it is off.
+  bool get referralEnabled =>
+      parseBoolSetting(values, 'feature.referral', false);
 
   // F-55 PR 2 — the agenda's operator keys (the RPCs read the same ones).
   bool get agendaPremiumOnly =>

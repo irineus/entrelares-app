@@ -1,0 +1,1 @@
+New: when a family admin changes days directly on the calendar, the caregivers of those days get a notification with the changed day, or the period when several days change at once. Tapping it opens the day, or the History when several days changed.

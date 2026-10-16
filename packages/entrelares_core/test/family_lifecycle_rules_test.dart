@@ -223,4 +223,50 @@ void main() {
           isFalse);
     });
   });
+
+  group('F-89', () {
+    test('Help is reachable from the exit confinement', () {
+      expect(
+          FamilyLifecycleRules.mustStayOnLeavingScreen(
+              isLeaving: true, location: '/help'),
+          isFalse);
+      expect(
+          FamilyLifecycleRules.mustStayOnLeavingScreen(
+              isLeaving: true, location: '/family'),
+          isTrue);
+    });
+
+    test('a viewer keeps no family alive', () {
+      expect(
+          FamilyLifecycleRules.isFamilyRemoval(myId: 1, members: [
+            (id: 1, isActiveMember: true, isViewer: false),
+            (id: 2, isActiveMember: true, isViewer: true),
+          ]),
+          isTrue);
+      expect(
+          FamilyLifecycleRules.isFamilyRemoval(myId: 1, members: [
+            (id: 1, isActiveMember: true, isViewer: false),
+            (id: 2, isActiveMember: true, isViewer: false),
+          ]),
+          isFalse);
+    });
+
+    test('only an admin leaving a charging subscription is told', () {
+      for (final status in ['active', 'scheduled', 'overdue']) {
+        expect(
+            FamilyLifecycleRules.leavesAPayingSubscription(
+                isAdmin: true, subscriptionStatus: status),
+            isTrue,
+            reason: status);
+      }
+      expect(
+          FamilyLifecycleRules.leavesAPayingSubscription(
+              isAdmin: true, subscriptionStatus: 'canceled'),
+          isFalse);
+      expect(
+          FamilyLifecycleRules.leavesAPayingSubscription(
+              isAdmin: false, subscriptionStatus: 'active'),
+          isFalse);
+    });
+  });
 }

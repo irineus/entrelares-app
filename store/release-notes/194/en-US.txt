@@ -1,0 +1,1 @@
+Internal improvement: when a family is created, the app now records where the sign-up came from (an ad, a referral or neither), with no pixel and nothing sent to third parties. Nothing changes in how you use the calendar.

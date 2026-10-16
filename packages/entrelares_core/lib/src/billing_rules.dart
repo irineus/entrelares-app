@@ -12,6 +12,7 @@
 library;
 
 import 'localization/k.dart';
+import 'localization/k_app.dart';
 
 /// Which block the Premium section shows. Pure input → output so the free/paid
 /// UI line is unit-tested without a DB.
@@ -163,6 +164,72 @@ DateTime? paidUntil({
   return end != null && end.isAfter(nowUtc) ? end : null;
 }
 
+/// F-86: what the family had the moment its admin left for the hosted
+/// checkout — the line the return page measures a payment against. The page
+/// used to poll `plan == 'premium'`, already true for a trial, a cancelled-
+/// but-paid family or one in grace: a parent who closed the Pix page without
+/// paying read "Pagamento confirmado" and let Premium lapse.
+class CheckoutBaseline {
+  final bool premium;
+
+  /// `subscriptions.current_period_end` before the checkout (null: none).
+  final DateTime? periodEndUtc;
+
+  /// When the baseline was taken — a stale one (a checkout abandoned days
+  /// ago) says nothing about this return.
+  final DateTime takenAtUtc;
+
+  const CheckoutBaseline({
+    required this.premium,
+    required this.periodEndUtc,
+    required this.takenAtUtc,
+  });
+
+  Map<String, Object?> toJson() => {
+        'premium': premium,
+        'period_end': periodEndUtc?.toUtc().toIso8601String(),
+        'taken_at': takenAtUtc.toUtc().toIso8601String(),
+      };
+
+  /// Null for anything malformed — a baseline we cannot read is no baseline.
+  static CheckoutBaseline? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final premium = json['premium'];
+    final takenAt = DateTime.tryParse('${json['taken_at']}');
+    if (premium is! bool || takenAt == null) return null;
+    final periodEnd = json['period_end'];
+    return CheckoutBaseline(
+      premium: premium,
+      periodEndUtc: periodEnd == null ? null : DateTime.tryParse('$periodEnd'),
+      takenAtUtc: takenAt.toUtc(),
+    );
+  }
+
+  /// A checkout is a matter of minutes; a baseline older than this belongs
+  /// to some earlier attempt.
+  static const Duration maxAge = Duration(hours: 6);
+
+  bool isFresh(DateTime nowUtc) =>
+      nowUtc.difference(takenAtUtc) <= maxAge &&
+      !takenAtUtc.isAfter(nowUtc.add(const Duration(minutes: 5)));
+}
+
+/// F-86: did a payment land since [before]? Only a CHANGE counts: the paid
+/// period moved past where it stood (the webhook extends it on every
+/// confirmed payment, avulso included), or a family that was not Premium
+/// became Premium. A family already Premium whose period did not move has
+/// paid nothing yet — whatever its plan says.
+bool checkoutConfirmed({
+  required CheckoutBaseline before,
+  required bool premiumNow,
+  required DateTime? periodEndNowUtc,
+}) {
+  final was = before.periodEndUtc;
+  final now = periodEndNowUtc;
+  if (now != null && (was == null || now.isAfter(was))) return true;
+  return !before.premium && premiumNow;
+}
+
 /// F-48: days left when the paid-but-not-renewing period (avulso or a canceled
 /// subscription) is about to lapse — the offer then adds the urgency line +
 /// renew CTA. Null while comfortably far (more than [thresholdDays]) or
@@ -253,5 +320,7 @@ String? billingTypeKey(String? billingType) => switch (billingType) {
       'PIX' => K.premMethodPix,
       'CREDIT_CARD' => K.premMethodCard,
       'BOLETO' => K.premMethodBoleto,
+      // F-107: the store rail's rows in the payment history.
+      'PLAY' => KApp.premMethodPlay,
       _ => null,
     };

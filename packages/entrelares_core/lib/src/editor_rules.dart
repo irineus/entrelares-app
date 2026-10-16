@@ -132,3 +132,65 @@ bool dayDraftChanged({
   return stored?.hour != draftHandoff?.hour ||
       stored?.minute != draftHandoff?.minute;
 }
+
+/// F-99 (owner, 05/10/2026) — the client half of `enforce_handoff_party`: a
+/// day's handoff time is changed by its two ends (the day's planned or real
+/// carer, and the previous day's effective carer) or by an admin. A hint for
+/// the UI only; the database refuses everyone else.
+bool mayChangeHandoff({
+  required int? me,
+  required bool isAdmin,
+  required int? scheduledParentId,
+  required int? actualParentId,
+  required int? previousEffectiveParentId,
+}) {
+  if (isAdmin) return true;
+  if (me == null) return false;
+  return me == scheduledParentId ||
+      me == actualParentId ||
+      me == previousEffectiveParentId;
+}
+
+/// Owner's QA of 3.1.10 (06/10/2026) — who "Pedir para outra pessoa ficar com
+/// este dia" pre-selects. With two carers it is obvious; with three or more the
+/// first of the roster read as a guess. In order:
+///
+/// 1. the day is the father's and the mother can take it, or the other way
+///    round — they swap between themselves (built-in roles only, by their
+///    canonical name; step-parents follow rule 2, there is no kinship guess);
+/// 2. whoever has the child the day before or the day after (same lane) — the
+///    other side of the routine at that point;
+/// 3. a tie, or nobody around: the one with more days this month; still tied,
+///    the roster order of [candidates].
+///
+/// [candidates] are the carers who may take the day (F-28's filter), already
+/// without the day's planned one. [canonicalRoleOf] answers a built-in role's
+/// canonical name (`father`, `mother`, …) or null. A pre-selection only — the
+/// asker can pick any other chip.
+int? suggestSwapCandidate({
+  required int scheduledParentId,
+  required List<int> candidates,
+  required String? Function(int profileId) canonicalRoleOf,
+  int? previousCarerId,
+  int? nextCarerId,
+  Map<int, int> daysInMonth = const {},
+}) {
+  if (candidates.isEmpty) return null;
+  final partner = const {'father': 'mother', 'mother': 'father'}[
+      canonicalRoleOf(scheduledParentId)];
+  if (partner != null) {
+    for (final c in candidates) {
+      if (canonicalRoleOf(c) == partner) return c;
+    }
+  }
+  final around = [
+    for (final c in candidates)
+      if (c == previousCarerId || c == nextCarerId) c
+  ];
+  final pool = around.isNotEmpty ? around : candidates;
+  var best = pool.first;
+  for (final c in pool.skip(1)) {
+    if ((daysInMonth[c] ?? 0) > (daysInMonth[best] ?? 0)) best = c;
+  }
+  return best;
+}

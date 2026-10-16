@@ -4,8 +4,12 @@
 /// subsets inline in `Home.razor` that never had a C# unit suite.
 library;
 
+import 'dart:io';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:test/test.dart';
+
+import 'mirrors/repo_files.dart';
 
 final _day = DateTime(2026, 7, 20);
 const _noon = '12:00';
@@ -125,6 +129,22 @@ void main() {
           SwapPriorityTag.urgent);
       expect(computePriorityTag(_day, null, justAfterMidnight),
           SwapPriorityTag.overdue);
+    });
+
+    test('U-63: overdue on a day with NO time is "the day started"; with a '
+        'time it is late', () {
+      SwapRequestView view(String? time) => SwapRequestView(
+          id: 1,
+          scheduleDate: _day,
+          status: 'pending',
+          requestingProfileId: 1,
+          targetProfileId: 2,
+          proposedHandoffTime: time);
+      final earlyOnTheDay = DateTime(2026, 7, 20, 1);
+      expect(view(null).dayStartedWithoutTime(earlyOnTheDay), isTrue);
+      expect(view('00:30:00').dayStartedWithoutTime(earlyOnTheDay), isFalse);
+      expect(view(null).dayStartedWithoutTime(DateTime(2026, 7, 19, 23)),
+          isFalse, reason: 'not overdue yet');
     });
 
     test('the "HH:mm:ss" wire form parses like "HH:mm"', () {
@@ -481,7 +501,8 @@ void main() {
               scheduledParentId: 1,
               actualParentId: 2,
               today: _today,
-              frozenDates: const []),
+              frozenDates: const [],
+              requesterId: 1),
           isTrue);
     });
 
@@ -492,7 +513,8 @@ void main() {
               scheduledParentId: 1,
               actualParentId: 2,
               today: _today,
-              frozenDates: const []),
+              frozenDates: const [],
+              requesterId: 1),
           isFalse);
       expect(
           isRevertCandidate(
@@ -500,7 +522,8 @@ void main() {
               scheduledParentId: 1,
               actualParentId: null,
               today: _today,
-              frozenDates: const []),
+              frozenDates: const [],
+              requesterId: 1),
           isFalse);
       expect(
           isRevertCandidate(
@@ -508,7 +531,8 @@ void main() {
               scheduledParentId: 1,
               actualParentId: 1,
               today: _today,
-              frozenDates: const []),
+              frozenDates: const [],
+              requesterId: 1),
           isFalse);
       expect(
           isRevertCandidate(
@@ -516,8 +540,54 @@ void main() {
               scheduledParentId: 1,
               actualParentId: 2,
               today: _today,
-              frozenDates: [_future]),
+              frozenDates: [_future],
+              requesterId: 1),
           isFalse);
+    });
+  });
+
+  group('S-26 · who may ask for a revert', () {
+    test('the planned and the actual carer may; a third caregiver may not',
+        () {
+      for (final who in [1, 2]) {
+        expect(
+            isRevertCandidate(
+                scheduleDate: _future,
+                scheduledParentId: 1,
+                actualParentId: 2,
+                today: _today,
+                frozenDates: const [],
+                requesterId: who),
+            isTrue,
+            reason: 'profile $who');
+      }
+      expect(
+          isRevertCandidate(
+              scheduleDate: _future,
+              scheduledParentId: 1,
+              actualParentId: 2,
+              today: _today,
+              frozenDates: const [],
+              requesterId: 3),
+          isFalse);
+      expect(
+          mayRequestRevert(
+              requesterId: null, scheduledParentId: 1, actualParentId: 2),
+          isFalse);
+    });
+
+    test('the database says the same rule (enforce_revert_party)', () {
+      final sql = migrationsDirectory()
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('_s26_revert_party.sql'))
+          .single
+          .readAsStringSync();
+      expect(sql, contains("NEW.status IS DISTINCT FROM 'revert_pending'"));
+      expect(
+          sql,
+          contains(
+              'NEW.requesting_profile_id IN (cs.scheduled_parent_id, cs.actual_parent_id)'));
     });
   });
 

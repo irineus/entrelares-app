@@ -16,6 +16,7 @@ import 'package:entrelares_app/services/notification_badge.dart';
 import 'package:entrelares_app/screens/placeholder_screen.dart';
 import 'package:entrelares_app/screens/reset_password_screen.dart';
 import 'package:entrelares_app/screens/update_password_screen.dart';
+import 'package:entrelares_app/services/auth_failed.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 
 final pt = Localization(AppLanguage.ptBr);
@@ -298,8 +299,8 @@ void main() {
       await tester.pump();
       expect(find.text(pt[K.updatePwdErrorShort]), findsOneWidget);
 
-      await tester.enterText(find.byType(TextField).first, '123456');
-      await tester.enterText(find.byType(TextField).last, '123457');
+      await tester.enterText(find.byType(TextField).first, '12345678');
+      await tester.enterText(find.byType(TextField).last, '12345679');
       await tester.tap(find.text(pt[K.updatePwdSubmit]));
       await tester.pump();
       expect(find.text(pt[K.updatePwdErrorMismatch]), findsOneWidget);
@@ -403,6 +404,173 @@ void main() {
             wasAuthed: false),
         SessionExpiredReason.none,
       );
+    });
+  });
+
+  // F-87: the sentence follows GoTrue's code. An unconfirmed e-mail and a 429
+  // used to read "check your internet", and every failure fed the throttle.
+  group('F-87 — sign-in and password errors', () {
+    Future<SharedPreferences> prefs() async {
+      SharedPreferences.setMockInitialValues({});
+      return SharedPreferences.getInstance();
+    }
+
+    Future<void> submitTwice(WidgetTester tester) async {
+      for (var i = 0; i < 4; i++) {
+        await tester.tap(find.text(pt[K.loginSubmit]));
+        await tester.pumpAndSettle();
+      }
+    }
+
+    testWidgets('an unconfirmed e-mail says so and offers the resend',
+        (tester) async {
+      final resent = <String>[];
+      await tester.pumpWidget(wrap(LoginScreen(
+        onSignIn: (_, _) async =>
+            throw const AuthFailed(AuthFailure.emailNotConfirmed),
+        onForgotPassword: () {},
+        onSignUp: () {},
+        onResendConfirmation: (email) async => resent.add(email),
+        prefs: await prefs(),
+      )));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'ana@example.com');
+      await tester.tap(find.text(pt[K.loginSubmit]));
+      await tester.pumpAndSettle();
+
+      expect(find.text(pt[K.authErrEmailNotConfirmed]), findsOne);
+      expect(find.text(pt[K.authErrConnection]), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('auth-resend-confirmation')));
+      await tester.pump();
+      expect(resent, ['ana@example.com']);
+      expect(find.text(pt[KApp.authResendSent]), findsOne);
+      // The button rests after a send.
+      expect(find.text(pt.format(KApp.authResendWait, [60])), findsOne);
+      await tester.pump(const Duration(seconds: 61));
+    });
+
+    testWidgets('a 429 says "many attempts", and only a wrong password locks',
+        (tester) async {
+      final p = await prefs();
+      await tester.pumpWidget(wrap(LoginScreen(
+        onSignIn: (_, _) async => throw const AuthFailed(AuthFailure.rateLimited),
+        onForgotPassword: () {},
+        onSignUp: () {},
+        prefs: p,
+      )));
+      await tester.pumpAndSettle();
+      await submitTwice(tester);
+
+      expect(find.text(pt[K.authErrRateLimited]), findsOne);
+      expect(p.getInt('login_fails'), isNull,
+          reason: 'a refusal that is not a wrong password feeds no throttle');
+      expect(find.text(pt[K.loginSubmit]), findsOne);
+    });
+
+    testWidgets('a dropped connection is the connection sentence and no lock',
+        (tester) async {
+      final p = await prefs();
+      await tester.pumpWidget(wrap(LoginScreen(
+        onSignIn: (_, _) async => throw const AuthFailed(AuthFailure.network),
+        onForgotPassword: () {},
+        onSignUp: () {},
+        prefs: p,
+      )));
+      await tester.pumpAndSettle();
+      await submitTwice(tester);
+      expect(find.text(pt[K.authErrConnection]), findsOne);
+      expect(p.getInt('login_fails'), isNull);
+    });
+
+    testWidgets('old failures are forgotten after 15 minutes', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'login_fails': 4,
+        'login_last_fail': DateTime.now()
+                .toUtc()
+                .subtract(const Duration(minutes: 20))
+                .millisecondsSinceEpoch ~/
+            1000,
+      });
+      final p = await SharedPreferences.getInstance();
+      await tester.pumpWidget(wrap(LoginScreen(
+        onSignIn: (_, _) async =>
+            throw const AuthFailed(AuthFailure.invalidCredentials),
+        onForgotPassword: () {},
+        onSignUp: () {},
+        prefs: p,
+      )));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(pt[K.loginSubmit]));
+      await tester.pumpAndSettle();
+      // 4 + 1 would have locked for 60 s; decayed, it is the first failure.
+      expect(p.getInt('login_fails'), 1);
+      expect(find.text(pt[K.loginSubmit]), findsOne);
+    });
+
+    testWidgets('an expired link is announced, and the typed e-mail travels '
+        'to the recovery', (tester) async {
+      final forgot = <String>[];
+      await tester.pumpWidget(wrap(LoginScreen(
+        onSignIn: (_, _) async {},
+        onForgotPassword: () {},
+        onForgotPasswordFor: forgot.add,
+        onSignUp: () {},
+        linkErrorCode: 'otp_expired',
+        prefs: await prefs(),
+      )));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('login-link-expired')), findsOne);
+      await tester.enterText(find.byType(TextField).first, ' ana@example.com ');
+      await tester.ensureVisible(find.text(pt[K.loginForgot]));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(pt[K.loginForgot]));
+      expect(forgot, ['ana@example.com']);
+    });
+
+    testWidgets('the recovery form starts with that e-mail; a 429 has its own '
+        'sentence', (tester) async {
+      await tester.pumpWidget(wrap(ResetPasswordScreen(
+        initialEmail: 'ana@example.com',
+        onSendReset: (_) async => throw const AuthFailed(AuthFailure.rateLimited),
+        onBackToLogin: () {},
+      )));
+      await tester.pumpAndSettle();
+      expect(find.text('ana@example.com'), findsOne);
+      await tester.tap(find.text(pt[K.resetSubmit]));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[K.authErrRateLimitedReset]), findsOne);
+    });
+
+    testWidgets('an expired reset link offers the way out', (tester) async {
+      var asked = 0;
+      await tester.pumpWidget(wrap(UpdatePasswordScreen(
+        hasSession: false,
+        onUpdatePassword: (_) async {},
+        onDone: () {},
+        onRequestNewLink: () => asked++,
+        onBackToLogin: () {},
+      )));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('update-pwd-request-new')));
+      expect(asked, 1);
+      expect(find.text(pt[K.registerBackToLogin]), findsOne);
+    });
+
+    testWidgets('the same password is said in Portuguese, never as an '
+        'exception', (tester) async {
+      await tester.pumpWidget(wrap(UpdatePasswordScreen(
+        hasSession: true,
+        onUpdatePassword: (_) async =>
+            throw const AuthFailed(AuthFailure.samePassword, 'same_password'),
+        onDone: () {},
+      )));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, '12345678');
+      await tester.enterText(find.byType(TextField).last, '12345678');
+      await tester.tap(find.text(pt[K.updatePwdSubmit]));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[KApp.authErrSamePassword]), findsOne);
+      expect(find.textContaining('AuthFailed'), findsNothing);
     });
   });
 }

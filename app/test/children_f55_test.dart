@@ -29,20 +29,28 @@ FakeCustodyDataSource source({
   List<Member> members = const [admin, plain],
   Map<String, String> settings = on,
   List<Child> children = const [],
+  bool premium = false,
 }) =>
     FakeCustodyDataSource(members: members, days: [])
-      ..family = const Family(id: 7, name: 'Souza', plan: 'free')
+      ..family = premium
+          ? Family(
+              id: 7,
+              name: 'Souza',
+              plan: 'free',
+              compPremiumAt: DateTime.utc(2026, 1, 1))
+          : const Family(id: 7, name: 'Souza', plan: 'free')
       ..publicSettings = settings
       ..children = List.of(children);
 
 Future<void> pumpPage(WidgetTester tester, FakeCustodyDataSource ds,
-    {AppLanguage language = AppLanguage.ptBr}) async {
+    {AppLanguage language = AppLanguage.ptBr, VoidCallback? onOpenPlan}) async {
   await tester.binding.setSurfaceSize(const Size(420, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(AppL10n(
     l: Localization(language),
     setLanguage: (_) async {},
-    child: MaterialApp(home: FamilyChildrenScreen(dataSource: ds)),
+    child: MaterialApp(
+        home: FamilyChildrenScreen(dataSource: ds, onOpenPlan: onOpenPlan)),
   ));
   await tester.pumpAndSettle();
 }
@@ -113,8 +121,11 @@ void main() {
       expect(ds.childWrites, ['add:Maria Clara']);
       expect(find.text('Maria Clara'), findsOne);
       expect(find.text(l[KApp.childAdded]), findsOne);
-      // v1 is one child: the add door is gone once there is one.
+      // F-07: a free family has one child included — the next one is the
+      // Premium gate, not a door the server would refuse.
       expect(find.text(l[KApp.childAdd]), findsNothing);
+      expect(find.byKey(const ValueKey('child-add-another')), findsNothing);
+      expect(find.byKey(const ValueKey('child-free-cap')), findsOne);
     });
 
     testWidgets('an empty name never reaches the server', (tester) async {
@@ -201,7 +212,179 @@ void main() {
       await pumpPage(tester, source(children: const [lia]),
           language: AppLanguage.en);
       expect(find.text('Lia'), findsOne);
-      expect(find.text('Child'), findsOne);
+      expect(find.text('Children'), findsOne);
+    });
+  });
+
+  // F-07 (PR 1): more than one child; the second one onwards is Premium.
+  group('more than one child', () {
+    const theo = Child(id: 6, familyId: 7, firstName: 'Theo', sortOrder: 1);
+
+    testWidgets('free with one child: the gate says the live number and '
+        'lands on the plan page', (tester) async {
+      var opened = 0;
+      await pumpPage(tester, source(children: const [lia]),
+          onOpenPlan: () => opened++);
+      final gate = find.byKey(const ValueKey('child-free-cap'));
+      expect(
+          find.descendant(
+              of: gate,
+              matching: find.text(l.format(KApp.childFreeCapOne, [1]))),
+          findsOne);
+      await tester.tap(
+          find.descendant(of: gate, matching: find.text(l[K.famSeePremium])));
+      expect(opened, 1);
+    });
+
+    testWidgets('the operator raising children.free_max opens the door',
+        (tester) async {
+      await pumpPage(
+          tester,
+          source(
+              children: const [lia],
+              settings: const {...on, 'children.free_max': '2'}));
+      expect(find.byKey(const ValueKey('child-free-cap')), findsNothing);
+      expect(find.byKey(const ValueKey('child-add-another')), findsOne);
+    });
+
+    testWidgets('Premium adds another child and lists both', (tester) async {
+      final ds = source(children: const [lia], premium: true);
+      await pumpPage(tester, ds);
+      await tester.tap(find.byKey(const ValueKey('child-add-another')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byKey(const ValueKey('child-name-field')), 'Theo');
+      await tester.tap(find.text(l[K.commonSave]));
+      await tester.pumpAndSettle();
+      expect(ds.childWrites, ['add:Theo']);
+      expect(find.text('Lia'), findsOne);
+      expect(find.text('Theo'), findsOne);
+      expect(find.byKey(const ValueKey('child-add-another')), findsOne);
+    });
+
+    testWidgets('a downgraded family keeps both children; only the next '
+        'one meets the gate', (tester) async {
+      await pumpPage(tester, source(children: const [lia, theo]));
+      expect(find.text('Lia'), findsOne);
+      expect(find.text('Theo'), findsOne);
+      expect(find.byKey(const ValueKey('child-edit-6')), findsOne);
+      expect(find.byKey(const ValueKey('child-free-cap')), findsOne);
+    });
+
+    testWidgets('at the ceiling there is no door, only the limit',
+        (tester) async {
+      await pumpPage(
+          tester,
+          source(
+              children: const [lia, theo],
+              premium: true,
+              settings: const {...on, 'children.max_per_family': '2'}));
+      expect(find.byKey(const ValueKey('child-add-another')), findsNothing);
+      expect(find.byKey(const ValueKey('child-free-cap')), findsNothing);
+      expect(find.text(l.format(KApp.childMaxCap, [2])), findsOne);
+    });
+
+    testWidgets('a member sees neither the door nor the gate', (tester) async {
+      await pumpPage(tester,
+          source(members: const [plain, admin], children: const [lia]));
+      expect(find.byKey(const ValueKey('child-free-cap')), findsNothing);
+      expect(find.byKey(const ValueKey('child-add-another')), findsNothing);
+    });
+
+    testWidgets('the Família row names every child', (tester) async {
+      await pumpFamily(tester, source(children: const [lia, theo]),
+          onOpenChildren: () {});
+      expect(find.text('Lia e Theo'), findsOne);
+    });
+  });
+
+  // F-07 (PR 3): the plan's mode, switched only by `set_schedule_mode`.
+  group('the plan mode', () {
+    const theo = Child(id: 6, familyId: 7, firstName: 'Theo', sortOrder: 1);
+    const planOn = {...on, 'feature.per_child_schedule': 'true'};
+    final card = find.byKey(const ValueKey('child-plan-card'));
+    final switchButton = find.byKey(const ValueKey('child-plan-switch'));
+
+    FakeCustodyDataSource perChild(FakeCustodyDataSource ds) => ds
+      ..family = Family(
+          id: 7,
+          name: 'Souza',
+          plan: 'free',
+          compPremiumAt: DateTime.utc(2026, 1, 1),
+          scheduleMode: 'per_child');
+
+    testWidgets('flag OFF: no plan card at all', (tester) async {
+      await pumpPage(tester, source(children: const [lia, theo]));
+      expect(card, findsNothing);
+    });
+
+    testWidgets('one child: the card says two are needed, with no door',
+        (tester) async {
+      await pumpPage(tester, source(children: const [lia], settings: planOn));
+      expect(find.text(l[KApp.childPlanSingle]), findsOne);
+      expect(find.text(l[KApp.childPlanNeedsTwo]), findsOne);
+      expect(switchButton, findsNothing);
+    });
+
+    testWidgets('two children: the admin confirms and every child gets a plan',
+        (tester) async {
+      final ds = source(
+          children: const [lia, theo], premium: true, settings: planOn);
+      await pumpPage(tester, ds);
+      await tester.tap(switchButton);
+      await tester.pumpAndSettle();
+      expect(find.text(l[KApp.childPlanToPerChildConfirm]), findsOne);
+      await tester.tap(find.text(l[KApp.childPlanToPerChild]).last);
+      await tester.pumpAndSettle();
+      expect(ds.scheduleModeCalls, [('per_child', null)]);
+      expect(find.text(l[KApp.childPlanSwitched]), findsOne);
+      expect(find.text(l[KApp.childPlanPerChild]), findsOne);
+    });
+
+    testWidgets('back to one plan asks whose plan it becomes', (tester) async {
+      final ds = perChild(source(
+          children: const [lia, theo], premium: true, settings: planOn));
+      await pumpPage(tester, ds);
+      await tester.tap(switchButton);
+      await tester.pumpAndSettle();
+      // No child chosen yet: the primary names no plan and does nothing.
+      await tester.tap(find.text(l[KApp.childPlanToSingle]).last);
+      await tester.pumpAndSettle();
+      expect(ds.scheduleModeCalls, isEmpty);
+
+      await tester.tap(find.byKey(const ValueKey('child-plan-base-6')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l.format(KApp.childPlanUseChild, ['Theo'])));
+      await tester.pumpAndSettle();
+      expect(ds.scheduleModeCalls, [('single', 6)]);
+      expect(find.text(l[KApp.childPlanSingle]), findsOne);
+    });
+
+    testWidgets('a server refusal keeps the sheet open with its sentence',
+        (tester) async {
+      final ds = source(
+          children: const [lia, theo], premium: true, settings: planOn)
+        ..throwOnWrite = Exception('{"code":"23514","message":'
+            '"Há pedidos de troca pendentes a partir de hoje. Resolva-os '
+            'antes de mudar o modo do plano."}');
+      await pumpPage(tester, ds);
+      await tester.tap(switchButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l[KApp.childPlanToPerChild]).last);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('pedidos de troca pendentes'), findsOne);
+      expect(find.text(l[KApp.childPlanToPerChildConfirm]), findsOne);
+    });
+
+    testWidgets('a member reads the state and gets no door', (tester) async {
+      await pumpPage(
+          tester,
+          perChild(source(
+              members: const [plain, admin],
+              children: const [lia, theo],
+              settings: planOn)));
+      expect(find.text(l[KApp.childPlanPerChild]), findsOne);
+      expect(switchButton, findsNothing);
     });
   });
 }

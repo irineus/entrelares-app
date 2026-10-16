@@ -22,7 +22,7 @@ import 'package:entrelares_app/services/connectivity_status.dart';
 import 'package:entrelares_app/services/notification_badge.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'calendar_slice_test.dart'
-    show FakeCustodyDataSource, ana, bruno, dayOfMonth, row;
+    show FakeCustodyDataSource, ana, bruno, dayOfMonth, inGrid, row;
 
 final pt = Localization(AppLanguage.ptBr);
 final en = Localization(AppLanguage.en);
@@ -226,7 +226,7 @@ void main() {
       final status = ConnectivityStatus();
       await tester.pumpWidget(calendarApp(ds, status));
       await tester.pumpAndSettle();
-      expect(find.text('A'), findsWidgets);
+      expect(inGrid('A'), findsWidgets);
       final asOf = status.value.dataAsOf;
 
       ds.throwOnMembers = noNetwork;
@@ -235,8 +235,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300)); // F-51 debounce
       await tester.pumpAndSettle();
 
-      expect(find.text('A'), findsWidgets);
-      expect(find.text('B'), findsWidgets);
+      expect(inGrid('A'), findsWidgets);
+      expect(inGrid('B'), findsWidgets);
       expect(find.textContaining(pt[KApp.errCalendarLoad]), findsNothing);
       expect(find.textContaining(pt[KApp.offlineMonthNotLoaded]), findsNothing);
       // The age is still the last REAL read — a failed load dates nothing.
@@ -288,7 +288,7 @@ void main() {
 
       expect(ds.monthFetches, greaterThan(fetchesBefore));
       expect(find.textContaining(pt[KApp.offlineMonthNotLoaded]), findsNothing);
-      expect(find.text('A'), findsWidgets);
+      expect(inGrid('A'), findsWidgets);
     });
   });
 }

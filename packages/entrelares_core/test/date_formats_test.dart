@@ -135,6 +135,20 @@ void main() {
 
     // TodayCard.razor: "dddd, dd 'de' MMMM" pt-BR / "dddd, MMMM d" en-US —
     // the pt day is zero-padded, the English one is not.
+    // U-63: a deadline is said the way a person says it.
+    test('a deadline reads "sábado, 10/10, à 0h" / "Saturday, 10 Oct, at 12 AM"',
+        () {
+      expect(ptBr.formatDeadline(DateTime(2026, 10, 10)), 'sábado, 10/10, à 0h');
+      expect(ptBr.formatDeadline(DateTime(2026, 10, 10, 1)),
+          'sábado, 10/10, à 1h');
+      expect(ptBr.formatDeadline(DateTime(2026, 10, 11, 18, 30)),
+          'domingo, 11/10, às 18h30');
+      expect(en.formatDeadline(DateTime(2026, 10, 10)),
+          'Saturday, 10 Oct, at 12 AM');
+      expect(en.formatDeadline(DateTime(2026, 10, 11, 18, 30)),
+          'Sunday, 11 Oct, at 6:30 PM');
+    });
+
     test('the Today card heading follows the language', () {
       expect(ptBr.formatTodayHeading(theDay), 'quarta-feira, 05 de agosto');
       expect(en.formatTodayHeading(theDay), 'Wednesday, August 5');

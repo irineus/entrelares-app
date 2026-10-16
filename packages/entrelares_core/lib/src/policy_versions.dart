@@ -41,7 +41,7 @@ enum ConsentGateState {
 
 abstract final class PolicyVersions {
   /// The version the shipped policy/terms text corresponds to.
-  static const String current = '2026-09-25';
+  static const String current = '2026-10-03';
 
   /// Date from which a missing accept of [current] blocks the app. Always the
   /// date the text becomes VISIBLE to users, plus 15 days — the window exists
@@ -51,8 +51,10 @@ abstract final class PolicyVersions {
   /// Do NOT shorten it afterwards: an already-published notice period is a
   /// promise. The migration `20260801200000_s15_enforce_from_promotion` carries
   /// the other half — S-22 moves it again for the phase-6 version, in
-  /// `20260925100000_s22_phase6_live`.
-  static const String enforceFrom = '2026-10-10';
+  /// `20260925100000_s22_phase6_live`, and F-82 for 2.1 (the referral), in
+  /// `20261003150000_f82_referral_live`: 2.0's 10/10 became 18/10 for whoever
+  /// had not accepted yet — a window may grow, never shrink.
+  static const String enforceFrom = '2026-10-18';
 
   /// [enforceFrom] parsed once. Invalid content would be an authoring mistake,
   /// and `DateTime.parse` throws rather than defaulting to "never block" — a
@@ -62,7 +64,12 @@ abstract final class PolicyVersions {
   /// Plain-PT-BR summary of what changed in the current version, rendered on
   /// the acceptance screen so nobody is asked to accept a diff they cannot see
   /// (LGPD art. 9 — clear and adequate information).
+  ///
+  /// F-82 (2.1) put its entry FIRST and kept 2.0's: a profile that never
+  /// accepted 2.0 is asked for 2.1 directly, and the agenda's health items
+  /// (art. 11) must still be in what it reads before accepting.
   static const List<String> changeSummary = [
+    'Indicação de famílias (versão 2.1): cada família tem um link de convite na aba Família. Quando uma família nova é criada por esse link, guardamos o vínculo entre as duas famílias, o canal do cadastro e a situação da indicação, e consultamos os pagamentos da família indicada para saber se a família que indicou ganha um mês de Premium. No Android, a informação de instalação do Google Play é usada só para ler o código do convite. As regras estão nos Termos de Uso.',
     'Agenda da criança: a pessoa administradora pode cadastrar a criança pelo primeiro nome, e os responsáveis registram compromissos por dia (Escola, Saúde, Remédio, Atividade, Livre, Nota ou Outro), com rotinas, avisos e lembretes. As observações dos dias passam a ser Notas da agenda. A política explica como tratamos esses dados, inclusive as informações de saúde que a família registrar.',
     'Visualizador: um novo tipo de membro, convidado para acompanhar o planejamento sem editá-lo. Ele vê o calendário, a agenda e a conversa da família, mas não vê as despesas nem as mensagens das trocas, e recebe só notificações informativas, nunca por e-mail.',
     'Despesas compartilhadas: os responsáveis podem registrar despesas da criança e pagamentos entre si, que só contam depois que quem recebeu confirma. O aplicativo não movimenta dinheiro; cada alteração ou exclusão fica guardada numa trilha que não se altera.',
@@ -75,6 +82,7 @@ abstract final class PolicyVersions {
   /// not asked to accept a diff in a language they cannot read. NOT a second
   /// normative text. **Entries must stay index-aligned with [changeSummary].**
   static const List<String> changeSummaryEn = [
+    "Family referral (version 2.1): every family has an invitation link on the Family tab. When a new family is created through that link, we keep the link between the two families, the sign-up channel and the referral's status, and we check the referred family's payments to know whether the referring family earns a month of Premium. On Android, Google Play's install information is used only to read the invitation code. The rules are in the Terms of Use.",
     "The child's agenda: the family's administrator may register the child by first name, and the caregivers record appointments per day (School, Health, Medicine, Activity, Free, Note or Other), with routines, notices and reminders. The days' notes become agenda Notes. The policy explains how we handle this data, including the health information the family may record.",
     'Viewer: a new kind of member, invited to follow the plan without editing it. A viewer sees the calendar, the agenda and the family chat, but not the expenses nor the swap messages, and receives only informative notifications, never by e-mail.',
     "Shared expenses: caregivers may record the child's expenses and payments between them, which count only after the receiver confirms. The app moves no money; every change or deletion is kept in a trail that cannot be altered.",

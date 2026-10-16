@@ -332,11 +332,17 @@ void main() {
     Rect link(WidgetTester tester, String key) =>
         tester.getRect(find.widgetWithText(TextButton, l[key]));
 
+    // U-64: the language picker's segments shrink to fit too — the legal
+    // links' box is the one around the privacy link.
+    final linksFit = find.ancestor(
+        of: find.text(l[K.commonPrivacyPolicy]),
+        matching: find.byType(AppShrinkToFit));
+
     testWidgets('login at 1.3×: the pair never shrinks — it wraps, and each '
         'link keeps its 48 dp', (tester) async {
       await _usePhone(tester, scale: 1.3);
       await pumpLogin(tester);
-      final fit = find.byType(AppShrinkToFit);
+      final fit = linksFit;
       expect(fit, findsOneWidget);
       expect(
         _appliedScale(tester, fit),
@@ -359,7 +365,7 @@ void main() {
         'one line, no shrink, 48 dp', (tester) async {
       await _usePhone(tester);
       await pumpLogin(tester);
-      expect(_appliedScale(tester, find.byType(AppShrinkToFit)), 1.0);
+      expect(_appliedScale(tester, linksFit), 1.0);
       expect(
         link(tester, K.commonTermsOfUse).top,
         closeTo(link(tester, K.commonPrivacyPolicy).top, 1e-6),

@@ -148,4 +148,86 @@ void main() {
       expect(ExpenseLedger.room(net, const [], from: 3, to: 2), 6000);
     });
   });
+
+  // F-93: the trail always held the whole expense; the screens printed only
+  // the description and the amount, so a 70/30 -> 50/50 edit read as nothing.
+  group('ExpenseDiff', () {
+    Map<String, dynamic> snap(
+            {String desc = 'Mensalidade',
+            int amount = 120000,
+            String category = 'school',
+            int paidBy = 1,
+            String spentOn = '2026-10-01',
+            String method = 'percent',
+            Map<int, int> shares = const {1: 36000, 2: 84000}}) =>
+        {
+          'description': desc,
+          'amount_cents': amount,
+          'category': category,
+          'paid_by': paidBy,
+          'spent_on': spentOn,
+          'split_method': method,
+          'shares': [
+            for (final e in shares.entries)
+              {'profile_id': e.key, 'weight': 1, 'share_cents': e.value}
+          ],
+        };
+    final pt = Localization(AppLanguage.ptBr);
+    String name(int id) => id == 1 ? 'Ana' : 'Bruno';
+
+    test('a split edit is a change, person by person', () {
+      final changes = ExpenseDiff.between(
+          snap(), snap(method: 'equal', shares: const {1: 60000, 2: 60000}));
+      expect(changes.map((c) => c.field), [ExpenseField.split]);
+      expect(ExpenseDiff.describe(changes, pt, name), [
+        'Divisão: Ana de R\$ 360,00 para R\$ 600,00; Bruno de R\$ 840,00 para R\$ 600,00'
+      ]);
+    });
+
+    test('payer, date, category and amount, in reading order', () {
+      final changes = ExpenseDiff.between(
+          snap(),
+          snap(
+              amount: 125000,
+              category: 'health',
+              paidBy: 2,
+              spentOn: '2026-10-02',
+              shares: const {1: 37500, 2: 87500}));
+      expect(changes.map((c) => c.field), [
+        ExpenseField.amount,
+        ExpenseField.category,
+        ExpenseField.paidBy,
+        ExpenseField.spentOn,
+        ExpenseField.split,
+      ]);
+      final lines = ExpenseDiff.describe(changes, pt, name);
+      expect(lines[0], 'Valor: de R\$ 1.200,00 para R\$ 1.250,00');
+      expect(lines[1], 'Categoria: de Escola para Saúde');
+      expect(lines[2], 'Quem pagou: de Ana para Bruno');
+      expect(lines[3], 'Data: de 01/10/2026 para 02/10/2026');
+    });
+
+    test('a method change that leaves every part in place changed nothing',
+        () {
+      expect(ExpenseDiff.between(snap(), snap(method: 'exact')), isEmpty);
+    });
+
+    test('someone joining or leaving the split reads as a dash', () {
+      final changes = ExpenseDiff.between(
+          snap(), snap(shares: const {1: 120000}));
+      expect(ExpenseDiff.describe(changes, pt, name),
+          ['Divisão: Ana de R\$ 360,00 para R\$ 1.200,00; Bruno de R\$ 840,00 para —']);
+    });
+
+    test('a missing snapshot is no change, never a crash', () {
+      expect(ExpenseDiff.between(null, snap()), isEmpty);
+      expect(ExpenseDiff.between(snap(), null), isEmpty);
+    });
+
+    test('English reads English', () {
+      final en = Localization(AppLanguage.en);
+      final changes = ExpenseDiff.between(snap(), snap(paidBy: 2));
+      expect(ExpenseDiff.describe(changes, en, name), ['Paid by: from Ana to Bruno']);
+    });
+  });
 }

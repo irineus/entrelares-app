@@ -10,6 +10,7 @@ library;
 
 import 'date_math.dart';
 import 'localization/k_app.dart';
+import 'localization/localization.dart';
 
 /// The closed kinds (owner, 24/09/2026). The wire key travels; the label is
 /// the reader's language (the F-44/F-52 rule).
@@ -254,7 +255,21 @@ class AgendaNotify {
   });
 
   static const none = AgendaNotify();
-  static const List<int> remindOffsets = [0, 15, 30, 60];
+  /// F-105: minutes before the start, plus [eveAt19] — "na véspera às 19h",
+  /// a fixed hour of the day before (a sentinel, not an offset). The same
+  /// closed list as the server's CHECK (T-84).
+  static const List<int> remindOffsets = [0, 15, 30, 60, 120, 180, 1440, eveAt19];
+  static const int eveAt19 = -1;
+
+  /// F-105: the chip's words for an offset.
+  static String remindLabel(Localization l, int minutes) => switch (minutes) {
+        0 => l[KApp.agendaRemindAtStart],
+        eveAt19 => l[KApp.agendaRemindEve],
+        1440 => l[KApp.agendaRemindDayBefore],
+        >= 60 when minutes % 60 == 0 && minutes > 60 =>
+          l.format(KApp.agendaRemindHoursBefore, [minutes ~/ 60]),
+        _ => l.format(KApp.agendaRemindBefore, [minutes]),
+      };
 
   final AgendaAudience to;
   final bool push;
@@ -270,7 +285,7 @@ class AgendaNotify {
     final remind = remindMinutes;
     if (remind != null) {
       if (!remindOffsets.contains(remind)) {
-        return 'O lembrete é na hora ou 15, 30 ou 60 minutos antes.';
+        return 'Escolha um lembrete da lista: na hora, 15, 30 ou 60 minutos, 2 ou 3 horas, 1 dia antes ou na véspera às 19h.';
       }
       if (start == null) return 'O lembrete precisa do horário de início.';
       if (to == AgendaAudience.none) return 'Escolha quem recebe o lembrete.';

@@ -65,10 +65,10 @@ void main() {
     });
 
     for (final nearMiss in const [
-      ' 2026-09-25',
-      '2026-09-25 ',
-      '2026-9-25',
-      '2026-09-25T00:00:00Z',
+      ' 2026-10-03',
+      '2026-10-03 ',
+      '2026-10-3',
+      '2026-10-03T00:00:00Z',
       '',
     ]) {
       test('"$nearMiss" is not the current version', () {
@@ -85,7 +85,7 @@ void main() {
     });
 
     test('enforceFromDate parses the declared constant', () {
-      expect(PolicyVersions.enforceFromDate, DateTime.parse('2026-10-10'));
+      expect(PolicyVersions.enforceFromDate, DateTime.parse('2026-10-18'));
     });
 
     test('the change summary is present and non-empty', () {

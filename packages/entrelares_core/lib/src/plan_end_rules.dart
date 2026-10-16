@@ -16,7 +16,11 @@ abstract final class PlanEndRules {
 
   /// The two `kind`s the job writes; anything else is a future writer's shape
   /// and gets no action (the row still renders its stored sentence).
-  static const kinds = {'ending', 'ended'};
+  static const kinds = {'ending', 'ended', unplanned};
+
+  /// F-78 — the family never planned a day; `date` is the day the nudge was
+  /// written, and the action opens the wizard there (or today, if later).
+  static const unplanned = 'unplanned';
 
   /// The day the row's action opens the wizard on, or null when the row
   /// offers no action: another type, an unknown `kind`, or no real date.
@@ -31,7 +35,26 @@ abstract final class PlanEndRules {
     }
     if (decoded is! Map || !kinds.contains(decoded['kind'])) return null;
     final date = decoded['date'];
-    return date is String ? wizardStart(date, today) : null;
+    if (date is! String) return null;
+    if (decoded['kind'] == unplanned) {
+      final day = _parseIso(date);
+      if (day == null) return null;
+      final floor = DateTime(today.year, today.month, today.day);
+      return day.isBefore(floor) ? floor : day;
+    }
+    return wizardStart(date, today);
+  }
+
+  /// F-78: whether a `plan_ending` row's params say the plan never started —
+  /// the row's action then reads "Planejar o primeiro mês".
+  static bool isUnplanned(String? paramsJson) {
+    if (paramsJson == null) return false;
+    try {
+      final decoded = jsonDecode(paramsJson);
+      return decoded is Map && decoded['kind'] == unplanned;
+    } on FormatException {
+      return false;
+    }
   }
 
   /// The day the wizard opens on: [isoLastDay] + 1, never before [today].

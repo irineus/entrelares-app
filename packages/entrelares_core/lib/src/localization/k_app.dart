@@ -195,6 +195,11 @@ abstract final class KApp {
   static const String pushHintReallowBrowser = 'app.push.hintReallowBrowser';
   static const String pushHintUnsupportedHere = 'app.push.hintUnsupportedHere';
   static const String pushEnable = 'app.push.enable';
+  // ── F-59 — the strip under the Hoje card that points to Notificações for
+  //    a device without push, now that most notices left e-mail. ──
+  static const String pushTodayMessage = 'app.push.todayMessage';
+  static const String pushTodayAction = 'app.push.todayAction';
+  static const String pushTodayDismiss = 'app.push.todayDismiss';
   static const String pushDisable = 'app.push.disable';
   /// U-43: the app-bar icon that replaces the card once push is on — its
   /// tooltip is also the name a screen reader gives the button.
@@ -202,10 +207,45 @@ abstract final class KApp {
   static const String pushToastOn = 'app.push.toastOn';
   static const String pushToastOff = 'app.push.toastOff';
   static const String pushErrEnable = 'app.push.errEnable';
-  static const String onbStepPushTitle = 'app.onbStep.push.title';
-  static const String onbStepPushHint = 'app.onbStep.push.hint';
-  static const String onbStepPushDoneHint = 'app.onbStep.push.doneHint';
-  static const String onbStepPushAction = 'app.onbStep.push.action';
+  /// U-61: the Hoje card of a family with no plan at all points at the
+  /// wizard (`showPlanNudge`) — the founder's first step, where the F-31
+  /// invite nudge used to stand.
+  static const String cardPlanTitle = 'app.card.plan.title';
+  static const String cardPlanHint = 'app.card.plan.hint';
+  static const String cardPlanAction = 'app.card.plan.action';
+  /// U-61: the optional child's first name on the founder's step 2 (and the
+  /// Google onboarding), and the sentences that say the name where they said
+  /// "a criança" when the family has exactly one child.
+  static const String registerChildName = 'app.register.childName';
+  static const String registerChildNameHint = 'app.register.childNameHint';
+  static const String tourTodayTitleNamed = 'app.tour.todayTitleNamed';
+  static const String swapAskKeepNamed = 'app.swap.askKeepNamed';
+  static const String swapAskTakeNamed = 'app.swap.askTakeNamed';
+  static const String noticeRequestPickupNamed = 'app.notice.requestPickupNamed';
+  static const String noticeRequestKeepNamed = 'app.notice.requestKeepNamed';
+  static const String noticeMinePickupNamed = 'app.notice.minePickupNamed';
+  static const String noticeMineKeepNamed = 'app.notice.mineKeepNamed';
+  /// F-101: the invitation card's state when the e-mail did not leave, the
+  /// expired card's one action, the second-family sentence (inviter and
+  /// invitee sides).
+  static const String famInviteEmailUnsentBadge = 'app.fam.inviteEmailUnsentBadge';
+  static const String famInviteEmailUnsentHint = 'app.fam.inviteEmailUnsentHint';
+  static const String famShareAgain = 'app.fam.shareAgain';
+  static const String famInviteEmailTaken = 'app.fam.inviteEmailTaken';
+  static const String registerMigrationOtherEmail = 'app.register.migrationOtherEmail';
+  /// F-102: the plan page for a member who is not an admin — who can
+  /// subscribe, by name, and the one thing they can do about it.
+  static const String premAdminNamedOne = 'app.prem.adminNamedOne';
+  static const String premAdminNamedMany = 'app.prem.adminNamedMany';
+  static const String premAskAdmin = 'app.prem.askAdmin';
+  static const String premAskAdmins = 'app.prem.askAdmins';
+  static const String premAskAdminSent = 'app.prem.askAdminSent';
+  /// U-63: a day with NO handoff time is anchored at 00:00, so its request
+  /// read "ATRASADO — o horário de entrega já passou" at 00:01 — a time that
+  /// never existed. The state is said as what it is: the day has started.
+  static const String frozenDayStarted = 'app.frozen.dayStarted';
+  static const String calDayStartedAwaitingYou = 'app.cal.dayStartedAwaitingYou';
+  static const String notifTagDayStartedShort = 'app.notif.tagDayStartedShort';
 
   // ── F-56 pending member (invited, not yet joined) ──
   static const String famPendingBadge = 'app.fam.pendingBadge';
@@ -379,7 +419,6 @@ abstract final class KApp {
   static const String noticeCapReached = 'app.notice.capReached';
   static const String noticeSent = 'app.notice.sent';
   static const String noticeErrSend = 'app.notice.errSend';
-  static const String noticeOpenMine = 'app.notice.openMine';
   static const String noticeCancel = 'app.notice.cancel';
   static const String noticeCancelConfirm = 'app.notice.cancelConfirm';
   static const String noticeCancelKeep = 'app.notice.cancelKeep';
@@ -514,6 +553,37 @@ abstract final class KApp {
   static const String childRenamed = 'app.child.renamed';
   static const String childRemoved = 'app.child.removed';
   static const String childErrLoad = 'app.child.errLoad';
+  // F-07: more than one child; from `children.free_max` on, Premium.
+  static const String childAddAnother = 'app.child.addAnother';
+  static const String childFreeCapOne = 'app.child.freeCapOne';
+  static const String childFreeCapMany = 'app.child.freeCapMany';
+  static const String childMaxCap = 'app.child.maxCap';
+  // F-07 PR 3: the plan's mode, on the Crianças page.
+  static const String childPlanTitle = 'app.child.planTitle';
+  static const String childPlanSingle = 'app.child.planSingle';
+  static const String childPlanPerChild = 'app.child.planPerChild';
+  static const String childPlanNeedsTwo = 'app.child.planNeedsTwo';
+  static const String childPlanToPerChild = 'app.child.planToPerChild';
+  static const String childPlanToPerChildConfirm = 'app.child.planToPerChildConfirm';
+  static const String childPlanToSingle = 'app.child.planToSingle';
+  static const String childPlanToSingleLead = 'app.child.planToSingleLead';
+  static const String childPlanUseChild = 'app.child.planUseChild';
+  static const String childPlanSwitched = 'app.child.planSwitched';
+  // F-07 PR 4: the calendar's lanes.
+  static const String calLaneAll = 'app.cal.laneAll';
+  static const String calLaneAllShort = 'app.cal.laneAllShort';
+
+  /// The plan-end strip's action (owner, 29/09/2026): one word, so the
+  /// strip is one line above the month.
+  static const String calPlanEndAction = 'app.cal.planEndAction';
+  static const String calLanePickFirst = 'app.cal.lanePickFirst';
+  static const String calLaneEditDay = 'app.cal.laneEditDay';
+  static const String calLanePending = 'app.cal.lanePending';
+  static const String calLaneWith = 'app.cal.laneWith';
+  static const String editorAlsoFor = 'app.editor.alsoFor';
+  static const String frozenApproveAll = 'app.frozen.approveAll';
+  static const String quickSwapAlreadyOne = 'app.quickSwap.alreadyOne';
+  static const String quickSwapAlreadyMany = 'app.quickSwap.alreadyMany';
 
   // ── F-55 the day agenda (PR 2). Every key lives under `app.agenda.` — the
   //    ADDRESS vocabulary_test pins the words "agenda" and "nota" to. ──
@@ -634,6 +704,11 @@ abstract final class KApp {
   static const String agendaRemindAtStart = 'app.agenda.remindAtStart';
   static const String agendaRemindBefore = 'app.agenda.remindBefore';
   static const String agendaRemindNeedsStart = 'app.agenda.remindNeedsStart';
+
+  /// F-105: the reminders that reach the evening before.
+  static const String agendaRemindHoursBefore = 'app.agenda.remindHoursBefore';
+  static const String agendaRemindDayBefore = 'app.agenda.remindDayBefore';
+  static const String agendaRemindEve = 'app.agenda.remindEve';
   static const String agendaRepeat = 'app.agenda.repeat';
   static const String agendaRepeatLead = 'app.agenda.repeatLead';
   static const String agendaRepeatDays = 'app.agenda.repeatDays';
@@ -695,6 +770,45 @@ abstract final class KApp {
   static const String expenseFilterPayments = 'app.expense.filterPayments';
   static const String expensePaymentRow = 'app.expense.paymentRow';
   static const String expenseYouLent = 'app.expense.youLent';
+
+  /// U-67: the load error of the family pages (Família, Plano, Modo
+  /// administrador, Excluir família) — they said "o calendário".
+  static const String errFamilyLoad = 'app.err.familyLoad';
+
+  /// U-67: a non-admin who reaches the admin mode page (a typed URL) was told
+  /// only admins can SEND INVITATIONS.
+  static const String adminModeOnlyAdmins = 'app.adminMode.onlyAdmins';
+
+  /// U-67: the referral link could only be shared; desktop web has no Web
+  /// Share, so it could not leave the page.
+  static const String famReferralCopy = 'app.fam.referralCopy';
+
+  /// S-27: the Conversa's push hides the text unless the member turns the
+  /// preview on — the switch's two tooltips and its two confirmations.
+  static const String chatPreviewShow = 'app.chat.previewShow';
+  static const String chatPreviewHide = 'app.chat.previewHide';
+  static const String chatPreviewShown = 'app.chat.previewShown';
+  static const String chatPreviewHidden = 'app.chat.previewHidden';
+
+  /// T-105: beside a deadline when the device's clock is not the family's.
+  static const String familyTimeSuffix = 'app.familyTime.suffix';
+
+  /// F-103: the confirmation before the S-10 password ask — what an admin can
+  /// do (grant) or stops being able to do (revoke), and that the person is told.
+  static const String adminConfirmGrantTitle = 'app.adminConfirm.grantTitle';
+  static const String adminConfirmRevokeTitle = 'app.adminConfirm.revokeTitle';
+  static const String adminConfirmGrantIntro = 'app.adminConfirm.grantIntro';
+  static const String adminConfirmRevokeIntro = 'app.adminConfirm.revokeIntro';
+  static const String adminPowerInvite = 'app.adminPower.invite';
+  static const String adminPowerAdmins = 'app.adminPower.admins';
+  static const String adminPowerPastDays = 'app.adminPower.pastDays';
+  static const String adminPowerFamily = 'app.adminPower.family';
+  static const String adminConfirmGrantWarning = 'app.adminConfirm.grantWarning';
+  static const String adminConfirmNotice = 'app.adminConfirm.notice';
+  static const String adminConfirmContinue = 'app.adminConfirm.continue';
+
+  /// U-67: the Notificações load error said "o calendário" too.
+  static const String errNotificationsLoad = 'app.err.notificationsLoad';
   static const String expenseYourShare = 'app.expense.yourShare';
   static const String expenseNotYours = 'app.expense.notYours';
   static const String expenseYouPaid = 'app.expense.youPaid';
@@ -731,8 +845,19 @@ abstract final class KApp {
   static const String expenseChangeCreated = 'app.expense.changeCreated';
   static const String expenseChangeUpdated = 'app.expense.changeUpdated';
   static const String expenseChangeDeleted = 'app.expense.changeDeleted';
-  static const String expenseChangeBefore = 'app.expense.changeBefore';
   static const String expenseOpen = 'app.expense.open';
+
+  /// U-65: Conversa rows left "Todas" (one per text flooded the newest 100);
+  /// one line at the top says how many are unread and opens the Conversa.
+  static const String notifChatUnreadOne = 'app.notif.chatUnread.one';
+  static const String notifChatUnreadMany = 'app.notif.chatUnread.many';
+  static const String notifOpenChat = 'app.notif.openChat';
+
+  /// U-65: an agenda row's way into its day.
+  static const String notifAgendaSeeDay = 'app.notif.agenda.seeDay';
+
+  /// U-65: the Despesas tab's badge, read out — settle-ups waiting for me.
+  static const String expenseNavPending = 'app.expense.navPending';
   static const String expenseFormerMember = 'app.expense.formerMember';
   static const String expensePdfSection = 'app.expense.pdfSection';
   static const String expensePdfLead = 'app.expense.pdfLead';
@@ -744,6 +869,92 @@ abstract final class KApp {
   static const String expensePdfChange = 'app.expense.pdfChange';
   static const String expensePdfUpdated = 'app.expense.pdfUpdated';
   static const String expensePdfDeleted = 'app.expense.pdfDeleted';
+  // ── U-60: a swap request said in plain words ──
+  static const String swapOnDayFem = 'app.swap.onDayFem';
+  static const String swapOnDayMasc = 'app.swap.onDayMasc';
+  static const String swapOfDayFem = 'app.swap.ofDayFem';
+  static const String swapOfDayMasc = 'app.swap.ofDayMasc';
+  static const String swapAskKeep = 'app.swap.askKeep';
+  static const String swapAskTake = 'app.swap.askTake';
+  static const String swapAskRevert = 'app.swap.askRevert';
+  static const String swapRowMessage = 'app.swap.rowMessage';
+  static const String swapRowDetails = 'app.swap.rowDetails';
+  // Owner's QA of 3.1.10: the strip is one line — several requests say how
+  // many and open the list; today's request carries the others as "+N".
+  static const String cardRequestsSee = 'app.swap.cardRequestsSee';
+  static const String cardRequestsMoreOne = 'app.swap.cardRequestsMoreOne';
+  static const String cardRequestsMore = 'app.swap.cardRequestsMore';
+  static const String cardRequestsMany = 'app.swap.cardRequestsMany';
+  static const String cardRequestsAnswer = 'app.swap.cardRequestsAnswer';
+  static const String editorAskSwap = 'app.swap.editorAsk';
+  static const String editorSendRequest = 'app.swap.editorSend';
+  static const String editorClearDayConfirm = 'app.swap.editorClearConfirm';
+  static const String calAskSwap = 'app.swap.calAsk';
+  static const String calAskSwapPick = 'app.swap.calAskPick';
+  static const String cardPendingTodayLine = 'app.swap.pendingTodayLine';
+  static const String cardPendingTodayBody = 'app.swap.pendingTodayBody';
+  static const String cardPendingTodayYouStay = 'app.swap.pendingTodayYouStay';
+  static const String cardPendingTodayUntilYou = 'app.swap.pendingTodayUntilYou';
+  static const String cardPendingTodayYouUntilYou = 'app.swap.pendingTodayYouUntilYou';
+  static const String cardPendingTodayCancel = 'app.swap.pendingTodayCancel';
+  static const String noticeMineInfo = 'app.notice.mineInfo';
+  static const String noticeMinePickup = 'app.notice.minePickup';
+  static const String noticeMineKeep = 'app.notice.mineKeep';
+  static const String noticeQuickAction = 'app.notice.quickAction';
+  static const String auditSwapAsked = 'app.report.auditSwapAsked';
+  static const String pdfSwapAsked = 'app.report.pdfSwapAsked';
+  static const String sumPlannedToDate = 'app.report.sumPlannedToDate';
+  static const String sumPlannedRemaining = 'app.report.sumPlannedRemaining';
+  static const String sumFutureAccepted = 'app.report.sumFutureAccepted';
+  static const String chatPdfNotRead = 'app.report.chatPdfNotRead';
+  static const String expensePdfChild = 'app.report.expensePdfChild';
+  static const String pdfChangeFromTo = 'app.report.pdfChangeFromTo';
+  static const String pdfReadyAnnounce = 'app.report.pdfReadyAnnounce';
+  static const String pdfChildrenPick = 'app.report.pdfChildrenPick';
+  static const String attestRetry = 'app.report.attestRetry';
+  static const String wizPreset311 = 'app.wizard.preset311';
+  static const String wizPreset321611 = 'app.wizard.preset321611';
+  static const String wizAnchoredStart = 'app.wizard.anchoredStart';
+  static const String wizContinues = 'app.wizard.continues';
+  static const String wizPhasedStart = 'app.wizard.phasedStart';
+  static const String errHandoffParty = 'app.save.errHandoffParty';
+  static const String noticeHandoffPartyOnly = 'app.notice.handoffPartyOnly';
+  // Owner's QA of 3.1.10: the way out under the read-only time — the aviso
+  // (today, for whoever may send one) or the Conversa (another day).
+  static const String noticeHandoffPartySend = 'app.notice.handoffPartySend';
+  static const String noticeHandoffPartySendLink =
+      'app.notice.handoffPartySendLink';
+  static const String noticeHandoffPartyChat = 'app.notice.handoffPartyChat';
+  static const String swapStoryAsked = 'app.swap.storyAsked';
+  static const String swapStoryApproved = 'app.swap.storyApproved';
+  static const String swapStoryAuto = 'app.swap.storyAuto';
+  static const String swapStorySeeHistory = 'app.swap.storySeeHistory';
+  static const String frozenViewDay = 'app.swap.frozenViewDay';
+  static const String frozenAlreadyResolved = 'app.swap.frozenAlreadyResolved';
+  static const String errConflictReloaded = 'app.swap.errConflictReloaded';
+  static const String expenseDiffLine = 'app.expense.diffLine';
+  static const String expenseDiffAmount = 'app.expense.diffAmount';
+  static const String expenseDiffSplit = 'app.expense.diffSplit';
+  static const String expenseDiffShare = 'app.expense.diffShare';
+  static const String expenseDiffNone = 'app.expense.diffNone';
+  static const String expenseAnswerYesTitle = 'app.expense.answerYesTitle';
+  static const String expenseAnswerNoTitle = 'app.expense.answerNoTitle';
+  static const String expenseAnswerYesAsk = 'app.expense.answerYesAsk';
+  static const String expenseAnswerNoAsk = 'app.expense.answerNoAsk';
+  static const String expenseAnswerNote = 'app.expense.answerNote';
+  static const String expenseAnswerNoteHint = 'app.expense.answerNoteHint';
+  static const String expenseReference = 'app.expense.reference';
+  static const String expenseReferenceHint = 'app.expense.referenceHint';
+  static const String expenseReferenceLine = 'app.expense.referenceLine';
+  static const String expenseNoteLine = 'app.expense.noteLine';
+  static const String expenseBadgeRejected = 'app.expense.badgeRejected';
+  static const String expenseBadgeCancelled = 'app.expense.badgeCancelled';
+  static const String expenseOutOfBalance = 'app.expense.outOfBalance';
+  static const String expensePdfUnconfirmed = 'app.expense.pdfUnconfirmed';
+  static const String expensePdfUnconfirmedLine = 'app.expense.pdfUnconfirmedLine';
+  static const String expensePdfStatusPending = 'app.expense.pdfStatusPending';
+  static const String expensePdfStatusRejected = 'app.expense.pdfStatusRejected';
+  static const String expensePdfStatusCancelled = 'app.expense.pdfStatusCancelled';
   // ── F-35: the family's Conversa ──
   static const String chatNav = 'app.chat.nav';
   static const String chatTabChat = 'app.chat.tabChat';
@@ -764,7 +975,51 @@ abstract final class KApp {
   static const String chatReadEntry = 'app.chat.readEntry';
   static const String chatSearch = 'app.chat.search';
   static const String chatSearchClose = 'app.chat.searchClose';
+
+  /// U-66: the permanence the opening notice states, said again where the
+  /// text is written — the notice scrolls away once the thread has history.
+  static const String chatComposerPermanent = 'app.chat.composerPermanent';
+
+  /// U-66: a search result's way back into the thread, around it.
+  static const String chatShowInThread = 'app.chat.showInThread';
+
+  /// U-66: a quote's way to the text it quotes (read by a screen reader).
+  static const String chatOpenQuoted = 'app.chat.openQuoted';
+
+  /// U-66: "Ir para a data" in the search bar.
+  static const String chatGoToDate = 'app.chat.goToDate';
   static const String chatSearchEmpty = 'app.chat.searchEmpty';
+  static const String chatLoadOlder = 'app.chat.loadOlder';
+  static const String premMethodPlay = 'app.billing.methodPlay';
+  static const String viewerDeletionNoVote = 'app.viewer.deletionNoVote';
+  static const String leavingLoadFailed = 'app.leaving.loadFailed';
+  static const String profLeaveBilling = 'app.profile.leaveBilling';
+  static const String profLeaveCancelFirst = 'app.profile.leaveCancelFirst';
+  static const String chatUnmute = 'app.chat.unmute';
+  static const String chatNewOne = 'app.chat.newOne';
+  static const String chatNewMany = 'app.chat.newMany';
+  static const String authResendConfirmation = 'app.auth.resendConfirmation';
+  static const String authResendSent = 'app.auth.resendSent';
+  static const String authResendWait = 'app.auth.resendWait';
+  static const String authLinkExpired = 'app.auth.linkExpired';
+  static const String registerCheckSpam = 'app.register.checkSpam';
+  static const String registerFixEmail = 'app.register.fixEmail';
+  static const String updatePwdRequestNew = 'app.updatePwd.requestNew';
+  static const String authErrSamePassword = 'app.auth.errSamePassword';
+  static const String inviteUnreachableTitle = 'app.invite.unreachableTitle';
+  static const String inviteUnreachableBody = 'app.invite.unreachableBody';
+  static const String inviteRetry = 'app.invite.retry';
+  static const String inviteEmailMismatch = 'app.invite.emailMismatch';
+  static const String inviteSignedInTitle = 'app.invite.signedInTitle';
+  static const String inviteSignedInBody = 'app.invite.signedInBody';
+  static const String inviteSignOutContinue = 'app.invite.signOutContinue';
+  static const String inviteNotNow = 'app.invite.notNow';
+  static const String inviteAcceptedTitle = 'app.invite.acceptedTitle';
+  static const String inviteAcceptedBody = 'app.invite.acceptedBody';
+  static const String inviteOfferTitle = 'app.invite.offerTitle';
+  static const String inviteOfferBody = 'app.invite.offerBody';
+  static const String inviteOfferJoin = 'app.invite.offerJoin';
+  static const String loginInvitedHint = 'app.login.invitedHint';
   static const String chatMute = 'app.chat.mute';
   static const String chatMuteLead = 'app.chat.muteLead';
   static const String chatMuted = 'app.chat.muted';
@@ -794,6 +1049,10 @@ abstract final class KApp {
   static const String expensePremiumBenefit = 'app.expense.premiumBenefit';
   static const String chatPremiumBenefit = 'app.chat.premiumBenefit';
   static const String viewerPremiumBenefit = 'app.viewer.premiumBenefit';
+  // ── F-80 PR 2: the Família card "Indique uma família" (built dark) ──
+  static const String famReferralTitle = 'app.fam.referralTitle';
+  static const String famReferralRule = 'app.fam.referralRule';
+  static const String famReferralShareText = 'app.fam.referralShareText';
 
   static const List<String> allKeys = [
     sessionRestoredExpired,
@@ -888,15 +1147,39 @@ abstract final class KApp {
     pushHintReallowBrowser,
     pushHintUnsupportedHere,
     pushEnable,
+    pushTodayMessage,
+    pushTodayAction,
+    pushTodayDismiss,
     pushDisable,
     pushStatusOnTooltip,
     pushToastOn,
     pushToastOff,
     pushErrEnable,
-    onbStepPushTitle,
-    onbStepPushHint,
-    onbStepPushDoneHint,
-    onbStepPushAction,
+    cardPlanTitle,
+    cardPlanHint,
+    cardPlanAction,
+    registerChildName,
+    registerChildNameHint,
+    tourTodayTitleNamed,
+    swapAskKeepNamed,
+    swapAskTakeNamed,
+    noticeRequestPickupNamed,
+    noticeRequestKeepNamed,
+    noticeMinePickupNamed,
+    noticeMineKeepNamed,
+    famInviteEmailUnsentBadge,
+    famInviteEmailUnsentHint,
+    famShareAgain,
+    famInviteEmailTaken,
+    registerMigrationOtherEmail,
+    premAdminNamedOne,
+    premAdminNamedMany,
+    premAskAdmin,
+    premAskAdmins,
+    premAskAdminSent,
+    frozenDayStarted,
+    calDayStartedAwaitingYou,
+    notifTagDayStartedShort,
     famPendingBadge,
     famPendingHint,
     famInviteName,
@@ -1017,7 +1300,6 @@ abstract final class KApp {
     noticeCapReached,
     noticeSent,
     noticeErrSend,
-    noticeOpenMine,
     noticeCancel,
     noticeCancelConfirm,
     noticeCancelKeep,
@@ -1119,6 +1401,31 @@ abstract final class KApp {
     childRenamed,
     childRemoved,
     childErrLoad,
+    childAddAnother,
+    childFreeCapOne,
+    childFreeCapMany,
+    childMaxCap,
+    childPlanTitle,
+    childPlanSingle,
+    childPlanPerChild,
+    childPlanNeedsTwo,
+    childPlanToPerChild,
+    childPlanToPerChildConfirm,
+    childPlanToSingle,
+    childPlanToSingleLead,
+    childPlanUseChild,
+    childPlanSwitched,
+    calLaneAll,
+    calLaneAllShort,
+    calPlanEndAction,
+    calLanePickFirst,
+    calLaneEditDay,
+    calLanePending,
+    calLaneWith,
+    editorAlsoFor,
+    frozenApproveAll,
+    quickSwapAlreadyOne,
+    quickSwapAlreadyMany,
     agendaSection,
     agendaKindSchool,
     agendaKindHealth,
@@ -1232,6 +1539,9 @@ abstract final class KApp {
     agendaRemindAtStart,
     agendaRemindBefore,
     agendaRemindNeedsStart,
+    agendaRemindHoursBefore,
+    agendaRemindDayBefore,
+    agendaRemindEve,
     agendaRepeat,
     agendaRepeatLead,
     agendaRepeatDays,
@@ -1291,6 +1601,26 @@ abstract final class KApp {
     expenseFilterPayments,
     expensePaymentRow,
     expenseYouLent,
+    errFamilyLoad,
+    adminModeOnlyAdmins,
+    famReferralCopy,
+    chatPreviewShow,
+    chatPreviewHide,
+    chatPreviewShown,
+    chatPreviewHidden,
+    familyTimeSuffix,
+    adminConfirmGrantTitle,
+    adminConfirmRevokeTitle,
+    adminConfirmGrantIntro,
+    adminConfirmRevokeIntro,
+    adminPowerInvite,
+    adminPowerAdmins,
+    adminPowerPastDays,
+    adminPowerFamily,
+    adminConfirmGrantWarning,
+    adminConfirmNotice,
+    adminConfirmContinue,
+    errNotificationsLoad,
     expenseYourShare,
     expenseNotYours,
     expenseYouPaid,
@@ -1327,8 +1657,12 @@ abstract final class KApp {
     expenseChangeCreated,
     expenseChangeUpdated,
     expenseChangeDeleted,
-    expenseChangeBefore,
     expenseOpen,
+    notifChatUnreadOne,
+    notifChatUnreadMany,
+    notifOpenChat,
+    notifAgendaSeeDay,
+    expenseNavPending,
     expenseFormerMember,
     expensePdfSection,
     expensePdfLead,
@@ -1340,6 +1674,86 @@ abstract final class KApp {
     expensePdfChange,
     expensePdfUpdated,
     expensePdfDeleted,
+    swapOnDayFem,
+    swapOnDayMasc,
+    swapOfDayFem,
+    swapOfDayMasc,
+    swapAskKeep,
+    swapAskTake,
+    swapAskRevert,
+    swapRowMessage,
+    swapRowDetails,
+    cardRequestsSee,
+    cardRequestsMoreOne,
+    cardRequestsMore,
+    cardRequestsMany,
+    cardRequestsAnswer,
+    editorAskSwap,
+    editorSendRequest,
+    editorClearDayConfirm,
+    calAskSwap,
+    calAskSwapPick,
+    cardPendingTodayLine,
+    cardPendingTodayBody,
+    cardPendingTodayYouStay,
+    cardPendingTodayUntilYou,
+    cardPendingTodayYouUntilYou,
+    cardPendingTodayCancel,
+    noticeMineInfo,
+    noticeMinePickup,
+    noticeMineKeep,
+    noticeQuickAction,
+    auditSwapAsked,
+    pdfSwapAsked,
+    sumPlannedToDate,
+    sumPlannedRemaining,
+    sumFutureAccepted,
+    chatPdfNotRead,
+    expensePdfChild,
+    pdfChangeFromTo,
+    pdfReadyAnnounce,
+    pdfChildrenPick,
+    attestRetry,
+    wizPreset311,
+    wizPreset321611,
+    wizAnchoredStart,
+    wizContinues,
+    wizPhasedStart,
+    errHandoffParty,
+    noticeHandoffPartyOnly,
+    noticeHandoffPartySend,
+    noticeHandoffPartySendLink,
+    noticeHandoffPartyChat,
+    swapStoryAsked,
+    swapStoryApproved,
+    swapStoryAuto,
+    swapStorySeeHistory,
+    frozenViewDay,
+    frozenAlreadyResolved,
+    errConflictReloaded,
+    expenseDiffLine,
+    expenseDiffAmount,
+    expenseDiffSplit,
+    expenseDiffShare,
+    expenseDiffNone,
+    expenseAnswerYesTitle,
+    expenseAnswerNoTitle,
+    expenseAnswerYesAsk,
+    expenseAnswerNoAsk,
+    expenseAnswerNote,
+    expenseAnswerNoteHint,
+    expenseReference,
+    expenseReferenceHint,
+    expenseReferenceLine,
+    expenseNoteLine,
+    expenseBadgeRejected,
+    expenseBadgeCancelled,
+    expenseOutOfBalance,
+    expensePdfUnconfirmed,
+    expensePdfUnconfirmedLine,
+    expensePdfStatusPending,
+    expensePdfStatusRejected,
+    expensePdfStatusCancelled,
     chatNav,
     chatTabChat,
     chatTabNotifications,
@@ -1359,7 +1773,42 @@ abstract final class KApp {
     chatReadEntry,
     chatSearch,
     chatSearchClose,
+    chatComposerPermanent,
+    chatShowInThread,
+    chatOpenQuoted,
+    chatGoToDate,
     chatSearchEmpty,
+    chatLoadOlder,
+    premMethodPlay,
+    viewerDeletionNoVote,
+    leavingLoadFailed,
+    profLeaveBilling,
+    profLeaveCancelFirst,
+    chatUnmute,
+    chatNewOne,
+    chatNewMany,
+    authResendConfirmation,
+    authResendSent,
+    authResendWait,
+    authLinkExpired,
+    registerCheckSpam,
+    registerFixEmail,
+    updatePwdRequestNew,
+    authErrSamePassword,
+    inviteUnreachableTitle,
+    inviteUnreachableBody,
+    inviteRetry,
+    inviteEmailMismatch,
+    inviteSignedInTitle,
+    inviteSignedInBody,
+    inviteSignOutContinue,
+    inviteNotNow,
+    inviteAcceptedTitle,
+    inviteAcceptedBody,
+    inviteOfferTitle,
+    inviteOfferBody,
+    inviteOfferJoin,
+    loginInvitedHint,
     chatMute,
     chatMuteLead,
     chatMuted,
@@ -1387,6 +1836,9 @@ abstract final class KApp {
     expensePremiumBenefit,
     chatPremiumBenefit,
     viewerPremiumBenefit,
+    famReferralTitle,
+    famReferralRule,
+    famReferralShareText,
   ];
 }
 
@@ -1398,7 +1850,7 @@ abstract final class StringsAppPtBr {
     KApp.errCalendarLoad: 'Não foi possível carregar o calendário.',
     KApp.sheetNoResponsible: 'Dia sem responsável definido.',
     KApp.sheetPlanned: 'Planejado: {0}',
-    KApp.sheetHandoffAt: 'Troca às {0}',
+    KApp.sheetHandoffAt: 'Entrega às {0}',
     KApp.sheetNote: 'Observação: {0}',
     KApp.sheetWhoQuestion: 'Quem fica com a criança neste dia?',
     KApp.sheetSave: 'Salvar',
@@ -1508,7 +1960,7 @@ abstract final class StringsAppPtBr {
     KApp.pushHintOn: 'Este aparelho recebe notificações de trocas e prazos.',
     KApp.pushHintUnsupported:
         'Notificações no celular funcionam no aplicativo instalado. Aqui no '
-            'navegador, você continua vendo tudo nesta tela e por e-mail.',
+            'navegador, você vê tudo nesta tela.',
     KApp.pushHintInstallIos:
         'No iPhone, as notificações só funcionam com o Entrelares na Tela de '
             'Início.',
@@ -1534,6 +1986,10 @@ abstract final class StringsAppPtBr {
         'Este aparelho não recebe notificações do Entrelares. Você continua '
             'vendo tudo nesta tela e por e-mail.',
     KApp.pushEnable: 'Ativar notificações',
+    KApp.pushTodayMessage:
+        'Ative as notificações: trocas não vêm por e-mail.',
+    KApp.pushTodayAction: 'Ativar',
+    KApp.pushTodayDismiss: 'Agora não',
     KApp.pushDisable: 'Desativar',
     KApp.pushStatusOnTooltip: 'Notificações no celular: ativadas',
     KApp.pushToastOn: 'Notificações ativadas neste aparelho.',
@@ -1541,19 +1997,50 @@ abstract final class StringsAppPtBr {
     KApp.pushErrEnable:
         'Não foi possível ativar as notificações agora. Você continua recebendo '
             'tudo nesta tela e por e-mail.',
-    KApp.onbStepPushTitle: 'Ativar notificações no celular',
-    KApp.onbStepPushHint:
-        'Uma troca costuma ser pedida em cima da hora. Com as notificações ligadas '
-            'você fica sabendo na mesma hora, mesmo com o app fechado.',
-    KApp.onbStepPushDoneHint:
-        'Este aparelho notifica você sobre pedidos de troca e prazos.',
-    KApp.onbStepPushAction: 'Ativar notificações',
+    KApp.cardPlanTitle: 'Nenhum dia planejado ainda',
+    KApp.cardPlanHint:
+        'O assistente preenche um mês inteiro a partir de um padrão.',
+    KApp.cardPlanAction: 'Planejar',
+    KApp.registerChildName: 'Primeiro nome da criança (opcional)',
+    KApp.registerChildNameHint:
+        'Só o primeiro nome. O app passa a dizer o nome no lugar de '
+            '"a criança"; dá para cadastrar depois, em Família.',
+    KApp.tourTodayTitleNamed: 'Quem está com {0} hoje',
+    KApp.swapAskKeepNamed: '{0} pede que você fique com {2} {1}.',
+    KApp.swapAskTakeNamed: '{0} pede para ficar com {2} {1}, que é seu dia.',
+    KApp.noticeRequestPickupNamed: 'Alguém pode buscar {0}?',
+    KApp.noticeRequestKeepNamed: 'Alguém pode ficar com {0} hoje?',
+    KApp.noticeMinePickupNamed:
+        'Você avisou que {0}{1} e precisa que alguém busque {3}.{2}',
+    KApp.noticeMineKeepNamed:
+        'Você avisou que {0}{1} e precisa que alguém fique com {3} hoje.{2}',
+    KApp.famInviteEmailUnsentBadge: 'E-mail não enviado',
+    KApp.famInviteEmailUnsentHint:
+        'O e-mail não saiu. Compartilhe o link — pelo WhatsApp costuma '
+            'funcionar melhor.',
+    KApp.famShareAgain: 'Compartilhar de novo',
+    KApp.famInviteEmailTaken:
+        'Este e-mail já tem conta em outra família do Entrelares. Cada e-mail '
+            'entra em uma família só: para participar das duas, essa pessoa '
+            'usa outro e-mail neste convite.',
+    KApp.registerMigrationOtherEmail:
+        'Para manter as duas famílias, peça um convite para outro e-mail em '
+            'vez de apagar este cadastro.',
+    KApp.premAdminNamedOne: '{0} pode assinar o Premium pela família.',
+    KApp.premAdminNamedMany: '{0} podem assinar o Premium pela família.',
+    KApp.premAskAdmin: 'Pedir ao administrador',
+    KApp.premAskAdmins: 'Pedir aos administradores',
+    KApp.premAskAdminSent: 'Pedido enviado para {0}.',
+    KApp.frozenDayStarted:
+        'O DIA JÁ COMEÇOU — sem horário de entrega, o prazo conta da meia-noite',
+    KApp.calDayStartedAwaitingYou: 'O dia já começou. Aguardando sua resposta',
+    KApp.notifTagDayStartedShort: 'DIA INICIADO',
     KApp.famPendingBadge: 'Ainda não entrou',
     KApp.famPendingHint:
         'Sem conta ainda: você planeja os dias dessa pessoa, e as trocas '
             'ficam disponíveis quando ela entrar.',
     KApp.famInviteName: 'Nome',
-    KApp.famInviteNameHint: 'Como essa pessoa aparece no calendário',
+    KApp.famInviteNameHint: 'Nome no calendário',
     KApp.famInviteEmailOptional:
         'Opcional: com o e-mail, o convite sai agora. Sem ele, você planeja '
             'os dias e convida depois.',
@@ -1695,16 +2182,15 @@ abstract final class StringsAppPtBr {
     KApp.noticeConsequenceInfo:
         'Ninguém precisa responder e o calendário não muda.',
     KApp.noticeConsequencePickup:
-        'Quem receber pode se oferecer para ajudar agora. O calendário não '
-            'muda: o dia de hoje continua sendo seu.',
+        'Quem puder buscar responde. O dia continua seu no calendário.',
     KApp.noticeConsequenceKeep:
-        'Quem receber pode se oferecer para ficar com a criança. Se alguém '
-            'aceitar, uma troca já aprovada passa o dia de hoje para essa '
-            'pessoa, sem precisar de outra confirmação sua. Você verá quem '
-            'aceitou, e a troca fica no histórico.',
+        'Se alguém aceitar, essa pessoa fica com a criança pelo resto de hoje '
+            'e o calendário já muda para ela. Você não precisa confirmar de '
+            'novo.',
     KApp.noticeConsequenceKeepClearsEta:
-        'Escolher esta opção tira a previsão de tempo: um atraso com hora '
-            'marcada não passa o dia para ninguém.',
+        'Se alguém aceitar, essa pessoa fica com a criança pelo resto de hoje '
+            'e o calendário já muda para ela. Você não precisa confirmar de '
+            'novo. A previsão de atraso sai do aviso.',
     KApp.noticeConsequenceKeepNotMyDay:
         'Só quem está com o dia de hoje pode oferecê-lo. Hoje o dia é de '
             'outra pessoa.',
@@ -1716,7 +2202,6 @@ abstract final class StringsAppPtBr {
         'Você já enviou {0} avisos hoje. O limite volta amanhã.',
     KApp.noticeSent: 'Aviso enviado.',
     KApp.noticeErrSend: 'Não foi possível enviar o aviso.',
-    KApp.noticeOpenMine: 'Seu aviso de hoje está aberto.',
     KApp.noticeCancel: 'Cancelar aviso',
     KApp.noticeCancelConfirm:
         'Cancelar este aviso? Quem recebeu será informado de que não é mais '
@@ -1844,13 +2329,13 @@ abstract final class StringsAppPtBr {
     KApp.pdfDayAccountCorrectionLine:
         'Sobre {0} — correção registrada por {1} em {2}.',
     // ── F-55 the child entity ──
-    KApp.famChildRow: 'Criança',
+    KApp.famChildRow: 'Crianças',
     KApp.famChildRowEmpty: 'Nenhuma criança cadastrada',
     KApp.childAnd: 'e',
-    KApp.childTitle: 'Criança',
-    KApp.childLead: 'Só o primeiro nome. O relatório e a agenda do dia usam este nome.',
+    KApp.childTitle: 'Crianças',
+    KApp.childLead: 'Só o primeiro nome de cada criança. O relatório, a agenda do dia e as despesas usam esses nomes.',
     KApp.childEmpty: 'Nenhuma criança cadastrada ainda.',
-    KApp.childAdminOnly: 'Só um administrador da família cadastra ou muda a criança.',
+    KApp.childAdminOnly: 'Só um administrador da família cadastra ou muda as crianças.',
     KApp.childNameLabel: 'Primeiro nome',
     KApp.childAdd: 'Cadastrar a criança',
     KApp.editorNoSwap: 'Sem troca',
@@ -1862,7 +2347,32 @@ abstract final class StringsAppPtBr {
     KApp.childAdded: 'Criança cadastrada.',
     KApp.childRenamed: 'Nome atualizado.',
     KApp.childRemoved: 'Criança removida.',
-    KApp.childErrLoad: 'Não foi possível carregar a criança.',
+    KApp.childErrLoad: 'Não foi possível carregar as crianças.',
+    KApp.childAddAnother: 'Cadastrar outra criança',
+    KApp.childFreeCapOne: 'No plano gratuito, a família cadastra até {0} criança. Para cadastrar mais, ative o Premium.',
+    KApp.childFreeCapMany: 'No plano gratuito, a família cadastra até {0} crianças. Para cadastrar mais, ative o Premium.',
+    KApp.childMaxCap: 'A família já tem {0} crianças, o limite.',
+    KApp.childPlanTitle: 'Plano de guarda',
+    KApp.childPlanSingle: 'O plano é o mesmo para todas as crianças.',
+    KApp.childPlanPerChild: 'Cada criança tem o próprio plano.',
+    KApp.childPlanNeedsTwo: 'Com duas crianças ou mais, cada uma pode ter o próprio plano.',
+    KApp.childPlanToPerChild: 'Ter um plano para cada criança',
+    KApp.childPlanToPerChildConfirm: 'A partir de hoje, cada criança passa a ter o próprio plano, começando igual ao plano atual. Os dias que já passaram não mudam.',
+    KApp.childPlanToSingle: 'Voltar a um plano para todas',
+    KApp.childPlanToSingleLead: 'A partir de hoje, o plano da criança escolhida vira o plano de todas. Os planos das outras crianças de hoje em diante são apagados; os dias que já passaram não mudam.',
+    KApp.childPlanUseChild: 'Usar o plano de {0}',
+    KApp.childPlanSwitched: 'Plano de guarda atualizado.',
+    KApp.calLaneAll: 'Todas as crianças',
+    KApp.calLaneAllShort: 'Todas',
+    KApp.calPlanEndAction: 'Planejar',
+    KApp.calLanePickFirst: 'Escolha uma criança acima para editar.',
+    KApp.calLaneEditDay: 'Editar o dia de {0}',
+    KApp.calLanePending: 'Pedido de troca pendente neste dia.',
+    KApp.calLaneWith: '{0} com {1}',
+    KApp.editorAlsoFor: 'Também para',
+    KApp.frozenApproveAll: 'Aprovar os {0} pedidos deste dia',
+    KApp.quickSwapAlreadyOne: ' · {0} dia já tinha pedido em aberto',
+    KApp.quickSwapAlreadyMany: ' · {0} dias já tinham pedido em aberto',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'Escola',
@@ -1976,6 +2486,9 @@ abstract final class StringsAppPtBr {
     KApp.agendaRemindNone: 'Sem lembrete',
     KApp.agendaRemindAtStart: 'Na hora',
     KApp.agendaRemindBefore: '{0} min antes',
+    KApp.agendaRemindHoursBefore: '{0} h antes',
+    KApp.agendaRemindDayBefore: '1 dia antes',
+    KApp.agendaRemindEve: 'Na véspera, 19h',
     KApp.agendaRemindNeedsStart: 'Para ter lembrete, escolha o horário de início.',
     KApp.agendaRepeat: 'Repetir toda semana',
     KApp.agendaRepeatLead: 'De {0} até o último dia planejado do calendário, nos dias marcados.',
@@ -2035,7 +2548,27 @@ abstract final class StringsAppPtBr {
     KApp.expenseFilterExpenses: 'Despesas',
     KApp.expenseFilterPayments: 'Pagamentos',
     KApp.expensePaymentRow: 'Pagamento: {0} → {1}',
-    KApp.expenseYouLent: 'você emprestou {0}',
+    KApp.expenseYouLent: 'a receber: {0}',
+    KApp.errFamilyLoad: 'Não foi possível carregar os dados da família.',
+    KApp.adminModeOnlyAdmins: 'Somente administradores da família usam o modo administrador.',
+    KApp.famReferralCopy: 'Copiar link',
+    KApp.chatPreviewShow: 'Mostrar o texto nas notificações',
+    KApp.chatPreviewHide: 'Esconder o texto nas notificações',
+    KApp.chatPreviewShown: 'As notificações da Conversa mostram o texto neste perfil.',
+    KApp.chatPreviewHidden: 'As notificações da Conversa mostram só quem escreveu.',
+    KApp.familyTimeSuffix: '(horário de Brasília)',
+    KApp.adminConfirmGrantTitle: 'Tornar {0} administrador(a)?',
+    KApp.adminConfirmRevokeTitle: 'Remover a permissão de administrador(a) de {0}?',
+    KApp.adminConfirmGrantIntro: 'Como administrador(a), {0} poderá:',
+    KApp.adminConfirmRevokeIntro: '{0} deixará de poder:',
+    KApp.adminPowerInvite: 'convidar pessoas para a família',
+    KApp.adminPowerAdmins: 'dar e tirar a permissão de administrador(a) de outras pessoas',
+    KApp.adminPowerPastDays: 'alterar dias que já passaram, pelo modo administrador',
+    KApp.adminPowerFamily: 'renomear a família e pedir a exclusão dela',
+    KApp.adminConfirmGrantWarning: 'Isso inclui tirar a sua permissão de administrador(a).',
+    KApp.adminConfirmNotice: '{0} recebe uma notificação no aplicativo.',
+    KApp.adminConfirmContinue: 'Continuar',
+    KApp.errNotificationsLoad: 'Não foi possível carregar as notificações.',
     KApp.expenseYourShare: 'sua parte {0}',
     KApp.expenseNotYours: 'não envolve você',
     KApp.expenseYouPaid: 'você pagou',
@@ -2072,19 +2605,103 @@ abstract final class StringsAppPtBr {
     KApp.expenseChangeCreated: '{0} lançou em {1}',
     KApp.expenseChangeUpdated: '{0} alterou em {1}',
     KApp.expenseChangeDeleted: '{0} apagou em {1}',
-    KApp.expenseChangeBefore: 'Antes: {0} · {1}',
     KApp.expenseOpen: 'Abrir Despesas',
+    KApp.notifChatUnreadOne: '1 mensagem nova na Conversa',
+    KApp.notifChatUnreadMany: '{0} mensagens novas na Conversa',
+    KApp.notifOpenChat: 'Abrir a Conversa',
+    KApp.notifAgendaSeeDay: 'Ver o dia',
+    KApp.expenseNavPending: '{0}, pagamentos para confirmar: {1}',
     KApp.expenseFormerMember: 'Ex-membro',
     KApp.expensePdfSection: '{0}. Despesas',
-    KApp.expensePdfLead: 'O que a família lançou como despesa da criança no período, quem pagou e a parte de cada um. Um pagamento entre responsáveis só aparece depois que quem recebeu confirmou.',
+    KApp.expensePdfLead: 'O que a família lançou como despesa da criança no período, quem pagou e a parte de cada um. Um pagamento entre responsáveis só entra no saldo depois que quem recebeu confirmou; os não confirmados ficam listados à parte.',
     KApp.expensePdfEmpty: 'Nenhuma despesa no período.',
     KApp.expensePdfTotals: '{0}: pagou {1} · parte {2}',
     KApp.expensePdfSettlements: 'Pagamentos confirmados',
     KApp.expensePdfSettlement: '{0} — {1} pagou {2} a {3}',
     KApp.expensePdfChanges: 'Alterações e exclusões',
     KApp.expensePdfChange: '{0} — {1}: {2}',
-    KApp.expensePdfUpdated: 'alterou "{0}" (antes: {1})',
+    KApp.expensePdfUpdated: 'alterou "{0}": {1}',
     KApp.expensePdfDeleted: 'apagou "{0}" ({1})',
+    KApp.swapOnDayFem: 'na {0}',
+    KApp.swapOnDayMasc: 'no {0}',
+    KApp.swapOfDayFem: 'da {0}',
+    KApp.swapOfDayMasc: 'do {0}',
+    KApp.swapAskKeep: '{0} pede que você fique com a criança {1}.',
+    KApp.swapAskTake: '{0} pede para ficar com a criança {1}, que é seu dia.',
+    KApp.swapAskRevert: '{0} pede para desfazer a troca {1}.',
+    KApp.swapRowMessage: 'Mensagem de {0}: {1}',
+    KApp.swapRowDetails: 'Detalhes',
+    KApp.cardRequestsSee: 'Ver',
+    KApp.cardRequestsMoreOne: '+1 pedido',
+    KApp.cardRequestsMore: '+{0} pedidos',
+    KApp.cardRequestsMany: '{0} pedidos esperam a sua resposta',
+    KApp.cardRequestsAnswer: 'Responder',
+    KApp.editorAskSwap: 'Pedir para outra pessoa ficar com este dia',
+    KApp.editorSendRequest: 'Enviar pedido',
+    KApp.editorClearDayConfirm: 'Limpar este dia? O que estava planejado nele é apagado, e o Histórico guarda o registro.',
+    KApp.calAskSwap: 'Pedir troca de um dia',
+    KApp.calAskSwapPick: 'Qual dia?',
+    KApp.cardPendingTodayLine: 'Pedido de hoje sem resposta: {0}',
+    KApp.cardPendingTodayBody: '{0} segue responsável até {1} responder.',
+    KApp.cardPendingTodayYouStay: 'Você segue responsável até {0} responder.',
+    KApp.cardPendingTodayUntilYou: '{0} segue responsável até você responder.',
+    KApp.cardPendingTodayYouUntilYou: 'Você segue responsável até responder ao pedido.',
+    KApp.cardPendingTodayCancel: 'Cancelar pedido',
+    KApp.noticeMineInfo: 'Você avisou que {0}{1}.{2}',
+    KApp.noticeMinePickup: 'Você avisou que {0}{1} e precisa que alguém busque a criança.{2}',
+    KApp.noticeMineKeep: 'Você avisou que {0}{1} e precisa que alguém fique com a criança hoje.{2}',
+    KApp.noticeQuickAction: 'Avisar',
+    KApp.auditSwapAsked: 'pediu uma troca para este dia',
+    KApp.pdfSwapAsked: 'Pediu uma troca para o dia',
+    KApp.sumPlannedToDate: 'Planejado até hoje',
+    KApp.sumPlannedRemaining: 'Planejado restante',
+    KApp.sumFutureAccepted: 'Trocas futuras já aceitas: {0}',
+    KApp.chatPdfNotRead: 'Não lida até a emissão',
+    KApp.expensePdfChild: 'Criança',
+    KApp.pdfChangeFromTo: 'de {0} para {1}',
+    KApp.pdfReadyAnnounce: 'Relatório gerado.',
+    KApp.pdfChildrenPick: 'Crianças no cabeçalho',
+    KApp.attestRetry: 'Tentar de novo',
+    KApp.wizPreset311: 'Fins de semana alternados (sex–dom)',
+    KApp.wizPreset321611: 'Fins de semana alternados + pernoite de quarta',
+    KApp.wizAnchoredStart: 'Este modelo começa numa sexta: o início passou para {0}.',
+    KApp.wizContinues: 'Continua o plano: no dia anterior a criança estava com {0}.',
+    KApp.wizPhasedStart: 'O plano começa em {0} e já entra no ritmo deste modelo, sem deixar dias vazios.',
+    KApp.errHandoffParty: 'Só quem entrega ou recebe a criança neste dia pode mudar o horário da entrega.',
+    KApp.noticeHandoffPartyOnly: 'O horário é de quem entrega e de quem recebe a criança.',
+    KApp.noticeHandoffPartySend: 'Para avisar de um imprevisto, envie um {0}.',
+    KApp.noticeHandoffPartySendLink: 'aviso',
+    KApp.noticeHandoffPartyChat: 'Para combinar outro horário, fale na {0}.',
+    KApp.swapStoryAsked: 'Troca pedida por {0} em {1}',
+    KApp.swapStoryApproved: 'aprovada por {0} em {1}',
+    KApp.swapStoryAuto: 'aprovada automaticamente em {0}',
+    KApp.swapStorySeeHistory: 'Ver no Histórico',
+    KApp.frozenViewDay: 'Ver o dia',
+    KApp.frozenAlreadyResolved: 'Esta solicitação já foi resolvida.',
+    KApp.errConflictReloaded: 'Outro responsável salvou este dia primeiro. O dia foi recarregado: confira e salve de novo.',
+    KApp.expenseDiffLine: '{0}: de {1} para {2}',
+    KApp.expenseDiffAmount: 'Valor',
+    KApp.expenseDiffSplit: 'Divisão: {0}',
+    KApp.expenseDiffShare: '{0} de {1} para {2}',
+    KApp.expenseDiffNone: 'nenhum campo mudou',
+    KApp.expenseAnswerYesTitle: 'Confirmar que recebeu',
+    KApp.expenseAnswerNoTitle: 'Dizer que não recebeu',
+    KApp.expenseAnswerYesAsk: 'Você recebeu {0} de {1}? O pagamento entra no saldo, e esta resposta não pode ser desfeita.',
+    KApp.expenseAnswerNoAsk: 'Você não recebeu {0} de {1}? O pagamento fica fora do saldo, guardado no registro, e esta resposta não pode ser desfeita.',
+    KApp.expenseAnswerNote: 'Comentário (opcional)',
+    KApp.expenseAnswerNoteHint: 'Ex.: chegou só uma parte',
+    KApp.expenseReference: 'Referência (opcional)',
+    KApp.expenseReferenceHint: 'Ex.: o identificador do Pix',
+    KApp.expenseReferenceLine: 'Referência: {0}',
+    KApp.expenseNoteLine: 'Comentário de {0}: {1}',
+    KApp.expenseBadgeRejected: 'Não confirmado',
+    KApp.expenseBadgeCancelled: 'Desfeito',
+    KApp.expenseOutOfBalance: 'fora do saldo',
+    KApp.expensePdfUnconfirmed: 'Pagamentos registrados e não confirmados',
+    KApp.expensePdfUnconfirmedLine: '{0} — {1} registrou {2} pagos a {3}: {4}',
+    KApp.expensePdfStatusPending: 'aguardando a confirmação',
+    KApp.expensePdfStatusRejected: '{0} disse que não recebeu, em {1}',
+    KApp.expensePdfStatusCancelled: 'desfeito por quem registrou, em {0}',
     KApp.chatNav: 'Comunicação',
     KApp.chatTabChat: 'Conversa',
     KApp.chatTabNotifications: 'Notificações',
@@ -2104,7 +2721,42 @@ abstract final class StringsAppPtBr {
     KApp.chatReadEntry: '{0} ({1})',
     KApp.chatSearch: 'Buscar na conversa',
     KApp.chatSearchClose: 'Fechar a busca',
+    KApp.chatComposerPermanent: 'Permanente: não se edita nem se apaga.',
+    KApp.chatShowInThread: 'Ver na conversa',
+    KApp.chatOpenQuoted: 'Ir para a mensagem citada',
+    KApp.chatGoToDate: 'Ir para a data',
     KApp.chatSearchEmpty: 'Nada encontrado para "{0}".',
+    KApp.chatLoadOlder: 'Mostrar mensagens anteriores',
+    KApp.premMethodPlay: 'Google Play',
+    KApp.viewerDeletionNoVote: 'Você acompanha o plano como visualizador: a decisão de excluir a família é dos responsáveis.',
+    KApp.leavingLoadFailed: 'Não conseguimos carregar sua saída agora. Confira a internet e tente de novo.',
+    KApp.profLeaveBilling: 'A assinatura Premium da família continua cobrando depois que você sair. Se quiser interrompê-la, cancele antes.',
+    KApp.profLeaveCancelFirst: 'Cancelar a assinatura antes de sair',
+    KApp.chatUnmute: 'Ligar o push da Conversa',
+    KApp.chatNewOne: '1 mensagem nova',
+    KApp.chatNewMany: '{0} mensagens novas',
+    KApp.authResendConfirmation: 'Reenviar e-mail de confirmação',
+    KApp.authResendSent: 'Enviamos de novo. Confira também a caixa de spam e a de promoções.',
+    KApp.authResendWait: 'Reenviar em {0} s',
+    KApp.authLinkExpired: 'Este link expirou ou já foi usado. Entre com seu e-mail e senha — se o e-mail ainda não foi confirmado, você poderá pedir um novo link aqui.',
+    KApp.registerCheckSpam: 'Não chegou? Confira a caixa de spam e a de promoções.',
+    KApp.registerFixEmail: 'Corrigir o e-mail',
+    KApp.updatePwdRequestNew: 'Pedir novo link',
+    KApp.authErrSamePassword: 'A nova senha precisa ser diferente da atual.',
+    KApp.inviteUnreachableTitle: 'Não conseguimos conferir o convite',
+    KApp.inviteUnreachableBody: 'Parece que a conexão caiu. O convite continua guardado — confira a internet e tente de novo.',
+    KApp.inviteRetry: 'Tentar de novo',
+    KApp.inviteEmailMismatch: 'Este convite foi enviado para {0}, e você entrou como {1}. Se o convite é seu, use "Entrar com outra conta" — ele fica guardado.',
+    KApp.inviteSignedInTitle: 'Este convite é para outra conta',
+    KApp.inviteSignedInBody: 'Este aparelho está conectado como {0}. O convite de {1} para a família {2} é para {3}. Para aceitá-lo, saia desta conta e continue.',
+    KApp.inviteSignOutContinue: 'Sair e continuar',
+    KApp.inviteNotNow: 'Agora não',
+    KApp.inviteAcceptedTitle: 'Este convite já foi aceito',
+    KApp.inviteAcceptedBody: 'É só entrar com a conta que aceitou o convite.',
+    KApp.inviteOfferTitle: 'Você tem um convite',
+    KApp.inviteOfferBody: '{0} convidou você para a família {1} — entrar nela? A família que você criou ainda está vazia (sem outros membros nem dias planejados) e será descartada.',
+    KApp.inviteOfferJoin: 'Entrar na família',
+    KApp.loginInvitedHint: 'Recebeu um convite? Abra o link do convite que chegou para você — é ele que liga a sua conta à família.',
     KApp.chatMute: 'Silenciar o push da Conversa',
     KApp.chatMuteLead: 'A notificação continua no app; só o celular deixa de tocar.',
     KApp.chatMuted: 'Push da Conversa silenciado.',
@@ -2132,6 +2784,9 @@ abstract final class StringsAppPtBr {
     KApp.expensePremiumBenefit: 'Despesas compartilhadas, com o acerto confirmado por quem recebe',
     KApp.chatPremiumBenefit: 'Conversa da família, permanente e com leitura confirmada',
     KApp.viewerPremiumBenefit: 'Até {0} visualizadores, que acompanham o plano sem editar',
+    KApp.famReferralTitle: 'Indique uma família',
+    KApp.famReferralRule: 'Quando uma família que vocês indicaram assinar o Premium e o primeiro pagamento dela passar um período sem estorno, a sua família ganha um mês de Premium, até um limite por ano.',
+    KApp.famReferralShareText: 'Usamos o Entrelares para organizar o calendário da guarda compartilhada. Para criar o da sua família, comece por este link:',
   };
 }
 
@@ -2143,7 +2798,7 @@ abstract final class StringsAppEn {
     KApp.errCalendarLoad: 'Could not load the calendar.',
     KApp.sheetNoResponsible: 'No caregiver assigned to this day.',
     KApp.sheetPlanned: 'Planned: {0}',
-    KApp.sheetHandoffAt: 'Handoff at {0}',
+    KApp.sheetHandoffAt: 'Handover at {0}',
     KApp.sheetNote: 'Note: {0}',
     KApp.sheetWhoQuestion: 'Who has the child on this day?',
     KApp.sheetSave: 'Save',
@@ -2249,7 +2904,7 @@ abstract final class StringsAppEn {
     KApp.pushHintOn: 'This device receives swap and deadline notifications.',
     KApp.pushHintUnsupported:
         'Phone notifications work in the installed app. Here in the browser you '
-            'still see everything on this screen and by e-mail.',
+            'see everything on this screen.',
     KApp.pushHintInstallIos:
         'On iPhone, notifications only work with Entrelares on your Home '
             'Screen.',
@@ -2275,6 +2930,10 @@ abstract final class StringsAppEn {
         'This device does not receive notifications from Entrelares. You still '
             'see everything on this screen and by e-mail.',
     KApp.pushEnable: 'Turn notifications on',
+    KApp.pushTodayMessage:
+        'Turn notifications on: no more swap e-mails.',
+    KApp.pushTodayAction: 'Turn on',
+    KApp.pushTodayDismiss: 'Not now',
     KApp.pushDisable: 'Turn off',
     KApp.pushStatusOnTooltip: 'Phone notifications: on',
     KApp.pushToastOn: 'Notifications are on for this device.',
@@ -2282,19 +2941,49 @@ abstract final class StringsAppEn {
     KApp.pushErrEnable:
         'Could not turn notifications on right now. You still get everything on this '
             'screen and by e-mail.',
-    KApp.onbStepPushTitle: 'Turn on phone notifications',
-    KApp.onbStepPushHint:
-        'A swap is usually asked for at short notice. With notifications on you hear '
-            'about it right away, even with the app closed.',
-    KApp.onbStepPushDoneHint:
-        'This device notifies you about swap requests and deadlines.',
-    KApp.onbStepPushAction: 'Turn notifications on',
+    KApp.cardPlanTitle: 'No day planned yet',
+    KApp.cardPlanHint: 'The wizard fills a whole month from a pattern.',
+    KApp.cardPlanAction: 'Plan',
+    KApp.registerChildName: 'Child\'s first name (optional)',
+    KApp.registerChildNameHint:
+        'First name only. The app will say the name instead of "the child"; '
+            'you can add it later, under Family.',
+    KApp.tourTodayTitleNamed: 'Who has {0} today',
+    KApp.swapAskKeepNamed: '{0} asks you to keep {2} {1}.',
+    KApp.swapAskTakeNamed: '{0} asks to keep {2} {1}, which is your day.',
+    KApp.noticeRequestPickupNamed: 'Can someone collect {0}?',
+    KApp.noticeRequestKeepNamed: 'Can someone keep {0} today?',
+    KApp.noticeMinePickupNamed:
+        'You said you {0}{1} and need someone to collect {3}.{2}',
+    KApp.noticeMineKeepNamed:
+        'You said you {0}{1} and need someone to keep {3} today.{2}',
+    KApp.famInviteEmailUnsentBadge: 'E-mail not sent',
+    KApp.famInviteEmailUnsentHint:
+        'The e-mail did not go out. Share the link — WhatsApp usually works '
+            'best.',
+    KApp.famShareAgain: 'Share again',
+    KApp.famInviteEmailTaken:
+        'This e-mail already has an account in another Entrelares family. '
+            'One e-mail belongs to one family: to take part in both, that '
+            'person uses another e-mail for this invitation.',
+    KApp.registerMigrationOtherEmail:
+        'To keep both families, ask for an invitation to another e-mail '
+            'instead of deleting this registration.',
+    KApp.premAdminNamedOne: '{0} can take out Premium for the family.',
+    KApp.premAdminNamedMany: '{0} can take out Premium for the family.',
+    KApp.premAskAdmin: 'Ask the administrator',
+    KApp.premAskAdmins: 'Ask the administrators',
+    KApp.premAskAdminSent: 'Request sent to {0}.',
+    KApp.frozenDayStarted:
+        'THE DAY HAS STARTED — with no handover time, the deadline counts from midnight',
+    KApp.calDayStartedAwaitingYou: 'The day has started. Awaiting your reply',
+    KApp.notifTagDayStartedShort: 'DAY STARTED',
     KApp.famPendingBadge: 'Not joined yet',
     KApp.famPendingHint:
         'No account yet: you plan this person\'s days, and swaps become '
             'available once they join.',
     KApp.famInviteName: 'Name',
-    KApp.famInviteNameHint: 'How this person appears on the calendar',
+    KApp.famInviteNameHint: 'Name on the calendar',
     KApp.famInviteEmailOptional:
         'Optional: with an e-mail the invitation goes out now. Without it, '
             'you plan the days and invite later.',
@@ -2434,16 +3123,15 @@ abstract final class StringsAppEn {
     KApp.noticeConsequenceInfo:
         'Nobody has to answer, and the calendar does not change.',
     KApp.noticeConsequencePickup:
-        'Whoever receives it can offer to help now. The calendar does not '
-            'change: today stays yours.',
+        'Whoever can collect answers. Today stays yours on the calendar.',
     KApp.noticeConsequenceKeep:
-        'Whoever receives it can offer to keep the child. If someone '
-            'accepts, an already-approved swap moves today to them, with no '
-            'further confirmation from you. You will see who accepted, and '
-            'the swap stays in the history.',
+        'If someone accepts, they keep the child for the rest of today and '
+            'the calendar moves to them right away. You do not need to '
+            'confirm again.',
     KApp.noticeConsequenceKeepClearsEta:
-        'Choosing this clears the estimate: a delay with a time on it does '
-            'not hand the day to anyone.',
+        'If someone accepts, they keep the child for the rest of today and '
+            'the calendar moves to them right away. You do not need to '
+            'confirm again. The delay estimate comes off the notice.',
     KApp.noticeConsequenceKeepNotMyDay:
         'Only the carer whose day it is can offer it. Today belongs to '
             'someone else.',
@@ -2455,7 +3143,6 @@ abstract final class StringsAppEn {
         'You have already sent {0} notices today. The limit resets tomorrow.',
     KApp.noticeSent: 'Notice sent.',
     KApp.noticeErrSend: 'The notice could not be sent.',
-    KApp.noticeOpenMine: 'Your notice for today is open.',
     KApp.noticeCancel: 'Cancel notice',
     KApp.noticeCancelConfirm:
         'Cancel this notice? Whoever received it will be told it is no '
@@ -2583,13 +3270,13 @@ abstract final class StringsAppEn {
     KApp.pdfDayAccountCorrectionLine:
         'About {0} — correction recorded by {1} on {2}.',
     // ── F-55 the child entity ──
-    KApp.famChildRow: 'Child',
+    KApp.famChildRow: 'Children',
     KApp.famChildRowEmpty: 'No child added yet',
     KApp.childAnd: 'and',
-    KApp.childTitle: 'Child',
-    KApp.childLead: 'First name only. The report and the day agenda use this name.',
+    KApp.childTitle: 'Children',
+    KApp.childLead: 'First name only, for each child. The report, the day agenda and the expenses use these names.',
     KApp.childEmpty: 'No child added yet.',
-    KApp.childAdminOnly: 'Only a family administrator adds or changes the child.',
+    KApp.childAdminOnly: 'Only a family administrator adds or changes the children.',
     KApp.childNameLabel: 'First name',
     KApp.childAdd: 'Add the child',
     KApp.editorNoSwap: 'No swap',
@@ -2601,7 +3288,32 @@ abstract final class StringsAppEn {
     KApp.childAdded: 'Child added.',
     KApp.childRenamed: 'Name updated.',
     KApp.childRemoved: 'Child removed.',
-    KApp.childErrLoad: 'The child could not be loaded.',
+    KApp.childErrLoad: 'The children could not be loaded.',
+    KApp.childAddAnother: 'Add another child',
+    KApp.childFreeCapOne: 'On the free plan, the family adds up to {0} child. To add more, activate Premium.',
+    KApp.childFreeCapMany: 'On the free plan, the family adds up to {0} children. To add more, activate Premium.',
+    KApp.childMaxCap: 'The family already has {0} children, the limit.',
+    KApp.childPlanTitle: 'Custody plan',
+    KApp.childPlanSingle: 'The plan is the same for every child.',
+    KApp.childPlanPerChild: 'Each child has their own plan.',
+    KApp.childPlanNeedsTwo: 'With two children or more, each one can have their own plan.',
+    KApp.childPlanToPerChild: 'Give each child their own plan',
+    KApp.childPlanToPerChildConfirm: 'From today on, each child gets their own plan, starting as a copy of the current one. Days already past do not change.',
+    KApp.childPlanToSingle: 'Go back to one plan for all',
+    KApp.childPlanToSingleLead: 'From today on, the chosen child\'s plan becomes everyone\'s. The other children\'s plans from today on are deleted; days already past do not change.',
+    KApp.childPlanUseChild: 'Use {0}\'s plan',
+    KApp.childPlanSwitched: 'Custody plan updated.',
+    KApp.calLaneAll: 'All children',
+    KApp.calLaneAllShort: 'All',
+    KApp.calPlanEndAction: 'Plan',
+    KApp.calLanePickFirst: 'Choose a child above to edit.',
+    KApp.calLaneEditDay: 'Edit {0}\'s day',
+    KApp.calLanePending: 'A swap request is pending on this day.',
+    KApp.calLaneWith: '{0} with {1}',
+    KApp.editorAlsoFor: 'Also for',
+    KApp.frozenApproveAll: 'Approve the {0} requests for this day',
+    KApp.quickSwapAlreadyOne: ' · {0} day already had an open request',
+    KApp.quickSwapAlreadyMany: ' · {0} days already had an open request',
     // ── F-55 the day agenda ──
     KApp.agendaSection: 'Agenda',
     KApp.agendaKindSchool: 'School',
@@ -2715,6 +3427,9 @@ abstract final class StringsAppEn {
     KApp.agendaRemindNone: 'No reminder',
     KApp.agendaRemindAtStart: 'At the time',
     KApp.agendaRemindBefore: '{0} min before',
+    KApp.agendaRemindHoursBefore: '{0} h before',
+    KApp.agendaRemindDayBefore: '1 day before',
+    KApp.agendaRemindEve: 'The day before, 19h',
     KApp.agendaRemindNeedsStart: 'To get a reminder, set a start time.',
     KApp.agendaRepeat: 'Repeat every week',
     KApp.agendaRepeatLead: 'From {0} to the calendar\'s last planned day, on the days marked.',
@@ -2774,7 +3489,27 @@ abstract final class StringsAppEn {
     KApp.expenseFilterExpenses: 'Expenses',
     KApp.expenseFilterPayments: 'Payments',
     KApp.expensePaymentRow: 'Payment: {0} → {1}',
-    KApp.expenseYouLent: 'you lent {0}',
+    KApp.expenseYouLent: "you're owed {0}",
+    KApp.errFamilyLoad: 'Could not load the family.',
+    KApp.adminModeOnlyAdmins: 'Only the family\'s admins use admin mode.',
+    KApp.famReferralCopy: 'Copy link',
+    KApp.chatPreviewShow: 'Show the text in notifications',
+    KApp.chatPreviewHide: 'Hide the text in notifications',
+    KApp.chatPreviewShown: 'Chat notifications show the text on this profile.',
+    KApp.chatPreviewHidden: 'Chat notifications show only who wrote.',
+    KApp.familyTimeSuffix: '(Brasília time)',
+    KApp.adminConfirmGrantTitle: 'Make {0} an admin?',
+    KApp.adminConfirmRevokeTitle: "Remove {0}'s admin permission?",
+    KApp.adminConfirmGrantIntro: 'As an admin, {0} will be able to:',
+    KApp.adminConfirmRevokeIntro: '{0} will no longer be able to:',
+    KApp.adminPowerInvite: 'invite people to the family',
+    KApp.adminPowerAdmins: 'grant and remove the admin permission of other people',
+    KApp.adminPowerPastDays: 'change days that have passed, through admin mode',
+    KApp.adminPowerFamily: 'rename the family and ask for its deletion',
+    KApp.adminConfirmGrantWarning: 'That includes removing yours.',
+    KApp.adminConfirmNotice: '{0} gets a notification in the app.',
+    KApp.adminConfirmContinue: 'Continue',
+    KApp.errNotificationsLoad: 'Could not load the notifications.',
     KApp.expenseYourShare: 'your share {0}',
     KApp.expenseNotYours: 'does not involve you',
     KApp.expenseYouPaid: 'you paid',
@@ -2811,19 +3546,103 @@ abstract final class StringsAppEn {
     KApp.expenseChangeCreated: '{0} added it on {1}',
     KApp.expenseChangeUpdated: '{0} changed it on {1}',
     KApp.expenseChangeDeleted: '{0} deleted it on {1}',
-    KApp.expenseChangeBefore: 'Before: {0} · {1}',
     KApp.expenseOpen: 'Open Expenses',
+    KApp.notifChatUnreadOne: '1 new message in the Chat',
+    KApp.notifChatUnreadMany: '{0} new messages in the Chat',
+    KApp.notifOpenChat: 'Open the Chat',
+    KApp.notifAgendaSeeDay: 'See the day',
+    KApp.expenseNavPending: '{0}, payments to confirm: {1}',
     KApp.expenseFormerMember: 'Former member',
     KApp.expensePdfSection: '{0}. Expenses',
-    KApp.expensePdfLead: 'What the family added as the child\'s expenses in the period, who paid and each one\'s share. A payment between caregivers shows only after the receiver confirmed it.',
+    KApp.expensePdfLead: 'What the family added as the child\'s expenses in the period, who paid and each one\'s share. A payment between caregivers enters the balance only after the receiver confirmed it; the unconfirmed ones are listed apart.',
     KApp.expensePdfEmpty: 'No expenses in the period.',
     KApp.expensePdfTotals: '{0}: paid {1} · share {2}',
     KApp.expensePdfSettlements: 'Confirmed payments',
     KApp.expensePdfSettlement: '{0} — {1} paid {2} to {3}',
     KApp.expensePdfChanges: 'Changes and deletions',
     KApp.expensePdfChange: '{0} — {1}: {2}',
-    KApp.expensePdfUpdated: 'changed "{0}" (before: {1})',
+    KApp.expensePdfUpdated: 'changed "{0}": {1}',
     KApp.expensePdfDeleted: 'deleted "{0}" ({1})',
+    KApp.swapOnDayFem: 'on {0}',
+    KApp.swapOnDayMasc: 'on {0}',
+    KApp.swapOfDayFem: 'of {0}',
+    KApp.swapOfDayMasc: 'of {0}',
+    KApp.swapAskKeep: '{0} asks you to keep the child {1}.',
+    KApp.swapAskTake: '{0} asks to keep the child {1}, which is your day.',
+    KApp.swapAskRevert: '{0} asks to undo the swap {1}.',
+    KApp.swapRowMessage: 'Message from {0}: {1}',
+    KApp.swapRowDetails: 'Details',
+    KApp.cardRequestsSee: 'See',
+    KApp.cardRequestsMoreOne: '+1 request',
+    KApp.cardRequestsMore: '+{0} requests',
+    KApp.cardRequestsMany: '{0} requests are waiting for your answer',
+    KApp.cardRequestsAnswer: 'Answer',
+    KApp.editorAskSwap: 'Ask someone else to take this day',
+    KApp.editorSendRequest: 'Send request',
+    KApp.editorClearDayConfirm: 'Clear this day? What was planned on it is deleted, and the History keeps the record.',
+    KApp.calAskSwap: 'Ask to swap a day',
+    KApp.calAskSwapPick: 'Which day?',
+    KApp.cardPendingTodayLine: 'Today\'s request unanswered: {0}',
+    KApp.cardPendingTodayBody: '{0} stays responsible until {1} answers.',
+    KApp.cardPendingTodayYouStay: 'You stay responsible until {0} answers.',
+    KApp.cardPendingTodayUntilYou: '{0} stays responsible until you answer.',
+    KApp.cardPendingTodayYouUntilYou: 'You stay responsible until you answer the request.',
+    KApp.cardPendingTodayCancel: 'Cancel request',
+    KApp.noticeMineInfo: 'You said you {0}{1}.{2}',
+    KApp.noticeMinePickup: 'You said you {0}{1} and need someone to collect the child.{2}',
+    KApp.noticeMineKeep: 'You said you {0}{1} and need someone to keep the child today.{2}',
+    KApp.noticeQuickAction: 'Send a notice',
+    KApp.auditSwapAsked: 'asked for a swap for this day',
+    KApp.pdfSwapAsked: 'Asked for a swap for',
+    KApp.sumPlannedToDate: 'Planned to date',
+    KApp.sumPlannedRemaining: 'Planned ahead',
+    KApp.sumFutureAccepted: 'Future swaps already accepted: {0}',
+    KApp.chatPdfNotRead: 'Not read before this report was issued',
+    KApp.expensePdfChild: 'Child',
+    KApp.pdfChangeFromTo: 'from {0} to {1}',
+    KApp.pdfReadyAnnounce: 'Report generated.',
+    KApp.pdfChildrenPick: 'Children in the header',
+    KApp.attestRetry: 'Try again',
+    KApp.wizPreset311: 'Alternating weekends (Fri–Sun)',
+    KApp.wizPreset321611: 'Alternating weekends + Wednesday overnight',
+    KApp.wizAnchoredStart: 'This pattern starts on a Friday: the start moved to {0}.',
+    KApp.wizContinues: 'Continues the plan: the day before, the child was with {0}.',
+    KApp.wizPhasedStart: 'The plan starts on {0}, already in step with this pattern, with no empty days.',
+    KApp.errHandoffParty: 'Only who hands the child over or receives them on this day can change the handover time.',
+    KApp.noticeHandoffPartyOnly: 'The time belongs to who hands the child over and who receives them.',
+    KApp.noticeHandoffPartySend: 'To tell about a change of plans, send a {0}.',
+    KApp.noticeHandoffPartySendLink: 'notice',
+    KApp.noticeHandoffPartyChat: 'To agree on another time, use the {0}.',
+    KApp.swapStoryAsked: 'Swap requested by {0} on {1}',
+    KApp.swapStoryApproved: 'approved by {0} on {1}',
+    KApp.swapStoryAuto: 'approved automatically on {0}',
+    KApp.swapStorySeeHistory: 'See in the History',
+    KApp.frozenViewDay: 'See the day',
+    KApp.frozenAlreadyResolved: 'This request has already been settled.',
+    KApp.errConflictReloaded: 'Another caregiver saved this day first. The day was reloaded: check it and save again.',
+    KApp.expenseDiffLine: '{0}: from {1} to {2}',
+    KApp.expenseDiffAmount: 'Amount',
+    KApp.expenseDiffSplit: 'Split: {0}',
+    KApp.expenseDiffShare: '{0} from {1} to {2}',
+    KApp.expenseDiffNone: 'no field changed',
+    KApp.expenseAnswerYesTitle: 'Confirm you received it',
+    KApp.expenseAnswerNoTitle: 'Say you did not receive it',
+    KApp.expenseAnswerYesAsk: 'Did you receive {0} from {1}? The payment enters the balance, and this answer cannot be undone.',
+    KApp.expenseAnswerNoAsk: 'You did not receive {0} from {1}? The payment stays out of the balance, kept in the record, and this answer cannot be undone.',
+    KApp.expenseAnswerNote: 'Comment (optional)',
+    KApp.expenseAnswerNoteHint: 'E.g.: only part of it arrived',
+    KApp.expenseReference: 'Reference (optional)',
+    KApp.expenseReferenceHint: 'E.g.: the Pix transaction ID',
+    KApp.expenseReferenceLine: 'Reference: {0}',
+    KApp.expenseNoteLine: 'Comment from {0}: {1}',
+    KApp.expenseBadgeRejected: 'Not confirmed',
+    KApp.expenseBadgeCancelled: 'Taken back',
+    KApp.expenseOutOfBalance: 'not in the balance',
+    KApp.expensePdfUnconfirmed: 'Recorded payments not confirmed',
+    KApp.expensePdfUnconfirmedLine: '{0} — {1} recorded {2} paid to {3}: {4}',
+    KApp.expensePdfStatusPending: 'awaiting confirmation',
+    KApp.expensePdfStatusRejected: '{0} said it was not received, on {1}',
+    KApp.expensePdfStatusCancelled: 'taken back by who recorded it, on {0}',
     KApp.chatNav: 'Inbox',
     KApp.chatTabChat: 'Chat',
     KApp.chatTabNotifications: 'Notifications',
@@ -2843,7 +3662,42 @@ abstract final class StringsAppEn {
     KApp.chatReadEntry: '{0} ({1})',
     KApp.chatSearch: 'Search the chat',
     KApp.chatSearchClose: 'Close the search',
+    KApp.chatComposerPermanent: 'Permanent: cannot be edited or deleted.',
+    KApp.chatShowInThread: 'See in the chat',
+    KApp.chatOpenQuoted: 'Go to the quoted message',
+    KApp.chatGoToDate: 'Go to a date',
     KApp.chatSearchEmpty: 'Nothing found for "{0}".',
+    KApp.chatLoadOlder: 'Show earlier messages',
+    KApp.premMethodPlay: 'Google Play',
+    KApp.viewerDeletionNoVote: 'You follow the plan as a viewer: deleting the family is for the caregivers to decide.',
+    KApp.leavingLoadFailed: 'We could not load your departure right now. Check your internet and try again.',
+    KApp.profLeaveBilling: 'The family Premium subscription keeps charging after you leave. If you want it to stop, cancel it first.',
+    KApp.profLeaveCancelFirst: 'Cancel the subscription before leaving',
+    KApp.chatUnmute: 'Turn the chat push back on',
+    KApp.chatNewOne: '1 new message',
+    KApp.chatNewMany: '{0} new messages',
+    KApp.authResendConfirmation: 'Resend the confirmation e-mail',
+    KApp.authResendSent: 'Sent again. Check your spam and promotions folders too.',
+    KApp.authResendWait: 'Resend in {0} s',
+    KApp.authLinkExpired: 'This link has expired or was already used. Sign in with your e-mail and password — if the e-mail is not confirmed yet, you can ask for a new link here.',
+    KApp.registerCheckSpam: 'Nothing yet? Check your spam and promotions folders.',
+    KApp.registerFixEmail: 'Fix the e-mail address',
+    KApp.updatePwdRequestNew: 'Ask for a new link',
+    KApp.authErrSamePassword: 'The new password must be different from the current one.',
+    KApp.inviteUnreachableTitle: 'We could not check the invitation',
+    KApp.inviteUnreachableBody: 'The connection seems to have dropped. The invitation is still kept — check your internet and try again.',
+    KApp.inviteRetry: 'Try again',
+    KApp.inviteEmailMismatch: 'This invitation was sent to {0}, and you signed in as {1}. If the invitation is yours, use "Sign in with another account" — it stays kept.',
+    KApp.inviteSignedInTitle: 'This invitation is for another account',
+    KApp.inviteSignedInBody: 'This device is signed in as {0}. The invitation from {1} to the {2} family is for {3}. To accept it, sign out of this account and continue.',
+    KApp.inviteSignOutContinue: 'Sign out and continue',
+    KApp.inviteNotNow: 'Not now',
+    KApp.inviteAcceptedTitle: 'This invitation was already accepted',
+    KApp.inviteAcceptedBody: 'Just sign in with the account that accepted it.',
+    KApp.inviteOfferTitle: 'You have an invitation',
+    KApp.inviteOfferBody: '{0} invited you to the {1} family — join it? The family you created is still empty (no other members, no planned days) and will be discarded.',
+    KApp.inviteOfferJoin: 'Join the family',
+    KApp.loginInvitedHint: 'Got an invitation? Open the invitation link you received — that is what joins your account to the family.',
     KApp.chatMute: 'Silence the chat\'s push',
     KApp.chatMuteLead: 'The notification stays in the app; only the phone stops ringing.',
     KApp.chatMuted: 'Chat push silenced.',
@@ -2871,5 +3725,8 @@ abstract final class StringsAppEn {
     KApp.expensePremiumBenefit: 'Shared expenses, with settle-ups confirmed by whoever receives them',
     KApp.chatPremiumBenefit: 'A family chat that is permanent, with read receipts',
     KApp.viewerPremiumBenefit: 'Up to {0} viewers, who follow the plan without editing it',
+    KApp.famReferralTitle: 'Refer a family',
+    KApp.famReferralRule: 'When a family you referred subscribes to Premium and its first payment stands for a period with no refund, your family gets a month of Premium, up to a yearly limit.',
+    KApp.famReferralShareText: 'We use Entrelares to organize our shared custody calendar. To start one for your family, begin with this link:',
   };
 }

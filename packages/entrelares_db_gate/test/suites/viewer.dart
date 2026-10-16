@@ -169,6 +169,36 @@ void viewerTests(GateFixture fx) {
       expect(await viewer.from('swap_requests').select('id'), isEmpty);
     });
 
+    // S-27: a viewer no longer reads the caregivers' e-mails — directly only
+    // their own row; through family_members() the family, others' e-mail NULL.
+    test("S-27 · a viewer reads the family's names, not the others' e-mails",
+        () async {
+      final direct = await viewer.from('profiles').select('id, email');
+      expect(direct.map((r) => r['id']), [viewerProfile.id],
+          reason: 'a viewer reads only its own row of profiles directly');
+
+      final rows = List<Map<String, dynamic>>.from(
+          (await viewer.rpc<List<dynamic>>('family_members'))
+              .map((r) => Map<String, dynamic>.from(r as Map)));
+      final byId = {for (final r in rows) r['id'] as int: r};
+      expect(byId.keys,
+          containsAll([fam.adminProfile.id, fam.memberProfile.id, viewerProfile.id]));
+      expect(byId[viewerProfile.id]!['email'], viewerEmail);
+      expect(byId[fam.adminProfile.id]!['email'], isNull);
+      expect(byId[fam.memberProfile.id]!['email'], isNull);
+      expect(byId[fam.adminProfile.id]!['full_name'], isNotEmpty,
+          reason: 'the names stay');
+
+      // A caregiver reads what it always read.
+      final full = List<Map<String, dynamic>>.from(
+          (await fam.member.rpc<List<dynamic>>('family_members'))
+              .map((r) => Map<String, dynamic>.from(r as Map)));
+      final admin = full.firstWhere((r) => r['id'] == fam.adminProfile.id);
+      expect(admin['email'], isNotNull);
+      final seen = await fam.member.from('profiles').select('id');
+      expect(seen.length, greaterThanOrEqualTo(3));
+    });
+
     test('a viewer is never admin, and never moves its own category',
         () async {
       await fx.elevate(fam.adminProfile);

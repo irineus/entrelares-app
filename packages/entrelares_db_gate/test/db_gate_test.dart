@@ -5,6 +5,12 @@ import 'package:entrelares_db_gate/entrelares_db_gate.dart';
 import 'package:test/test.dart';
 
 import 'suites/account_deletion.dart';
+import 'suites/acquisition_source.dart';
+import 'suites/signup_child.dart';
+import 'suites/invitation_expiry.dart';
+import 'suites/premium_request.dart';
+import 'suites/admin_bit_notice.dart';
+import 'suites/admin_change_notice.dart';
 import 'suites/admin_override_tier.dart';
 import 'suites/admin_rpc.dart';
 import 'suites/adversarial.dart';
@@ -30,6 +36,8 @@ import 'suites/viewer.dart';
 import 'suites/expenses.dart';
 import 'suites/report_attestation.dart';
 import 'suites/chat.dart';
+import 'suites/paged_reads.dart';
+import 'suites/pending_invitation_offer.dart';
 import 'suites/children.dart';
 import 'suites/custom_role.dart';
 import 'suites/day_account.dart';
@@ -40,7 +48,6 @@ import 'suites/day_protection.dart';
 import 'suites/e2e_date_allocator.dart';
 import 'suites/edge_function_auth.dart';
 import 'suites/elevation_code.dart';
-import 'suites/email_quota_gate.dart';
 import 'suites/family_deletion.dart';
 import 'suites/family_isolation.dart';
 import 'suites/handoff_range.dart';
@@ -57,22 +64,33 @@ import 'suites/pending_member.dart';
 import 'suites/public_settings.dart';
 import 'suites/server_parameters.dart';
 import 'suites/plan_end_reminders.dart';
+import 'suites/trial_end_reminders.dart';
+import 'suites/unplanned_nudges.dart';
+import 'suites/weekly_bulletin.dart';
 import 'suites/planning_horizon_gate.dart';
 import 'suites/platform_operator.dart';
 import 'suites/premium_entitlement.dart';
 import 'suites/profile_language.dart';
 import 'suites/profile_self_service.dart';
 import 'suites/push_subscriptions.dart';
+import 'suites/referral.dart';
+import 'suites/referral_reward.dart';
 import 'suites/reconsent_gate.dart';
 import 'suites/register_invitee.dart';
 import 'suites/resolution_log_link.dart';
 import 'suites/revert_notes.dart';
 import 'suites/rls_hardening.dart';
 import 'suites/schedule_range.dart';
+import 'suites/schedule_lanes.dart';
+import 'suites/notification_child.dart';
 import 'suites/session_has_password.dart';
 import 'suites/sudo_elevation.dart';
 import 'suites/support_request.dart';
 import 'suites/swap_message.dart';
+import 'suites/swap_answer.dart';
+import 'suites/swap_eve_reminder.dart';
+import 'suites/revert_party.dart';
+import 'suites/handoff_party.dart';
 import 'suites/test_recipient_suppression.dart';
 
 /// **The single entrypoint of the database gate, and why it is single.**
@@ -131,6 +149,12 @@ void main() {
   optimisticConcurrencyTests(fx);
   autoApprovalTests(fx);
   swapMessageTests(fx);
+  swapAnswerTests(fx);
+  // F-94: the eve reminder at 19:00 São Paulo, once per request.
+  swapEveReminderTests(fx);
+  revertPartyTests(fx);
+  // F-99: only the two ends of a handoff (or an admin) change its time.
+  handoffPartyTests(fx);
   revertNotesTests(fx);
   // F-52: the aviso de imprevisto — who may send one, who may offer the DAY,
   // the daily cap, and the append-only shape the record rests on.
@@ -161,6 +185,13 @@ void main() {
   customRoleTests(fx);
   // F-55: the child entity — dark by flag, admin-only, family-scoped.
   childrenTests(fx);
+  // F-07 PR 2: the plan per child — every day rule reads its own lane.
+  scheduleLaneTests(fx);
+  // F-07 PR 5b: a swap notification names its child.
+  notificationChildTests(fx);
+  // F-81: an admin's direct change tells the caregivers it affects — one
+  // notification per action and recipient, never one per day.
+  adminChangeNoticeTests(fx);
   // F-55 PR 2: the agenda — kinds, the free note, Premium, the past, the
   // frozen observation and the conversion.
   agendaTests(fx);
@@ -177,13 +208,14 @@ void main() {
   expenseTests(fx);
   // F-35: the family's Conversa — immutable, read by viewers, dark + Premium.
   chatTests(fx);
+  pagedReadsTests(fx);
+  pendingInvitationOfferTests(fx);
   appSettingsTests(fx);
   publicSettingsTests(fx);
   serverParametersTests(fx);
   edgeFunctionAuthTests(fx);
   notificationParamsTests(fx);
   pushSubscriptionsTests(fx);
-  emailQuotaGateTests(fx);
   testRecipientSuppressionTests(fx);
   // F-68: the support door — who the reply goes to, the limit, retention,
   // and a table no client can read.
@@ -196,6 +228,27 @@ void main() {
   billingGraceTests(fx);
   billingGraceWarningTests(fx);
   planEndReminderTests(fx);
+  trialEndReminderTests(fx);
+  unplannedNudgeTests(fx);
+  // T-99: the operator's weekly bulletin — counts only, closed keys, no
+  // client, and a week sent once.
+  weeklyBulletinTests(fx);
+  acquisitionSourceTests(fx);
+  // U-61: the child's first name at sign-up — one writer for both doors,
+  // stripped from the auth row, dropped when invalid, dark when the flag is.
+  signupChildTests(fx);
+  // F-101: the inviting admin is told once when an invitation expires.
+  invitationExpiryTests(fx);
+  // F-102: a member's ask for Premium — to the admins, once a day.
+  premiumRequestTests(fx);
+  // F-103: the member whose admin bit changed is told, once per change.
+  adminBitNoticeTests(fx);
+  // F-80: family referral — dark by flag, an opaque code, first touch wins,
+  // and nothing a client can read.
+  referralTests(fx);
+  // F-80 PR 3: qualification after the hold window and the free month on the
+  // referrer's rail — capped, idempotent, naming no family.
+  referralRewardTests(fx);
   billingHistoryTests(fx);
   billingReactivateTests(fx);
   billingAvulsoTests(fx);

@@ -83,7 +83,13 @@ abstract final class PlayInstallRules {
   /// report, which is the only place an install can be attributed at all —
   /// our Umami ends at the tap (`play-invite-open`), and `utm_*` on OUR
   /// addresses measures nothing (L-27).
-  static Uri listingUri(String androidPackage) => Uri.https(
+  ///
+  /// [referrer] defaults to the shell banner's campaign; F-80 passes
+  /// `ReferralRules.installReferrer(code)` so the installed app can read the
+  /// family's code back through the Install Referrer API.
+  static Uri listingUri(String androidPackage,
+          {String referrer = PlayInstallRules.referrer}) =>
+      Uri.https(
         'play.google.com',
         '/store/apps/details',
         {'id': androidPackage, 'referrer': referrer},

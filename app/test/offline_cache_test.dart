@@ -60,12 +60,15 @@ final dayRow = <String, dynamic>{
   'updated_at': '2026-09-02T10:00:00+00:00',
   'revision': 3,
   'revision_token': 'tok-11',
+  // F-07: the lane survives the offline copy too.
+  'child_id': 5,
 };
 
 final requestRow = <String, dynamic>{
   'id': 21,
   'schedule_date': '2026-09-20',
   'schedule_id': 11,
+  'child_id': 5,
   'requesting_profile_id': 8,
   'target_profile_id': 7,
   'previous_actual_parent_id': 7,

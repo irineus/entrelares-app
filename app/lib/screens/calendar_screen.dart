@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';
+import 'package:entrelares_db_contracts/models/child.dart';
 import 'package:entrelares_db_contracts/models/child_event.dart';
 import 'package:entrelares_db_contracts/models/day_notice.dart';
 import 'package:entrelares_db_contracts/models/family.dart';
@@ -37,8 +38,11 @@ import 'quick_swap_sheet.dart';
 import 'resolve_sheet.dart';
 import '../services/handoff_nudge_prefs.dart';
 import '../services/onboarding_service.dart';
+import '../services/push_service.dart';
+import '../services/push_today_prefs.dart';
 import '../widgets/invitee_welcome_sheet.dart';
 import '../widgets/onboarding.dart';
+import '../widgets/person_chip.dart';
 import 'wizard_sheet.dart';
 
 /// U-28 — what one day of the grid is tall enough to hold: the day number, the
@@ -123,6 +127,16 @@ class CalendarScreen extends StatefulWidget {
   /// F-55: the agenda's "add the child" door (`/family/children`).
   final VoidCallback? onOpenChildren;
 
+  /// F-95: Relatórios → Histórico, from a swapped day's story line.
+  final VoidCallback? onOpenHistory;
+
+  /// Owner's QA of 3.1.10: the Conversa, from the day sheet's read-only time.
+  final VoidCallback? onOpenChat;
+
+  /// F-07 (owner's QA, 29/09/2026): a carer's legend chip leads to the
+  /// person — my profile, anyone's for an admin, the Família otherwise.
+  final void Function(MemberLinkTarget target, int memberId)? onOpenMember;
+
   /// U-55: where the "Definir horário" strip's dismissal is kept on this
   /// device. Null (tests, hosts without storage) keeps it for the session.
   final HandoffNudgePrefs? handoffNudgePrefs;
@@ -138,8 +152,43 @@ class CalendarScreen extends StatefulWidget {
   /// opens that day's sheet once the month has loaded.
   final ValueNotifier<DateTime?>? dayRequest;
 
+  /// F-59: this device's push, read for the *Ativar notificações* strip under
+  /// the Hoje card. Null (tests, a host without push) shows no strip.
+  final PushService? push;
+
+  /// F-59: the U-51 browser facts (null in the native app), so the strip
+  /// offers what THIS device can do — the same step Notificações shows.
+  final BrowserInstallFacts? installFacts;
+
+  /// F-59: where the strip's dismissals are kept on this device. Null keeps
+  /// them for the session.
+  final PushTodayPrefs? pushTodayPrefs;
+
+  /// Owner's QA of 3.1.10: true while this screen shows one of its system
+  /// strips ([_SystemStrip]) — the shell then holds back its own offers
+  /// ("Abrir no app", the install invitation), so the calendar never carries
+  /// more than one.
+  final ValueNotifier<bool>? systemStripShowing;
+
   /// F-70: the plan-end strip, for tests.
   static const planEndStripKey = Key('plan-end-strip');
+
+  /// F-59: the *Ativar notificações* strip, for tests.
+  static const pushTodayKey = Key('push-today');
+
+  /// F-07: the lane chips.
+  static const laneChipsKey = Key('lane-chips');
+
+  /// U-60: the ⋮ "Pedir troca de um dia" and the Hoje card's strip of the
+  /// requests waiting for the reader's answer.
+  static const askSwapMenuKey = Key('ask-swap-menu');
+  static const requestStripKey = Key('request-strip');
+
+  /// F-94: today's request, still unanswered, on the Hoje card.
+  static const pendingTodayStripKey = Key('pending-today-strip');
+
+  /// F-98: the Hoje card's own "Avisar" for whoever may send one today.
+  static const noticeQuickActionKey = Key('notice-quick-action');
 
   const CalendarScreen(
       {super.key,
@@ -154,7 +203,14 @@ class CalendarScreen extends StatefulWidget {
       this.onOpenNotifications,
       this.onOpenPlan,
       this.onOpenChildren,
+      this.onOpenHistory,
+      this.onOpenChat,
+      this.onOpenMember,
       this.handoffNudgePrefs,
+      this.push,
+      this.installFacts,
+      this.pushTodayPrefs,
+      this.systemStripShowing,
       this.planRequest,
       this.dayRequest});
 
@@ -196,6 +252,11 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// U-55: the strip was sent away in THIS session (the prefs keep it for
   /// good; this covers a host without them and the frame before the write).
   bool _handoffNudgeDismissed = false;
+
+  /// F-59: what the server said about this account's push, and the strip's
+  /// dismissal in THIS session (the prefs keep the rhythm across openings).
+  ({bool accountHasPush, DateTime? newestUnreadAt})? _pushReach;
+  DateTime? _pushTodayDismissedAt;
   // Today + the next-handoff window ([today, today + 91] — the web scans
   // [tomorrow, tomorrow + 90]; one query serves the card's row and the scan).
   List<CareSchedule> _upcoming = const [];
@@ -205,12 +266,116 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// cancellation stops showing the instant the load returns.
   List<DayNotice> _todayNotices = const [];
 
+  /// U-60: every open request waiting for MY answer, any date — the Hoje
+  /// card names them (it was only a badge on the Comunicação tab).
+  List<SwapRequest> _pendingForMe = const [];
+
   /// F-52: yesterday's row, for the "who handed over today" end of the sender
   /// rule. Fetched on its own because `_upcoming` starts at today.
   CareSchedule? _yesterdayRow;
   // F-12: the visible month's OPEN swap requests — the frozen-day source
   // (paint, guards, panel). Keyed alongside _daysByIso on every load.
   Map<String, SwapRequest> _frozenByIso = const {};
+
+  // ── F-07: the plan per child ──
+  /// Every row of the visible month, EVERY lane — [_daysByIso] and
+  /// [_frozenByIso] are the view of them the screen shows ([_applyLaneView]).
+  List<CareSchedule> _monthRows = const [];
+  List<SwapRequest> _monthFrozen = const [];
+  List<CareSchedule> _upcomingRows = const [];
+
+  /// The family's children, in their order — read only for a per-child plan.
+  List<Child> _children = const [];
+
+  /// F-07 (PR 5c): yesterday in every lane — the aviso's second end, per
+  /// child. Read only for a per-child plan ([_yesterdayRow] is the family's).
+  List<CareSchedule> _yesterdayRows = const [];
+
+  /// The lane on screen in a per-child family: a child, or null for *Todas*.
+  int? _lane;
+
+  /// *Todas*: the dates whose children are with different carers, each with
+  /// every lane's row — the cell paints the split, a tap asks which child.
+  Map<String, List<CareSchedule>> _divergentByIso = const {};
+
+  bool get _perChild => (_family?.isPerChild ?? false) && _children.isNotEmpty;
+
+  String? _childName(int? id) =>
+      _children.where((c) => c.id == id).firstOrNull?.firstName;
+
+  /// Derives what the grid, the sheets and the today card read from the
+  /// month's rows and the lane on screen. A single-plan family gets exactly
+  /// what it always had: its rows are all in the family lane.
+  void _applyLaneView() {
+    final lane = _perChild ? _lane : null;
+    final view = _laneViewOf(_monthRows, _monthFrozen, _monthEvents);
+    final upcoming = LaneViewRules.view<CareSchedule>(
+      rows: _upcomingRows,
+      isoOf: (d) => CareSchedule.isoDate(d.scheduleDate),
+      childOf: (d) => d.childId,
+      effectiveOf: (d) => d.effectiveParentId,
+      lane: lane,
+      childOrder: [for (final c in _children) c.id],
+    );
+    _daysByIso = view.days;
+    _divergentByIso = view.divergent;
+    _agendaByIso = view.agenda;
+    _frozenByIso = view.frozen;
+    _upcoming = upcoming.byIso.values.toList()
+      ..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
+  }
+
+  /// The grid's maps for one month's reads, in the lane on screen — the
+  /// visible month's ([_applyLaneView]) and, since T-106, a cached
+  /// neighbour's while the finger drags it in ([_neighbourView]).
+  _MonthView _laneViewOf(List<CareSchedule> rows, List<SwapRequest> frozenRows,
+      List<ChildEvent> events) {
+    final lane = _perChild ? _lane : null;
+    final order = [for (final c in _children) c.id];
+    final days = LaneViewRules.view<CareSchedule>(
+      rows: rows,
+      isoOf: (d) => CareSchedule.isoDate(d.scheduleDate),
+      childOf: (d) => d.childId,
+      effectiveOf: (d) => d.effectiveParentId,
+      lane: lane,
+      childOrder: order,
+    );
+    // Web parity (Home's frozenRequests.First per day): one request per date
+    // and lane — the DB's one-pending-per-date-per-lane index guarantees it.
+    final frozen = LaneViewRules.view<SwapRequest>(
+      rows: frozenRows,
+      isoOf: (r) => CareSchedule.isoDate(r.scheduleDate),
+      childOf: (r) => r.childId,
+      effectiveOf: (r) => r.proposedActualParentId,
+      lane: lane,
+      childOrder: order,
+    );
+    return _MonthView(
+      days: days.byIso,
+      divergent: _perChild && lane == null ? days.divergent : const {},
+      // F-07 (owner's QA, 29/09/2026): a child's lane marks only that child's
+      // items and the family's notes; Todas marks them all.
+      agenda: _groupAgenda([
+        for (final e in events)
+          if (lane == null || e.childId == null || e.childId == lane) e,
+      ]),
+      frozen: frozen.byIso,
+    );
+  }
+
+  /// T-106: a cached month's view for a page that is not the visible one —
+  /// derived once per lane, so a repaint during the drag costs nothing.
+  _MonthView _neighbourView(DateTime month) {
+    final data = _monthCache[_monthKey(month)];
+    if (data == null) return _MonthView.empty;
+    final key = '$_perChild|$_lane|${[for (final c in _children) c.id]}';
+    if (data.viewKey != key) {
+      data.view = _laneViewOf(data.rows, data.frozen, data.events);
+      data.viewKey = key;
+    }
+    return data.view!;
+  }
+
   bool _loading = true;
 
   /// F-51: the Realtime burst of a range operation folds into one reload.
@@ -241,7 +406,9 @@ class _CalendarScreenState extends State<CalendarScreen>
   bool _entitlementFailed = false;
   PublicSettings _settings = PublicSettings.unloaded;
 
-  DateTime get _today => DateTime.now();
+  // T-105: the family's clock (America/Sao_Paulo), the one the server's day
+  // rules read — not the device's.
+  DateTime get _today => FamilyTime.now();
 
   bool get _isPremiumForPaging => _entitlementFailed ||
       Family.isPremiumFamily(_family, DateTime.now().toUtc());
@@ -296,6 +463,9 @@ class _CalendarScreenState extends State<CalendarScreen>
     // passos" ping this — the State lives on in the tab stack, so nothing
     // else runs when the user lands back.
     widget.onboarding?.addListener(_onOnboardingPing);
+    // F-59: the strip follows the push state — enabling it on Notificações
+    // (the State lives on in the tab stack) takes it away here too.
+    widget.push?.addListener(_onPushChanged);
     _wasOffline = widget.connectivity?.offline ?? false;
     widget.connectivity?.addListener(_onConnectivityChanged);
     // T-18: a boot that already knows there is no network paints the device's
@@ -325,11 +495,22 @@ class _CalendarScreenState extends State<CalendarScreen>
   int _loadSeq = 0;
   int _pendingDayAfter = 0;
 
+  /// U-60: the queued day opens with the swap request armed (the ⋮ entry).
+  bool _pendingAskSwap = false;
+
   void _onDayRequest() {
     final day = widget.dayRequest?.value;
     if (day == null) return;
     widget.dayRequest!.value = null;
+    _queueDay(day);
+  }
+
+  /// Puts [day]'s month on screen and opens the day once a load that started
+  /// after this call has read it — the cited day's path (F-35), and since
+  /// U-60 the ⋮ "Pedir troca de um dia".
+  void _queueDay(DateTime day, {bool askSwap = false}) {
     _pendingDay = DateTime(day.year, day.month, day.day);
+    _pendingAskSwap = askSwap;
     _pendingDayAfter = _loadSeq;
     final month = DateTime(day.year, day.month);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -351,10 +532,12 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (day == null || !mounted || completedLoad <= _pendingDayAfter) return;
     if (!_isOnScreen(DateTime(day.year, day.month))) return;
     _pendingDay = null;
+    final askSwap = _pendingAskSwap;
+    _pendingAskSwap = false;
     // The same action a tap on the cell takes: a day with a pending request
     // opens the approval panel, anything else the day sheet.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _openDayAsTapped(day);
+      if (mounted) _openDayAsTapped(day, askSwap: askSwap);
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
@@ -365,6 +548,10 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// F-55 on the grid (owner's validation, 25/09/2026): each day's live
   /// agenda items, in the day sheet's order, for the month on screen.
   Map<String, List<ChildEvent>> _agendaByIso = const {};
+
+  /// F-07: the month's agenda items, every child — [_agendaByIso] is the
+  /// lane's view of them ([_applyLaneView]).
+  List<ChildEvent> _monthEvents = const [];
   void Function()? _unwatchAgenda;
 
   /// F-70: the day a plan-end notification asked the wizard to open on, held
@@ -457,18 +644,16 @@ class _CalendarScreenState extends State<CalendarScreen>
       if (_members.isEmpty) _members = snap.members;
       if (_roles.isEmpty) _roles = snap.roles;
       _ownProfile ??= snap.ownProfile;
-      if (_upcoming.isEmpty) _upcoming = snap.upcoming;
+      if (_upcomingRows.isEmpty) _upcomingRows = snap.upcoming;
       if (fillsGrid) {
-        _daysByIso = {
-          for (final d in snap.days) CareSchedule.isoDate(d.scheduleDate): d
-        };
-        _frozenByIso = {
-          for (final r in snap.frozen) CareSchedule.isoDate(r.scheduleDate): r
-        };
+        _monthRows = snap.days;
+        _monthFrozen = snap.frozen;
         _loadedMonth = month;
         _loading = false;
+        _monthLoading = false;
         _loadError = null;
       }
+      _applyLaneView();
     });
     // U-28: the account button in every tab's app bar wears the profile — from
     // the copy too, or an offline boot shows a "?" where the reader's initial
@@ -559,6 +744,10 @@ class _CalendarScreenState extends State<CalendarScreen>
       final agendaTurnedOn = settings != null &&
           settings.childAgendaEnabled &&
           !_settings.childAgendaEnabled;
+      // F-07: a switch of the plan's mode (here or on another device) needs
+      // the children and the lanes — the next load reads them.
+      final modeChanged = !failed &&
+          (family?.isPerChild ?? false) != (_family?.isPerChild ?? false);
       setState(() {
         if (!failed || _family == null) {
           _family = family;
@@ -569,7 +758,11 @@ class _CalendarScreenState extends State<CalendarScreen>
           _settingsRead = true;
         }
       });
-      if (agendaTurnedOn && _loadedMonth != null) _load(silent: true);
+      // T-106: the load reads every month half the moment it starts, so one
+      // already started read without the flag even when it has not landed —
+      // the old `_loadedMonth != null` guard only held while the reads ran
+      // one after another and reached the agenda after this answer.
+      if (agendaTurnedOn || modeChanged) _load(silent: true);
     } finally {
       _horizonInFlight = false;
       if (mounted) {
@@ -661,6 +854,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     WidgetsBinding.instance.removeObserver(this);
     widget.adminMode.removeListener(_onAdminModeChanged);
     widget.onboarding?.removeListener(_onOnboardingPing);
+    widget.push?.removeListener(_onPushChanged);
     widget.connectivity?.removeListener(_onConnectivityChanged);
     widget.planRequest?.removeListener(_onPlanRequest);
     widget.dayRequest?.removeListener(_onDayRequest);
@@ -677,6 +871,185 @@ class _CalendarScreenState extends State<CalendarScreen>
   DateTime _monthForPage(int page) =>
       DateTime(_anchorMonth.year, _anchorMonth.month + (page - _basePage), 1);
 
+  // ── T-106: the month half and the context half of a load ────────────────
+  //
+  // A swipe used to run every read the screen has, one after another, each a
+  // round trip through the gateway — 10 to 14 of them, 2–3 s, when only the
+  // three month reads change with the month. Now a swipe reads the month
+  // alone (cached months paint at once and are re-read in silence), every
+  // other reload reads both halves, and inside each half the reads run side
+  // by side. The context (members, today, the strips) stays fresh through
+  // Realtime, resume, the poll, every write and pull-to-refresh (owner,
+  // 09/10/2026).
+
+  /// The months read so far, by [_monthKey] — memory only: the device copy
+  /// stays T-18's, the current month in the cache directory.
+  final Map<int, _MonthData> _monthCache = {};
+
+  /// Months whose prefetch is in flight.
+  final Set<int> _prefetching = {};
+
+  /// A read numbered below this started before the last full reload and may
+  /// predate a change that reload was asked for: it does not enter the cache.
+  int _cacheFloor = 0;
+
+  /// The number of the load whose month rows are on screen, and of the load
+  /// whose context is — a load older than either writes nothing over it.
+  int _shownSeq = 0;
+  int _contextSeq = 0;
+
+  /// The visible month's rows are still being read (a swipe to a month not
+  /// in the cache). Only the grid waits on it; the strips do not blink.
+  bool _monthLoading = false;
+
+  static int _monthKey(DateTime month) => month.year * 12 + month.month - 1;
+
+  /// A best-effort read: its failure keeps [fallback] and never fails the
+  /// load around it.
+  static Future<T> _orKeep<T>(Future<T> Function() read, T fallback) async {
+    try {
+      return await read();
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  /// The three reads that change with the month, side by side.
+  Future<_MonthData> _readMonth(DateTime month) async {
+    final ds = widget.dataSource;
+    final rowsF = ds.fetchMonth(month.year, month.month);
+    final frozenF = ds.fetchFrozenRequestsForMonth(month.year, month.month);
+    // F-55: the month's agenda marks. Best-effort like the avisos, and asked
+    // only while the module is on for this family.
+    final keep = _monthCache[_monthKey(month)]?.events ??
+        (_isOnScreen(month) ? _monthEvents : const <ChildEvent>[]);
+    final eventsF = _settings.childAgendaEnabled
+        ? _orKeep(
+            () => ds.fetchChildEvents(DateTime(month.year, month.month, 1),
+                DateTime(month.year, month.month + 1, 0)),
+            keep)
+        : Future.value(const <ChildEvent>[]);
+    await Future.wait([rowsF, frozenF, eventsF]);
+    return _MonthData(
+        rows: await rowsF, frozen: await frozenF, events: await eventsF);
+  }
+
+  /// Everything the screen reads that does not depend on the month, in two
+  /// waves: the invite nudge and the pending list need the members and the
+  /// reader's profile first.
+  Future<_ContextData> _readContext() async {
+    final ds = widget.dataSource;
+    final membersF = ds.fetchMembers();
+    final ownProfileF = ds.fetchOwnProfile();
+    final upcomingF = ds.fetchUpcoming(_today, nextHandoffWindowDays + 1);
+    // Best-effort: a family whose roles fail to load still gets its
+    // calendar, just without the "(Mãe)" suffix.
+    final rolesF = _orKeep(ds.fetchRoles, _roles);
+    // F-70: the plan-end strip's one fact. Best-effort like the avisos: a
+    // calendar must not fail to draw because the strip could not decide.
+    final lastPlannedDayF = _orKeep(ds.fetchLastPlannedDay, _lastPlannedDay);
+    // F-07: the children name the lanes; read for a per-child plan — and,
+    // since U-61, whenever the module is on: with exactly one child the
+    // calendar says the name where it said "a criança" (`_singleChildName`).
+    // Best-effort like the avisos.
+    final perChild = _family?.isPerChild ?? false;
+    final childrenF = perChild || _settings.childAgendaEnabled
+        ? _orKeep(ds.fetchChildren, _children)
+        : Future.value(const <Child>[]);
+    final yesterday = DateTime(_today.year, _today.month, _today.day - 1);
+    final yesterdayRowsF = perChild
+        ? _orKeep(() => ds.fetchUpcoming(yesterday, 0), _yesterdayRows)
+        : Future.value(const <CareSchedule>[]);
+    // F-52: today's avisos, and yesterday's row — the second end of a
+    // handover happening today. `_upcoming` starts at today, so yesterday is
+    // in `_daysByIso` on most days and MISSING on the 1st of a month; a
+    // carer whose eligibility depends on it would silently lose the action
+    // once a month, which is exactly the kind of defect nobody reports.
+    // Both reads are best-effort: a calendar must not fail to draw because
+    // an aviso could not be counted.
+    final todayNoticesF =
+        _orKeep(() => ds.fetchDayNotices(_today), _todayNotices);
+    final yesterdayRowF = _orKeep(() => ds.fetchDay(yesterday), _yesterdayRow);
+    await Future.wait([
+      membersF,
+      ownProfileF,
+      upcomingF,
+      rolesF,
+      lastPlannedDayF,
+      childrenF,
+      yesterdayRowsF,
+      todayNoticesF,
+      yesterdayRowF,
+    ]);
+    final members = await membersF;
+    final ownProfile = await ownProfileF;
+
+    // T-76: the nudge's own fact, asked only when the nudge could show at
+    // all — a family whose second seat is filled never pays for the read.
+    // It rides INSIDE the load for the same reason the rule refuses to run
+    // while loading: an answer that arrives after the frame is a prompt
+    // that blinks.
+    final nudgeApplies = inviteNudgeApplies(
+      isLoading: false,
+      isAdmin: ownProfile?.isAdmin ?? false,
+      activeMemberCount: members.where((m) => !m.hasLeft).length,
+    );
+    // Best-effort, and it fails towards SHOWING: the growth loop's only
+    // prompt must not disappear because one bounded read did. The worst case
+    // is an admin told to invite somebody they already invited.
+    final openInvitationF = nudgeApplies
+        ? _orKeep(ds.hasOpenInvitation, false)
+        : Future.value(false);
+    // U-60: best-effort like the avisos — the strip may wait for the next
+    // load, the calendar may not.
+    final pendingForMeF = ownProfile != null && !ownProfile.isViewer
+        ? _orKeep(() => ds.fetchPendingForMe(ownProfile.id), _pendingForMe)
+        : Future.value(const <SwapRequest>[]);
+    await Future.wait([openInvitationF, pendingForMeF]);
+
+    return _ContextData(
+      members: members,
+      roles: await rolesF,
+      ownProfile: ownProfile,
+      upcoming: await upcomingF,
+      openInvitation: await openInvitationF,
+      lastPlannedDay: await lastPlannedDayF,
+      children: await childrenF,
+      yesterdayRows: await yesterdayRowsF,
+      pendingForMe: await pendingForMeF,
+      todayNotices: await todayNoticesF,
+      yesterdayRow: await yesterdayRowF,
+    );
+  }
+
+  /// Keeps [data] for [month] unless a newer read of it is already kept, or
+  /// the read started before the last full reload.
+  void _storeMonth(DateTime month, _MonthData data, int seq) {
+    if (seq < _cacheFloor) return;
+    final key = _monthKey(month);
+    final kept = _monthCache[key];
+    if (kept != null && kept.seq > seq) return;
+    _monthCache[key] = data..seq = seq;
+  }
+
+  /// Whether a read of [month] numbered [seq] may replace the rows on screen:
+  /// the month is still the visible one and nothing newer is shown.
+  bool _mayShow(DateTime month, int seq) =>
+      month.year == _visibleMonth.year &&
+      month.month == _visibleMonth.month &&
+      seq > _shownSeq;
+
+  /// Puts [data] on screen as [month]'s rows. Call inside setState.
+  void _showMonthData(DateTime month, _MonthData data, int seq) {
+    _monthRows = data.rows;
+    _monthFrozen = data.frozen;
+    _monthEvents = data.events;
+    _loadedMonth = month;
+    _shownSeq = seq;
+    _monthLoading = false;
+  }
+
+  /// The full reload: both halves, side by side. Every caller but the swipe.
   Future<void> _load({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
     final seq = ++_loadSeq;
@@ -684,158 +1057,204 @@ class _CalendarScreenState extends State<CalendarScreen>
     // as another's.
     final month = _visibleMonth;
     if (!_settingsRead) unawaited(_loadHorizonInputs());
+    // T-106: whatever asked for this reload (a write, a Realtime event, the
+    // poll) may have changed any month — the others are read again, never
+    // served from before it.
+    _cacheFloor = seq;
+    _monthCache.removeWhere((key, _) => key != _monthKey(month));
     try {
-      final members = await widget.dataSource.fetchMembers();
-      // Best-effort: a family whose roles fail to load still gets its
-      // calendar, just without the "(Mãe)" suffix.
-      List<Role> roles = _roles;
-      try {
-        roles = await widget.dataSource.fetchRoles();
-      } catch (_) {/* keep whatever we had */}
-      final days = await widget.dataSource.fetchMonth(month.year, month.month);
-      final frozen = await widget.dataSource
-          .fetchFrozenRequestsForMonth(month.year, month.month);
-      final ownProfile = await widget.dataSource.fetchOwnProfile();
-      final upcoming = await widget.dataSource
-          .fetchUpcoming(_today, nextHandoffWindowDays + 1);
-      // T-76: the nudge's own fact, asked only when the nudge could show at
-      // all — a family whose second seat is filled never pays for the read.
-      // It rides INSIDE the load for the same reason the rule refuses to run
-      // while loading: an answer that arrives after the frame is a prompt
-      // that blinks.
-      final nudgeApplies = inviteNudgeApplies(
-        isLoading: false,
-        isAdmin: ownProfile?.isAdmin ?? false,
-        activeMemberCount: members.where((m) => !m.hasLeft).length,
-      );
-      var openInvitation = false;
-      if (nudgeApplies) {
-        try {
-          openInvitation = await widget.dataSource.hasOpenInvitation();
-        } catch (_) {
-          // Best-effort, and it fails towards SHOWING: the growth loop's only
-          // prompt must not disappear because one bounded read did. The worst
-          // case is an admin told to invite somebody they already invited.
-        }
-      }
-      // F-52: today's avisos, and yesterday's row — the second end of a
-      // handover happening today. `_upcoming` starts at today, so yesterday is
-      // in `_daysByIso` on most days and MISSING on the 1st of a month; a
-      // carer whose eligibility depends on it would silently lose the action
-      // once a month, which is exactly the kind of defect nobody reports.
-      // Both reads are best-effort: a calendar must not fail to draw because
-      // an aviso could not be counted.
-      // F-70: the plan-end strip's one fact. Best-effort like the avisos: a
-      // calendar must not fail to draw because the strip could not decide.
-      var lastPlannedDay = _lastPlannedDay;
-      try {
-        lastPlannedDay = await widget.dataSource.fetchLastPlannedDay();
-      } catch (_) {/* keep whatever we had */}
-      // F-55: the month's agenda marks. Best-effort like the avisos, and
-      // asked only while the module is on for this family.
-      var agendaByIso = _agendaByIso;
-      if (_settings.childAgendaEnabled) {
-        try {
-          final events = await widget.dataSource.fetchChildEvents(
-              DateTime(month.year, month.month, 1),
-              DateTime(month.year, month.month + 1, 0));
-          agendaByIso = _groupAgenda(events);
-        } catch (_) {/* keep whatever we had */}
-      } else {
-        agendaByIso = const {};
-      }
-      var todayNotices = _todayNotices;
-      var yesterdayRow = _yesterdayRow;
-      try {
-        todayNotices = await widget.dataSource.fetchDayNotices(_today);
-        yesterdayRow = await widget.dataSource
-            .fetchDay(DateTime(_today.year, _today.month, _today.day - 1));
-      } catch (_) {/* keep whatever we had */}
+      final monthF = _readMonth(month);
+      final contextF = _readContext();
+      await Future.wait([monthF, contextF]);
+      final data = await monthF;
+      final ctx = await contextF;
       if (!mounted) return;
+      _storeMonth(month, data, seq);
+      final showMonth = _mayShow(month, seq);
+      final showContext = seq > _contextSeq;
+      if (!showMonth && !showContext) return;
+      if (showContext) _contextSeq = seq;
       setState(() {
-        _members = members;
-        _roles = roles;
-        _daysByIso = {
-          for (final d in days) CareSchedule.isoDate(d.scheduleDate): d
-        };
-        // Web parity (Home's frozenRequests.First per day): one request per
-        // date matters — the DB's one-pending-per-date index guarantees it.
-        _frozenByIso = {
-          for (final r in frozen) CareSchedule.isoDate(r.scheduleDate): r
-        };
-        _ownProfile = ownProfile;
-        _upcoming = upcoming;
-        _todayNotices = todayNotices;
-        _yesterdayRow = yesterdayRow;
-        _lastPlannedDay = lastPlannedDay;
-        _agendaByIso = agendaByIso;
-        _loadedMonth = month;
-        _openInvitation = openInvitation;
+        if (showContext) {
+          _members = ctx.members;
+          _roles = ctx.roles;
+          _children = ctx.children;
+          _yesterdayRows = ctx.yesterdayRows;
+          if (_lane != null && !ctx.children.any((c) => c.id == _lane)) {
+            _lane = null;
+          }
+          _ownProfile = ctx.ownProfile;
+          _upcomingRows = ctx.upcoming;
+          _todayNotices = ctx.todayNotices;
+          _pendingForMe = [
+            for (final r in ctx.pendingForMe)
+              if (!dateOnly(r.scheduleDate).isBefore(dateOnly(_today))) r
+          ]..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
+          _yesterdayRow = ctx.yesterdayRow;
+          _lastPlannedDay = ctx.lastPlannedDay;
+          _openInvitation = ctx.openInvitation;
+        }
+        if (showMonth) _showMonthData(month, data, seq);
+        _applyLaneView();
         _loading = false;
         _loadError = null;
       });
       _openPendingPlan();
-      _openPendingDay(seq);
-      final readAt = DateTime.now();
-      widget.connectivity?.loadedData(readAt);
-      // T-18: only the CURRENT month is worth a device copy — the door-of-the-
-      // school moment is today and this week, and one month keeps the copy
-      // small and its purpose obvious.
-      if (isCurrentMonth(month, _today)) {
-        unawaited(widget.offlineCache?.save(OfflineCalendarSnapshot(
-          savedAt: readAt,
-          month: month,
-          members: members,
-          roles: roles,
-          days: days,
-          frozen: frozen,
-          ownProfile: ownProfile,
-          upcoming: upcoming,
-        )));
+      if (showMonth) {
+        _openPendingDay(seq);
+        _afterMonthRead(month);
       }
+      if (!showContext) return;
+      final ownProfile = ctx.ownProfile;
       // U-28: the account button in every tab's app bar wears this.
       AccountScope.identityOf(context)?.adopt(
           fullName: ownProfile?.fullName, colorSlot: ownProfile?.colorSlot);
-      unawaited(_refreshOnboarding(ownProfile, members));
+      unawaited(_refreshOnboarding(ownProfile, ctx.members));
+      if (ownProfile != null) unawaited(_loadPushReach(ownProfile.id));
       // T-76 — the impression the Flutter port lost: `invite_nudge_shown` fed
       // Umami until the 23/08/2026 cutover and then simply stopped, leaving
       // the one loop that brings a new adult into the product unmeasured.
       // Fired where the answer is KNOWN (never from `build`) and once per app
       // session, the scope the pre-cutover series was counted in.
-      if (nudgeApplies && !openInvitation) {
-        final analytics = widget.analytics;
-        if (analytics != null) {
-          unawaited(analytics.trackEventOnce(AnalyticsEvents.inviteNudgeShown,
-              props: analyticsFunnelProps(channel: analytics.channel)));
-        }
+      // U-61: the plan nudge stands in front of it while the first run is on,
+      // and that is only known once the onboarding signals have landed — so
+      // with a service in play [_refreshOnboarding] fires it, after them.
+      if (widget.onboarding == null || _onboardingSignals != null) {
+        _trackInviteNudgeShown();
       }
     } catch (e) {
       if (!mounted) return;
-      final l = AppL10n.of(context).l;
-      final raw = e.toString();
-      final offline = isNetworkFailure(raw);
-      var monthOnScreen = _isOnScreen(month);
-      if (offline && !monthOnScreen) {
-        monthOnScreen = await _adoptCopyOf(month);
-        if (!mounted) return;
-      }
-      setState(() {
-        _loading = false;
-        // T-18: before, the F-23 poll's first failure with no signal replaced
-        // a perfectly good month with an error banner — the calendar went
-        // blank at the exact moment the reader needed it. What was read stays;
-        // the shell's strip says how old it is.
-        if (offline && monthOnScreen) {
-          _loadError = null;
-          return;
-        }
-        _loadError = isSessionExpired(raw)
-            ? sessionExpiredMessage(l)
-            : offline
-                ? l[KApp.offlineMonthNotLoaded]
-                : l[KApp.errCalendarLoad];
-      });
+      // T-106: a failure is news only for the month still on screen, and
+      // only while nothing newer has answered for it.
+      if (!_mayShow(month, seq)) return;
+      await _loadFailed(e, month);
     }
+  }
+
+  /// The swipe's load: the month alone. A cached month is on screen in the
+  /// same frame and re-read in silence (owner, 09/10/2026); any other waits
+  /// one parallel round trip under the grid's skeleton.
+  Future<void> _loadMonth(DateTime month) async {
+    final seq = ++_loadSeq;
+    final cached = _monthCache[_monthKey(month)];
+    setState(() {
+      if (cached != null) {
+        _showMonthData(month, cached, cached.seq);
+        _applyLaneView();
+        _loadError = null;
+      } else {
+        // Nothing of this month is on screen yet: any read of it may show.
+        _shownSeq = 0;
+        _monthLoading = true;
+      }
+    });
+    try {
+      final data = await _readMonth(month);
+      if (!mounted) return;
+      _storeMonth(month, data, seq);
+      if (!_mayShow(month, seq)) return;
+      setState(() {
+        _showMonthData(month, data, seq);
+        _applyLaneView();
+        _loadError = null;
+      });
+      _openPendingDay(seq);
+      _afterMonthRead(month);
+    } catch (e) {
+      if (!mounted || !_mayShow(month, seq)) return;
+      await _loadFailed(e, month);
+    }
+  }
+
+  /// What every successful read of the month on screen does after painting
+  /// it: date the strip, keep T-18's device copy, read the neighbours.
+  void _afterMonthRead(DateTime month) {
+    final readAt = DateTime.now();
+    widget.connectivity?.loadedData(readAt);
+    // T-18: only the CURRENT month is worth a device copy — the door-of-the-
+    // school moment is today and this week, and one month keeps the copy
+    // small and its purpose obvious.
+    if (isCurrentMonth(month, _today) && _isOnScreen(month)) {
+      unawaited(widget.offlineCache?.save(OfflineCalendarSnapshot(
+        savedAt: readAt,
+        month: month,
+        members: _members,
+        roles: _roles,
+        days: _monthRows,
+        frozen: _monthFrozen,
+        ownProfile: _ownProfile,
+        upcoming: _upcomingRows,
+      )));
+    }
+    _prefetchAround(month);
+  }
+
+  /// T-106: the months either side of [month], read ahead so the next swipe
+  /// paints at once — never past the F-39 horizon, never twice at a time.
+  void _prefetchAround(DateTime month) {
+    for (final step in const [-1, 1]) {
+      final next = DateTime(month.year, month.month + step);
+      final key = _monthKey(next);
+      if (_monthCache.containsKey(key) || _prefetching.contains(key)) continue;
+      if (!canPageToMonth(next, _horizonDate)) continue;
+      unawaited(_prefetch(next));
+    }
+  }
+
+  Future<void> _prefetch(DateTime month) async {
+    final key = _monthKey(month);
+    _prefetching.add(key);
+    final seq = ++_loadSeq;
+    try {
+      final data = await _readMonth(month);
+      if (!mounted) return;
+      _storeMonth(month, data, seq);
+      // The neighbour page paints from the cache while the finger drags it
+      // in — and a swipe that landed on this month before its own read
+      // answered gets these rows in the meantime.
+      setState(() {
+        if (_mayShow(month, seq)) {
+          _showMonthData(month, data, seq);
+          _applyLaneView();
+        }
+      });
+    } catch (_) {
+      // A prefetch is a guess: the swipe reads the month for itself.
+    } finally {
+      _prefetching.remove(key);
+    }
+  }
+
+  /// A load that failed for [month]. T-18: offline, the month keeps what is
+  /// on screen (the strip dates it) or the device's copy; anything else says
+  /// so.
+  Future<void> _loadFailed(Object e, DateTime month) async {
+    final l = AppL10n.of(context).l;
+    final raw = e.toString();
+    final offline = isNetworkFailure(raw);
+    var monthOnScreen = _isOnScreen(month);
+    if (offline && !monthOnScreen) {
+      monthOnScreen = await _adoptCopyOf(month);
+      if (!mounted) return;
+    }
+    setState(() {
+      _loading = false;
+      // T-18: before, the F-23 poll's first failure with no signal replaced
+      // a perfectly good month with an error banner — the calendar went
+      // blank at the exact moment the reader needed it. What was read stays;
+      // the shell's strip says how old it is.
+      if (offline && monthOnScreen) {
+        _monthLoading = false;
+        _loadError = null;
+        return;
+      }
+      _monthLoading = false;
+      _loadError = isSessionExpired(raw)
+          ? sessionExpiredMessage(l)
+          : offline
+              ? l[KApp.offlineMonthNotLoaded]
+              : l[KApp.errCalendarLoad];
+    });
   }
 
   // ── U-23: first-run onboarding ──────────────────────────────────────────
@@ -846,6 +1265,34 @@ class _CalendarScreenState extends State<CalendarScreen>
   OnboardingSignals? get _effectiveSignals => _onboardingSignals?.copyWith(
       hasAnyPlannedDay:
           _onboardingSignals!.hasAnyPlannedDay || _daysByIso.isNotEmpty);
+
+  /// Owner's QA of 3.1.10 (06/10/2026) — ONE system strip at a time over the
+  /// calendar. On a first opening the notifications offer, the checklist, the
+  /// handoff nudge and the shell's "Abrir no app" all stood above the grid
+  /// and left it a single week. The order is the owner's: notifications, then
+  /// the first steps, then the rest; the next one shows once the one before
+  /// is answered or sent away. The day's own strips (a request, an aviso) are
+  /// not in this queue — they are about today.
+  _SystemStrip? get _systemStrip {
+    if (_showPushToday) return _SystemStrip.pushToday;
+    if (_showChecklist) return _SystemStrip.checklist;
+    if (_showHandoffNudge) return _SystemStrip.handoffNudge;
+    // U-62: the plan's end is a STATE, but it is also a push + in-app notice
+    // (F-70, D-30/D-7/ended), so it takes its turn in the one slot rather
+    // than a second row over the month. LAST: it has no ✕ and stays until the
+    // family plans further, so anything ahead of it would never show.
+    if (_planEndKind != null) return _SystemStrip.planEnd;
+    return null;
+  }
+
+  /// Tells the shell, after the frame, whether a system strip is on screen.
+  void _reportSystemStrip(bool showing) {
+    final notifier = widget.systemStripShowing;
+    if (notifier == null || notifier.value == showing) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) notifier.value = showing;
+    });
+  }
 
   bool get _showChecklist {
     final signals = _effectiveSignals;
@@ -861,6 +1308,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         await onboarding.loadSignals(me: me, members: members);
     if (!mounted) return;
     setState(() => _onboardingSignals = signals);
+    _trackInviteNudgeShown();
 
     // U-58: the invitee's welcome comes FIRST, only in the session where the
     // invitation was claimed (taken once), and the tour follows it. While it
@@ -884,6 +1332,20 @@ class _CalendarScreenState extends State<CalendarScreen>
       if (!mounted) return;
     }
 
+    // U-61 (owner, 07/10/2026): ONE first run per role. The invitee's is the
+    // welcome above — what they see, what the others see, what the record
+    // holds — and the Hoje card names the request waiting for them; the
+    // founder's tour ("é por aqui que se sai de um calendário vazio") and
+    // checklist are not theirs. The tour stays one tap away on the profile,
+    // so the stamp is written as if it had been offered — which it was.
+    if (me.joinedViaInvite) {
+      if (!_tourShown && me.onboardingTourSeenAt == null) {
+        _tourShown = true;
+        await onboarding.markTourSeen();
+      }
+      return;
+    }
+
     // The tour runs ONCE, on the first authenticated session, and hands over
     // to the checklist when it ends — the web's FinishTour does the same.
     // (Explicit replays arrive through [_onTourReplayRequested] now.)
@@ -897,10 +1359,73 @@ class _CalendarScreenState extends State<CalendarScreen>
       // the frame settle first, or the holes light where things WERE.
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
-      await showGuidedTour(context: context, keys: widget.tourKeys!);
+      await _runTour();
       await onboarding.markTourSeen();
       if (mounted && _showChecklist) await _openChecklist();
     }
+  }
+
+  /// The tour, counted: finished or skipped (U-61).
+  Future<void> _runTour() async {
+    final finished = await showGuidedTour(
+        context: context, keys: widget.tourKeys!, childName: _singleChildName);
+    final analytics = widget.analytics;
+    if (analytics != null) {
+      unawaited(analytics.trackEvent(AnalyticsEvents.tourEnded,
+          props: {'outcome': finished ? 'finished' : 'skipped'}));
+    }
+  }
+
+  /// U-61 — the F-31 impression, from the state the card is drawn from, once
+  /// per session (`trackEventOnce`). The plan nudge in front of it is part of
+  /// that state, so a founder who sees "Planejar" is not counted as having
+  /// seen "Convidar".
+  void _trackInviteNudgeShown() {
+    final analytics = widget.analytics;
+    if (analytics == null || !_inviteNudgeShowing) return;
+    unawaited(analytics.trackEventOnce(AnalyticsEvents.inviteNudgeShown,
+        props: analyticsFunnelProps(channel: analytics.channel)));
+  }
+
+  /// U-61: the founder is still inside the first run (core rule) — the
+  /// push strip and the invite nudge wait behind the plan. Never a viewer's.
+  bool get _firstRunActive {
+    final signals = _effectiveSignals;
+    return signals != null &&
+        !_iAmViewer &&
+        OnboardingSteps.firstRunActive(signals);
+  }
+
+  bool get _planNudgeShowing => showPlanNudge(
+        isLoading: _loading,
+        firstRunActive: _firstRunActive,
+        // No signals yet reads as "planned": the nudge waits for the facts
+        // rather than flashing over a family that has a plan.
+        hasAnyPlannedDay: _effectiveSignals?.hasAnyPlannedDay ?? true,
+        isViewer: _iAmViewer,
+      );
+
+  bool get _inviteNudgeShowing =>
+      !_planNudgeShowing &&
+      showInviteNudge(
+        isLoading: _loading,
+        isAdmin: _ownProfile?.isAdmin ?? false,
+        // F-56: a pending member counts — the nudge is "reach out", and a
+        // caregiver already on the calendar was reached.
+        activeMemberCount: _assignableMembers.length,
+        // T-76: so was somebody with an invitation still in their inbox.
+        hasOpenInvitation: _openInvitation,
+      );
+
+  /// U-61 — the Hoje card's "Planejar": the wizard, counted apart from the
+  /// menu's and the empty-month strip's door (`plan-nudge-click`).
+  void _onPlanNudgeTap() {
+    final analytics = widget.analytics;
+    if (analytics != null) {
+      unawaited(analytics.trackEvent(AnalyticsEvents.planNudgeClick,
+          props: analyticsFunnelProps(channel: analytics.channel)));
+    }
+    unawaited(_openWizard());
   }
 
   /// One listener, two requests — each guarded by its own flag, so a ping for
@@ -954,7 +1479,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     // Let the navigation back to this tab land before measuring targets.
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    await showGuidedTour(context: context, keys: widget.tourKeys!);
+    await _runTour();
     await onboarding.markTourSeen();
   }
 
@@ -964,6 +1489,18 @@ class _CalendarScreenState extends State<CalendarScreen>
     final action =
         await showOnboardingChecklist(context: context, signals: signals);
     if (!mounted || action == null) return;
+    // U-61: which step the first run is actually taken through.
+    final analytics = widget.analytics;
+    if (analytics != null) {
+      unawaited(analytics.trackEvent(AnalyticsEvents.checklistAction, props: {
+        'step': switch (action) {
+          OnboardingAction.invite => 'invite',
+          OnboardingAction.plan => 'plan',
+          OnboardingAction.explainSwaps => 'swaps',
+          OnboardingAction.replayTour => 'tour',
+        },
+      }));
+    }
     switch (action) {
       case OnboardingAction.invite:
         widget.onOpenFamily?.call();
@@ -971,11 +1508,9 @@ class _CalendarScreenState extends State<CalendarScreen>
         await _openWizard();
       case OnboardingAction.explainSwaps:
         await _explainSwaps();
-      case OnboardingAction.enablePush:
-        widget.onOpenNotifications?.call();
       case OnboardingAction.replayTour:
         if (widget.tourKeys == null) return;
-        await showGuidedTour(context: context, keys: widget.tourKeys!);
+        await _runTour();
     }
   }
 
@@ -1011,36 +1546,6 @@ class _CalendarScreenState extends State<CalendarScreen>
         duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
   }
 
-  /// The web's navigation guard: month navigation while days are selected
-  /// asks before discarding the selection. Returns whether to proceed.
-  Future<bool> _confirmDiscardSelection() async {
-    final l = AppL10n.of(context).l;
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l.format(
-            _selectedDays.length == 1
-                ? K.navGuardSelectedOne
-                : K.navGuardSelectedMany,
-            [_selectedDays.length])),
-        content: Text(l[K.navGuardBody]),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(l[K.navGuardYes])),
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(l[K.navGuardNo])),
-        ],
-      ),
-    );
-    if (proceed == true) {
-      _cancelSelection();
-      return true;
-    }
-    return false;
-  }
-
   Future<void> _onPageChanged(int page) async {
     final month = _monthForPage(page);
     // The bounce-back below re-fires with the month already shown — no-op.
@@ -1055,12 +1560,15 @@ class _CalendarScreenState extends State<CalendarScreen>
       _bounceBack();
       return;
     }
-    if (_isSelectionMode && !await _confirmDiscardSelection()) {
-      _bounceBack();
-      return;
+    // F-100: a selection SURVIVES the month change — a school vacation runs
+    // from December into January. The month being left is remembered, so
+    // the sheets still know its days.
+    if (_isSelectionMode) {
+      _selectionDays.addAll(_daysByIso);
+      _selectionFrozen.addAll(_frozenByIso);
     }
     setState(() => _visibleMonth = month);
-    _load();
+    _loadMonth(month);
   }
 
   /// The F-39 tier message — the paging bounce's snack, and the sentence the
@@ -1079,7 +1587,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         today: _today,
         horizonDate: _horizonDate,
         hasPlannedDays: _daysByIso.isNotEmpty,
-        loading: _loading,
+        loading: _loading || _monthLoading,
       );
 
   List<MemberView> get _memberViews =>
@@ -1095,18 +1603,134 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// write (the server refuses it anyway).
   bool get _iAmViewer => _ownProfile?.isViewer == true;
 
+  /// U-61 (owner, 07/10/2026): the child's name where the screen said "a
+  /// criança" — only with EXACTLY one child (`ChildRules.singleName`), and
+  /// only while the module is on; otherwise null, and the generic word stays.
+  String? get _singleChildName => _settings.childAgendaEnabled
+      ? ChildRules.singleName([for (final c in _children) c.firstName])
+      : null;
+
+  /// Owner's QA of 3.1.10: in selection mode a tap marks or unmarks ONE day —
+  /// so alternate days are three taps. A run of days is a drag
+  /// ([_onDragSelect]); on the web, Shift+click also closes a run from the
+  /// last day clicked.
   void _toggleDaySelection(DateTime date) {
     final d = dateOnly(date);
+    final from = _lastPicked;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
     setState(() {
+      _lastPicked = d;
+      if (shift && from != null && from != d) {
+        _selectedDays.addAll(selectionRange(from, d, horizon: _horizonDate));
+        return;
+      }
       if (!_selectedDays.remove(d)) _selectedDays.add(d);
+      if (_selectedDays.isEmpty) _forgetSelectionMonths();
     });
   }
 
-  /// Mirror of LongPressDay: entering selection always ADDS the day.
-  void _onDayLongPress(DateTime date) {
+  /// Owner's QA of 3.1.10 — press and DRAG: the day the press started on, and
+  /// the selection as it was before it (so dragging back takes days out
+  /// again). Both null when no drag is under way.
+  DateTime? _dragAnchor;
+  Set<DateTime>? _dragBase;
+
+  /// Owner's QA of 3.1.14: a press that STARTS on a day already selected
+  /// takes days out — the press alone unmarks it, and the drag unmarks the
+  /// run — the same gesture as adding, in reverse.
+  bool _dragRemoves = false;
+
+  /// The last day picked by a tap or a press — where a Shift+click run
+  /// starts.
+  DateTime? _lastPicked;
+
+  /// The finger is over [date] while pressing: the selection is what it was
+  /// before the press plus every day from the press to here. It stops at the
+  /// month's edge (the grid maps no further) and at the planning horizon.
+  void _onDragSelect(DateTime date) {
+    final anchor = _dragAnchor;
+    final base = _dragBase;
+    if (anchor == null || base == null) return;
+    final run = selectionRange(anchor, date, horizon: _horizonDate);
+    final next = _dragRemoves ? base.difference(run.toSet()) : {...base, ...run};
+    if (next.length == _selectedDays.length && next.containsAll(_selectedDays)) {
+      return;
+    }
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selectedDays
+        ..clear()
+        ..addAll(next);
+      _lastPicked = dateOnly(date);
+    });
+  }
+
+  void _onDragEnd() {
+    _dragAnchor = null;
+    _dragBase = null;
+    _dragRemoves = false;
+    if (_selectedDays.isEmpty) _forgetSelectionMonths();
+  }
+
+  /// F-100: the days and open requests of the months the selection already
+  /// crossed — the sheets read a selection that spans months from these plus
+  /// the month on screen.
+  final Map<String, CareSchedule> _selectionDays = {};
+  final Map<String, SwapRequest> _selectionFrozen = {};
+
+  Map<String, CareSchedule> get _selDaysByIso =>
+      {..._selectionDays, ..._daysByIso};
+  Map<String, SwapRequest> get _selFrozenByIso =>
+      {..._selectionFrozen, ..._frozenByIso};
+
+  void _forgetSelectionMonths() {
+    _dragAnchor = null;
+    _dragBase = null;
+    _lastPicked = null;
+    _selectionDays.clear();
+    _selectionFrozen.clear();
+  }
+
+  /// F-07 (owner's QA, 29/09/2026) — *Todas* reads, a child's lane writes.
+  /// A write started in *Todas* says to pick the child above, and returns
+  /// true when it did (the caller stops).
+  bool _refuseWriteInTodas() {
+    if (!_perChild || _lane != null) return false;
+    showAppSnack(context, AppL10n.of(context).l[KApp.calLanePickFirst]);
+    return true;
+  }
+
+  void _selectLane(int? lane) {
+    if (lane == _lane) return;
+    setState(() {
+      _lane = lane;
+      // A selection belongs to the lane it was made in.
+      _selectedDays.clear();
+      _forgetSelectionMonths();
+      _applyLaneView();
+    });
+  }
+
+  /// Mirror of LongPressDay: a press ADDS the day — unless it is already
+  /// selected, and then it takes it out (owner's QA of 3.1.14).
+  Future<void> _onDayLongPress(DateTime date) async {
     if (_iAmViewer) return;
+    if (_refuseWriteInTodas()) return;
     HapticFeedback.mediumImpact();
-    setState(() => _selectedDays.add(dateOnly(date)));
+    setState(() {
+      // Owner's QA of 3.1.10: the press may become a drag — remember where
+      // it started and what was selected before it.
+      final d = dateOnly(date);
+      _dragBase = {..._selectedDays};
+      _dragAnchor = d;
+      _lastPicked = d;
+      _dragRemoves = _selectedDays.contains(d);
+      if (_dragRemoves) {
+        _selectedDays.remove(d);
+      } else {
+        _selectedDays.add(d);
+      }
+    });
   }
 
   void _onDayTap(DateTime date) {
@@ -1119,7 +1743,12 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   /// What a tap on [date]'s cell opens — also a day cited in the Conversa.
-  void _openDayAsTapped(DateTime date) {
+  Future<void> _openDayAsTapped(DateTime date, {bool askSwap = false}) async {
+    // F-07: in *Todas* the day is every child's — read it whole.
+    if (_perChild && _lane == null) {
+      await _openAllChildrenDay(date);
+      return;
+    }
     // Web parity (HandleDayClick): a day with a pending request opens the
     // frozen panel instead of the editor — for everyone, admins included.
     final frozen = _frozenByIso[CareSchedule.isoDate(date)];
@@ -1127,11 +1756,29 @@ class _CalendarScreenState extends State<CalendarScreen>
       _openFrozenDay(frozen);
       return;
     }
-    _openDay(date);
+    _openDay(date, askSwap: askSwap);
+  }
+
+  /// U-60: "Pedir troca de um dia" — which day, then that day's sheet with
+  /// the request armed: the SAME sheet and field a tap on the cell opens.
+  Future<void> _askSwapFromMenu() async {
+    if (_refuseWriteOffline() || _refuseWriteInTodas()) return;
+    final l = AppL10n.of(context).l;
+    final today = dateOnly(_today);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: today,
+      firstDate: today,
+      lastDate: DateTime(today.year + 2, 12, 31),
+      helpText: l[KApp.calAskSwapPick],
+    );
+    if (picked == null || !mounted) return;
+    _queueDay(picked, askSwap: true);
   }
 
   Future<void> _openFrozenDay(SwapRequest request) async {
     HapticFeedback.selectionClick();
+    final iso = CareSchedule.isoDate(request.scheduleDate);
     final outcome = await showFrozenDaySheet(
       context: context,
       request: request,
@@ -1139,6 +1786,27 @@ class _CalendarScreenState extends State<CalendarScreen>
       ownProfileId: _ownProfile?.id,
       dataSource: widget.dataSource,
       offline: _offline,
+      // F-95: the frozen day's own content, read-only (the sheet knows the
+      // day is frozen and offers no plan write; a past day keeps its relato).
+      // Only for a day this screen holds (a request from another month,
+      // reached from the Hoje strip, would open an empty day).
+      onViewDay: _daysByIso.containsKey(iso)
+          ? () => _openDay(request.scheduleDate)
+          : null,
+      childName: _perChild ? _childName(request.childId) : null,
+      // F-07 (PR 4b): the other children's requests of this day, from the
+      // same requester to the same approver — approved together.
+      siblings: _perChild
+          ? [
+              for (final r in _monthFrozen)
+                if (r.id != request.id &&
+                    r.status == request.status &&
+                    r.requestingProfileId == request.requestingProfileId &&
+                    r.targetProfileId == request.targetProfileId &&
+                    CareSchedule.isoDate(r.scheduleDate) == iso)
+                  r,
+            ]
+          : const [],
     );
     if (outcome != null) {
       _load(silent: true);
@@ -1153,6 +1821,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     setState(() {
       _selectedDays.clear();
       _selectionArmed = false;
+      _forgetSelectionMonths();
     });
   }
 
@@ -1171,7 +1840,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     final summary = await showBulkSheet(
       context: context,
       selectedDays: Set.of(_selectedDays),
-      daysByIso: _daysByIso,
+      daysByIso: _selDaysByIso,
       activeMembers: _assignableMembers,
       today: _today,
       dataSource: widget.dataSource,
@@ -1179,14 +1848,18 @@ class _CalendarScreenState extends State<CalendarScreen>
       adminOffer: _adminOfferer,
       isPremium: _isPremiumForGate,
       settings: _settings,
-      frozenDates: [for (final r in _frozenByIso.values) r.scheduleDate],
+      frozenDates: [for (final r in _selFrozenByIso.values) r.scheduleDate],
       myProfile: _ownProfile,
       allProfiles: _members,
+      childId: _lane,
     );
     if (summary != null) {
       // Mirror of FinishBulkSave: the selection clears (armed state stays),
       // the month reloads and the summary is the toast.
-      setState(() => _selectedDays.clear());
+      setState(() {
+        _selectedDays.clear();
+        _forgetSelectionMonths();
+      });
       _load(silent: true);
       if (mounted) showAppSnack(context, summary);
     }
@@ -1195,11 +1868,11 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// Mirror of `WorkflowActionableCount`: how many selected days carry an
   /// action for the resolve sheet (awaiting me + sent by me + revertable).
   int get _workflowActionableCount {
-    final views = [for (final r in _frozenByIso.values) r.toView()];
-    final frozenDates = [for (final r in _frozenByIso.values) r.scheduleDate];
+    final views = [for (final r in _selFrozenByIso.values) r.toView()];
+    final frozenDates = [for (final r in _selFrozenByIso.values) r.scheduleDate];
     var revertable = 0;
     for (final d in _selectedDays) {
-      final row = _daysByIso[CareSchedule.isoDate(d)];
+      final row = _selDaysByIso[CareSchedule.isoDate(d)];
       if (row != null &&
           isRevertCandidate(
             scheduleDate: row.scheduleDate,
@@ -1207,6 +1880,7 @@ class _CalendarScreenState extends State<CalendarScreen>
             actualParentId: row.actualParentId,
             today: _today,
             frozenDates: frozenDates,
+            requesterId: _ownProfile?.id,
           )) {
         revertable++;
       }
@@ -1233,7 +1907,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         selected: [
           for (final d in _selectedDays)
             () {
-              final row = _daysByIso[CareSchedule.isoDate(d)];
+              final row = _selDaysByIso[CareSchedule.isoDate(d)];
               return QuickSwapDay(
                 date: d,
                 scheduledParentId: row?.scheduledParentId ?? 0,
@@ -1243,7 +1917,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         ],
         requesterId: _ownProfile?.id,
         today: _today,
-        frozenDates: [for (final r in _frozenByIso.values) r.scheduleDate],
+        frozenDates: [for (final r in _selFrozenByIso.values) r.scheduleDate],
         members: _memberViews,
       );
 
@@ -1254,15 +1928,19 @@ class _CalendarScreenState extends State<CalendarScreen>
     final summary = await showQuickSwapSheet(
       context: context,
       plan: plan,
-      daysByIso: _daysByIso,
+      daysByIso: _selDaysByIso,
       dataSource: widget.dataSource,
       myProfile: my,
       allProfiles: _members,
+      childId: _lane,
     );
     if (summary != null) {
       // Same exit as the bulk sheet: selection clears, month reloads, the
       // summary is the toast.
-      setState(() => _selectedDays.clear());
+      setState(() {
+        _selectedDays.clear();
+        _forgetSelectionMonths();
+      });
       _load(silent: true);
       if (mounted) showAppSnack(context, summary);
     }
@@ -1273,8 +1951,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     final summary = await showResolveSheet(
       context: context,
       selectedDays: Set.of(_selectedDays),
-      openRequests: _frozenByIso.values.toList(),
-      daysByIso: _daysByIso,
+      openRequests: _selFrozenByIso.values.toList(),
+      daysByIso: _selDaysByIso,
       today: _today,
       ownProfileId: _ownProfile?.id,
       myProfile: _ownProfile,
@@ -1284,7 +1962,10 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (summary != null) {
       // Mirror of RunBulkWorkflowAsync's close: selection clears, month
       // reloads, the summary is the toast.
-      setState(() => _selectedDays.clear());
+      setState(() {
+        _selectedDays.clear();
+        _forgetSelectionMonths();
+      });
       _load(silent: true);
       if (mounted) showAppSnack(context, summary);
     }
@@ -1327,14 +2008,125 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// WITHOUT the admin mode: a handoff time is not a protected field.
   Future<void> _openHandoffRange() async {
     if (_refuseWriteOffline()) return;
+    if (_refuseWriteInTodas()) return;
     final summary = await showHandoffRangeSheet(
       context: context,
       dataSource: widget.dataSource,
       today: _today,
+      childId: _perChild ? _lane : null,
     );
     if (summary == null || !mounted) return;
     showAppSnack(context, summary);
     _load(silent: true);
+  }
+
+  // ── F-59: a device without push, now that most notices left e-mail ────────
+
+  PushNudgeStep get _pushStep => PushNudgeRules.step(
+      state: widget.push?.state ?? PushState.unsupported,
+      facts: widget.installFacts);
+
+  void _onPushChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Fire-and-forget, and only when the strip could show at all: a device
+  /// whose push is on, or that cannot have it, costs no query.
+  Future<void> _loadPushReach(int profileId) async {
+    if (!_pushStep.isActionable) return;
+    try {
+      final reach = await widget.dataSource.fetchPushReach(profileId);
+      if (mounted) setState(() => _pushReach = reach);
+    } catch (_) {/* no answer: the rhythm alone decides */}
+  }
+
+  bool get _showPushToday {
+    if (_loading || _ownProfile == null) return false;
+    final now = DateTime.now();
+    var dismissals =
+        widget.pushTodayPrefs?.read() ?? InstallHintDismissals.none;
+    // This session's dismissal, until the prefs have it (or with no prefs at
+    // all). The stored time is in milliseconds, hence the tolerance.
+    final session = _pushTodayDismissedAt;
+    final stored = dismissals.last;
+    if (session != null &&
+        (stored == null ||
+            session.difference(stored) > const Duration(seconds: 1))) {
+      dismissals = dismissals.next(session);
+    }
+    return PushTodayRules.show(
+      step: _pushStep,
+      dismissals: dismissals,
+      now: now,
+      // Unknown reads as "has push": a failed read never chases the reader.
+      accountHasPush: _pushReach?.accountHasPush ?? true,
+      newestUnreadAt: _pushReach?.newestUnreadAt,
+      // U-61: not in the first seconds of a founder's first run.
+      firstRunActive: _firstRunActive,
+    );
+  }
+
+  void _dismissPushToday() {
+    final now = DateTime.now();
+    setState(() => _pushTodayDismissedAt = now);
+    unawaited(widget.pushTodayPrefs?.dismiss(now));
+  }
+
+  /// A STATE line like F-70's, not an alert (03/10/2026): as an AppBanner it
+  /// took 146 dp between the Hoje card and the month on a Pixel 6 — the
+  /// month kept 228 dp of 729, and with the editor's keyboard up the column
+  /// overflowed (the Android E2E lane, run 37124944050). One tinted row: the
+  /// mark, a short sentence, a one-word action and the ✕ at its full 48 dp
+  /// target, which is also the row's height.
+  Widget _pushToday(Localization l) {
+    final tone = context.tokens.info;
+    return Padding(
+      key: CalendarScreen.pushTodayKey,
+      padding: const EdgeInsets.fromLTRB(
+          Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 36),
+        padding: const EdgeInsetsDirectional.only(start: Spacing.sm),
+        decoration: BoxDecoration(
+          color: tone.container,
+          borderRadius: BorderRadius.circular(Radii.md),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.notifications_outlined,
+                size: 18, color: tone.onContainer),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                l[KApp.pushTodayMessage],
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: tone.onContainer),
+              ),
+            ),
+            // F-09: Notificações is the ONE door to the OS dialog; this strip
+            // only points to it.
+            if (widget.onOpenNotifications != null)
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: tone.onContainer,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                ),
+                onPressed: widget.onOpenNotifications,
+                child: Text(l[KApp.pushTodayAction]),
+              ),
+            IconButton(
+              onPressed: _dismissPushToday,
+              tooltip: l[KApp.pushTodayDismiss],
+              color: tone.onContainer,
+              icon: const Icon(Icons.close, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ── F-70: the plan is running out ─────────────────────────────────────────
@@ -1349,40 +2141,142 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Widget _planEndStrip(Localization l, String kind) {
     final last = _lastPlannedDay!;
+    final tone = context.tokens.info;
+    // Owner (29/09/2026): the AppBanner took ~90 dp between the Hoje card
+    // and the month and pushed the grid down on a small phone. It is a
+    // STATE line, not an alert: one tinted row — the mark, the date, a
+    // one-word action at the end — no taller than the action's 48 dp.
     return Padding(
       key: CalendarScreen.planEndStripKey,
       padding: const EdgeInsets.fromLTRB(
           Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
-      child: AppBanner(
-        tone: context.tokens.info,
-        icon: Icons.event_note_outlined,
-        message: l.format(kind == 'ended' ? K.calPlanEnded : K.calPlanEnding,
-            [l.formatDate(last)]),
-        actionLabel: _iAmViewer ? null : l[K.notifPlanAction],
-        onAction: _iAmViewer
-            ? null
-            : () => _openWizard(start: PlanEndRules.startAfter(last, _today)),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 36),
+        padding: const EdgeInsetsDirectional.only(start: Spacing.sm),
+        decoration: BoxDecoration(
+          color: tone.container,
+          borderRadius: BorderRadius.circular(Radii.md),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.event_note_outlined, size: 18, color: tone.onContainer),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                l.format(kind == 'ended' ? K.calPlanEnded : K.calPlanEnding,
+                    [l.formatDate(last)]),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: tone.onContainer),
+              ),
+            ),
+            if (!_iAmViewer)
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: tone.onContainer,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                ),
+                onPressed: () =>
+                    _openWizard(start: PlanEndRules.startAfter(last, _today)),
+                child: Text(l[KApp.calPlanEndAction]),
+              )
+            else
+              const SizedBox(width: Spacing.sm),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _handoffNudge(Localization l) => Padding(
+  /// U-62: the one-row shape of the F-59 strip — the mark, the sentence, a
+  /// short action and the ✕ at its 48 dp — instead of the AppBanner, which
+  /// measured ~140 dp on a 360 dp phone and alone took two weeks off the
+  /// month. Same key, same actions.
+  Widget _handoffNudge(Localization l) => _oneRowStrip(
         key: const Key('handoff-nudge'),
-        padding: const EdgeInsets.fromLTRB(
-            Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
-        child: AppBanner(
-          tone: context.tokens.info,
-          icon: Icons.schedule_outlined,
-          message: l[K.handoffNudgeMessage],
-          actionLabel: l[K.handoffNudgeAction],
-          onAction: _openHandoffRange,
-          onClose: _dismissHandoffNudge,
-          closeTooltip: l[K.handoffNudgeDismiss],
-        ),
+        icon: Icons.schedule_outlined,
+        message: l[K.handoffNudgeMessage],
+        actionLabel: l[K.handoffNudgeAction],
+        onAction: _openHandoffRange,
+        onDismiss: _dismissHandoffNudge,
+        dismissTooltip: l[K.handoffNudgeDismiss],
       );
+
+  /// U-62: a viewer's standing note, one row, no button.
+  Widget _viewerLine(Localization l) => _oneRowStrip(
+        key: const ValueKey('viewer-read-only'),
+        icon: Icons.visibility_outlined,
+        message: l[KApp.viewerReadOnly],
+      );
+
+  /// The one-row tinted strip every system line over the month uses (F-59's
+  /// `_pushToday` is its origin): no taller than its 48 dp action, and never
+  /// an `AppBanner`, which is a page-level message (U-49) and costs the grid
+  /// a week. [onDismiss] draws the ✕; [actionLabel] the short action.
+  Widget _oneRowStrip({
+    required Key key,
+    required IconData icon,
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+    VoidCallback? onDismiss,
+    String? dismissTooltip,
+  }) {
+    final tone = context.tokens.info;
+    return Padding(
+      key: key,
+      padding: const EdgeInsets.fromLTRB(
+          Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 36),
+        padding: EdgeInsetsDirectional.only(
+            start: Spacing.sm, end: onDismiss == null ? Spacing.sm : 0),
+        decoration: BoxDecoration(
+          color: tone.container,
+          borderRadius: BorderRadius.circular(Radii.md),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: tone.onContainer),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: tone.onContainer),
+              ),
+            ),
+            if (actionLabel != null && onAction != null)
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: tone.onContainer,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                ),
+                onPressed: onAction,
+                child: Text(actionLabel),
+              ),
+            if (onDismiss != null)
+              IconButton(
+                onPressed: onDismiss,
+                tooltip: dismissTooltip,
+                color: tone.onContainer,
+                icon: const Icon(Icons.close, size: 18),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _openWizard({DateTime? start}) async {
     if (_refuseWriteOffline()) return;
+    // F-07: a plan is one child's in a per-child family.
+    if (_refuseWriteInTodas()) return;
     final generated = await showWizardSheet(
       context: context,
       activeMembers: _assignableMembers,
@@ -1397,6 +2291,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       adminBypass: _adminBypass,
       adminOffer: _adminOfferer,
       analytics: widget.analytics,
+      childId: _lane,
     );
     if (generated == true) _load(silent: true);
   }
@@ -1410,6 +2305,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// rules spared. U-27: the confirming action first, the way out after it.
   Future<void> _clearMonth() async {
     if (_refuseWriteOffline()) return;
+    if (_refuseWriteInTodas()) return;
     // F-67 Part B: offered to an admin with the mode off. Yes turns it on
     // and carries on into the month's own "apagar N dias?" — activating the
     // mode never deletes anything by itself.
@@ -1433,13 +2329,22 @@ class _CalendarScreenState extends State<CalendarScreen>
     // Only what the server will actually delete: a frozen day (pending
     // request) and a day holding an approved swap are kept by the RPC's
     // WHERE, so they must not be counted as "serão apagados" here either.
-    final count = plannedDaysInRange([
-      for (final d in _daysByIso.values)
-        if (!_frozenByIso.containsKey(CareSchedule.isoDate(d.scheduleDate)) &&
+    // F-07: the lane on screen — or, in *Todas*, every lane (one row each).
+    final lane = _perChild ? _lane : null;
+    bool frozenRow(CareSchedule d) => _monthFrozen.any((r) =>
+        r.childId == d.childId &&
+        CareSchedule.isoDate(r.scheduleDate) ==
+            CareSchedule.isoDate(d.scheduleDate));
+    final count = [
+      for (final d in _monthRows)
+        if ((lane == null || d.childId == lane) &&
+            !frozenRow(d) &&
             (d.actualParentId == null ||
-                d.actualParentId == d.scheduledParentId))
-          d.scheduleDate,
-    ], range);
+                d.actualParentId == d.scheduledParentId) &&
+            !d.scheduleDate.isBefore(range.from) &&
+            !d.scheduleDate.isAfter(range.to))
+          d,
+    ].length;
     if (count == 0) {
       showAppSnack(
           context, l.format(K.calClearMonthNothing, [fromText, toText]));
@@ -1467,7 +2372,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (proceed != true || !mounted) return;
     try {
       final result =
-          await widget.dataSource.clearScheduleRange(range.from, range.to);
+          await widget.dataSource
+              .clearScheduleRange(range.from, range.to, childId: lane);
       if (!mounted) return;
       _load(silent: true);
       showAppSnack(context, clearRangeSummary(l, result));
@@ -1482,16 +2388,92 @@ class _CalendarScreenState extends State<CalendarScreen>
     }
   }
 
-  Future<void> _openDay(DateTime date) async {
+  /// F-07 (PR 4b) — the other children whose [date] is in the SAME state as
+  /// the lane on screen (same planned carer, same real carer, nothing
+  /// pending): a swap asked for this child can be asked for them too.
+  List<DaySheetSibling> _daySiblings(DateTime date) {
+    if (!_perChild || _lane == null) return const [];
+    final iso = CareSchedule.isoDate(date);
+    final mine = _daysByIso[iso];
+    if (mine == null) return const [];
+    return [
+      for (final c in _children)
+        if (c.id != _lane)
+          for (final d in _monthRows)
+            if (d.childId == c.id &&
+                CareSchedule.isoDate(d.scheduleDate) == iso &&
+                d.scheduledParentId == mine.scheduledParentId &&
+                d.actualParentId == mine.actualParentId &&
+                !_monthFrozen.any((r) =>
+                    r.childId == c.id &&
+                    CareSchedule.isoDate(r.scheduleDate) == iso))
+              DaySheetSibling(childId: c.id, childName: c.firstName, day: d),
+    ];
+  }
+
+  /// F-07 (owner's QA, 29/09/2026) — *Todas*: the whole day, read-only. One
+  /// block per child (who has them, the swap, the time, a pending request),
+  /// every child's agenda and the day's relatos; "Editar o dia de `criança`"
+  /// moves the calendar to that child and opens the day there.
+  Future<void> _openAllChildrenDay(DateTime date) async {
+    HapticFeedback.selectionClick();
+    final iso = CareSchedule.isoDate(date);
+    final lanes = [
+      for (final c in _children)
+        DaySheetLane(
+          childId: c.id,
+          childName: c.firstName,
+          initials: _childInitials[c.id] ?? '',
+          day: _monthRows
+              .where((d) =>
+                  d.childId == c.id &&
+                  CareSchedule.isoDate(d.scheduleDate) == iso)
+              .firstOrNull,
+          frozen: _monthFrozen.any((r) =>
+              r.childId == c.id && CareSchedule.isoDate(r.scheduleDate) == iso),
+        ),
+    ];
+    await showDaySheet(
+      context: context,
+      date: date,
+      day: _daysByIso[iso],
+      previousDay: null,
+      members: _assignableMembers,
+      memberViews: _memberViews,
+      today: _today,
+      dataSource: widget.dataSource,
+      ownProfileId: _ownProfile?.id,
+      isPremium: _isPremiumForGate,
+      settings: _settings,
+      myProfile: _ownProfile,
+      allProfiles: _members,
+      offline: _offline,
+      childName: AppL10n.of(context).l[KApp.calLaneAll],
+      allLanes: lanes,
+      onEditLane: _iAmViewer
+          ? null
+          : (childId) {
+              _selectLane(childId);
+              _openDayAsTapped(date);
+            },
+    );
+  }
+
+  Future<void> _openDay(DateTime date, {bool askSwap = false}) async {
     HapticFeedback.selectionClick();
     final iso = CareSchedule.isoDate(date);
     final previousIso =
         CareSchedule.isoDate(date.subtract(const Duration(days: 1)));
+    final nextIso = CareSchedule.isoDate(
+        DateTime(date.year, date.month, date.day + 1));
     final outcome = await showDaySheet(
       context: context,
       date: date,
       day: _daysByIso[iso],
       previousDay: _daysByIso[previousIso],
+      nextDay: _daysByIso[nextIso],
+      canonicalRoleOf: _canonicalRoleOf,
+      daysInMonth: _carerDayCounts(),
       members: _assignableMembers,
       memberViews: _memberViews,
       today: _today,
@@ -1510,6 +2492,17 @@ class _CalendarScreenState extends State<CalendarScreen>
       offline: _offline,
       onOpenPlan: widget.onOpenPlan,
       onOpenChildren: widget.onOpenChildren,
+      childId: _perChild ? _lane : null,
+      childName: _perChild ? _childName(_lane) : null,
+      siblings: _daySiblings(date),
+      askSwap: askSwap,
+      onOpenHistory: widget.onOpenHistory,
+      onCalendarStale: () => _load(silent: true),
+      onSendNotice:
+          dateOnly(date) == dateOnly(_today) && _canOfferNotice
+              ? _openNoticeFromMenu
+              : null,
+      onOpenChat: widget.onOpenChat,
     );
     if (outcome != null) {
       _load(silent: true);
@@ -1524,6 +2517,147 @@ class _CalendarScreenState extends State<CalendarScreen>
             }]);
       }
     }
+  }
+
+  /// F-07 (PR 4b) — *Todas*, today, children with different carers: who has
+  /// whom, in the family's order. Null everywhere else.
+  String? _todayLaneSummary(Localization l) {
+    if (!_perChild || _lane != null) return null;
+    final todayIso = CareSchedule.isoDate(_today);
+    final rows = [
+      for (final c in _children)
+        for (final d in _upcomingRows)
+          if (d.childId == c.id && CareSchedule.isoDate(d.scheduleDate) == todayIso)
+            d,
+    ];
+    if ({for (final r in rows) r.effectiveParentId}.length < 2) return null;
+    return [
+      for (final r in rows)
+        l.format(KApp.calLaneWith, [
+          _childName(r.childId) ?? '',
+          _members
+                  .where((m) => m.id == r.effectiveParentId)
+                  .firstOrNull
+                  ?.fullName ??
+              '',
+        ]),
+    ].join('; ');
+  }
+
+  /// F-07 — whose plan is on screen: *Todas* or one child. The same chip as
+  /// the carers' legend above (owner, 29/09/2026), each child with the
+  /// neutral avatar the split day draws — this row is the children's key.
+  Widget _laneChips(Localization l) {
+    final tokens = context.tokens;
+    final scheme = Theme.of(context).colorScheme;
+    final initials = _childInitials;
+    // Round 3 (owner, 29/09/2026): the carers' short-name rule — the first
+    // word, "Ana C." on a clash — so "Filho Pródigo" does not spend the
+    // width that would let every name show.
+    final short =
+        legendNames({for (final c in _children) c.id: c.firstName});
+    final allLabel = l[KApp.calLaneAllShort];
+    PersonChip chip(
+            {required Key key,
+            required String? label,
+            required String spoken,
+            required bool selected,
+            required VoidCallback onTap,
+            required Widget avatar}) =>
+        PersonChip(
+          key: key,
+          label: label,
+          semanticsLabel: spoken,
+          selected: selected,
+          onTap: onTap,
+          background: selected
+              ? scheme.primary.withValues(alpha: 0.12)
+              : scheme.surface,
+          border: selected ? scheme.primary : tokens.outline,
+          ink: tokens.text,
+          avatar: avatar,
+        );
+    return Padding(
+      key: CalendarScreen.laneChipsKey,
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+      child: LayoutBuilder(builder: (context, box) {
+        // F-07 (owner's QA, 29/09/2026, round 3): every name while the row
+        // fits one line. Past that, "Todas" is its icon and only the
+        // SELECTED child keeps a name — the others are their avatars (the
+        // name in the tooltip and the screen reader), so no name is ever
+        // cut. Measured with every name, so a tap never flips the mode.
+        final named = [
+          PersonChip.widthOf(context, allLabel),
+          for (final c in _children)
+            PersonChip.widthOf(context, short[c.id] ?? c.firstName),
+        ];
+        final compact = named.fold<double>(0, (a, w) => a + w) +
+                Spacing.sm * (named.length - 1) >
+            box.maxWidth;
+        final gap = compact
+            ? Spacing.sm - (PersonChip.target - PersonChip.visual)
+            : Spacing.sm;
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: box.maxWidth),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                chip(
+                  key: const ValueKey('lane-all'),
+                  label: compact ? null : allLabel,
+                  spoken: allLabel,
+                  selected: _lane == null,
+                  onTap: () => _selectLane(null),
+                  avatar: Icon(Icons.groups_outlined,
+                      size: PersonChip.avatarSize, color: tokens.textMuted),
+                ),
+                for (final c in _children) ...[
+                  SizedBox(width: gap),
+                  Padding(
+                    // The named chip among compact ones gets the 4 dp each
+                    // side their 40 dp targets already carry.
+                    padding: EdgeInsets.symmetric(
+                        horizontal: compact && _lane == c.id
+                            ? (PersonChip.target - PersonChip.visual) / 2
+                            : 0),
+                    child: chip(
+                      key: ValueKey('lane-${c.id}'),
+                      label: compact && _lane != c.id
+                          ? null
+                          : short[c.id] ?? c.firstName,
+                      spoken: c.firstName,
+                      selected: _lane == c.id,
+                      onTap: () => _selectLane(c.id),
+                      avatar: _childAvatar(
+                          initials[c.id] ?? '?', PersonChip.avatarSize),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  /// F-07: the children's letters (`childInitials`, core).
+  Map<int, String> get _childInitials =>
+      childInitials({for (final c in _children) c.id: c.firstName});
+
+  /// A child's NEUTRAL avatar — surface, ring, text ink.
+  Widget _childAvatar(String letters, double diameter) {
+    final tokens = context.tokens;
+    return MiniAvatar(
+      diameter: diameter,
+      letters: letters,
+      fill: Theme.of(context).colorScheme.surface,
+      ink: tokens.text,
+      ring: tokens.textMuted,
+      letterScale: SplitCellFit.childLetter,
+    );
   }
 
   /// Web: GoToToday — no-op when already on the current month (the card is
@@ -1574,20 +2708,149 @@ class _CalendarScreenState extends State<CalendarScreen>
       today: _today,
       nextHandoffDate: nextHandoff,
       viewingCurrentMonth: isCurrentMonth(_visibleMonth, _today),
-      showInviteNudge: showInviteNudge(
-        isLoading: _loading,
-        isAdmin: _ownProfile?.isAdmin ?? false,
-        // F-56: a pending member counts — the nudge is "reach out", and a
-        // caregiver already on the calendar was reached.
-        activeMemberCount: _assignableMembers.length,
-        // T-76: so was somebody with an invitation still in their inbox.
-        hasOpenInvitation: _openInvitation,
-      ),
+      showInviteNudge: _inviteNudgeShowing,
+      // U-61: plan first — the wizard where the invite used to be, while the
+      // family has no day at all and the first run is on.
+      showPlanNudge: _planNudgeShowing,
       responsibleRole: _roleLabelFor(
           todayRow?.effectiveParentId, AppL10n.of(context).l.current),
       onGoToToday: _goToToday,
       onInvite: _onInviteNudgeTap,
+      onPlan: _onPlanNudgeTap,
       noticeStrip: _noticeStrip(context, todayRow, nextHandoff),
+      requestStrip: _requestStrips(context),
+      onSendNotice: _canOfferNotice ? _openNoticeFromMenu : null,
+      sendNoticeKey: CalendarScreen.noticeQuickActionKey,
+      laneSummary: _todayLaneSummary(AppL10n.of(context).l),
+    );
+  }
+
+  /// F-94: today's request that I asked or must answer, still open — the
+  /// day itself is here and nobody has said yes or no.
+  SwapRequest? get _pendingToday {
+    final me = _ownProfile?.id;
+    if (me == null || !isCurrentMonth(_visibleMonth, _today)) return null;
+    final todayIso = CareSchedule.isoDate(_today);
+    for (final r in _monthFrozen) {
+      if (CareSchedule.isoDate(r.scheduleDate) == todayIso &&
+          (r.requestingProfileId == me || r.targetProfileId == me)) {
+        return r;
+      }
+    }
+    return null;
+  }
+
+  /// The Hoje card's request strip — ONE line (owner's QA of 3.1.10): today's
+  /// open request when there is one (F-94), with the others waiting for my
+  /// answer as a "+N" under it; otherwise the waiting ones (U-60).
+  Widget? _requestStrips(BuildContext context) {
+    final waiting = _waitingForMe;
+    return _pendingTodayStrip(context, others: waiting.length) ??
+        _requestStrip(context);
+  }
+
+  /// The requests waiting for MY answer, today's own request left out (it has
+  /// its own line).
+  List<SwapRequest> get _waitingForMe {
+    final today = _pendingToday;
+    return [
+      for (final r in _pendingForMe)
+        if (today == null || r.id != today.id) r
+    ];
+  }
+
+  /// F-94 (owner, 05/10/2026): on the day, while the request waits, both
+  /// parties read who stays responsible until the answer — the target gets
+  /// "Responder", the requester "Cancelar pedido" (the same panel, which
+  /// holds both). No push on the morning of the day: the eve reminder was it.
+  Widget? _pendingTodayStrip(BuildContext context, {int others = 0}) {
+    final req = _pendingToday;
+    final me = _ownProfile?.id;
+    if (_loading || req == null || me == null) return null;
+    final l = AppL10n.of(context).l;
+    final todayIso = CareSchedule.isoDate(_today);
+    final row = _monthRows
+        .where((d) =>
+            CareSchedule.isoDate(d.scheduleDate) == todayIso &&
+            d.childId == req.childId)
+        .firstOrNull;
+    final carer = row?.effectiveParentId ??
+        req.previousActualParentId ??
+        req.targetProfileId;
+    String first(int id) =>
+        _members
+            .where((m) => m.id == id)
+            .firstOrNull
+            ?.fullName
+            .trim()
+            .split(' ')
+            .first ??
+        '—';
+    final iAnswer = req.targetProfileId == me;
+    return AppStripLine(
+      key: CalendarScreen.pendingTodayStripKey,
+      tone: context.tokens.warning,
+      icon: Icons.hourglass_top,
+      message: l.format(KApp.cardPendingTodayLine, [
+        pendingTodaySentence(
+          l: l,
+          me: me,
+          carerId: carer,
+          targetId: req.targetProfileId,
+          firstName: first,
+        ),
+      ]),
+      actionLabel:
+          l[iAnswer ? KApp.cardRequestsAnswer : KApp.cardPendingTodayCancel],
+      onAction: () => _openFrozenDay(req),
+      extraLabel: others == 0
+          ? null
+          : l.format(
+              others == 1 ? KApp.cardRequestsMoreOne : KApp.cardRequestsMore,
+              [others]),
+      onExtra: others == 0 ? null : widget.onOpenNotifications ?? () {},
+    );
+  }
+
+  /// U-60: the requests waiting for MY answer, on the card about today —
+  /// the soonest said in words, "Responder" opening its approval panel.
+  /// Today's own request is the F-94 strip's, not this one's.
+  Widget? _requestStrip(BuildContext context) {
+    final waiting = _waitingForMe;
+    if (_loading || waiting.isEmpty || _ownProfile == null) return null;
+    final l = AppL10n.of(context).l;
+    final first = waiting.first;
+    final requester = _members
+            .where((m) => m.id == first.requestingProfileId)
+            .firstOrNull
+            ?.fullName
+            .trim()
+            .split(' ')
+            .first ??
+        '—';
+    final count = waiting.length;
+    // Owner's QA of 3.1.10: one line. One request says itself and answers in
+    // place; several say how many and open the list.
+    return AppStripLine(
+      key: CalendarScreen.requestStripKey,
+      tone: context.tokens.info,
+      icon: Icons.swap_horiz,
+      message: count == 1
+          ? swapRequestSentence(
+              l: l,
+              requesterName: requester,
+              date: first.scheduleDate,
+              isRevert: first.isRevertPending,
+              requesterIsProposed:
+                  first.proposedActualParentId == first.requestingProfileId,
+              childName: _singleChildName,
+            )
+          : l.format(KApp.cardRequestsMany, [count]),
+      actionLabel:
+          l[count == 1 ? KApp.cardRequestsAnswer : KApp.cardRequestsSee],
+      onAction: count == 1
+          ? () => _openFrozenDay(first)
+          : (widget.onOpenNotifications ?? () => _openFrozenDay(first)),
     );
   }
 
@@ -1607,34 +2870,48 @@ class _CalendarScreenState extends State<CalendarScreen>
     return null;
   }
 
-  /// Whether I am one of the day's three ends (`noticeSenderIds`). The server
+  /// Whether I am one of the day's two ends (`noticeSenderIds`). The server
   /// decides for real; this only chooses whether to OFFER the action, because
   /// an action that always ends in a refusal is worse than no action at all.
-  bool _canSendNotice(CareSchedule? todayRow, DateTime? nextHandoff) {
+  bool _canSendNotice(CareSchedule? todayRow) {
     final me = _ownProfile?.id;
     if (me == null) return false;
-    CareSchedule? nextRow;
-    if (nextHandoff != null) {
-      final iso = CareSchedule.isoDate(nextHandoff);
-      for (final d in _upcoming) {
-        if (CareSchedule.isoDate(d.scheduleDate) == iso) {
-          nextRow = d;
-          break;
-        }
-      }
-    }
+    // F-07 (PR 5c): per child, the ends of the day in ANY lane — the server's
+    // own rule since PR 5a.
+    if (_perChild) return _laneNoticeSenders().contains(me);
     return noticeSenderIds(
       dayParentId: todayRow?.effectiveParentId,
       previousParentId: _yesterdayRow?.effectiveParentId,
-      nextHandoffParentId: nextRow?.effectiveParentId,
     ).contains(me);
+  }
+
+  /// F-07 (PR 5c) — `noticeSenderIds` for every child's lane, united.
+  Set<int> _laneNoticeSenders() {
+    final todayIso = CareSchedule.isoDate(_today);
+    final senders = <int>{};
+    for (final c in _children) {
+      final lane = [
+        for (final d in _upcomingRows)
+          if (d.childId == c.id) d,
+      ]..sort((a, b) => a.scheduleDate.compareTo(b.scheduleDate));
+      final today = lane
+          .where((d) => CareSchedule.isoDate(d.scheduleDate) == todayIso)
+          .firstOrNull;
+      final yesterday =
+          _yesterdayRows.where((d) => d.childId == c.id).firstOrNull;
+      senders.addAll(noticeSenderIds(
+        dayParentId: today?.effectiveParentId,
+        previousParentId: yesterday?.effectiveParentId,
+      ));
+    }
+    return senders;
   }
 
   /// The sentence a reader sees for an open aviso — the SAME one the
   /// notification carries, composed once in core. Two copies of it is how the
   /// strip says "30 min" while the notification says "sem previsão", both
   /// well-formed.
-  String _noticeSentence(DayNotice notice, Localization l) {
+  String _noticeSentence(DayNotice notice, Localization l, {bool mine = false}) {
     final reason = NoticeReason.fromWire(notice.reason);
     final request = NoticeRequest.fromWire(notice.request);
     // A row we cannot read is a FUTURE writer's; saying nothing about it beats
@@ -1654,6 +2931,8 @@ class _CalendarScreenState extends State<CalendarScreen>
       etaMinutes: notice.etaMinutes,
       request: request,
       note: notice.note,
+      mine: mine,
+      childName: _singleChildName,
     );
   }
 
@@ -1663,50 +2942,63 @@ class _CalendarScreenState extends State<CalendarScreen>
     final l = AppL10n.of(context).l;
     final me = _ownProfile!.id;
 
-    final mine = _myOpenNotice;
-    if (mine != null) {
-      return AppBanner(
-        tone: context.tokens.warning,
-        icon: Icons.campaign_outlined,
-        title: l[KApp.noticeOpenMine],
-        message: _noticeSentence(mine, l),
-        actionLabel: l[KApp.noticeCancel],
-        actionIcon: Icons.close,
-        onAction: () => _confirmCancelNotice(mine),
-      );
-    }
-
-    // Somebody else is asking. PR 2 puts the two answers on this banner; here
-    // it says what happened, which is already more than the product did.
+    // F-98 (owner, 05/10/2026): the others' open avisos are shown WITH mine —
+    // my own open "Só avisando" used to hide the other parent's "alguém pode
+    // buscar?" all day — and the ones that ask for an answer come first. When
+    // an aviso closes is still F-52's rule.
     final theirs = [
       for (final n in _openNotices)
         if (n.senderProfileId != me) n
     ];
-    if (theirs.isNotEmpty) {
-      final first = theirs.first;
-      // "Só avisando" asks for nothing, so the banner offers nothing: an
-      // action on a notice that made no request is an invitation to answer a
-      // question nobody asked.
-      final answerable =
-          NoticeRequest.fromWire(first.request) != NoticeRequest.info &&
-              !_iAmViewer;
-      return AppBanner(
-        tone: context.tokens.warning,
-        icon: Icons.campaign_outlined,
-        message: _noticeSentence(first, l),
-        actionLabel: answerable ? l[KApp.noticeAnswerTitle] : null,
-        actionIcon: answerable ? Icons.reply : null,
-        onAction: answerable ? () => _answerNotice(first) : null,
-      );
-    }
-
-    // Nothing open: the card grows by NOTHING. An idle affordance here cost
-    // the month grid 8 dp per cell (76 → 67.8 at 360x740, measured), and U-28
-    // already paid for that lesson once — the Hoje card growing takes a whole
-    // week off the grid for everyone, every day, to serve a rare event. The
-    // way to SEND one lives in the month bar instead, which is a row of
-    // buttons already and costs no height at all.
-    return null;
+    bool answerable(DayNotice n) =>
+        NoticeRequest.fromWire(n.request) != null &&
+        NoticeRequest.fromWire(n.request) != NoticeRequest.info &&
+        !_iAmViewer;
+    final ordered = [
+      ...theirs.where(answerable),
+      ...theirs.where((n) => !answerable(n)),
+    ];
+    final mine = _myOpenNotice;
+    final strips = <Widget>[
+      for (final n in ordered)
+        // "Só avisando" asks for nothing, so its banner offers nothing: an
+        // action on a notice that made no request is an invitation to answer
+        // a question nobody asked.
+        // Owner's QA of 3.1.10: one line each, like every strip on the card.
+        AppStripLine(
+          key: ValueKey('notice-strip-${n.id}'),
+          tone: context.tokens.warning,
+          icon: Icons.campaign_outlined,
+          message: _noticeSentence(n, l),
+          actionLabel: answerable(n) ? l[KApp.noticeAnswerTitle] : null,
+          onAction: answerable(n) ? () => _answerNotice(n) : null,
+        ),
+      if (mine != null)
+        AppStripLine(
+          key: ValueKey('notice-strip-${mine.id}'),
+          tone: context.tokens.warning,
+          icon: Icons.campaign_outlined,
+          // F-98: the author reads herself in the second person — which is
+          // also what says it is hers, so the strip needs no title.
+          message: _noticeSentence(mine, l, mine: true),
+          actionLabel: l[KApp.noticeCancel],
+          onAction: () => _confirmCancelNotice(mine),
+        ),
+    ];
+    // Owner's QA of 3.1.10: "Avisar" is an icon in the card's header now
+    // ([TodayCard.onSendNotice]) — a line of its own pushed the calendar down
+    // for the one action of the day most people never need.
+    if (strips.isEmpty) return null;
+    if (strips.length == 1) return strips.single;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, w) in strips.indexed) ...[
+          if (i > 0) const SizedBox(height: Spacing.sm),
+          w,
+        ],
+      ],
+    );
   }
 
   Future<void> _openNoticeSheet(int? dayParentId, int sentToday) async {
@@ -1718,6 +3010,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       dayParentId: dayParentId,
       sentToday: sentToday,
       dailyCap: _settings.dayNoticeDailyCap,
+      childName: _singleChildName,
     );
     if (id == null || !mounted) return;
     _load(silent: true);
@@ -1787,6 +3080,25 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// it costs the grid the width of its own label.
   bool get _visibleMonthHasSwap => _daysByIso.values.any((d) =>
       d.actualParentId != null && d.actualParentId != d.scheduledParentId);
+
+  /// Owner's QA of 3.1.10 — how many days of the visible month each carer
+  /// has (the swap entry's tie-break).
+  Map<int, int> _carerDayCounts() {
+    final counts = <int, int>{};
+    for (final d in _daysByIso.values) {
+      counts[d.effectiveParentId] = (counts[d.effectiveParentId] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Owner's QA of 3.1.10 — a member's BUILT-IN role by its canonical name
+  /// (`father`, `mother`, …), or null for none or a custom role.
+  String? _canonicalRoleOf(int profileId) {
+    final roleId =
+        _members.where((m) => m.id == profileId).firstOrNull?.roleId;
+    final role = _roles.where((r) => r.id == roleId).firstOrNull;
+    return role == null ? null : RoleCatalog.find(role.roleName)?.canonicalName;
+  }
 
   /// U-28 — how a member's role reads for this reader, or null when the family
   /// never set one. Built-ins translate, custom roles pass through — the
@@ -1898,7 +3210,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     // An aviso already open is withdrawn on the card's strip, not sent twice.
     if (_myOpenNotice != null) return false;
     final todayRow = _rowForToday();
-    return _canSendNotice(todayRow, _nextHandoffFrom(todayRow));
+    return _canSendNotice(todayRow);
   }
 
   void _openNoticeFromMenu() {
@@ -1908,7 +3220,16 @@ class _CalendarScreenState extends State<CalendarScreen>
       for (final n in _todayNotices)
         if (n.senderProfileId == me) n
     ].length;
-    unawaited(_openNoticeSheet(todayRow?.effectiveParentId, sentToday));
+    // F-07 (PR 5c): per child, I may offer the day when I hold it in ANY
+    // lane — taking it moves every lane that is mine (server, PR 5a).
+    final todayIso = CareSchedule.isoDate(_today);
+    final holdsAnyLane = _perChild &&
+        _upcomingRows.any((d) =>
+            d.childId != null &&
+            CareSchedule.isoDate(d.scheduleDate) == todayIso &&
+            d.effectiveParentId == me);
+    unawaited(_openNoticeSheet(
+        holdsAnyLane ? me : todayRow?.effectiveParentId, sentToday));
   }
 
   /// Today's row out of [_upcoming], which the load fetches starting today.
@@ -1918,22 +3239,6 @@ class _CalendarScreenState extends State<CalendarScreen>
       if (CareSchedule.isoDate(d.scheduleDate) == todayIso) return d;
     }
     return null;
-  }
-
-  /// The next day whose effective carer differs from today's — null on a day
-  /// with no row, because the scan needs a carer to differ FROM.
-  DateTime? _nextHandoffFrom(CareSchedule? todayRow) {
-    if (todayRow == null) return null;
-    final todayIso = CareSchedule.isoDate(_today);
-    return nextHandoffDate(todayRow.effectiveParentId, [
-      for (final d in _upcoming)
-        if (CareSchedule.isoDate(d.scheduleDate) != todayIso)
-          (
-            date: d.scheduleDate,
-            scheduledParentId: d.scheduledParentId,
-            actualParentId: d.actualParentId,
-          ),
-    ]);
   }
 
   /// U-28 QA — the way back to today, as a chip that says which WAY it goes.
@@ -2024,6 +3329,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               // long-press). Once armed, tapping a day toggles its selection.
               _CalendarAction.selectDays =>
                 setState(() => _selectionArmed = true),
+              _CalendarAction.askSwap => _askSwapFromMenu(),
               _CalendarAction.notice => _openNoticeFromMenu(),
               _CalendarAction.clearMonth => _clearMonth(),
               _CalendarAction.adminMode => widget.adminMode.toggle(),
@@ -2050,6 +3356,19 @@ class _CalendarScreenState extends State<CalendarScreen>
                   title: Text(l[K.calSelectDays]),
                 ),
               ),
+              // U-60: the explicit way to ask — it lands on the day sheet's
+              // own request, never around it.
+              if (!_iAmViewer && _assignableMembers.length > 1)
+                PopupMenuItem(
+                  key: CalendarScreen.askSwapMenuKey,
+                  value: _CalendarAction.askSwap,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.swap_horiz),
+                    title: Text(l[KApp.calAskSwap]),
+                  ),
+                ),
               // F-52: offered only to one of the day's three ends, and only
               // on the month today is in — an action about today offered from
               // December reads as a bug.
@@ -2126,6 +3445,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     final l = app.l;
     final views = _memberViews;
     final quickSwap = _isSelectionMode ? _quickSwapPlan : null;
+    final strip = _systemStrip;
+    _reportSystemStrip(strip != null);
     return Scaffold(
       // U-28: the app bar names the TAB, like the other three do. The month
       // moved down to sit against the grid it labels — up here, competing with
@@ -2189,7 +3510,7 @@ class _CalendarScreenState extends State<CalendarScreen>
           skipTraversal: true,
           child: Column(
         children: [
-          if (_showChecklist)
+          if (strip == _SystemStrip.checklist)
             OnboardingLauncher(
               signals: _effectiveSignals!,
               onOpen: _openChecklist,
@@ -2205,19 +3526,13 @@ class _CalendarScreenState extends State<CalendarScreen>
             KeyedSubtree(
                 key: widget.tourKeys?.keyFor(TourTarget.todayCard),
                 child: _todayCard(context)),
-          if (_showHandoffNudge) _handoffNudge(l),
-          if (_iAmViewer)
-            Padding(
-              key: const ValueKey('viewer-read-only'),
-              padding: const EdgeInsets.fromLTRB(
-                  Spacing.md, Spacing.xs, Spacing.md, Spacing.xs),
-              child: AppBanner(
-                tone: context.tokens.info,
-                icon: Icons.visibility_outlined,
-                message: l[KApp.viewerReadOnly],
-              ),
-            ),
-          if (_planEndKind case final kind?) _planEndStrip(l, kind),
+          if (strip == _SystemStrip.pushToday) _pushToday(l),
+          if (strip == _SystemStrip.handoffNudge) _handoffNudge(l),
+          if (strip == _SystemStrip.planEnd) _planEndStrip(l, _planEndKind!),
+          // U-62: a viewer's standing note is ONE tinted row (the F-59 strip's
+          // shape, no button) — the AppBanner took ~70 dp of a 360 dp phone
+          // for a sentence the reader sees on every opening.
+          if (_iAmViewer) _viewerLine(l),
           _monthBar(context, l),
           if (_members.isEmpty && _loading)
             const _LegendSkeleton()
@@ -2227,11 +3542,18 @@ class _CalendarScreenState extends State<CalendarScreen>
               child: _Legend(
                 members: _members,
                 views: views,
-                roleOf: (id) => _roleLabelFor(id, l.current),
                 showSwapKey: _visibleMonthHasSwap,
+                onOpen: widget.onOpenMember == null || _ownProfile == null
+                    ? null
+                    : (m) => widget.onOpenMember!(
+                        memberLinkTarget(
+                            isOwn: m.id == _ownProfile!.id,
+                            iAmAdmin: _ownProfile!.isAdmin),
+                        m.id),
               ),
             ),
           const Divider(height: 1),
+          if (_perChild) _laneChips(l),
           Expanded(
             child: PageView.builder(
               controller: _pageController,
@@ -2240,6 +3562,10 @@ class _CalendarScreenState extends State<CalendarScreen>
                 final month = _monthForPage(page);
                 final isVisible = month.year == _visibleMonth.year &&
                     month.month == _visibleMonth.month;
+                // T-106: a neighbour page paints the month the cache holds
+                // for it — the drag shows the plan, not an empty grid.
+                final neighbour =
+                    isVisible ? _MonthView.empty : _neighbourView(month);
                 return LayoutBuilder(builder: (context, box) {
                   return RefreshIndicator(
                   onRefresh: _load,
@@ -2264,19 +3590,30 @@ class _CalendarScreenState extends State<CalendarScreen>
                         ])
                       : _MonthGrid(
                           month: month,
-                          daysByIso: isVisible ? _daysByIso : const {},
-                          frozenByIso: isVisible ? _frozenByIso : const {},
-                          agendaByIso: isVisible ? _agendaByIso : const {},
+                          daysByIso: isVisible ? _daysByIso : neighbour.days,
+                          divergentByIso: isVisible
+                              ? _divergentByIso
+                              : neighbour.divergent,
+                          laneNames: {
+                            for (final c in _children) c.id: c.firstName
+                          },
+                          laneInitials: _childInitials,
+                          frozenByIso:
+                              isVisible ? _frozenByIso : neighbour.frozen,
+                          agendaByIso:
+                              isVisible ? _agendaByIso : neighbour.agenda,
                           ownProfileId: _ownProfile?.id,
                           views: views,
                           today: _today,
-                          loading: _loading && isVisible,
+                          loading: (_loading || _monthLoading) && isVisible,
                           selectedIso: {
                             for (final d in _selectedDays)
                               CareSchedule.isoDate(d)
                           },
                           onDayTap: _onDayTap,
                           onDayLongPress: _onDayLongPress,
+                          onDragSelect: _onDragSelect,
+                          onDragEnd: _onDragEnd,
                           // U-28 QA: the height the grid may actually spend.
                           availableHeight: box.maxHeight,
                           // U-40: only the month whose rows are in hand can
@@ -2358,7 +3695,14 @@ class _CalendarScreenState extends State<CalendarScreen>
 }
 
 /// U-36 — the items of the calendar's ⋮ menu. F-51 adds `clearMonth` here.
-enum _CalendarAction { wizard, selectDays, notice, adminMode, clearMonth }
+enum _CalendarAction {
+  wizard,
+  selectDays,
+  askSwap,
+  notice,
+  adminMode,
+  clearMonth,
+}
 
 /// The today card's outline while it loads — the same card, the same two
 /// bands, the same heights, so nothing moves when the real one arrives.
@@ -2441,21 +3785,21 @@ class _Legend extends StatelessWidget {
   final List<Member> members;
   final List<MemberView> views;
 
-  /// Resolves a member's role for the current reader; null keeps the bare name.
-  final String? Function(int memberId) roleOf;
-
   /// U-18 parity: whether the month on screen has any swapped day at all.
   final bool showSwapKey;
+
+  /// F-07 (owner's QA, 29/09/2026): a carer's chip leads to the person.
+  final void Function(Member member)? onOpen;
 
   const _Legend({
     required this.members,
     required this.views,
-    required this.roleOf,
     required this.showSwapKey,
+    this.onOpen,
   });
 
-  /// One row of keys. A four-carer family plus the swap key needs two.
-  static const rowHeight = 22.0;
+  /// One row of keys (the skeleton's height).
+  static const rowHeight = PersonChip.target;
 
   @override
   Widget build(BuildContext context) {
@@ -2473,31 +3817,86 @@ class _Legend extends StatelessWidget {
     // horizontal scroll hides the fourth carer behind a gesture nobody knows is
     // there. Two rows show everyone, and the rows only appear when the family
     // has grown enough to need them — a two-carer family still gets one.
+    // F-07 (owner's QA, 29/09/2026): an avatar and the short name — the role
+    // left the key, the chip leads to the person instead, and the children's
+    // lane chips wear the same shape.
+    final names = legendNames({for (final m in active) m.id: m.fullName});
+    final l = AppL10n.of(context).l;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.sm, 0, Spacing.sm, Spacing.xs),
-      child: Wrap(
-        spacing: Spacing.md,
-        runSpacing: Spacing.xs,
-        children: [
-          for (final m in active)
-            Builder(builder: (context) {
-              final slot = context.tokens.slot(profileSlotIndex(m.id, views));
-              final role = roleOf(m.id);
-              final first = m.fullName.split(' ').first;
-              final base = role == null ? first : '$first ($role)';
-              final label = m.isPendingMember
-                  ? '$base ${AppL10n.of(context).l[KApp.calMemberPending]}'
-                  : base;
-              return _key(context, slot: slot, label: label);
-            }),
-          if (showSwapKey)
-            _key(context,
-                slot: context.tokens.swapped,
-                label: AppL10n.of(context).l[K.calSwapped],
-                dashed: true),
-        ],
-      ),
+      padding: const EdgeInsets.fromLTRB(Spacing.sm, 0, Spacing.sm, 0),
+      child: LayoutBuilder(builder: (context, box) {
+        // F-07 (owner's QA, 29/09/2026, round 3): the names while the whole
+        // key fits ONE line; past that, every carer is the avatar alone (the
+        // name goes to the screen reader and a long-press tooltip) — four
+        // carers and "Trocado" on an iPhone SE, where two rows of names took
+        // the grid's height.
+        final swapLabel = l[K.calSwapped];
+        final named = [
+          for (final m in active) PersonChip.widthOf(context, names[m.id]),
+          if (showSwapKey) _swapKeyWidth(context, swapLabel),
+        ];
+        final compact = named.fold<double>(0, (a, w) => a + w) +
+                Spacing.sm * (named.length - 1) >
+            box.maxWidth;
+        return Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          // The compact chip's 40 dp target already holds 8 dp around its
+          // 32 dp circle: no extra gap, or the key spreads.
+          spacing: compact
+              ? Spacing.sm - (PersonChip.target - PersonChip.visual)
+              : Spacing.sm,
+          children: [
+            for (final m in active)
+              Builder(builder: (context) {
+                final slot =
+                    context.tokens.slot(profileSlotIndex(m.id, views));
+                final base = names[m.id] ?? m.fullName;
+                // The pending mark is the hollow avatar, never "(pendente)"
+                // on the chip — the words stay for the screen reader.
+                final pending = m.isPendingMember;
+                return PersonChip(
+                  key: ValueKey('legend-member-${m.id}'),
+                  label: compact ? null : base,
+                  semanticsLabel:
+                      pending ? '$base ${l[KApp.calMemberPending]}' : base,
+                  background: slot.tone.container,
+                  border: slot.tone.border,
+                  ink: slot.tone.onContainer,
+                  onTap: onOpen == null ? null : () => onOpen!(m),
+                  avatar: MiniAvatar(
+                    key: ValueKey('legend-avatar-${m.id}'),
+                    diameter: PersonChip.avatarSize,
+                    letters: displayInitials(m.id, views),
+                    fill: pending
+                        ? Theme.of(context).colorScheme.surface
+                        : slot.tone.solid,
+                    ink: pending ? slot.tone.onContainer : slot.tone.onSolid,
+                    dashedRing: pending ? slot.tone.onContainer : null,
+                  ),
+                );
+              }),
+            if (showSwapKey)
+              _key(context,
+                  slot: context.tokens.swapped, label: swapLabel, dashed: true),
+          ],
+        );
+      }),
     );
+  }
+
+  /// The swap key's width — the [SlotPill] with [Spacing.sm] each side.
+  static double _swapKeyWidth(BuildContext context, String label) {
+    final painter = TextPainter(
+      text: TextSpan(
+          text: label, style: Theme.of(context).textTheme.labelSmall),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width + 2 * Spacing.sm + 2;
+    painter.dispose();
+    return width.ceilToDouble();
   }
 
   /// One key, as the web draws it: a pill in the carer's own colour with their
@@ -2512,12 +3911,21 @@ class _Legend extends StatelessWidget {
           {required SlotColors slot,
           required String label,
           bool dashed = false}) =>
-      SlotPill(slot: slot, label: label, height: rowHeight, dashed: dashed);
+      SlotPill(slot: slot, label: label, height: 22, dashed: dashed);
 }
 
 class _MonthGrid extends StatelessWidget {
   final DateTime month;
   final Map<String, CareSchedule> daysByIso;
+
+  /// F-07: *Todas* — the dates whose children are with different carers.
+  final Map<String, List<CareSchedule>> divergentByIso;
+
+  /// F-07: child id → first name, for the split cell's spoken label.
+  final Map<int, String> laneNames;
+
+  /// F-07: child id → avatar letters (`childInitials`).
+  final Map<int, String> laneInitials;
   final Map<String, SwapRequest> frozenByIso;
   final Map<String, List<ChildEvent>> agendaByIso;
   final int? ownProfileId;
@@ -2527,6 +3935,11 @@ class _MonthGrid extends StatelessWidget {
   final Set<String> selectedIso;
   final void Function(DateTime) onDayTap;
   final void Function(DateTime) onDayLongPress;
+
+  /// Owner's QA of 3.1.10: the finger moved while still pressing — over
+  /// [onDragSelect]'s day — and was lifted ([onDragEnd]).
+  final void Function(DateTime) onDragSelect;
+  final VoidCallback onDragEnd;
 
   /// What the PageView's box gives this month, in logical pixels. The cell
   /// height is derived from it and the number of weeks the month really has.
@@ -2541,6 +3954,9 @@ class _MonthGrid extends StatelessWidget {
   const _MonthGrid({
     required this.month,
     required this.daysByIso,
+    this.divergentByIso = const {},
+    this.laneNames = const {},
+    this.laneInitials = const {},
     required this.frozenByIso,
     this.agendaByIso = const {},
     required this.ownProfileId,
@@ -2550,6 +3966,8 @@ class _MonthGrid extends StatelessWidget {
     required this.selectedIso,
     required this.onDayTap,
     required this.onDayLongPress,
+    required this.onDragSelect,
+    required this.onDragEnd,
     required this.availableHeight,
     required this.emptyPrompt,
     required this.horizonNote,
@@ -2563,12 +3981,17 @@ class _MonthGrid extends StatelessWidget {
     if (frozen == null) return null;
     final awaitingMe = frozen.targetProfileId == ownProfileId;
     final overdue =
-        frozen.toView().priorityTag(DateTime.now()) == SwapPriorityTag.overdue;
+        frozen.toView().priorityTag(FamilyTime.now()) == SwapPriorityTag.overdue;
     if (awaitingMe) {
       return _FrozenMark(
         badge: Icons.notifications_active,
         overdue: overdue,
-        label: l[overdue ? K.calOverdueAwaitingYou : K.calAwaitingYou],
+        // U-63: a day with no handoff time is not "late" at 00:01.
+        label: l[!overdue
+            ? K.calAwaitingYou
+            : frozen.toView().dayStartedWithoutTime(FamilyTime.now())
+                ? KApp.calDayStartedAwaitingYou
+                : K.calOverdueAwaitingYou],
       );
     }
     String? targetName;
@@ -2694,9 +4117,56 @@ class _MonthGrid extends StatelessWidget {
     return widest;
   }
 
+  /// Owner's QA of 3.1.10 — the day under [position] in a grid of [size]:
+  /// seven columns 4 dp apart, rows [_daySpacing] apart. Off the grid it is
+  /// null — unless [clamp], for a drag, which stops at the month's first and
+  /// last day instead of leaving it.
+  DateTime? _dayAt(Offset position, Size size, double ratio, int blanksBefore,
+      int daysInMonth,
+      {bool clamp = false}) {
+    const gap = 4.0;
+    final cellWidth = (size.width - gap * 6) / 7;
+    final cellHeight = cellWidth / ratio;
+    var col = (position.dx / (cellWidth + gap)).floor();
+    final row = (position.dy / (cellHeight + _daySpacing)).floor();
+    if (!clamp && (col < 0 || col > 6 || row < 0)) return null;
+    col = col.clamp(0, 6);
+    var day = math.max(row, 0) * 7 + col - blanksBefore + 1;
+    if (day < 1 || day > daysInMonth) {
+      if (!clamp) return null;
+      day = day.clamp(1, daysInMonth);
+    }
+    return DateTime(month.year, month.month, day);
+  }
+
   Widget _grid(BuildContext context, double ratio, DayCellType type,
           int daysInMonth, int blanksBefore, String todayIso) =>
-      GridView.count(
+      // Owner's QA of 3.1.10: the long press belongs to the GRID, not to a
+      // cell — a cell's own press could not follow the finger into the next
+      // one. Press and drag paints the run; press alone picks the day. The
+      // cell keeps its semantic long press for screen readers.
+      Builder(
+        builder: (gridContext) {
+          Size size() => (gridContext.findRenderObject()! as RenderBox).size;
+          return GestureDetector(
+            // Each cell already says "double-tap and hold to select" (U-32);
+            // the grid's own press is for fingers, and as a node of its own
+            // it would read as an unlabelled button the size of the month.
+            excludeFromSemantics: true,
+            onLongPressStart: (d) {
+              final day = _dayAt(
+                  d.localPosition, size(), ratio, blanksBefore, daysInMonth);
+              if (day != null) onDayLongPress(day);
+            },
+            onLongPressMoveUpdate: (d) {
+              final day = _dayAt(
+                  d.localPosition, size(), ratio, blanksBefore, daysInMonth,
+                  clamp: true);
+              if (day != null) onDragSelect(day);
+            },
+            onLongPressEnd: (_) => onDragEnd(),
+            onLongPressCancel: onDragEnd,
+            child: GridView.count(
             crossAxisCount: 7,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -2712,6 +4182,11 @@ class _MonthGrid extends StatelessWidget {
                   date: DateTime(month.year, month.month, day),
                   day: daysByIso[CareSchedule.isoDate(
                       DateTime(month.year, month.month, day))],
+                  lanes: divergentByIso[CareSchedule.isoDate(
+                          DateTime(month.year, month.month, day))] ??
+                      const [],
+                  laneNames: laneNames,
+                  laneInitials: laneInitials,
                   frozenMark: _markFor(
                       frozenByIso[CareSchedule.isoDate(
                           DateTime(month.year, month.month, day))],
@@ -2730,7 +4205,10 @@ class _MonthGrid extends StatelessWidget {
                   onLongPress: onDayLongPress,
                 ),
             ],
+          ),
           );
+        },
+      );
 }
 
 /// U-40 — the sentence under an empty month. Two shapes, both decided in
@@ -2775,10 +4253,10 @@ class EmptyMonthStrip extends StatelessWidget {
                     style: style,
                   ),
                 ),
+                // U-61: the full 48 dp target (U-32) — a first run's only
+                // door to the wizard measured 40 dp under the compact density.
                 TextButton(
                   key: planKey,
-                  style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact),
                   onPressed: onPlan,
                   child: Text(l[K.calEmptyMonthPlan]),
                 ),
@@ -2834,6 +4312,12 @@ class _FrozenMark {
 class _DayCell extends StatelessWidget {
   final DateTime date;
   final CareSchedule? day;
+
+  /// F-07: on a divergent date of *Todas*, every child's row — the fill is
+  /// split between their carers' tones and the cell says who has whom.
+  final List<CareSchedule> lanes;
+  final Map<int, String> laneNames;
+  final Map<int, String> laneInitials;
   final _FrozenMark? frozenMark;
   final List<MemberView> views;
 
@@ -2851,6 +4335,9 @@ class _DayCell extends StatelessWidget {
   const _DayCell({
     required this.date,
     required this.day,
+    this.lanes = const [],
+    this.laneNames = const {},
+    this.laneInitials = const {},
     required this.frozenMark,
     required this.views,
     this.agenda = const [],
@@ -2937,6 +4424,31 @@ class _DayCell extends StatelessWidget {
           );
     final paint = dayPaint(assignment, views);
     final slot = _slotOf(context, paint);
+    final split = lanes.length > 1;
+    // F-07 (owner's QA, 29/09/2026): one COLUMN per distinct carer, in the
+    // children's order — the carer's avatar on top, the children's (neutral)
+    // below, so who has whom reads without a tap. `fitSplitCell` (core)
+    // sizes it all. Round 3: each column stands on its carer's light tone
+    // (a white cell read as "not planned"), under a neutral border.
+    final carers = <int, List<int?>>{};
+    for (final r in lanes) {
+      (carers[r.effectiveParentId] ??= []).add(r.childId);
+    }
+    LinearGradient? bands;
+    if (split) {
+      final tones = [
+        for (final id in carers.keys)
+          context.tokens.slot(profileSlotIndex(id, views)).tone.container,
+      ];
+      final n = tones.length;
+      // Hard stops: flat bands, not a blend.
+      bands = LinearGradient(
+        colors: [for (final t in tones) ...[t, t]],
+        stops: [
+          for (var i = 0; i < n; i++) ...[i / n, (i + 1) / n],
+        ],
+      );
+    }
     final initial = parentInitial(assignment, views);
     final assigned = paint is! DayUnassigned;
     // The swap wears a dashed border instead of the slot's solid one — the
@@ -2953,7 +4465,16 @@ class _DayCell extends StatelessWidget {
     // responsible, the swap and the handoff time are the whole calendar.
     String? responsibleName;
     final effectiveId = assignment?.effectiveParentId;
-    if (effectiveId != null) {
+    if (split) {
+      // F-07: "Lia com Ana; Theo com Bruno" — the split said aloud.
+      String nameOf(int id) =>
+          views.where((v) => v.id == id).firstOrNull?.fullName ?? '';
+      responsibleName = [
+        for (final r in lanes)
+          l.format(KApp.calLaneWith,
+              [laneNames[r.childId] ?? '', nameOf(r.effectiveParentId)]),
+      ].join('; ');
+    } else if (effectiveId != null) {
       for (final v in views) {
         if (v.id == effectiveId) {
           responsibleName = v.fullName;
@@ -3003,9 +4524,12 @@ class _DayCell extends StatelessWidget {
               borderRadius: BorderRadius.circular(Radii.md),
               color: isSelected
                   ? primary.withValues(alpha: 0.12)
-                  : assigned
-                      ? slot.tone.container
-                      : null,
+                  : split
+                      ? null
+                      : assigned
+                          ? slot.tone.container
+                          : null,
+              gradient: isSelected ? null : bands,
             ),
             // U-48: the border is a FOREGROUND decoration, so the ink below
             // fills the whole cell (a `decoration` border insets the child by
@@ -3021,7 +4545,7 @@ class _DayCell extends StatelessWidget {
                   : isToday
                       ? Border.all(color: tokens.text, width: 2.5)
                       : Border.all(
-                          color: assigned && !isSwapped
+                          color: assigned && !isSwapped && !split
                               ? slot.tone.border
                               : tokens.outline),
             ),
@@ -3039,13 +4563,13 @@ class _DayCell extends StatelessWidget {
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: () => onTap(date),
-                // U-11: the mobile entry point to bulk selection (web:
-                // 500 ms press).
-                onLongPress: () => onLongPress(date),
+                // U-11: the mobile entry point to bulk selection lives on the
+                // GRID since the owner's QA of 3.1.10 (press and drag); the
+                // semantic long press above stays for screen readers.
                 hoverColor: (assigned ? slot.tone.solid : tokens.text)
                     .withValues(alpha: _hoverAlpha),
                 child: CustomPaint(
-              painter: assigned
+              painter: assigned && !split
                   ? SlotPatternPainter(slot.pattern, slot.tone.border)
                   : null,
               // U-39: one clamp over the cell's texts, a no-op wherever the
@@ -3058,25 +4582,42 @@ class _DayCell extends StatelessWidget {
                     _numberLine(context, tokens,
                         assigned ? slot.tone.onContainer : null),
                     const SizedBox(height: DayCellType.gap),
-                    DayCellAvatar(
-                      radius: type.avatarRadius,
-                      color: assigned ? slot.tone.solid : Colors.transparent,
-                      child: Text(initial,
-                          style: TextStyle(
-                              fontSize: type.initial,
-                              height: 1,
-                              color: assigned
-                                  ? slot.tone.onSolid
-                                  : Theme.of(context).hintColor)),
-                    ),
+                    // F-07: the split day draws its columns in the avatar's
+                    // place — number and columns centred as one group, as
+                    // every other cell centres number and avatar (round 3).
+                    if (split)
+                      _SplitColumns(
+                        key: ValueKey('cell-split-${date.day}'),
+                        carers: carers,
+                        views: views,
+                        laneInitials: laneInitials,
+                        avatarDiameter: type.avatarRadius * 2,
+                      )
+                    else
+                      DayCellAvatar(
+                        radius: type.avatarRadius,
+                        color: assigned ? slot.tone.solid : Colors.transparent,
+                        child: Text(initial,
+                            style: TextStyle(
+                                fontSize: type.initial,
+                                height: 1,
+                                color: assigned
+                                    ? slot.tone.onSolid
+                                    : Theme.of(context).hintColor)),
+                      ),
                     // U-29 round 4 (owner): the same breath the date already
                     // gets above the avatar — without it the time sat glued to
                     // the initial. Gated, so a badge-less cell stays centred.
-                    if (frozenMark != null || day?.handoffTime != null)
+                    if (!split &&
+                        (frozenMark != null || day?.handoffTime != null))
                       const SizedBox(height: DayCellType.gap),
                     // Web parity: the frozen badge REPLACES the handoff badge.
                     // (U-29: its label rides the CELL's semantics node now.)
-                    if (frozenMark != null)
+                    // F-07: the split day has no room for a mark or a time
+                    // (they may differ per child); the tap shows both.
+                    if (split)
+                      const SizedBox.shrink()
+                    else if (frozenMark != null)
                       Container(
                         padding: frozenMark!.overdue
                             ? const EdgeInsets.symmetric(horizontal: 3)
@@ -3149,4 +4690,164 @@ class _DayCell extends StatelessWidget {
 
   /// Material 3's hover state layer: 8 % of the content colour.
   static const double _hoverAlpha = 0.08;
+}
+
+/// F-07 (owner's QA, 29/09/2026) — the split day's columns: one per carer,
+/// the carer's avatar on top and the children's below (a "+N" when they do
+/// not fit). Sized by `fitSplitCell` (core), whose floors are exception D
+/// of `no_tiny_text_test` — the letters here are under the U-48 floor on
+/// purpose, by the owner's decision, and ONLY here.
+class _SplitColumns extends StatelessWidget {
+  final Map<int, List<int?>> carers;
+  final List<MemberView> views;
+  final Map<int, String> laneInitials;
+  final double avatarDiameter;
+
+  const _SplitColumns({
+    super.key,
+    required this.carers,
+    required this.views,
+    required this.laneInitials,
+    required this.avatarDiameter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final surface = Theme.of(context).colorScheme.surface;
+    return LayoutBuilder(builder: (context, box) {
+      final entries = carers.entries.toList();
+      final width = box.maxWidth;
+      final fit = fitSplitCell(
+        width: width,
+        avatarDiameter: avatarDiameter,
+        childrenPerColumn: [for (final e in entries) e.value.length],
+      );
+      Widget child(String letters) => MiniAvatar(
+            diameter: fit.childDiameter,
+            letters: letters,
+            fill: surface,
+            ink: tokens.text,
+            ring: tokens.textMuted,
+            letterScale: SplitCellFit.childLetter,
+          );
+      // Each column is centred on its band. Round 3 (owner, iPhone SE with
+      // four carers): the carers' floor (14 dp) is wider than a quarter of a
+      // 46 dp cell, so they OVERLAP there, ringed in the surface colour so
+      // each circle stays whole — instead of the fourth falling off the edge.
+      final column = width / entries.length;
+      final overlapping = fit.carerDiameter > column;
+      final step = fit.childDiameter * (1 - SplitCellFit.overlap);
+      double left(double centre, double size) =>
+          (centre - size / 2).clamp(0.0, math.max(0.0, width - size));
+      return SizedBox(
+          width: width,
+          height: fit.carerDiameter + 2 + fit.childDiameter,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (final (i, e) in entries.indexed) ...() {
+                final centre = column * (i + 0.5);
+                final slot = tokens.slot(profileSlotIndex(e.key, views));
+                final count = fit.shown[i] + (fit.more[i] > 0 ? 1 : 0);
+                final start = left(
+                    centre, fit.childDiameter + (count - 1) * step);
+                return [
+                  Positioned(
+                    left: left(centre, fit.carerDiameter),
+                    top: 0,
+                    child: MiniAvatar(
+                      diameter: fit.carerDiameter,
+                      letters: displayInitials(e.key, views),
+                      fill: slot.tone.solid,
+                      ink: slot.tone.onSolid,
+                      ring: overlapping ? surface : null,
+                      letterScale: SplitCellFit.carerLetter,
+                    ),
+                  ),
+                  for (var k = 0; k < fit.shown[i]; k++)
+                    Positioned(
+                      left: start + k * step,
+                      top: fit.carerDiameter + 2,
+                      child: child(laneInitials[e.value[k]] ?? '?'),
+                    ),
+                  if (fit.more[i] > 0)
+                    Positioned(
+                      left: start + fit.shown[i] * step,
+                      top: fit.carerDiameter + 2,
+                      child: child('+${fit.more[i]}'),
+                    ),
+                ];
+              }(),
+            ],
+          ),
+      );
+    });
+  }
+}
+
+/// Owner's QA of 3.1.10 — the system strips the calendar queues, in order.
+enum _SystemStrip { pushToday, checklist, planEnd, handoffNudge }
+
+/// T-106: one month's own reads, as the cache keeps them.
+class _MonthData {
+  _MonthData({required this.rows, required this.frozen, required this.events});
+
+  final List<CareSchedule> rows;
+  final List<SwapRequest> frozen;
+  final List<ChildEvent> events;
+
+  /// The number of the load that read it — a newer read always wins.
+  int seq = 0;
+
+  /// The lane view last derived from it, and the lane it was derived for.
+  _MonthView? view;
+  String? viewKey;
+}
+
+/// T-106: the grid's four maps for one month in one lane.
+class _MonthView {
+  const _MonthView({
+    required this.days,
+    required this.divergent,
+    required this.agenda,
+    required this.frozen,
+  });
+
+  static const empty =
+      _MonthView(days: {}, divergent: {}, agenda: {}, frozen: {});
+
+  final Map<String, CareSchedule> days;
+  final Map<String, List<CareSchedule>> divergent;
+  final Map<String, List<ChildEvent>> agenda;
+  final Map<String, SwapRequest> frozen;
+}
+
+/// T-106: everything a full load reads that does not change with the month.
+class _ContextData {
+  const _ContextData({
+    required this.members,
+    required this.roles,
+    required this.ownProfile,
+    required this.upcoming,
+    required this.openInvitation,
+    required this.lastPlannedDay,
+    required this.children,
+    required this.yesterdayRows,
+    required this.pendingForMe,
+    required this.todayNotices,
+    required this.yesterdayRow,
+  });
+
+  final List<Member> members;
+  final List<Role> roles;
+  final Member? ownProfile;
+  final List<CareSchedule> upcoming;
+  final bool openInvitation;
+  final DateTime? lastPlannedDay;
+  final List<Child> children;
+  final List<CareSchedule> yesterdayRows;
+  final List<SwapRequest> pendingForMe;
+  final List<DayNotice> todayNotices;
+  final CareSchedule? yesterdayRow;
 }

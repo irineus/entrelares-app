@@ -1,0 +1,70 @@
+# T-98 — the Main store listing of `com.entrelares.app`, and ONLY from here.
+#
+# The name, short and full description live in `store/listing-pt-BR.txt` and
+# `store/listing-en-US.txt`, and the phone screenshots in
+# `store/screenshots/<lang>/phone-<n>.png`. They change in a PR; after the
+# merge the owner dispatches this workflow on `main` and approves the run on the
+# `play-production` Environment (required reviewer = owner, deployment branch =
+# `main`). Nothing is pasted in the Play Console any more (owner, 02/10/2026).
+#
+# Inputs (see `fastlane/Fastfile`, lane `android listing`):
+#   dry_run            — Play validates the whole edit and nothing is committed.
+#                        ON by default: run it first, read the summary, then
+#                        dispatch again with it off.
+#   upload_screenshots — also REPLACE each language's phone set with the PNGs in
+#                        store/screenshots/<lang>/. OFF by default: text only,
+#                        no image touched.
+#
+# A green run means the change was SENT: Google reviews a listing change before
+# it shows, and the Console's Publishing overview says when it is live.
+name: play-listing
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate with Play, commit nothing"
+        type: boolean
+        default: true
+      upload_screenshots:
+        description: "Also replace the phone screenshots with store/screenshots/<lang>/"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  listing:
+    # The Environment's branch rule already refuses any other ref; this `if`
+    # says so in the run list instead of as a rejected deployment.
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: play-production
+    timeout-minutes: 15
+    # The same group as `play-promote`: one Play edit from the owner's
+    # workflows at a time, never interrupted half-way.
+    concurrency:
+      group: play-production
+      cancel-in-progress: false
+    env:
+      PLAY_RELEASE_SERVICE_ACCOUNT: ${{ secrets.PLAY_RELEASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run without the service account
+        if: env.PLAY_RELEASE_SERVICE_ACCOUNT == ''
+        run: |
+          echo "::error::PLAY_RELEASE_SERVICE_ACCOUNT is missing from the play-production Environment (T-98)."
+          exit 1
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      # Inputs through the environment, never interpolated into the script.
+      - name: Publish the store listing
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          UPLOAD_SCREENSHOTS: ${{ inputs.upload_screenshots }}
+        run: >-
+          bundle exec fastlane android listing
+          "dry_run:$DRY_RUN" "upload_screenshots:$UPLOAD_SCREENSHOTS"

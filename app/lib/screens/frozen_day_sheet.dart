@@ -41,6 +41,9 @@ Future<FrozenDayOutcome?> showFrozenDaySheet({
   required int? ownProfileId,
   required CustodyDataSource dataSource,
   bool offline = false,
+  String? childName,
+  List<SwapRequest> siblings = const [],
+  VoidCallback? onViewDay,
 }) {
   return showAppSheet<FrozenDayOutcome>(
     context: context,
@@ -50,6 +53,9 @@ Future<FrozenDayOutcome?> showFrozenDaySheet({
       ownProfileId: ownProfileId,
       dataSource: dataSource,
       offline: offline,
+      childName: childName,
+      siblings: siblings,
+      onViewDay: onViewDay,
     ),
   );
 }
@@ -67,12 +73,27 @@ class _FrozenDaySheet extends StatefulWidget {
   /// honest "connect first".
   final bool offline;
 
+  /// F-07: whose day this is, in a per-child plan.
+  final String? childName;
+
+  /// F-07 (PR 4b): the same requester's OTHER pending swap requests to me for
+  /// this date, one per child — approved together from here.
+  final List<SwapRequest> siblings;
+
+  /// F-95: "Ver o dia" — the day this request froze, read-only (its agenda,
+  /// note and relatos were unreachable while the request waited). Null where
+  /// the caller has no day to show.
+  final VoidCallback? onViewDay;
+
   const _FrozenDaySheet({
     required this.request,
     required this.allProfiles,
     required this.ownProfileId,
     required this.dataSource,
     this.offline = false,
+    this.childName,
+    this.siblings = const [],
+    this.onViewDay,
   });
 
   @override
@@ -89,10 +110,28 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
   String? _pendingAction;
   String? _error;
 
+  /// F-95: the request is no longer open — answered, cancelled or
+  /// auto-approved since the push or the list was read. The panel says so
+  /// and offers nothing to act on.
+  bool _resolved = false;
+
   @override
   void initState() {
     super.initState();
     _approverNote = TextEditingController();
+    _refresh();
+  }
+
+  /// F-95: read the request again on open — a push from yesterday must not
+  /// offer "Aprovar" on a request the 48 h cron already approved.
+  Future<void> _refresh() async {
+    try {
+      final fresh = await widget.dataSource.fetchSwapRequest(widget.request.id);
+      if (!mounted || fresh == null) return;
+      if (fresh.status != 'pending' && fresh.status != 'revert_pending') {
+        setState(() => _resolved = true);
+      }
+    } catch (_) {/* the server still refuses a stale answer */}
   }
 
   @override
@@ -133,9 +172,17 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
       setState(() {
         _acting = false;
         _pendingAction = null;
-        _error = isSessionExpired(e.toString())
-            ? sessionExpiredMessage(l)
-            : l.format(errorKey, [e.toString()]);
+        final raw = e.toString();
+        // F-95: a request settled meanwhile is a state, not a failure; and no
+        // raw `PostgrestException(... P0001 ...)` ever reaches the reader.
+        if (isSwapAlreadyAnswered(raw)) {
+          _resolved = true;
+          _error = null;
+        } else {
+          _error = isSessionExpired(raw)
+              ? sessionExpiredMessage(l)
+              : translateSaveError(raw, l[errorKey], l);
+        }
       });
     }
   }
@@ -148,7 +195,7 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
     final iAmRequester = widget.ownProfileId == request.requestingProfileId;
     final iAmTarget = widget.ownProfileId == request.targetProfileId;
     // F-20: computed at render time — the panel always shows a pending request.
-    final tag = request.toView().priorityTag(DateTime.now());
+    final tag = request.toView().priorityTag(FamilyTime.now());
 
     final requesterName = _nameOf(request.requestingProfileId);
     final targetName = _nameOf(request.targetProfileId);
@@ -210,6 +257,7 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
       // U-31: the title is words only. The urgency it used to carry as an
       // emoji is the pinned notice below, which says it in a sentence.
       title: l[isRevert ? K.frozenRevertTitle : K.frozenSwapTitle],
+      subtitle: widget.childName,
       // U-25: a tap on a day opens this sheet or the day sheet, and both carry
       // the same visible way out — the reader cannot tell in advance which one
       // a day will open.
@@ -243,8 +291,12 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                   const SizedBox(width: Spacing.sm),
                   Flexible(
                     child: Text(
+                      // U-63: a day with no time "started", it is not late.
                       l[tag == SwapPriorityTag.overdue
-                          ? K.frozenOverdue
+                          ? (request.toView().dayStartedWithoutTime(
+                                  FamilyTime.now())
+                              ? KApp.frozenDayStarted
+                              : K.frozenOverdue)
                           : K.frozenUrgent],
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -255,7 +307,7 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                 ],
               ),
             ),
-      extraAction: widget.offline
+      extraAction: widget.offline || _resolved
           ? null
           : _actionRow(context, l,
           request: request,
@@ -265,10 +317,34 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
           targetName: targetName,
           actionButton: actionButton),
       children: [
+              // F-95: settled since this panel's data was read.
+              if (_resolved) ...[
+                AppBanner(
+                  key: const ValueKey('frozen-resolved'),
+                  tone: context.tokens.info,
+                  icon: Icons.task_alt,
+                  message: l[KApp.frozenAlreadyResolved],
+                ),
+                const SizedBox(height: Spacing.sm),
+              ],
               Text(
                   l.format(
                       K.frozenDay, [l.formatDate(request.scheduleDate)]),
                   style: Theme.of(context).textTheme.bodyMedium),
+              // F-95: the day itself — its agenda, note and relatos — read-only.
+              if (widget.onViewDay != null)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    key: const ValueKey('frozen-view-day'),
+                    icon: const Icon(Icons.event_note_outlined),
+                    label: Text(l[KApp.frozenViewDay]),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      widget.onViewDay!();
+                    },
+                  ),
+                ),
               const SizedBox(height: Spacing.sm),
               // U-28 QA: the request's facts in their own panel. Loose on the
               // sheet, a label on the left and its value on the right had
@@ -303,9 +379,10 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                     // (`expiry + 48h`, the F-24 anchor) and never a window
                     // measured from the request — which is what the old
                     // "em 24h" copy described and no request ever had.
+                    // U-63: said as a person says it — "sábado, 10/10, à 0h".
                     infoRow(
                         K.frozenAutoApproval,
-                        l.formatDateTime(autoApprovalDeadline(
+                        l.formatFamilyDeadline(autoApprovalDeadline(
                             request.scheduleDate,
                             request.proposedHandoffTime))),
                   ],
@@ -357,8 +434,94 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
       bool destructive,
     }) actionButton,
   }) {
+    if (iAmTarget && !isRevert && widget.siblings.isNotEmpty) {
+      // F-07 (PR 4b): every child's request of this day, approved in one tap
+      // — each one still through its own two-party workflow.
+      final all = [request, ...widget.siblings];
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton(
+            key: const ValueKey('frozen-approve-all'),
+            onPressed: _acting
+                ? null
+                : () => _run('approve-all', K.errApproveFailed, () async {
+                      // S-25: each answer is atomic on the server, and one
+                      // already settled (approved on a first attempt, or
+                      // cancelled meanwhile) is skipped — so a failure half
+                      // way can simply be tapped again.
+                      for (final r in all) {
+                        try {
+                          await widget.dataSource.approveSwap(r.id,
+                              approvalNote: _note,
+                              allProfiles: widget.allProfiles);
+                        } on SwapAlreadyAnswered {
+                          continue;
+                        }
+                      }
+                      return FrozenDayOutcome.approved;
+                    }),
+            child: _pendingAction == 'approve-all'
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(l.format(KApp.frozenApproveAll, [all.length])),
+          ),
+          const SizedBox(height: 8),
+          _targetRow(context, l,
+              request: request, isRevert: isRevert, actionButton: actionButton),
+        ],
+      );
+    }
     if (iAmTarget) {
-      return Row(
+      return _targetRow(context, l,
+          request: request, isRevert: isRevert, actionButton: actionButton);
+    }
+    if (iAmRequester) {
+      return actionButton(
+                  actionKey: 'cancel',
+                  labelKey:
+                      isRevert ? K.frozenCancelRevert : K.frozenCancelRequest,
+                  destructive: true,
+                  onPressed: () => _run(
+                      'cancel',
+                      isRevert ? K.errCancelRevertFailed : K.errCancelFailed,
+                      () async {
+                        if (isRevert) {
+                          await widget.dataSource.cancelRevert(request.id,
+                              allProfiles: widget.allProfiles);
+                          return FrozenDayOutcome.revertCancelled;
+                        }
+                        await widget.dataSource.cancelSwap(request.id,
+                            allProfiles: widget.allProfiles);
+                        return FrozenDayOutcome.cancelled;
+                      }),
+      );
+    }
+    return Text(
+      l.format(K.frozenObserver, [targetName ?? l[K.calOtherCaregiver]]),
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.bodySmall,
+    );
+  }
+
+  /// Approve / reject for the request's target.
+  Widget _targetRow(
+    BuildContext context,
+    Localization l, {
+    required SwapRequest request,
+    required bool isRevert,
+    required Widget Function({
+      required String actionKey,
+      required String labelKey,
+      required VoidCallback onPressed,
+      bool filled,
+      bool destructive,
+    }) actionButton,
+  }) {
+    return Row(
                   children: [
                     Expanded(
                       child: isRevert
@@ -420,32 +583,5 @@ class _FrozenDaySheetState extends State<_FrozenDaySheet> {
                     ),
                   ],
                 );
-    }
-    if (iAmRequester) {
-      return actionButton(
-                  actionKey: 'cancel',
-                  labelKey:
-                      isRevert ? K.frozenCancelRevert : K.frozenCancelRequest,
-                  destructive: true,
-                  onPressed: () => _run(
-                      'cancel',
-                      isRevert ? K.errCancelRevertFailed : K.errCancelFailed,
-                      () async {
-                        if (isRevert) {
-                          await widget.dataSource.cancelRevert(request.id,
-                              allProfiles: widget.allProfiles);
-                          return FrozenDayOutcome.revertCancelled;
-                        }
-                        await widget.dataSource.cancelSwap(request.id,
-                            allProfiles: widget.allProfiles);
-                        return FrozenDayOutcome.cancelled;
-                      }),
-      );
-    }
-    return Text(
-      l.format(K.frozenObserver, [targetName ?? l[K.calOtherCaregiver]]),
-      textAlign: TextAlign.center,
-      style: Theme.of(context).textTheme.bodySmall,
-    );
   }
 }

@@ -22,7 +22,10 @@ export interface StorePurchase {
 	/** Milliseconds since epoch, as a string — Google's own shape. */
 	expiryTimeMillis?: string;
 	startTimeMillis?: string;
-	/** 0 = payment received, 1 = free trial, 2 = pending deferred, 3 = pending. */
+	/** Google's codes: 0 = payment pending, 1 = payment received, 2 = free trial,
+	 * 3 = pending deferred upgrade/downgrade. (F-80's "first paid payment"
+	 * counts a verification only at 1 — `isPurchaseLive` below already reads 0
+	 * as pending.) */
 	paymentState?: number;
 	/** 1 = canceled by user, 0 = ... see the API docs; absent = not canceled. */
 	cancelReason?: number;
@@ -172,6 +175,55 @@ export function purchaseExpiry(purchase: StorePurchase): string | null {
 	return Number.isFinite(expiry) && expiry > 0
 		? new Date(expiry).toISOString()
 		: null;
+}
+
+/** What a deferral answered: Play's new expiry, or its refusal as-is. */
+export type DeferOutcome =
+	| { ok: true; newExpiryTimeMillis: string }
+	| { ok: false; status: number; body: string };
+
+/**
+ * F-80 — moves a subscription's expiry (and so its next charge) from
+ * [expectedExpiryMs] to [desiredExpiryMs]: `purchases.subscriptions.defer`.
+ *
+ * `expectedExpiryTimeMillis` is Google's own optimistic lock — a deferral
+ * computed from a stale expiry is refused instead of applied twice — which is
+ * what lets the caller reconcile an attempt whose answer it never saw.
+ *
+ * The call needs the "Manage orders and subscriptions" permission on the
+ * service account in the Play Console; without it Google answers 401/403 and
+ * this returns that status for the caller to record. Only a network failure
+ * throws (the outcome is then UNKNOWN, never "refused").
+ */
+export async function deferStorePurchase(
+	packageName: string,
+	productId: string,
+	purchaseToken: string,
+	expectedExpiryMs: string,
+	desiredExpiryMs: string,
+): Promise<DeferOutcome> {
+	const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/` +
+		`${encodeURIComponent(packageName)}/purchases/subscriptions/` +
+		`${encodeURIComponent(productId)}/tokens/${encodeURIComponent(purchaseToken)}:defer`;
+
+	const response = await fetch(url, {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${await playAccessToken()}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			deferralInfo: {
+				expectedExpiryTimeMillis: expectedExpiryMs,
+				desiredExpiryTimeMillis: desiredExpiryMs,
+			},
+		}),
+	});
+	if (!response.ok) {
+		return { ok: false, status: response.status, body: (await response.text()).slice(0, 2000) };
+	}
+	const answer = await response.json() as { newExpiryTimeMillis?: string };
+	return { ok: true, newExpiryTimeMillis: answer.newExpiryTimeMillis ?? desiredExpiryMs };
 }
 
 /** Play reports money in micros; the ledger and the UI speak cents. */

@@ -270,6 +270,66 @@ void expenseTests(GateFixture fx) {
           () => fam.admin.from('expense_reminders').select('id'));
     });
 
+    // F-93: the payment carries the payer's reference and the receiver's
+    // comment — trimmed, empty is none, capped like the description; the
+    // builds in Production call both RPCs WITHOUT them and keep working (the
+    // helpers above do exactly that).
+    test('F-93: reference and comment ride the payment, old calls still work',
+        () async {
+      Future<Map<String, dynamic>> row(int id) async => (await fx.service
+              .from('expense_settlements')
+              .select()
+              .eq('id', id)
+              .limit(1))
+          .single;
+
+      // The member owes 400 open here (the 800 above, 400 still waiting).
+      final refused = await fam.member.rpc<dynamic>('request_settlement',
+          params: {
+            'p_child_id': null,
+            'p_to': fam.adminProfile.id,
+            'p_amount': 100,
+            'p_reference': '  PIX-E2E-1 ',
+          }) as int;
+      expect((await row(refused))['reference'], 'PIX-E2E-1');
+      await fam.admin.rpc<dynamic>('answer_settlement', params: {
+        'p_id': refused,
+        'p_received': false,
+        'p_note': '  chegou só uma parte ',
+      });
+      final r = await row(refused);
+      expect(r['status'], 'rejected');
+      expect(r['answer_note'], 'chegou só uma parte');
+
+      await expectRejected(
+          () => fam.member.rpc<dynamic>('request_settlement', params: {
+                'p_child_id': null,
+                'p_to': fam.adminProfile.id,
+                'p_amount': 50,
+                'p_reference': 'x' * 201,
+              }),
+          contains: 'no máximo');
+
+      final blank = await fam.member.rpc<dynamic>('request_settlement',
+          params: {
+            'p_child_id': null,
+            'p_to': fam.adminProfile.id,
+            'p_amount': 50,
+            'p_reference': '   ',
+          }) as int;
+      await fam.admin.rpc<dynamic>('answer_settlement',
+          params: {'p_id': blank, 'p_received': true, 'p_note': ''});
+      final b = await row(blank);
+      expect(b['reference'], isNull);
+      expect(b['answer_note'], isNull);
+      expect(b['status'], 'confirmed');
+
+      // The columns are not a side door: no client writes them.
+      await expectRejected(() => fam.member
+          .from('expense_settlements')
+          .update({'answer_note': 'x'}).eq('id', refused));
+    });
+
     test('the expense notice reaches the participants, never the actor',
         () async {
       final n = await fx.service

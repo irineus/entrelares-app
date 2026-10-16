@@ -1,12 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretKey } from "../_shared/keys.ts";
-import { internalCallHeaders, isSecretKeyCaller } from "../_shared/auth.ts";
+import { isSecretKeyCaller } from "../_shared/auth.ts";
 
 // Scheduled (cron) Edge Function — F-24.
-// Calls the auto_approve_expired() RPC (which sends 24h reminders and auto-approves
-// requests expired for 48h, applying the calendar change + in-app notifications) and
-// dispatches the resulting e-mails by reusing the send-swap-email function.
+// Calls the auto_approve_expired() RPC, which sends the 24h reminders and
+// auto-approves requests expired for 48h, applying the calendar change and
+// writing the in-app notifications — the push follows from their trigger.
+//
+// F-59 (02/10/2026): it used to dispatch an e-mail twin of each through
+// send-swap-email. The reminder and the auto-approval are push + in-app only
+// now, so the rows the RPC returns are only counted.
 //
 // Not browser-invoked, so no CORS handling is needed. Trigger it on a schedule
 // (pg_cron -> net.http_post, or the Supabase cron scheduler), e.g. hourly.
@@ -36,27 +40,9 @@ serve(async (req: Request) => {
     }
 
     const rows = (data ?? []) as { swap_request_id: number; email_type: string }[];
-    console.log(`[auto-approve-expired] rpc processed ${rows.length} request(s) needing e-mail`);
+    console.log(`[auto-approve-expired] rpc processed ${rows.length} request(s)`);
 
-    // Reuse send-swap-email for the actual delivery (templates + Resend live there).
-    const results = await Promise.allSettled(
-      rows.map((r) =>
-        fetch(`${supabaseUrl}/functions/v1/send-swap-email`, {
-          method: "POST",
-          headers: internalCallHeaders(serviceKey),
-          body: JSON.stringify({
-            swapRequestId: r.swap_request_id,
-            emailType: r.email_type,
-            environmentPrefix: envPrefix,
-          }),
-        })
-      )
-    );
-
-    const failed = results.filter((x) => x.status === "rejected").length;
-    console.log(`[auto-approve-expired] done — emails attempted=${rows.length} failed=${failed}`);
-
-    return json({ processed: rows.length, emailsFailed: failed });
+    return json({ processed: rows.length });
   } catch (err) {
     console.error("[auto-approve-expired] unhandled error:", err);
     return json({ error: String(err) }, 500);

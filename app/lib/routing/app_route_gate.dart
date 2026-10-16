@@ -55,7 +55,9 @@ class AppRouteGate {
       if (!isLeaving() &&
           consentState() == ConsentGateState.blocked &&
           matchedLocation != FamilyLifecycleRules.policyUpdateRoute &&
-          matchedLocation != RouteRules.login) {
+          matchedLocation != RouteRules.login &&
+          // F-89: Help stays reachable from the consent block.
+          matchedLocation != RouteRules.help) {
         return FamilyLifecycleRules.policyUpdateRoute;
       }
     }

@@ -14,6 +14,26 @@ final _en = Localization(AppLanguage.en);
 final _today = DateTime(2026, 8, 19);
 
 void main() {
+  // F-100: press the first day, tap the last.
+  group('selectionRange', () {
+    test('inclusive, in either order, across months', () {
+      final r = selectionRange(DateTime(2026, 12, 30), DateTime(2027, 1, 2));
+      expect(r, [
+        DateTime(2026, 12, 30),
+        DateTime(2026, 12, 31),
+        DateTime(2027, 1, 1),
+        DateTime(2027, 1, 2),
+      ]);
+      expect(selectionRange(DateTime(2027, 1, 2), DateTime(2026, 12, 30)), r);
+    });
+    test('never past the planning horizon', () {
+      expect(
+          selectionRange(DateTime(2026, 10, 1), DateTime(2026, 10, 9),
+              horizon: DateTime(2026, 10, 3)),
+          [DateTime(2026, 10, 1), DateTime(2026, 10, 2), DateTime(2026, 10, 3)]);
+    });
+  });
+
   group('bulkSummary (mirror of BulkSummaryTests)', () {
     test('all parts joined with the middle dot', () {
       expect(

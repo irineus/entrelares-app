@@ -1,0 +1,1 @@
+Ajuste visual: o lembrete para ativar as notificações, no topo do calendário, ficou mais compacto e não empurra mais o mês para baixo em celulares menores.

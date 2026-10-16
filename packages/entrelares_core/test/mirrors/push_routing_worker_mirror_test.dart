@@ -58,6 +58,14 @@ void main() {
 
   late List<String> actionableKindsInJs;
   late List<String> chatInJs;
+  late List<String> planInJs;
+  late List<String> familyInJs;
+  late List<String> planFirstKindsInJs;
+  late List<String> adminChangeTypesInJs;
+  late List<String> adminChangeDayKindsInJs;
+  late List<String> adminChangeTrailKindsInJs;
+  late List<String> expenseInJs;
+  late List<String> agendaInJs;
 
   setUp(() {
     worker = repoFile(_worker);
@@ -78,12 +86,73 @@ void main() {
       RegExp(r'const CHAT_TYPES = \[([^\]]*)\]'),
       _worker,
     );
+    // F-77: the third destination — not a tab, the plan page.
+    planInJs = _stringList(
+      worker,
+      RegExp(r'const PLAN_TYPES = \[([^\]]*)\]'),
+      _worker,
+    );
+    planFirstKindsInJs = _stringList(
+      worker,
+      RegExp(r'const PLAN_FIRST_KINDS = \[([^\]]*)\]'),
+      _worker,
+    );
+    // F-101: the fourth destination — the Família page.
+    familyInJs = _stringList(
+      worker,
+      RegExp(r'const FAMILY_TYPES = \[([^\]]*)\]'),
+      _worker,
+    );
+    // F-81: an admin's direct change — one day opens it, several open the
+    // Histórico.
+    adminChangeTypesInJs = _stringList(
+      worker,
+      RegExp(r'const ADMIN_CHANGE_TYPES = \[([^\]]*)\]'),
+      _worker,
+    );
+    adminChangeDayKindsInJs = _stringList(
+      worker,
+      RegExp(r'const ADMIN_CHANGE_DAY_KINDS = \[([^\]]*)\]'),
+      _worker,
+    );
+    adminChangeTrailKindsInJs = _stringList(
+      worker,
+      RegExp(r'const ADMIN_CHANGE_TRAIL_KINDS = \[([^\]]*)\]'),
+      _worker,
+    );
+    // U-65: Despesas, and the agenda's day.
+    expenseInJs = _stringList(
+      worker,
+      RegExp(r'const EXPENSE_TYPES = \[([^\]]*)\]'),
+      _worker,
+    );
+    agendaInJs = _stringList(
+      worker,
+      RegExp(r'const AGENDA_TYPES = \[([^\]]*)\]'),
+      _worker,
+    );
   });
 
   /// What the JS would decide for a payload, read from the worker's own lists.
   NotificationLanding jsLanding(String type, String? kind) =>
       chatInJs.contains(type)
           ? NotificationLanding.chat
+          : expenseInJs.contains(type)
+          ? NotificationLanding.expenses
+          : agendaInJs.contains(type)
+          ? NotificationLanding.day
+          : planInJs.contains(type)
+          ? NotificationLanding.plan
+          : familyInJs.contains(type)
+          ? NotificationLanding.family
+          : type == 'plan_ending' && planFirstKindsInJs.contains(kind)
+          ? NotificationLanding.planFirst
+          : adminChangeTypesInJs.contains(type) &&
+              adminChangeDayKindsInJs.contains(kind)
+          ? NotificationLanding.day
+          : adminChangeTypesInJs.contains(type) &&
+              adminChangeTrailKindsInJs.contains(kind)
+          ? NotificationLanding.auditTrail
           : actionableInJs.contains(type) ||
               (type == 'day_notice' && actionableKindsInJs.contains(kind))
           ? NotificationLanding.incoming
@@ -111,6 +180,9 @@ void main() {
       'cancelled',
       'helping',
       'keeping',
+      ...planFirstKindsInJs,
+      ...adminChangeDayKindsInJs,
+      ...adminChangeTrailKindsInJs,
     ];
 
     for (final type in pushTypes) {
@@ -170,6 +242,29 @@ void main() {
     expect(worker, contains('/notifications'));
     expect(worker, contains('tab='));
     expect(worker, contains('n='));
+  });
+
+  // F-81: the two addresses the worker opens instead of a Notificações tab
+  // are the ones the app's routes READ — `/?day=` on `/` (main.dart, consumed
+  // once) and `tab=history` on `/reports`.
+  test('F-81 · the worker opens the day and the Histórico the app reads', () {
+    expect(worker, contains('/?day=\${data.date}'));
+    expect(worker, contains('/reports?tab=history'));
+    // F-101: the Família page, for an expired invitation.
+    expect(worker, contains("'/family'"));
+    // U-65: Despesas, the route main.dart declares.
+    expect(worker, contains("'/expenses'"));
+    expect(repoFile('app/lib/main.dart'), contains("path: '/expenses'"));
+    expect(PushRouting.expenseTypes.toSet(), expenseInJs.toSet());
+    expect(PushRouting.agendaTypes.toSet(), agendaInJs.toSet());
+    final main = repoFile('app/lib/main.dart');
+    expect(main, contains("queryParameters['day']"));
+    expect(main, contains("'/reports'"));
+    expect(main, contains("queryParameters['tab'] == 'history'"));
+    expect(PushRouting.adminChangeDayKinds.toSet(),
+        adminChangeDayKindsInJs.toSet());
+    expect(PushRouting.adminChangeTrailKinds.toSet(),
+        adminChangeTrailKindsInJs.toSet());
   });
 
   test('the click handler is installed before the SDK takes the event', () {

@@ -28,11 +28,15 @@ class PolicyUpdateScreen extends StatefulWidget {
 
   final Future<void> Function() onSignOut;
 
+  /// F-89: "Ajuda e contato", reachable from the consent block.
+  final VoidCallback? onHelp;
+
   const PolicyUpdateScreen({
     super.key,
     required this.dataSource,
     required this.onAccepted,
     required this.onSignOut,
+    this.onHelp,
   });
 
   @override
@@ -208,9 +212,19 @@ class _PolicyUpdateScreenState extends State<PolicyUpdateScreen> {
                 Text(l[K.policyDeclineSuffix],
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall),
-                Text('privacidade@entrelares.app',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall),
+                // F-89: the address is a door, not a string to copy.
+                TextButton(
+                  key: const ValueKey('policy-privacy-mail'),
+                  onPressed: () => launchUrl(
+                      Uri(scheme: 'mailto', path: SupportRules.privacyEmail)),
+                  child: Text(SupportRules.privacyEmail),
+                ),
+                if (widget.onHelp != null)
+                  TextButton(
+                    key: const ValueKey('policy-help'),
+                    onPressed: widget.onHelp,
+                    child: Text(l[KApp.helpLoginLink]),
+                  ),
               ],
             ),
           ),

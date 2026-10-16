@@ -34,9 +34,15 @@ const double _spacing = 3;
 /// Saturday, which is six rows.
 const int _worstRows = 6;
 
+/// The fixture's frozen day: the 1st, unless TODAY is the 1st. It used to be
+/// the 1st outright, so on every 1st of the month today's cell was frozen,
+/// carried no handoff time, and the whole U-39 group failed on `find.text`
+/// (01/10/2026) — the same defect F-59 fixed in the accessibility fixture.
+int get _frozenDay => cal.today.day == 1 ? 2 : 1;
+
 /// U-39 — a month with the two things a cell can carry under the avatar: a
 /// handoff time on today's cell (the one that also wears the widest ring) and
-/// a frozen mark on the 1st. Off by default so the U-28 tests keep pumping
+/// a frozen mark on another day. Off by default so the U-28 tests keep pumping
 /// the empty month they were written against.
 Future<void> _pump(WidgetTester tester, Size size,
     {double scale = 1.0,
@@ -54,7 +60,7 @@ Future<void> _pump(WidgetTester tester, Size size,
         ? [cal.row(1, cal.dayOfMonth(cal.today.day), 1, handoffTime: '18:00')]
         : const [],
   );
-  if (withMarks) ds.frozenRequests = [frz.swapReq(10, cal.dayOfMonth(1))];
+  if (withMarks) ds.frozenRequests = [frz.swapReq(10, cal.dayOfMonth(_frozenDay))];
   // F-70: the one seeded day is a mark to measure, not a plan ending today —
   // without this the plan-end strip takes the height the cell is measured in.
   if (withMarks) ds.lastPlannedDayOverride = cal.today.add(const Duration(days: 365));
@@ -208,7 +214,11 @@ void main() {
     testWidgets('at 1.3× the 76 dp cell keeps the comfortable step, unclamped',
         (tester) async {
       await _pump(tester, const Size(360, 740), scale: 1.3, withMarks: true);
-      expect(_cellHeight(tester), _cellCeiling);
+      // F-98 (owner, 05/10/2026): the Hoje card offers "Avisar" to whoever may
+      // send one today — the reader of this scene — and that 48 dp row costs
+      // the cell 0.6 dp here, the price U-28 taught us to count and the owner
+      // chose to pay. The step must not change.
+      expect(_cellHeight(tester), closeTo(_cellCeiling, 1.0));
       expect(_timeFontSize(tester), DayCellType.comfortable.time);
       // The clamp is a no-op here: the reader's scale reaches the text.
       expect(_paintedScaleOf(tester, find.text('18:00')), closeTo(1.3, 1e-9));

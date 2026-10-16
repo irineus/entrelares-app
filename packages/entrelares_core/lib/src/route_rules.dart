@@ -112,8 +112,11 @@ abstract final class RouteRules {
         // F-57: a profile-less session is confined to the onboarding screen —
         // the S-11 leaving confinement's shape, for the opposite end of the
         // account's life.
+        // F-89: and to Help — the "não consigo entrar" F-68 was built for.
         AuthPhase.onboarding =>
-            location == onboarding || isVerify(location) ? null : onboarding,
+            location == onboarding || isVerify(location) || location == help
+                ? null
+                : onboarding,
         AuthPhase.authed =>
             anonymousOnlyRoutes.contains(location) ? home : null,
       };

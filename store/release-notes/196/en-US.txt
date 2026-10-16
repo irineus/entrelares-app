@@ -1,0 +1,1 @@
+Payment history: if you subscribe through Google Play, each payment now shows up there with its amount, along with the cancellation, the refund and the end of the subscription, just as it already did for Pix and card payments. The receipt is still the e-mail Google sends you.

@@ -107,22 +107,30 @@ void main() {
       expect(find.text('Bruno (Pai)'), findsOne);
     });
 
-    testWidgets('planned and actual are the realized-day reading',
+    // F-96 (owner, 05/10/2026): planned and actual on ONE horizon, until
+    // today; what is planned ahead is its own line.
+    testWidgets('planned until today beside actual, the rest apart',
         (tester) async {
       await pumpSummary(tester, source());
 
-      expect(find.text(l[K.sumPlanned]), findsNWidgets(2));
-      // Ana: planned 15,16,17,20 = 4 · actual 15,16 = 2 (the 17th went away).
-      expect(find.text(l.format(K.sumDaysMany, [4])), findsOne);
-      // "2 dias" three times: Ana's actual, and Bruno's planned (18,21) and
-      // actual (the 17th he received, plus the 18th).
-      expect(find.text(l.format(K.sumDaysMany, [2])), findsNWidgets(3));
-      // U-07 split — given and received are their own paired stats now
-      // (U-29 F29). Ana gave the 17th; Bruno received it.
+      expect(find.text(l[KApp.sumPlannedToDate]), findsNWidgets(2));
+      expect(find.text(l[KApp.sumPlannedRemaining]), findsNWidgets(2));
+      // Ana: planned to date 15,16,17 = 3 · actual 15,16 = 2 · ahead 20 = 1.
+      // Bruno: planned to date 18 = 1 · actual 17,18 = 2 · ahead 21 = 1.
+      expect(find.text(l.format(K.sumDaysMany, [3])), findsOne);
+      expect(find.text(l.format(K.sumDaysMany, [2])), findsNWidgets(2));
+      // "1 dia": Bruno's planned to date, both "restante", Ana's given and
+      // Bruno's received (the 17th).
+      expect(find.text(l.format(K.sumDaysOne, [1])), findsNWidgets(5));
       expect(find.text(l[K.sumGiven]), findsNWidgets(2));
       expect(find.text(l[K.sumReceived]), findsNWidgets(2));
-      expect(find.text(l.format(K.sumDaysOne, [1])), findsNWidgets(2));
       expect(find.text(l.format(K.sumDaysMany, [0])), findsNWidgets(2));
+    });
+
+    testWidgets('an accepted swap still ahead is counted apart', (tester) async {
+      await pumpSummary(tester, source());
+      expect(find.byKey(const ValueKey('summary-future-accepted')), findsOne);
+      expect(find.text(l.format(KApp.sumFutureAccepted, [1])), findsOne);
     });
 
     testWidgets('the projected row appears only with the U-20 toggle on',
@@ -151,8 +159,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Bruno gave the 21st away, Ana received it — on top of the 17th:
-      // all four give/receive stats now read one day each.
-      expect(find.text(l.format(K.sumDaysOne, [1])), findsNWidgets(4));
+      // all four give/receive stats now read one day each (plus F-96's
+      // planned-to-date and the two "restante" lines).
+      expect(find.text(l.format(K.sumDaysOne, [1])), findsNWidgets(7));
+      expect(find.byKey(const ValueKey('summary-future-accepted')), findsNothing,
+          reason: 'with the projection on, the future swap is in the total');
     });
   });
 
@@ -232,7 +243,8 @@ void main() {
 
       expect(find.text(en[K.sumSubtitle]), findsOne);
       expect(find.text('Ana (Mother)'), findsOne);
-      expect(find.text(en.format(K.sumDaysMany, [4])), findsOne);
+      expect(find.text(en.format(K.sumDaysMany, [3])), findsOne);
+      expect(find.text(en[KApp.sumPlannedToDate]), findsNWidgets(2));
     });
   });
 

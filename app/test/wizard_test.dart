@@ -22,11 +22,22 @@ final pt = Localization(AppLanguage.ptBr);
 
 /// U-36: the wizard is an item of the calendar's ⋮ menu — two taps, both by
 /// the text a person reads, never by the icon.
-Future<void> openWizard(WidgetTester tester) async {
+Future<void> openWizard(WidgetTester tester, {bool free = true}) async {
   await tester.tap(find.byTooltip(pt[K.calActionsMenu]));
   await tester.pumpAndSettle();
   await tester.tap(find.text(pt[K.calWizard]));
   await tester.pumpAndSettle();
+  // Owner's QA of 3.1.14: the wizard opens on the alternating weekends
+  // (anchored on a Friday). These tests were written against a FREE start —
+  // they pick 7/7 first, as a reader would.
+  if (free) {
+    await tester.ensureVisible(find.byKey(const Key('wizPreset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('wizPreset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(pt[K.wizPreset77]).last);
+    await tester.pumpAndSettle();
+  }
 }
 
 /// U-55: "Gerar" needs an answer about the handoff time. The flows that are
@@ -297,19 +308,182 @@ void f51ReplaceTests() {
     expect(find.text(pt[K.wizGenerate]), findsOneWidget);
   });
 
-  testWidgets('F-51: an empty range asks nothing and still goes through the '
-      'replace path', (tester) async {
+  // F-97 (owner, 05/10/2026): an empty range has nothing to replace, so the
+  // box is not offered (it read as noise on a first plan). The F-51 replace
+  // path itself is pinned by the tests above, on ranges that hold days.
+  testWidgets('F-97: an empty range offers no "substituir"', (tester) async {
     final ds = FakeCustodyDataSource(members: [anaAdmin, bruno], days: []);
     await tester.pumpWidget(app(ds, adminMode: AdminMode()..toggle()));
     await tester.pumpAndSettle();
 
     await openWizard(tester);
-    await tapReplaceCheckbox(tester);
+    expect(find.byKey(const Key('wizReplaceExisting')), findsNothing);
+    await generate(tester);
+    expect(ds.replacedRanges, isEmpty);
+    expect(find.textContaining('dias criados'), findsOneWidget);
+  });
+
+  // F-97: continuing a plan — D-1 is read, the cycle turns, and the first
+  // generated day is a transition with its handoff.
+  testWidgets('F-97: a plan that ends on Ana continues with Bruno, and the '
+      'first day gets the handoff', (tester) async {
+    final yesterday = DateTime(today.year, today.month, today.day - 1);
+    final ds = FakeCustodyDataSource(
+        members: [ana, bruno], days: [row(1, yesterday, ana.id)]);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester);
+
+    expect(find.byKey(const Key('wizContinues')), findsOneWidget);
+    expect(find.text(pt.format(KApp.wizContinues, ['Ana'])), findsOneWidget);
+    await pickTime(tester, find.byKey(const Key('wizHandoff')), hour: 18);
     await generate(tester);
 
-    expect(find.text(pt[K.editorYesChange]), findsNothing);
-    expect(ds.replacedRanges, hasLength(1));
-    expect(find.textContaining('dias criados'), findsOneWidget);
-    expect(find.textContaining('do plano anterior'), findsNothing);
+    final first = ds.inserted
+        .where((d) => d.scheduleDate == dateOnly(today))
+        .single;
+    expect(first.scheduledParentId, bruno.id,
+        reason: 'Ana had yesterday: the 7/7 continues with Bruno');
+    expect(first.handoffTime, isNotNull,
+        reason: 'D-1 was Ana, so today is a real transition');
+  });
+
+  testWidgets('F-97: "Fins de semana alternados" moves the start to a Friday '
+      'and says so', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester);
+    await tester.ensureVisible(find.byKey(const Key('wizPreset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('wizPreset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(pt[KApp.wizPreset311]).last);
+    await tester.pumpAndSettle();
+
+    final friday = snapToWeekday(dateOnly(today), DateTime.friday);
+    if (friday != dateOnly(today)) {
+      expect(find.byKey(const Key('wizAnchoredStart')), findsOneWidget);
+    }
+    await generate(tester);
+    final first = ds.inserted
+        .reduce((a, b) => a.scheduleDate.isBefore(b.scheduleDate) ? a : b);
+    expect(first.scheduleDate, friday);
+    expect(first.scheduledParentId, bruno.id,
+        reason: 'p2 has the first weekend');
+  });
+
+  // Owner's QA of 3.1.10 (06/10/2026).
+  Future<void> pickPreset(WidgetTester tester, String label) async {
+    await tester.ensureVisible(find.byKey(const Key('wizPreset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('wizPreset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(label).last);
+    await tester.pumpAndSettle();
+  }
+
+  List<String> shownDays(WidgetTester tester) => [
+        for (final f in tester.widgetList<TextField>(find.byWidgetPredicate(
+            (w) => w is TextField && w.decoration?.labelText == pt[K.wizDays])))
+          f.controller!.text
+      ];
+
+  testWidgets('a quick model SHOWS its own numbers in the blocks — the 7 and '
+      '7 of the default never stay on screen under another model',
+      (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester);
+    expect(shownDays(tester), ['7', '7']);
+    await pickPreset(tester, pt[KApp.wizPreset311]);
+    expect(shownDays(tester), ['3', '11']);
+    await pickPreset(tester, pt[K.wizPreset1414]);
+    expect(shownDays(tester), ['14', '14']);
+  });
+
+  testWidgets('changing WHO is in a block keeps the quick model; the person '
+      'moves in every block of theirs', (tester) async {
+    const carla =
+        Member(id: 3, fullName: 'Carla Dias', colorSlot: 3, userId: 'u3');
+    final ds = FakeCustodyDataSource(members: [ana, bruno, carla], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester);
+    await pickPreset(tester, pt[KApp.wizPreset311]);
+
+    // Block 1 is Bruno's weekend: Carla takes it.
+    final parent = find.byType(DropdownButtonFormField<int>).first;
+    await tester.ensureVisible(parent);
+    await tester.pumpAndSettle();
+    await tester.tap(parent);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Carla').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text(pt[KApp.wizPreset311]), findsOneWidget,
+        reason: 'the model keeps its name');
+    expect(find.text(pt[K.wizPresetCustom]), findsNothing);
+    expect(shownDays(tester), ['3', '11']);
+
+    await generate(tester);
+    expect(ds.inserted.map((d) => d.scheduledParentId).toSet(),
+        {ana.id, carla.id});
+    final first = ds.inserted
+        .reduce((a, b) => a.scheduleDate.isBefore(b.scheduleDate) ? a : b);
+    expect(first.scheduledParentId, carla.id);
+  });
+
+  testWidgets('changing the days still makes the model "Personalizado"',
+      (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester);
+    await pickPreset(tester, pt[KApp.wizPreset311]);
+    final days = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == pt[K.wizDays]);
+    await tester.ensureVisible(days.first);
+    await tester.enterText(days.first, '4');
+    await tester.pumpAndSettle();
+    expect(find.text(pt[K.wizPresetCustom]), findsOneWidget);
+  });
+
+  testWidgets('the wizard opens on the alternating weekends, first in the '
+      'list, and 7/7 gives the asked-for start back', (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester, free: false);
+    expect(find.text(pt[KApp.wizPreset311]), findsOneWidget);
+    expect(shownDays(tester), ['3', '11']);
+    final friday = snapToWeekday(dateOnly(today), DateTime.friday);
+    expect(find.text(pt.formatDate(friday)), findsOneWidget);
+
+    await pickPreset(tester, pt[K.wizPreset77]);
+    expect(find.text(pt.formatDate(dateOnly(today))), findsOneWidget,
+        reason: 'a free model starts on the day asked for, not the Friday');
+  });
+
+  // Owner's QA of 3.1.14: 2-2-5-5 only gives each parent fixed weekdays and
+  // alternating weekends when its first five-day block starts on a Wednesday;
+  // 2/2/3 is Mon-Tue / Wed-Thu / Fri-Sun from a Monday.
+  testWidgets('5/2/2/5 starts on a Wednesday and 2/2/3 on a Monday',
+      (tester) async {
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+    await openWizard(tester);
+    await pickPreset(tester, pt[K.wizPreset5225]);
+    expect(
+        find.text(pt.formatDate(
+            snapToWeekday(dateOnly(today), DateTime.wednesday))),
+        findsOneWidget);
+    await pickPreset(tester, pt[K.wizPreset223]);
+    expect(
+        find.text(
+            pt.formatDate(snapToWeekday(dateOnly(today), DateTime.monday))),
+        findsOneWidget);
   });
 }

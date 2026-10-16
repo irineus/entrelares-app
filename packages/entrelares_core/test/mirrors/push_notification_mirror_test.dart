@@ -161,6 +161,46 @@ void main() {
       }
     });
 
+    // F-59 — the membership types carry receipts and news under ONE type
+    // (`account_deletion` is also the leaver's own confirmation; `family_deletion`
+    // is also the requester's own receipt and the answers addressed to them).
+    // Only the wordings about someone else may ring a phone, and the line is
+    // drawn twice: the dispatcher filters by `kind`, and renderPush refuses any
+    // other kind on its own.
+    test('a membership notice pushes only the kinds about someone else', () {
+      final trigger = _dispatcherMigration();
+      expect(trigger, contains("IS DISTINCT FROM 'other_left'"),
+          reason: "the dispatcher lets the leaver's own confirmation ring.");
+      expect(
+          trigger,
+          contains("NOT IN ('requested_other', 'refused', 'withdrawn', "
+              "'reminder')"),
+          reason: 'the dispatcher lets a family_deletion receipt ring.');
+      expect(trigger, contains('latest.resolved_by = NEW.recipient_profile_id'),
+          reason: 'whoever refused or withdrew would be pushed their own act.');
+
+      final source = _pushSource();
+      final body = source.substring(
+          source.indexOf('function renderMembership('),
+          source.indexOf('export interface PushCopy'));
+      for (final kind in ['requested_other', 'refused', 'withdrawn', 'reminder']) {
+        expect(body, contains('case "$kind":'),
+            reason: 'family_deletion `$kind` reaches renderPush with no copy.');
+      }
+      expect(body, contains('kind !== "other_left"'));
+      for (final receipt in [
+        'self',
+        'self_last',
+        'requested_self',
+        'agreed',
+        'agreement_undone',
+      ]) {
+        expect(body, isNot(contains('"$receipt"')),
+            reason: '`$receipt` is a receipt or an answer to the requester — '
+                'it must stay in-app.');
+      }
+    });
+
     // F-52 — the assertion that exists because its defect SHIPPED, twice, and
     // was silent both times.
     //
@@ -208,6 +248,16 @@ void main() {
       expect(source, contains('if (date === null) return null;'),
           reason: 'renderPush must drop a payload with no day rather than push '
               'a sentence with a hole in it.');
+    });
+
+    // F-07 (PR 5b): the push heading names the child exactly as the in-app
+    // one does (`NotificationRenderer.withChild`): " · " + the trimmed name,
+    // nothing when the stamp is absent or blank.
+    test('push.ts appends params.child to the title like withChild', () {
+      final src = _pushSource();
+      expect(src, contains('const child = (params["child"] ?? "").trim();'));
+      expect(src, contains('const lane = child === "" ? "" : ` · \${child}`;'));
+      expect(src, contains('fmt(lang, titleKey) + lane'));
     });
   });
 }

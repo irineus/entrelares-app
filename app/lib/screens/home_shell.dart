@@ -133,6 +133,12 @@ class HomeShell extends StatelessWidget {
   /// about the whole app. Listened to for the reason [deletionBanner] gives.
   final ValueListenable<InstallHintBanner?>? installHint;
 
+  /// Owner's QA of 3.1.10: true while the calendar shows one of its system
+  /// strips. On the calendar tab the shell's offers wait ("Abrir no app", the
+  /// Play invitation, the install hint) — one strip at a time. A deletion
+  /// scheduled, admin mode and the offline strip are states, never held.
+  final ValueListenable<bool>? calendarStripShowing;
+
   /// T-18: the "Sem conexão · dados de HH:mm" strip. Above every tab because
   /// connectivity is a fact about the app, and because the calendar is not the
   /// only screen whose data stops being current. Listened to for the reason
@@ -170,6 +176,7 @@ class HomeShell extends StatelessWidget {
       this.appHandoff,
       this.playInvite,
       this.installHint,
+      this.calendarStripShowing,
       this.connectivity,
       this.tourKeys,
       this.expensesTab,
@@ -182,7 +189,7 @@ class HomeShell extends StatelessWidget {
       body: ListenableBuilder(
         listenable: Listenable.merge(
             [adminMode, deletionBanner, appHandoff, playInvite, installHint,
-            connectivity]),
+            connectivity, calendarStripShowing]),
         builder: (context, _) {
           // T-18 device measurement (14/09/2026): every strip here wrapped
           // itself in a SafeArea, AND the tab below still received the status
@@ -191,9 +198,11 @@ class HomeShell extends StatelessWidget {
           // visible strip takes the inset now, and the tab loses it whenever
           // any strip is showing (two strips used to take it twice as well).
           final deletion = deletionBanner?.value;
-          final handoff = appHandoff?.value;
-          final invite = playInvite?.value;
-          final install = installHint?.value;
+          final holdOffers = shell.currentIndex == 0 &&
+              (calendarStripShowing?.value ?? false);
+          final handoff = holdOffers ? null : appHandoff?.value;
+          final invite = holdOffers ? null : playInvite?.value;
+          final install = holdOffers ? null : installHint?.value;
           final offline = connectivity?.value;
           final showsOffline = offline?.offline ?? false;
           final adminTop = adminMode.isActive;
@@ -348,19 +357,15 @@ class HomeShell extends StatelessWidget {
                         _bellIcon(const Icon(Icons.notifications_outlined), l),
                     selectedIcon:
                         _bellIcon(const Icon(Icons.notifications), l),
-                    tooltip: badge.count > 0
-                        ? l.format(
-                            badge.count == 1
-                                ? K.navNotificationsOnePending
-                                : K.navNotificationsManyPending,
-                            [badge.count])
-                        : null,
+                    tooltip: _bellLabel(l),
                     label: commLabel),
                 if (withExpenses)
                   NavigationDestination(
                       key: const ValueKey('nav-expenses'),
-                      icon: const Icon(Icons.receipt_long_outlined),
-                      selectedIcon: const Icon(Icons.receipt_long),
+                      icon: _expensesIcon(
+                          const Icon(Icons.receipt_long_outlined), l),
+                      selectedIcon:
+                          _expensesIcon(const Icon(Icons.receipt_long), l),
                       label: l[KApp.expenseNav]),
                 NavigationDestination(
                     icon: const Icon(Icons.bar_chart_outlined),
@@ -599,14 +604,47 @@ class HomeShell extends StatelessWidget {
   /// U-32 (TalkBack, 18/09/2026): the badge's text was its own node, so the
   /// reader heard "2" and then "Notificações". The count rides as the sentence the
   /// tooltip already carries, and the bare number leaves the tree.
+  /// F-90: the sentence names BOTH numbers the badge adds up — pending
+  /// requests and unread Conversa texts. It named only the first, so a
+  /// reader heard "nothing pending" over a badge showing 3.
+  String? _bellLabel(Localization l) {
+    final parts = <String>[
+      if (badge.count > 0)
+        l.format(
+            badge.count == 1
+                ? K.navNotificationsOnePending
+                : K.navNotificationsManyPending,
+            [badge.count])
+      else if (badge.chatUnread > 0)
+        l[K.navNotifications],
+      if (badge.chatUnread > 0)
+        badge.chatUnread == 1
+            ? l[KApp.chatNewOne]
+            : l.format(KApp.chatNewMany, [badge.chatUnread]),
+    ];
+    return parts.isEmpty ? null : parts.join(', ');
+  }
+
+  /// U-65: settle-ups waiting for my "Recebi / Não recebi", on the tab where
+  /// the answer is — they used to be counted nowhere.
+  Widget _expensesIcon(Icon icon, Localization l) {
+    final n = badge.settlementsToConfirm;
+    return Semantics(
+      label: n > 0
+          ? l.format(KApp.expenseNavPending, [l[KApp.expenseNav], n])
+          : l[KApp.expenseNav],
+      excludeSemantics: true,
+      child: Badge(
+        key: const ValueKey('nav-expenses-badge'),
+        isLabelVisible: n > 0,
+        label: Text(bellBadgeText(n)),
+        child: icon,
+      ),
+    );
+  }
+
   Widget _bellIcon(Icon icon, Localization l) => Semantics(
-        label: badge.count > 0
-            ? l.format(
-                badge.count == 1
-                    ? K.navNotificationsOnePending
-                    : K.navNotificationsManyPending,
-                [badge.count])
-            : null,
+        label: _bellLabel(l),
         excludeSemantics: true,
         child: Badge(
           // F-35: requests waiting on me plus unread Conversa texts.

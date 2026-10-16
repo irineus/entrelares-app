@@ -38,6 +38,7 @@ import 'package:entrelares_app/services/admin_mode.dart';
 import 'package:entrelares_app/services/analytics_service.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
+import 'package:entrelares_app/widgets/today_card.dart';
 
 class FakeCustodyDataSource implements CustodyDataSource {
   /// T-78: set by a test that asserts an event fired from a sheet.
@@ -60,6 +61,10 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Object? throwOnWrite;
   void Function()? realtimeCallback;
   int monthFetches = 0;
+
+  /// T-106: every month read, in order — a swipe reads only the month, and
+  /// the neighbours are read ahead.
+  final List<(int, int)> monthReads = [];
 
   FakeCustodyDataSource({required this.members, required this.days});
 
@@ -190,6 +195,16 @@ class FakeCustodyDataSource implements CustodyDataSource {
     reactivateCalls++;
   }
 
+  int overdueInvoiceCalls = 0;
+  String overdueInvoice = 'https://sandbox.asaas.com/i/overdue';
+
+  @override
+  Future<String> overdueInvoiceUrl() async {
+    if (throwOnBillingAction != null) throw throwOnBillingAction!;
+    overdueInvoiceCalls++;
+    return overdueInvoice;
+  }
+
   @override
   Future<void> updateOwnLanguage(int profileId, String languageCode) async {}
 
@@ -200,6 +215,7 @@ class FakeCustodyDataSource implements CustodyDataSource {
   @override
   Future<List<CareSchedule>> fetchMonth(int year, int month) async {
     monthFetches++;
+    monthReads.add((year, month));
     return days
         .where((d) =>
             d.scheduleDate.year == year && d.scheduleDate.month == month)
@@ -207,9 +223,10 @@ class FakeCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<CareSchedule?> fetchDay(DateTime date) async {
+  Future<CareSchedule?> fetchDay(DateTime date, {int? childId}) async {
     for (final d in days) {
-      if (CareSchedule.isoDate(d.scheduleDate) == CareSchedule.isoDate(date)) {
+      if (CareSchedule.isoDate(d.scheduleDate) == CareSchedule.isoDate(date) &&
+          d.childId == childId) {
         return d;
       }
     }
@@ -240,8 +257,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<ScheduleRangeResult> clearScheduleRange(
-      DateTime from, DateTime to) async {
+  Future<ScheduleRangeResult> clearScheduleRange(DateTime from, DateTime to,
+      {int? childId}) async {
     if (throwOnWrite != null) throw throwOnWrite!;
     clearedRanges.add((from: from, to: to));
     final removed = _dropRange(from, to);
@@ -251,16 +268,19 @@ class FakeCustodyDataSource implements CustodyDataSource {
 
   /// U-55: every call to the range handoff write, in order.
   final handoffRanges = <({DateTime from, DateTime? to, String time})>[];
+  final handoffRangeChildren = <int?>[];
 
   /// U-55: the server's rule, played on the fake's rows — transition days
   /// from [from] on (never before today) that have no time get it.
   @override
   Future<HandoffRangeResult> setHandoffTimeRange(
-      DateTime from, DateTime? to, HandoffTime time) async {
+      DateTime from, DateTime? to, HandoffTime time,
+      {int? childId}) async {
     if (throwOnWrite != null) throw throwOnWrite!;
     final wire = '${time.hour.toString().padLeft(2, '0')}:'
         '${time.minute.toString().padLeft(2, '0')}:00';
     handoffRanges.add((from: from, to: to, time: wire));
+    handoffRangeChildren.add(childId);
     final floor = from.isBefore(dateOnly(today)) ? dateOnly(today) : from;
     final byIso = {for (final d in days) CareSchedule.isoDate(d.scheduleDate): d};
     var updated = 0, existing = 0;
@@ -294,7 +314,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
 
   @override
   Future<ScheduleRangeResult> replaceScheduleRange(
-      DateTime from, DateTime to, List<CareSchedule> newDays) async {
+      DateTime from, DateTime to, List<CareSchedule> newDays,
+      {int? childId}) async {
     if (throwOnWrite != null) throw throwOnWrite!;
     replacedRanges.add((from: from, to: to, days: newDays));
     final removed = _dropRange(from, to);
@@ -345,6 +366,33 @@ class FakeCustodyDataSource implements CustodyDataSource {
   // ── Lote 3: swap workflow ──────────────────────────────────────────────────
 
   List<SwapRequest> frozenRequests = [];
+
+  /// F-95: the approved request behind a swapped day, by ISO date.
+  Map<String, SwapRequest> daySwapOrigins = {};
+
+  /// F-95: what a fresh read of one request answers; unset ids fall back to
+  /// the open lists (so a test that never sets it sees the request as open).
+  Map<int, SwapRequest?> swapRequestsById = {};
+
+  @override
+  Future<SwapRequest?> fetchDaySwapOrigin(DateTime date, {int? childId}) async =>
+      daySwapOrigins[CareSchedule.isoDate(date)];
+
+  /// F-96: the activity logs a swap request's base write produced.
+  Set<int> swapBaseLogIds = {};
+
+  @override
+  Future<Set<int>> fetchSwapBaseLogIds(List<int> logIds) async =>
+      {for (final id in logIds) if (swapBaseLogIds.contains(id)) id};
+
+  @override
+  Future<SwapRequest?> fetchSwapRequest(int id) async {
+    if (swapRequestsById.containsKey(id)) return swapRequestsById[id];
+    for (final r in [...frozenRequests, ...pendingForMe, ...sentRequests]) {
+      if (r.id == id) return r;
+    }
+    return null;
+  }
   List<SwapRequest> pendingForMe = [];
   List<SwapRequest> sentRequests = [];
   List<AppNotification> notifications = [];
@@ -391,6 +439,11 @@ class FakeCustodyDataSource implements CustodyDataSource {
       'handoff': proposedHandoffTime,
       'message': requestMessage,
       'requester': myProfile.id,
+      'scheduleId': schedule.id,
+      'childId': schedule.childId,
+      // F-85: the snapshot the revert replays is the log of a base write made
+      // just before the request.
+      'baseWritten': updated.any((u) => u.id == schedule.id),
     });
   }
 
@@ -398,8 +451,15 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Future<void> approveSwap(int swapRequestId,
       {String? approvalNote, required List<Member> allProfiles}) async {
     if (throwOnWrite != null) throw throwOnWrite!;
+    if (alreadyAnswered.contains(swapRequestId)) {
+      throw const SwapAlreadyAnswered(
+          'Esta solicitação já foi respondida e não está mais pendente.');
+    }
     approvedSwaps.add((id: swapRequestId, note: approvalNote));
   }
+
+  /// S-25: requests the server reports as answered another way.
+  Set<int> alreadyAnswered = {};
 
   @override
   Future<void> rejectSwap(int swapRequestId,
@@ -424,6 +484,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
     bool restoreNotes = false,
     required Member myProfile,
     required List<Member> allProfiles,
+    int? childId,
+    int? scheduleId,
   }) async {
     if (throwOnWrite != null) throw throwOnWrite!;
     revertRequests.add({
@@ -433,6 +495,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
       'message': requestMessage,
       'restoreNotes': restoreNotes,
       'requester': myProfile.id,
+      'childId': childId,
+      'scheduleId': scheduleId,
     });
   }
 
@@ -458,8 +522,31 @@ class FakeCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate) async =>
+  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate,
+          {int? childId}) async =>
       preEditNotes;
+
+  // ── F-07 ──
+  /// Every `set_schedule_mode` call, as (mode, baseChildId).
+  final List<(String, int?)> scheduleModeCalls = [];
+
+  @override
+  Future<int> setScheduleMode(String mode, {int? baseChildId}) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    scheduleModeCalls.add((mode, baseChildId));
+    final current = family;
+    if (current != null) {
+      family = Family(
+        id: current.id,
+        name: current.name,
+        plan: current.plan,
+        trialEndsAt: current.trialEndsAt,
+        compPremiumAt: current.compPremiumAt,
+        scheduleMode: mode,
+      );
+    }
+    return days.length;
+  }
 
   // ── F-67 ──
   /// Every relato the fake knows about; [addDayAccount] appends to it the way
@@ -711,9 +798,71 @@ class FakeCustodyDataSource implements CustodyDataSource {
   final List<Map<String, Object?>> signUps = [];
   final List<Map<String, Object?>> inviteeRegistrations = [];
 
+  /// F-80: what `referral_enabled` answers (dark by default, like prod).
+  bool referralEnabled = false;
+  int referralEnabledFetches = 0;
+
+  /// F-80: what `attribute_referral` answers, and the calls it received.
+  String? attributeAnswer = 'attributed';
+  final List<Map<String, String>> attributions = [];
+
   @override
-  Future<InviteInfo?> fetchInviteInfo(String token) async =>
-      InviteFormRules.isTokenShaped(token) ? inviteInfo : null;
+  Future<bool> fetchReferralEnabled() async {
+    referralEnabledFetches++;
+    return referralEnabled;
+  }
+
+  @override
+  Future<String?> attributeReferral(
+      {required String code, required String channel}) async {
+    attributions.add({'code': code, 'channel': channel});
+    return attributeAnswer;
+  }
+
+  /// F-80 PR 2: what `my_referral_code` answers, and how often it was asked.
+  /// The fake answers like the server: nothing while the flag is off.
+  String? myReferralCode = 'ABCDEFGH23';
+  int referralCodeFetches = 0;
+
+  @override
+  Future<String?> fetchMyReferralCode() async {
+    referralCodeFetches++;
+    if (publicSettings['feature.referral'] != 'true') return null;
+    return myReferralCode;
+  }
+
+  @override
+  Future<InviteInfo?> fetchInviteInfo(String token) async {
+    inviteLookups++;
+    // F-88: a lookup the server never answered.
+    if (inviteUnreachableTimes > 0) {
+      inviteUnreachableTimes--;
+      throw const InviteUnreachable();
+    }
+    return InviteFormRules.isTokenShaped(token) ? inviteInfo : null;
+  }
+
+  int inviteLookups = 0;
+  int inviteUnreachableTimes = 0;
+
+  /// F-88: what `invite_token_status` answers, and the founder's offer.
+  String inviteTokenStatus = 'unusable';
+  PendingInvitationOffer? pendingInvitation;
+  final List<String> joinedFromEmptyFamily = [];
+
+  @override
+  Future<String> fetchInviteTokenStatus(String token) async =>
+      inviteTokenStatus;
+
+  @override
+  Future<PendingInvitationOffer?> fetchMyPendingInvitation() async =>
+      pendingInvitation;
+
+  @override
+  Future<void> joinInvitationFromEmptyFamily(String token) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    joinedFromEmptyFamily.add(token);
+  }
 
   @override
   Future<void> signUpFounder({
@@ -723,13 +872,21 @@ class FakeCustodyDataSource implements CustodyDataSource {
     required String role,
     required String familyName,
     required String languageCode,
+    String? referralCode,
+    String? referralChannel,
+    Acquisition? acquisition,
+    String? childFirstName,
   }) async {
     signUps.add({
+      'acquisition': acquisition,
+      'childFirstName': childFirstName,
       'email': email,
       'fullName': fullName,
       'role': role,
       'familyName': familyName,
       'language': languageCode,
+      'referralCode': referralCode,
+      'referralChannel': referralChannel,
     });
     if (signUpFailureKey != null) throw SignUpFailure(signUpFailureKey!);
   }
@@ -784,8 +941,12 @@ class FakeCustodyDataSource implements CustodyDataSource {
     required String fullName,
     required String role,
     required String familyName,
+    Acquisition? acquisition,
+    String? childFirstName,
   }) async {
     onboardings.add({
+      'acquisition': acquisition,
+      'childFirstName': childFirstName,
       'fullName': fullName,
       'role': role,
       'familyName': familyName,
@@ -863,6 +1024,19 @@ class FakeCustodyDataSource implements CustodyDataSource {
     if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
     createdInvitations
         .add({'email': email, 'roleId': roleId, 'profileId': profileId});
+    // F-101: the renewed row is what the page re-reads and shares; the fake
+    // keeps the resend semantics (the old open one is gone).
+    invitations = [
+      for (final i in invitations) if (i.email != email) i,
+      FamilyInvitation(
+        id: 42,
+        email: email,
+        roleId: roleId,
+        token: 'renewed-0000-0000-0000-000000000042',
+        expiresAt: DateTime.now().toUtc().add(const Duration(days: 7)),
+        profileId: profileId,
+      ),
+    ];
     return 42;
   }
 
@@ -1170,9 +1344,17 @@ class FakeCustodyDataSource implements CustodyDataSource {
     attestWrites.add('revoke:$id');
   }
 
+  /// F-96: the verify page's read fails this many times, then answers.
+  int verifyFailures = 0;
+
   @override
-  Future<Map<String, dynamic>> verifyReportAttestation(String id) async =>
-      verifyAnswer;
+  Future<Map<String, dynamic>> verifyReportAttestation(String id) async {
+    if (verifyFailures > 0) {
+      verifyFailures--;
+      throw Exception('offline');
+    }
+    return verifyAnswer;
+  }
 
   // ── F-35: the family's Conversa ──
   List<ChatMessage> chatMessages = [];
@@ -1188,10 +1370,33 @@ class FakeCustodyDataSource implements CustodyDataSource {
   int chatActorId = 1;
 
   @override
-  Future<List<ChatMessage>> fetchChatMessages() async => chatMessages;
+  Future<List<ChatMessage>> fetchChatPage({int? beforeId}) async {
+    final older = [
+      for (final m in chatMessages)
+        if (beforeId == null || m.id < beforeId) m
+    ]..sort((a, b) => a.id.compareTo(b.id));
+    return older.length <= chatPageSize
+        ? older
+        : older.sublist(older.length - chatPageSize);
+  }
 
   @override
-  Future<List<ChatRead>> fetchChatReads() async => chatReads;
+  Future<List<ChatMessage>> fetchChatMessagesAfter(int afterId) async =>
+      [for (final m in chatMessages) if (m.id > afterId) m]
+        ..sort((a, b) => a.id.compareTo(b.id));
+
+  @override
+  Future<List<ChatMessage>> fetchChatMessagesForPeriod(
+          DateTime fromUtc, DateTime toUtcExclusive) async =>
+      chatMessages;
+
+  @override
+  Future<List<ChatMessage>> fetchChatMessagesByIds(List<int> ids) async =>
+      [for (final m in chatMessages) if (ids.contains(m.id)) m];
+
+  @override
+  Future<List<ChatRead>> fetchChatReads(List<int> messageIds) async =>
+      [for (final r in chatReads) if (messageIds.contains(r.messageId)) r];
 
   /// The chat channel's listener, so a test can deliver a change.
   void Function()? chatListener;
@@ -1268,6 +1473,15 @@ class FakeCustodyDataSource implements CustodyDataSource {
     chatWrites.add('mute:$muted');
     chatPushMuted = muted;
   }
+
+  /// S-27: the Conversa push preview switch.
+  bool chatPushPreview = false;
+
+  @override
+  Future<bool> fetchChatPushPreview() async => chatPushPreview;
+
+  @override
+  Future<void> setChatPushPreview(bool on) async => chatPushPreview = on;
 
   // ── F-34: shared expenses ──
   List<Expense> expenses = [];
@@ -1389,10 +1603,12 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Future<int> requestSettlement(
       {int? childId,
       required int toProfileId,
-      required int amountCents}) async {
+      required int amountCents,
+      String? reference}) async {
     if (throwOnExpenseWrite != null) throw throwOnExpenseWrite!;
     final id = _nextExpenseId++;
-    expenseWrites.add('settle:$toProfileId:$amountCents');
+    expenseWrites.add('settle:$toProfileId:$amountCents'
+        '${reference == null ? '' : ':$reference'}');
     settlements = [
       ExpenseSettlement(
           id: id,
@@ -1401,7 +1617,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
           toProfile: toProfileId,
           amountCents: amountCents,
           status: 'pending',
-          createdAt: DateTime.utc(2026, 9, 24)),
+          createdAt: DateTime.utc(2026, 9, 24),
+          reference: reference),
       ...settlements
     ];
     return id;
@@ -1415,6 +1632,17 @@ class FakeCustodyDataSource implements CustodyDataSource {
     expenseWrites.add('remind:$toProfileId');
   }
 
+  /// F-102: the gates the page asked the admins about, in order.
+  final List<String> premiumAsks = [];
+  Object? throwOnPremiumAsk;
+
+  @override
+  Future<int> requestPremiumFromAdmin({required String gate}) async {
+    if (throwOnPremiumAsk != null) throw throwOnPremiumAsk!;
+    premiumAsks.add(gate);
+    return 1;
+  }
+
   /// The expense channel's listener, so a test can deliver a change.
   void Function()? expenseListener;
 
@@ -1425,7 +1653,8 @@ class FakeCustodyDataSource implements CustodyDataSource {
     return () => expenseListener = null;
   }
 
-  ExpenseSettlement _withStatus(ExpenseSettlement s, String status) =>
+  ExpenseSettlement _withStatus(ExpenseSettlement s, String status,
+          {String? note}) =>
       ExpenseSettlement(
           id: s.id,
           childId: s.childId,
@@ -1434,15 +1663,21 @@ class FakeCustodyDataSource implements CustodyDataSource {
           amountCents: s.amountCents,
           status: status,
           createdAt: s.createdAt,
-          answeredAt: DateTime.utc(2026, 9, 24));
+          answeredAt: DateTime.utc(2026, 9, 24),
+          reference: s.reference,
+          answerNote: note);
 
   @override
-  Future<void> answerSettlement(int id, {required bool received}) async {
+  Future<void> answerSettlement(int id,
+      {required bool received, String? note}) async {
     if (throwOnExpenseWrite != null) throw throwOnExpenseWrite!;
-    expenseWrites.add('answer:$id:$received');
+    expenseWrites
+        .add('answer:$id:$received${note == null ? '' : ':$note'}');
     settlements = [
       for (final s in settlements)
-        s.id == id ? _withStatus(s, received ? 'confirmed' : 'rejected') : s
+        s.id == id
+            ? _withStatus(s, received ? 'confirmed' : 'rejected', note: note)
+            : s
     ];
   }
 
@@ -1836,6 +2071,16 @@ class FakeCustodyDataSource implements CustodyDataSource {
   /// Keyed on the token alone: this fake serves one profile, and the server's
   /// own answer for another profile's device is `false` either way — RLS hides
   /// the row, so there is nothing to model.
+  /// F-59: what [fetchPushReach] answers — no device anywhere, nothing
+  /// unread, unless a scene says otherwise.
+  bool accountHasPush = false;
+  DateTime? newestUnreadAt;
+
+  @override
+  Future<({bool accountHasPush, DateTime? newestUnreadAt})> fetchPushReach(
+          int myProfileId) async =>
+      (accountHasPush: accountHasPush, newestUnreadAt: newestUnreadAt);
+
   @override
   Future<bool> isDeviceRegistered({
     required int myProfileId,
@@ -1867,7 +2112,9 @@ CareSchedule row(int id, DateTime date, int scheduled,
 Widget app(FakeCustodyDataSource ds,
         {AppLanguage language = AppLanguage.ptBr,
         AdminMode? adminMode,
-        AnalyticsService? analytics}) =>
+        AnalyticsService? analytics,
+        void Function(MemberLinkTarget target, int memberId)? onOpenMember,
+        VoidCallback? onOpenChat}) =>
     AppL10n(
       l: Localization(language),
       setLanguage: (_) async {},
@@ -1876,9 +2123,18 @@ Widget app(FakeCustodyDataSource ds,
           dataSource: ds,
           adminMode: adminMode ?? AdminMode(),
           analytics: analytics,
+          // F-07: the legend's chips are tappable in the app, so they are
+          // measured as targets here too (the U-32 gate reads this app).
+          onOpenMember: onOpenMember ?? (_, _) {},
+          onOpenChat: onOpenChat,
         ),
       ),
     );
+
+/// A letter in the month grid only: since F-07 the legend's chips wear the
+/// carers' initials too, so a bare find.text('A') would read the legend.
+Finder inGrid(String t) =>
+    find.descendant(of: find.byType(PageView), matching: find.text(t));
 
 /// Tomorrow, unless the month ends today (then the write tests short-circuit
 /// — the fixed today of a CI clock never hits it two runs in a row).
@@ -1887,8 +2143,8 @@ int? get futureDay {
   return today.day == lastDay ? null : today.day + 1;
 }
 
-/// A member's chip in the day sheet, by the name it shows — only the chosen
-/// chip prints it; the others are the avatar (owner's validation, 25/09/2026).
+/// A member's chip in the day sheet, by the name it shows — since U-60 every
+/// chip prints it (initial and first name).
 Finder memberChip(String name) => find.byKey(ValueKey('member-chip:$name'));
 
 Future<void> openDay(WidgetTester tester, int day) async {
@@ -1968,10 +2224,18 @@ void main() {
 
     expect(find.text('Ana'), findsOneWidget);
     expect(find.text('Bruno'), findsOneWidget);
-    expect(find.text('Trocado'), findsOneWidget);
+    // The legend's "Trocado". When day 11 falls inside the Hoje card's window
+    // (on the 11th, say) the card wears the same word as its badge — counted
+    // apart, or the test reads the calendar's date instead of the legend.
+    final inTodayCard = find.descendant(
+        of: find.byType(TodayCard), matching: find.text('Trocado'));
+    expect(
+        find.text('Trocado').evaluate().length -
+            inTodayCard.evaluate().length,
+        1);
     // Day 10 belongs to Ana ("A"); day 11 is swapped to Bruno ("B").
-    expect(find.text('A'), findsWidgets);
-    expect(find.text('B'), findsWidgets);
+    expect(inGrid('A'), findsWidgets);
+    expect(inGrid('B'), findsWidgets);
   });
 
   testWidgets('unassigned future day: sheet inserts with the chosen parent',
@@ -2094,6 +2358,8 @@ void main() {
     await tester.pumpWidget(app(ds));
     await tester.pumpAndSettle();
     final before = ds.monthFetches;
+    final readsBefore = ds.monthReads.length;
+    final today = FamilyTime.today();
 
     for (var i = 0; i < 30; i++) {
       ds.realtimeCallback!();
@@ -2103,7 +2369,14 @@ void main() {
     expect(ds.monthFetches, before);
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
-    expect(ds.monthFetches, before + 1);
+    // T-106: the reload reads the month on screen once; the months either
+    // side are read ahead again (the reload may have changed them).
+    expect(
+        ds.monthReads
+            .skip(readsBefore)
+            .where((m) => m == (today.year, today.month)),
+        hasLength(1));
+    expect(ds.monthReads.length - readsBefore, lessThanOrEqualTo(3));
   });
 
   // U-13/U-24 — the proof the pilot never gave: the SAME slice, English

@@ -70,12 +70,12 @@ void main() {
       const json = '{"date":"2026-08-31","deadline":"2026-09-02T00:00"}';
       expect(
           NotificationRenderer.message('auto_reminder', json, 'x', ptBr),
-          'A solicitação do dia 31/08/2026 será aprovada automaticamente em '
-              '02/09/2026 às 00:00 se não houver resposta.');
+          'A solicitação do dia 31/08/2026 será aprovada automaticamente se '
+              'não houver resposta até quarta-feira, 02/09, à 0h.');
       expect(
           NotificationRenderer.message('auto_reminder', json, 'x', en),
-          'The request for 31 Aug 2026 will be approved automatically on '
-              '02 Sep 2026 at 12:00 AM if nobody replies.');
+          'The request for 31 Aug 2026 will be approved automatically if '
+              'nobody replies by Wednesday, 02 Sep, at 12 AM.');
     });
 
     test('no deadline: the window-free sentence, still in the reader language',
@@ -363,8 +363,8 @@ void main() {
     // F-60: the reminder's stored sentence names the instant, and the
     // catalog rebuilds it character for character from `params`.
     ('auto_reminder', '{"date":"04/08","deadline":"2026-08-06T00:00"}',
-        'A solicitação do dia 04/08 será aprovada automaticamente em '
-            '06/08/2026 às 00:00 se não houver resposta.'),
+        'A solicitação do dia 04/08 será aprovada automaticamente se não '
+            'houver resposta até quinta-feira, 06/08, à 0h.'),
     ('swap_family_info',
         '{"date":"04/08","kind":"auto_swap","name":"Ana"}',
         'Ana ficará com a criança no dia 04/08 (troca aprovada automaticamente por falta de resposta).'),
@@ -373,6 +373,17 @@ void main() {
         'A troca do dia 04/08 foi revertida automaticamente — Ana volta a ficar com a criança.'),
     ('member_joined', '{"name":"Ana"}',
         'Ana juntou-se à família. Confira o calendário para incluí-lo no planejamento.'),
+    ('premium_request', '{"kind":"ask","name":"Bruno","gate":"agenda"}',
+        'Bruno quer o Premium para a agenda da criança.'),
+    ('premium_request', '{"kind":"ask","name":"Bruno","gate":"something"}',
+        'Bruno quer o Premium para a família.'),
+    ('invitation_expired', '{"kind":"expired","name":"Bruno Lima"}',
+        'Bruno Lima não respondeu ao convite e o link expirou. Compartilhe de novo — um link pelo WhatsApp costuma funcionar melhor.'),
+    // F-103: what set_member_admin() stores, word for word.
+    ('admin_changed', '{"kind":"granted","name":"Ana Souza"}',
+        'Ana Souza tornou você administrador(a) da família.'),
+    ('admin_changed', '{"kind":"revoked","name":"Ana Souza"}',
+        'Ana Souza removeu a sua permissão de administrador(a) da família.'),
     ('member_returned', '{"name":"Ana"}',
         'Ana cancelou a saída e voltou à família.'),
     ('swap_cancelled',
@@ -417,6 +428,23 @@ void main() {
         'O planejamento da família vai até 12/11/2026. Planeje os próximos meses.'),
     ('plan_ending', '{"kind":"ended","date":"2026-09-22"}',
         'O último dia planejado foi 22/09/2026. Planeje os próximos meses no calendário.'),
+    // F-78: what unplanned_family_nudges_due() stores, word for word.
+    ('plan_ending', '{"kind":"unplanned","date":"2026-10-04"}',
+        'O calendário da família ainda não tem nenhum dia planejado. Comece pelo primeiro mês.'),
+    // F-80 PR 3: what referral_reward_notify() stores, word for word.
+    ('referral_reward', '{"kind":"granted"}',
+        'Uma família que vocês indicaram assinou o Premium: a sua família ganhou um mês de Premium.'),
+    // F-81: what flush_admin_change_notices() stores, word for word.
+    ('day_admin_change', '{"kind":"single","date":"2026-10-12","name":"Ana"}',
+        'Ana alterou o dia 12/10/2026 no calendário.'),
+    ('day_admin_change',
+        '{"kind":"batch","date":"2026-10-12","to":"2026-11-30","count":"14","name":"Ana"}',
+        'Ana alterou 14 dias entre 12/10/2026 e 30/11/2026 no calendário.'),
+    // F-77: what trial_end_reminders_due() stores, word for word.
+    ('premium_trial', '{"kind":"ending","date":"2026-10-09"}',
+        'A avaliação Premium da família vai até 09/10/2026. Para continuar com o Premium depois dessa data, veja o plano.'),
+    ('premium_trial', '{"kind":"ended","date":"2026-10-09"}',
+        'A avaliação Premium da família terminou em 09/10/2026. A família segue no plano gratuito, e o Premium pode ser assinado a qualquer momento.'),
     // F-55 PR 4: what agenda_notify() stores, word for word.
     ('agenda_notice',
         '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia","name":"Ana","msg":"5 ml"}',
@@ -432,10 +460,10 @@ void main() {
     // F-34: what expense_notify() / settlement_notify() store, word for word.
     ('expense_changed',
         '{"kind":"added","date":"2026-09-24","amount":"123456","category":"school","name":"Ana","msg":"mensalidade"}',
-        'Ana lançou uma despesa de R\$ 1.234,56 em 24/09/2026: Escola. mensalidade'),
+        'Ana lançou uma despesa de R\$ 1.234,56 em 24/09/2026: mensalidade (Escola).'),
     ('expense_changed',
         '{"kind":"deleted","date":"2026-09-24","amount":"5","category":"food","name":"Ana","msg":"lanche"}',
-        'Ana apagou uma despesa de R\$ 0,05 em 24/09/2026: Alimentação. lanche'),
+        'Ana apagou uma despesa de R\$ 0,05 em 24/09/2026: lanche (Alimentação).'),
     ('settlement_requested', '{"date":"2026-09-24","amount":"5000","name":"Bruno"}',
         'Bruno registrou em 24/09/2026 que pagou R\$ 50,00 a você. Confirme em Despesas se recebeu.'),
     ('settlement_answered',
@@ -481,6 +509,10 @@ void main() {
           '{"kind":"swap","date":"04/08/2026","name":"Ana","requester":"Bruno","approver":"Carla"}'),
       ('swap_family_info', '{"kind":"revert","date":"04/08/2026","name":"Ana"}'),
       ('member_joined', '{"name":"Ana"}'),
+      ('invitation_expired', '{"kind":"expired","name":"Ana"}'),
+      ('admin_changed', '{"kind":"granted","name":"Ana"}'),
+      ('admin_changed', '{"kind":"revoked","name":"Ana"}'),
+      ('premium_request', '{"kind":"ask","name":"Ana","gate":"chat"}'),
       ('member_returned', '{"name":"Ana"}'),
       ('account_deletion', '{"kind":"self"}'),
       ('account_deletion', '{"kind":"self_last"}'),
@@ -500,6 +532,13 @@ void main() {
       ('billing', '{"kind":"grace_warning","date":"12/08/2026"}'),
       ('plan_ending', '{"kind":"ending","date":"2026-11-12"}'),
       ('plan_ending', '{"kind":"ended","date":"2026-09-22"}'),
+      ('premium_trial', '{"kind":"ending","date":"2026-10-09"}'),
+      ('premium_trial', '{"kind":"ended","date":"2026-10-09"}'),
+      ('referral_reward', '{"kind":"granted"}'),
+      ('day_admin_change', '{"kind":"single","date":"2026-10-12","name":"Ana"}'),
+      ('day_admin_change',
+          '{"kind":"batch","date":"2026-10-12","to":"2026-11-30","count":"14","name":"Ana"}'),
+      ('plan_ending', '{"kind":"unplanned","date":"2026-10-04"}'),
       ('agenda_notice',
           '{"date":"2026-09-25","kind":"medicine","time":"14:00","child":"Bia","name":"Ana"}'),
       ('agenda_notice',
@@ -624,6 +663,105 @@ void main() {
           contains('04/08'));
       expect(NotificationRenderer.message('auto_reminder', json, sentinel, en),
           contains('04/08'));
+    });
+  });
+
+  // F-07 (PR 5b): a per-child plan's swap names its child after the heading.
+  group('the child of a per-child plan', () {
+    test('params.child follows the heading, in either language', () {
+      const json = '{"date":"2026-10-12","name":"Ana","child":"Lia"}';
+      expect(
+          NotificationRenderer.title('swap_requested', json, 'x', ptBr),
+          '${ptBr[K.notifRenderTitleSwapRequested]} · Lia');
+      expect(NotificationRenderer.title('swap_requested', json, 'x', en),
+          '${en[K.notifRenderTitleSwapRequested]} · Lia');
+    });
+
+    test('no child, or a blank one, leaves the heading alone', () {
+      expect(NotificationRenderer.withChild('Título', null), 'Título');
+      expect(NotificationRenderer.withChild('Título', '  '), 'Título');
+      expect(NotificationRenderer.withChild('Título', ' Theo '), 'Título · Theo');
+    });
+  });
+
+  // F-80 PR 3: the referral reward names no family and states no day; a kind
+  // a future writer invents falls back to the stored sentence, never a guess.
+  group('the referral reward', () {
+    test('an unknown kind keeps the stored sentence and heading', () {
+      const json = '{"kind":"revoked"}';
+      expect(NotificationRenderer.message('referral_reward', json, sentinel, en),
+          sentinel);
+      expect(NotificationRenderer.title('referral_reward', json, sentinel, en),
+          sentinel);
+    });
+
+    test('the English sentence carries no number and no family', () {
+      final text = NotificationRenderer.message(
+          'referral_reward', '{"kind":"granted"}', sentinel, en);
+      expect(text, en[K.notifRenderReferralReward]);
+      expect(RegExp(r'\d').hasMatch(text), isFalse);
+    });
+  });
+
+  // F-81: an admin's direct change. The heading follows the body: a batch
+  // with no count or no last day keeps the stored sentence AND heading, and a
+  // future kind is never guessed.
+  group("an admin's direct change of the reader's days", () {
+    test('one day: the heading, the day in the reader format, the name', () {
+      const json = '{"kind":"single","date":"2026-10-12","name":"Ana"}';
+      expect(NotificationRenderer.title('day_admin_change', json, sentinel, ptBr),
+          'Dia alterado no calendário');
+      expect(NotificationRenderer.title('day_admin_change', json, sentinel, en),
+          en[K.notifRenderTitleDayAdminChangeSingle]);
+      final text =
+          NotificationRenderer.message('day_admin_change', json, sentinel, en);
+      expect(text, startsWith('Ana changed '));
+      expect(text, contains(en.formatIsoDate('2026-10-12')));
+    });
+
+    test('several days: count, first and last day', () {
+      const json =
+          '{"kind":"batch","date":"2026-10-12","to":"2026-11-30","count":"14","name":"Ana"}';
+      expect(NotificationRenderer.title('day_admin_change', json, sentinel, ptBr),
+          'Dias alterados no calendário');
+      final text =
+          NotificationRenderer.message('day_admin_change', json, sentinel, en);
+      expect(text, contains('14 days'));
+      expect(text, contains(en.formatIsoDate('2026-10-12')));
+      expect(text, contains(en.formatIsoDate('2026-11-30')));
+    });
+
+    test('no name falls back to "another caregiver", never a blank', () {
+      final text = NotificationRenderer.message('day_admin_change',
+          '{"kind":"single","date":"2026-10-12"}', sentinel, ptBr);
+      expect(text, startsWith(ptBr[K.notifRenderFbOtherCap]));
+    });
+
+    test('the child of a per-child plan follows the heading', () {
+      expect(
+          NotificationRenderer.title('day_admin_change',
+              '{"kind":"single","date":"2026-10-12","name":"Ana","child":"Lia"}',
+              sentinel, ptBr),
+          'Dia alterado no calendário · Lia');
+    });
+
+    test('a malformed batch or an unknown kind keeps the stored row', () {
+      for (final json in [
+        '{"kind":"batch","date":"2026-10-12","to":"2026-11-30","name":"Ana"}',
+        '{"kind":"batch","date":"2026-10-12","count":"x","to":"2026-11-30"}',
+        '{"kind":"batch","date":"2026-10-12","count":"3"}',
+        '{"kind":"undone","date":"2026-10-12","name":"Ana"}',
+        '{"kind":"single","name":"Ana"}',
+      ]) {
+        expect(
+            NotificationRenderer.message('day_admin_change', json, sentinel, en),
+            sentinel,
+            reason: json);
+        expect(
+            NotificationRenderer.title('day_admin_change', json, sentinel, en),
+            sentinel,
+            reason: json);
+      }
     });
   });
 }

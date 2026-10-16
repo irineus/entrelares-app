@@ -36,7 +36,16 @@ class FamilyInvitation {
   /// a caregiver one.
   final String memberType;
 
+  /// F-101: when `send-swap-email` handed the e-mail to Resend (or suppressed
+  /// a test recipient). NULL = the message never left — the card says so and
+  /// offers the link, instead of "Convite enviado" beside a failure toast.
+  /// Rows older than the column were backfilled from `created_at`.
+  final DateTime? emailSentAt;
+
   bool get isViewer => memberType == 'viewer';
+
+  /// The e-mail did not go out (F-101). Only meaningful while [isPending].
+  bool get emailUnsent => emailSentAt == null;
 
   const FamilyInvitation({
     required this.id,
@@ -50,6 +59,7 @@ class FamilyInvitation {
     this.revokedAt,
     this.profileId,
     this.memberType = 'full',
+    this.emailSentAt,
   });
 
   /// Still usable: nobody accepted it, nobody revoked it, and the 7-day window
@@ -75,6 +85,7 @@ class FamilyInvitation {
         revokedAt: _utc(json['revoked_at'] as String?),
         profileId: json['profile_id'] as int?,
         memberType: (json['member_type'] as String?) ?? 'full',
+        emailSentAt: _utc(json['email_sent_at'] as String?),
       );
 
   static DateTime? _utc(String? wire) =>

@@ -157,8 +157,10 @@ void main() {
   });
 
   group('2. the day sheet chips', () {
-    testWidgets('only the chosen member prints a name; the others are their '
-        'avatar, named for a screen reader', (tester) async {
+    // U-60 (owner, 05/10/2026): every choice wears the name — the 25/09
+    // rule (only the chosen chip named) left "A"/"B" to decode.
+    testWidgets('every member chip prints the name, chosen or not',
+        (tester) async {
       final day = futureDay;
       if (day == null) return;
       final handle = tester.ensureSemantics();
@@ -168,11 +170,10 @@ void main() {
       await tester.pumpAndSettle();
       await openDayEditor(tester, day);
 
-      // Bruno is not chosen anywhere: his chips print no name, but they are
-      // there and say it aloud.
+      // Bruno is not chosen anywhere: his chips print his name anyway.
       expect(memberChip('Bruno'), findsWidgets);
       expect(find.descendant(of: memberChip('Bruno'), matching: find.text('Bruno')),
-          findsNothing);
+          findsWidgets);
       expect(find.bySemanticsLabel(RegExp('Bruno')), findsWidgets);
       // "Sem troca" is the whole answer now.
       expect(find.text(Localization(AppLanguage.ptBr)[KApp.editorNoSwap]),

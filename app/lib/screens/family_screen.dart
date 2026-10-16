@@ -1,4 +1,5 @@
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +20,7 @@ import '../theme/tokens.dart';
 import '../widgets/account_button.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
+import '../widgets/role_picker.dart';
 import '../widgets/sudo_sheet.dart';
 
 /// U-35: the observer the Família branch's navigator reports to, so the roster
@@ -92,6 +94,9 @@ class FamilyScreen extends StatefulWidget {
   /// a widget test can read what would be sent; null uses share_plus.
   final Future<void> Function(String message)? onShareInvite;
 
+  /// F-80 PR 2: the same seam for the "Indique uma família" card's message.
+  final Future<void> Function(String message)? onShareReferral;
+
   const FamilyScreen({
     super.key,
     required this.dataSource,
@@ -106,6 +111,7 @@ class FamilyScreen extends StatefulWidget {
     this.onOpenDeletion,
     this.onOpenChildren,
     this.onShareInvite,
+    this.onShareReferral,
   });
 
   @override
@@ -124,6 +130,10 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
   PublicSettings _settings = PublicSettings.unloaded;
   // F-55: read only while the flag is on (null = not asked).
   List<Child>? _children;
+  // F-80 PR 2: the family's referral code — asked only while
+  // `feature.referral` is on and only for an active full member; null hides
+  // the card (dark, refused, or failed alike).
+  String? _referralCode;
 
   // Rename
   bool _editingName = false;
@@ -265,9 +275,14 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       // deliberate, not a bug.
       // F-56: also fetched whenever a placeholder exists, at the cap or not —
       // its card needs to know whether an invitation is out.
-      final seated = members.where((m) => !m.hasLeft).length;
+      // F-91: CAREGIVER seats only — a viewer holds none (F-50). Counting
+      // them hid every invitation of a Premium family with two grandparents
+      // as viewers; and with viewers on, the viewer invitations need the
+      // list whatever the caregiver count.
+      final seated = members.where((m) => !m.hasLeft && !m.isViewer).length;
       final invitations = seated < settings.maxCaregivers ||
-              members.any((m) => m.isPendingMember)
+              members.any((m) => m.isPendingMember) ||
+              settings.viewersEnabled
           ? await widget.dataSource.fetchOpenInvitations()
           : <FamilyInvitation>[];
       final deletion = await widget.dataSource.fetchPendingFamilyDeletion();
@@ -289,8 +304,41 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
           ? await widget.dataSource.fetchSubscription()
           : null;
 
+      // F-80 PR 2: dark, nothing is asked. A viewer reads the family, it does
+      // not represent it to another one (the server refuses it too), and a
+      // departed or account-less member speaks for no family.
+      // U-61: and only a family that is complete (a second live caregiver)
+      // and active (a plan exists) is asked to bring in another one — the
+      // audit saw the card on a founder alone who had not even invited the
+      // co-parent. The plan fact is one bounded read, asked only once the
+      // cheaper conditions hold; a failed read offers nothing.
+      final me = results[3] as Member?;
+      String? referralCode;
+      if (me != null && settings.referralEnabled) {
+        final hasOther = members
+            .any((m) => m.id != me.id && m.isActiveMember && !m.isViewer);
+        var hasPlan = false;
+        if (hasOther && me.isActiveMember && !me.isViewer) {
+          try {
+            hasPlan = (await widget.dataSource.fetchOnboardingFacts(
+                    myProfileId: me.id, includeSwapParticipation: false))
+                .hasAnyPlannedDay;
+          } catch (_) {/* no answer: no card */}
+        }
+        if (ReferralRules.offerCard(
+          enabled: settings.referralEnabled,
+          isActiveMember: me.isActiveMember,
+          isViewer: me.isViewer,
+          hasOtherActiveMember: hasOther,
+          hasAnyPlannedDay: hasPlan,
+        )) {
+          referralCode = await widget.dataSource.fetchMyReferralCode();
+        }
+      }
+
       if (!mounted) return;
       setState(() {
+        _referralCode = referralCode;
         _children = children;
         _subscription = subscription;
         _deletion = deletion;
@@ -309,7 +357,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         _loading = false;
         _loadErrorKey = isSessionExpired(e.toString())
             ? KApp.sessionExpired
-            : KApp.errCalendarLoad;
+            : KApp.errFamilyLoad;
       });
     }
   }
@@ -406,8 +454,43 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       setState(() => _sendingInvite = false);
       // Every cap and permission refusal is the RPC's own sentence — it says
       // exactly which limit was hit, which no generic message could.
-      showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
-          type: AppSnackType.error);
+      showAppSnack(context, _inviteErrorText(e, l), type: AppSnackType.error);
+    }
+  }
+
+  /// F-101: an address that already has an account was a dead end said
+  /// verbatim ("já possui cadastro"); the app answers it with the way out —
+  /// another e-mail keeps both families. Every other refusal stays the RPC's.
+  String _inviteErrorText(Object e, Localization l) =>
+      InviteFormRules.isEmailTakenRefusal(e.toString())
+          ? l[KApp.famInviteEmailTaken]
+          : translateSaveError(e.toString(), l[K.errSaveFailed], l);
+
+  /// F-101: the expired card's one action — a new link (the RPC revokes the
+  /// dead one, F-56 carries the placeholder) handed straight to the share
+  /// sheet. The e-mail goes out too, best-effort; the link is the point, and
+  /// a WhatsApp message from the co-parent is what actually gets opened.
+  Future<void> _resendAndShare(
+      FamilyInvitation invitation, Localization l) async {
+    try {
+      final id = await widget.dataSource.createInvitation(
+          email: invitation.email,
+          roleId: invitation.roleId,
+          profileId: invitation.profileId);
+      final mailed = await widget.dataSource.sendInvitationEmail(id);
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      final renewed = _invitations.where((i) => i.id == id).firstOrNull;
+      if (renewed != null) await _shareLink(renewed, l);
+      if (!mounted) return;
+      if (!mailed) {
+        showAppSnack(context, l[K.famInviteRenewedEmailFailed],
+            type: AppSnackType.info);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnack(context, l[K.famErrResendInvite], type: AppSnackType.error);
     }
   }
 
@@ -486,6 +569,80 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     } else {
       await Share.share(message);
     }
+  }
+
+  /// F-80 PR 2 — the family's link to the share sheet, in the F-63 shape:
+  /// one sentence, then the link alone on its own line. The event says the
+  /// sheet opened and on which channel — never the code nor the link.
+  Future<void> _shareReferral(String code, Localization l) async {
+    final message = InviteFormRules.inviteShareMessage(
+        l[KApp.famReferralShareText], ReferralRules.shareLink(code));
+    widget.analytics?.trackEvent(AnalyticsEvents.referralShare,
+        props: {'channel': ReferralRules.channel(isWeb: kIsWeb)});
+    final share = widget.onShareReferral;
+    if (share != null) {
+      await share(message);
+    } else {
+      await Share.share(message);
+    }
+  }
+
+  /// U-67: the referral link to the clipboard — the link alone, like the
+  /// invitation's "Copiar link".
+  Future<void> _copyReferral(String code, Localization l) async {
+    try {
+      await Clipboard.setData(
+          ClipboardData(text: ReferralRules.shareLink(code)));
+      if (!mounted) return;
+      showAppSnack(context, l[K.famLinkCopied]);
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnack(context, l[K.famErrCopy], type: AppSnackType.error);
+    }
+  }
+
+  /// F-80 PR 2 — "Indique uma família": the link, the share button and the
+  /// rule in one sentence that types none of the operator's numbers (U-57).
+  /// No counts yet (PR 3) and never another family's name.
+  Widget _referralCard(String code, Localization l) {
+    final theme = Theme.of(context);
+    return Card(
+      key: const ValueKey('family-referral-card'),
+      margin: const EdgeInsets.only(top: 24),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l[KApp.famReferralTitle], style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(l[KApp.famReferralRule], style: theme.textTheme.bodySmall),
+            const SizedBox(height: 8),
+            Text(ReferralRules.shareLink(code),
+                style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 8),
+            // U-67: desktop web has no Web Share — the link can be copied.
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.tonalIcon(
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  label: Text(l[KApp.commonShare]),
+                  onPressed: () => _shareReferral(code, l),
+                ),
+                OutlinedButton.icon(
+                  key: const ValueKey('family-referral-copy'),
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: Text(l[KApp.famReferralCopy]),
+                  onPressed: () => _copyReferral(code, l),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// F-56: invite a placeholder that has no open invitation — the one moment
@@ -646,6 +803,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             const SizedBox(height: 24),
             _inviteSection(l),
             if (_isAdmin && _settings.viewersEnabled) _viewerSection(l),
+            if (_referralCode case final code?) _referralCard(code, l),
             // U-35: the three things that are not the family, one tap away.
             // The plan row is for everyone (the state is the family's); the
             // mode is the admin's tool; the deletion row appears only while
@@ -920,16 +1078,17 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         _InvitationAction.revoke => _revokeInvite(invitation, l),
       },
       itemBuilder: (context) => [
-        if (!expired) ...[
+        if (!expired)
           PopupMenuItem(
             value: _InvitationAction.copyLink,
             child: _menuRow(Icons.copy, l[K.famCopyLink]),
           ),
-          PopupMenuItem(
-            value: _InvitationAction.resend,
-            child: _menuRow(Icons.refresh, l[K.famResendInvite]),
-          ),
-        ],
+        // F-101: on an expired card the primary is "Compartilhar de novo";
+        // the plain resend (a new link, e-mail only) moves behind the ⋮.
+        PopupMenuItem(
+          value: _InvitationAction.resend,
+          child: _menuRow(Icons.refresh, l[K.famResendInvite]),
+        ),
         PopupMenuItem(
           value: _InvitationAction.revoke,
           child: _menuRow(Icons.link_off, l[K.famRevoke], danger: true),
@@ -1020,6 +1179,10 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     final now = DateTime.now().toUtc();
     final open =
         _invitations.where((i) => i.isViewer && !i.isExpired(now) && i.isPending(now));
+    // F-91: an expired viewer invitation was filtered out entirely — no
+    // "Reenviar", as if it had never been sent.
+    final expiredViewers =
+        _invitations.where((i) => i.isViewer && i.isExpired(now));
     final block = ViewerRules.inviteBlock(
       viewersTaken: _viewersTaken,
       isPremium: _isPremium,
@@ -1033,6 +1196,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       children: [
         _sectionTitle(l[KApp.viewerSection]),
         ...open.map((i) => _invitationCard(i, l, expired: false)),
+        ...expiredViewers.map((i) => _invitationCard(i, l, expired: true)),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1166,11 +1330,16 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                 Expanded(child: Text(invitation.email)),
                 // U-29: a row's state is an AppBadge everywhere else in the
                 // app — this was the one place it was still a grey text run.
+                // F-101: the card used to read "Convite enviado" from the
+                // row's mere existence, beside a toast saying the e-mail had
+                // failed. The row knows now (`email_sent_at`).
                 AppBadge(
                   text: expired
                       ? l[K.famInviteExpiredBadge]
-                      : l[K.famInviteSentBadge],
-                  tone: expired
+                      : invitation.emailUnsent
+                          ? l[KApp.famInviteEmailUnsentBadge]
+                          : l[K.famInviteSentBadge],
+                  tone: expired || invitation.emailUnsent
                       ? context.tokens.warning
                       : context.tokens.info,
                 ),
@@ -1182,6 +1351,9 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             const SizedBox(height: 8),
             if (expired)
               Text(l[K.famInviteExpiredHint], style: theme.textTheme.bodySmall)
+            else if (invitation.emailUnsent)
+              Text(l[KApp.famInviteEmailUnsentHint],
+                  style: theme.textTheme.bodySmall)
             else
               Text(
                   l.format(K.famInviteValidUntil,
@@ -1211,12 +1383,14 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                           onPressed: () => _attachPending(invitation, l),
                         ),
                       if (expired)
-                        // No link left to share: resending is what changes
-                        // this card's state.
+                        // F-101: no link left to share, so the one action
+                        // makes a new one AND hands it to the share sheet —
+                        // "Reenviar" alone re-sent an e-mail that had just
+                        // gone unanswered for a week.
                         FilledButton.icon(
-                          icon: const Icon(Icons.refresh, size: 18),
-                          label: Text(l[K.famResendInvite]),
-                          onPressed: () => _resendInvite(invitation, l),
+                          icon: const Icon(Icons.share_outlined, size: 18),
+                          label: Text(l[KApp.famShareAgain]),
+                          onPressed: () => _resendAndShare(invitation, l),
                         )
                       else
                         // The native improvement over "copy and paste on
@@ -1248,6 +1422,27 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     return null;
   }
 
+  /// F-101: the picker speaks canonical names (built-ins) and `custom:<id>`
+  /// keys (F-41); the form keeps the role ID the RPC wants.
+  String? get _inviteRoleKey {
+    if (_inviteRoleId == 0) return null;
+    final role = _roles.where((r) => r.id == _inviteRoleId).firstOrNull;
+    if (role == null) return null;
+    if (role.isCustom) return 'custom:${role.id}';
+    return RoleCatalog.find(role.roleName)?.canonicalName;
+  }
+
+  int _roleIdForPickerKey(String key) {
+    if (key.startsWith('custom:')) return int.tryParse(key.substring(7)) ?? 0;
+    for (final role in _roles) {
+      if (!role.isCustom &&
+          RoleCatalog.find(role.roleName)?.canonicalName == key) {
+        return role.id;
+      }
+    }
+    return 0;
+  }
+
   Widget _inviteForm(Localization l) {
     final theme = Theme.of(context);
     return Column(
@@ -1274,20 +1469,22 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         const SizedBox(height: 4),
         Text(l[KApp.famInviteEmailOptional], style: theme.textTheme.bodySmall),
         const SizedBox(height: 12),
-        DropdownButtonFormField<int>(
-          // A name or label never pushes the field past the screen
-          // (owner's validation, 25/09/2026: "Quem pagou" overflowed).
-          isExpanded: true,
-          initialValue: _inviteRoleId == 0 ? null : _inviteRoleId,
-          decoration: InputDecoration(labelText: l[K.famRoleInFamily]),
-          items: [
+        // F-101: the sign-up's own picker (U-44) — the six common roles as
+        // chips, the other built-ins and the family's custom roles behind
+        // "Outro…". It replaced a 21-item dropdown in no clear order (Mãe,
+        // Pai, Bisavô, Tio, Padrinho, Babá, Irmã…).
+        Text(l[K.famRoleInFamily], style: theme.textTheme.titleSmall),
+        const SizedBox(height: 8),
+        RolePicker(
+          key: const ValueKey('invite-role'),
+          selected: _inviteRoleKey,
+          extras: [
             for (final role in _roles)
-              DropdownMenuItem(
-                value: role.id,
-                child: Text(role.displayLabel(l.current)),
-              ),
+              if (role.isCustom)
+                (key: 'custom:${role.id}', label: role.displayLabel(l.current)),
           ],
-          onChanged: (value) => setState(() => _inviteRoleId = value ?? 0),
+          onSelected: (key) =>
+              setState(() => _inviteRoleId = _roleIdForPickerKey(key)),
         ),
         if (widget.onOpenCustomRoles != null)
           Align(
@@ -1578,7 +1775,13 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             ),
           ),
         const SizedBox(height: 12),
-        if (iAmRequester)
+        // F-91: a viewer follows the plan and has no vote (F-50) — the server
+        // refuses it; the panel is read-only for them.
+        if (_me?.isViewer == true)
+          Text(l[KApp.viewerDeletionNoVote],
+              key: const ValueKey('deletion-viewer-readonly'),
+              style: theme.textTheme.bodySmall)
+        else if (iAmRequester)
           OutlinedButton(
             onPressed: _deletionBusy
                 ? null

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -49,10 +50,45 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   SupabaseCustodyDataSource(this._client,
       {this.environmentPrefix = '', this.analytics});
 
+  /// T-104: every row of [query], however many. PostgREST cuts a response at
+  /// `max_rows` (1,000 locally, the hosted default) with a plain 200, so a
+  /// list read in ONE request silently loses whatever sorts last once a family
+  /// passes the cap — the newest texts, the end of a year. The first page
+  /// asks for the exact count and the loop advances by what each page really
+  /// returned, so it does not depend on the server's cap: a smaller cap means
+  /// more pages, never fewer rows. [query] must build a FRESH request each
+  /// call and order on a unique key (an `id` tie-breaker), or rows can slide
+  /// between pages.
+  Future<List<Map<String, dynamic>>> _allPages(
+      PostgrestTransformBuilder<PostgrestList> Function() query) async {
+    const page = 1000;
+    final first = await query().range(0, page - 1).count(CountOption.exact);
+    final rows = <Map<String, dynamic>>[...first.data];
+    while (rows.length < first.count) {
+      final next = await query().range(rows.length, rows.length + page - 1);
+      if (next.isEmpty) break;
+      rows.addAll(next);
+    }
+    return rows;
+  }
+
+  /// T-104: ids split so an `in.(...)` filter keeps the URL short.
+  static Iterable<List<int>> _chunks(List<int> ids, [int size = 150]) sync* {
+    for (var i = 0; i < ids.length; i += size) {
+      yield ids.sublist(i, i + size > ids.length ? ids.length : i + size);
+    }
+  }
+
   @override
   Future<List<Member>> fetchMembers() async {
-    final rows = await _client.from('profiles').select();
-    return rows.map(Member.fromJson).toList();
+    // S-27: through `family_members()`, not a select on `profiles` — a viewer
+    // reads only their own row directly, and the RPC gives them the family
+    // with every other member's e-mail left out.
+    final rows = await _client.rpc<List<dynamic>>('family_members');
+    return [
+      for (final row in rows)
+        Member.fromJson(Map<String, dynamic>.from(row as Map))
+    ];
   }
 
   @override
@@ -109,13 +145,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
 
   @override
   Future<DateTime?> fetchLastPlannedDay() async {
-    final rows = await _client
-        .from('care_schedules')
-        .select('schedule_date')
-        .order('schedule_date', ascending: false)
-        .limit(1);
-    if (rows.isEmpty) return null;
-    return DateTime.tryParse(rows.first['schedule_date'] as String);
+    // F-07 (PR 5c): the SAME last day the F-70 reminders use
+    // (`family_plan_last_day`): only the current mode's lanes count, and in a
+    // per-child plan the end is the first child's plan to run out.
+    final result = await _client.rpc<dynamic>('my_plan_last_day');
+    if (result is! String) return null;
+    return DateTime.tryParse(result);
   }
 
   @override
@@ -205,6 +240,10 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> reactivateSubscription() =>
       _invokeBilling({'action': 'reactivate'});
 
+  @override
+  Future<String> overdueInvoiceUrl() =>
+      _invokeBillingForUrl({'action': 'overdue_invoice'});
+
   /// The `billing-checkout` function, which owns every money action. Calls
   /// stay OUTSIDE any retry by construction (the web says it plainly: starting
   /// a checkout twice on a retry would create two payment links, and a retried
@@ -236,11 +275,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<CareSchedule?> fetchDay(DateTime date) async {
-    final row = await _client
+  Future<CareSchedule?> fetchDay(DateTime date, {int? childId}) async {
+    final query = _client
         .from('care_schedules')
         .select()
-        .eq('schedule_date', CareSchedule.isoDate(date))
+        .eq('schedule_date', CareSchedule.isoDate(date));
+    final row = await (childId == null
+            ? query.isFilter('child_id', null)
+            : query.eq('child_id', childId))
         .maybeSingle();
     return row == null ? null : CareSchedule.fromJson(row);
   }
@@ -264,31 +306,44 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
-  Future<ScheduleRangeResult> clearScheduleRange(
-      DateTime from, DateTime to) async {
+  Future<ScheduleRangeResult> clearScheduleRange(DateTime from, DateTime to,
+      {int? childId}) async {
     final result = await _client.rpc<dynamic>('clear_schedule_range', params: {
       'p_from': CareSchedule.isoDate(from),
       'p_to': CareSchedule.isoDate(to),
+      'p_child_id': ?childId,
     });
     return ScheduleRangeResult.fromJson(Map<String, dynamic>.from(result as Map));
   }
 
   @override
   Future<HandoffRangeResult> setHandoffTimeRange(
-      DateTime from, DateTime? to, HandoffTime time) async {
+      DateTime from, DateTime? to, HandoffTime time,
+      {int? childId}) async {
     final result =
         await _client.rpc<dynamic>('set_handoff_time_range', params: {
       'p_from': CareSchedule.isoDate(from),
       'p_to': to == null ? null : CareSchedule.isoDate(to),
       'p_time': '${time.hour.toString().padLeft(2, '0')}:'
           '${time.minute.toString().padLeft(2, '0')}:00',
+      'p_child_id': ?childId,
     });
     return HandoffRangeResult.fromJson(Map<String, dynamic>.from(result as Map));
   }
 
   @override
+  Future<int> setScheduleMode(String mode, {int? baseChildId}) async {
+    final result = await _client.rpc<dynamic>('set_schedule_mode', params: {
+      'p_mode': mode,
+      'p_base_child_id': baseChildId,
+    });
+    return (Map<String, dynamic>.from(result as Map)['days'] as int?) ?? 0;
+  }
+
+  @override
   Future<ScheduleRangeResult> replaceScheduleRange(
-      DateTime from, DateTime to, List<CareSchedule> days) async {
+      DateTime from, DateTime to, List<CareSchedule> days,
+      {int? childId}) async {
     final result =
         await _client.rpc<dynamic>('replace_schedule_range', params: {
       'p_from': CareSchedule.isoDate(from),
@@ -296,6 +351,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       // The same wire shape as a plain insert (actual_parent_id travels
       // null: the wizard never plans a swap).
       'p_days': [for (final d in days) d.toInsertJson()],
+      'p_child_id': ?childId,
     });
     return ScheduleRangeResult.fromJson(Map<String, dynamic>.from(result as Map));
   }
@@ -309,20 +365,26 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     final first = dates.first;
     final last = dates.last;
 
+    // F-07: a batch is one lane (the wizard plans one child at a time), and
+    // "already assigned" means assigned IN that lane.
+    final lane = days.first.childId;
     Future<Set<String>> existingDates() async {
-      final rows = await _client
+      final query = _client
           .from('care_schedules')
           .select('schedule_date')
           .gte('schedule_date', CareSchedule.isoDate(first))
           .lte('schedule_date', CareSchedule.isoDate(last));
+      final rows = await (lane == null
+          ? query.isFilter('child_id', null)
+          : query.eq('child_id', lane));
       return {for (final r in rows) r['schedule_date'] as String};
     }
 
     final existing = await existingDates();
     onProgress?.call(20);
 
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    // T-105: the family's day — the server refuses past days by its clock.
+    final today = FamilyTime.today();
     final toInsert = [
       for (final d in days)
         // Past days are immutable; already-assigned days are kept.
@@ -463,12 +525,16 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
 
   /// The revert links back to the swap it undoes: the most recently resolved
   /// approved request on that date.
-  Future<SwapRequest?> _approvedRequestForDate(DateTime date) async {
-    final rows = await _client
+  Future<SwapRequest?> _approvedRequestForDate(DateTime date,
+      {int? childId}) async {
+    final query = _client
         .from('swap_requests')
         .select()
         .eq('schedule_date', CareSchedule.isoDate(date))
-        .eq('status', 'approved')
+        .eq('status', 'approved');
+    final rows = await (childId == null
+            ? query.isFilter('child_id', null)
+            : query.eq('child_id', childId))
         .order('resolved_at', ascending: false, nullsFirst: false)
         .limit(1);
     return rows.isEmpty ? null : SwapRequest.fromJson(rows.first);
@@ -477,11 +543,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   /// The newest activity_logs row for a date is the one just written by the
   /// base-schedule upsert that precedes [createSwapRequest], so its old_data
   /// is the day's pre-edit snapshot (id is a monotonic identity).
-  Future<int?> _latestLogIdForDate(DateTime date) async {
-    final rows = await _client
+  Future<int?> _latestLogIdForDate(DateTime date, {int? childId}) async {
+    final query = _client
         .from('activity_logs')
         .select('id')
-        .eq('affected_date', CareSchedule.isoDate(date))
+        .eq('affected_date', CareSchedule.isoDate(date));
+    final rows = await (childId == null
+            ? query.isFilter('child_id', null)
+            : query.eq('child_id', childId))
         .order('id', ascending: false)
         .limit(1);
     return rows.isEmpty ? null : rows.first['id'] as int?;
@@ -569,12 +638,13 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     // Tag at this instant — only for the point-in-time notification title;
     // display badges stay dynamic (F-20).
     final creationTag = computePriorityTag(
-        schedule.scheduleDate, proposedHandoffTime, DateTime.now());
+        schedule.scheduleDate, proposedHandoffTime, FamilyTime.now());
 
     // Snapshot reference (F-26): the base schedule was just upserted by the
     // caller, so the newest audit log for this date holds the pre-edit
     // old_data used to fully restore the day if this swap is later reverted.
-    final preEditLogId = await _latestLogIdForDate(schedule.scheduleDate);
+    final preEditLogId = await _latestLogIdForDate(schedule.scheduleDate,
+        childId: schedule.childId);
 
     final now = _nowUtcIso();
     final inserted = await _client
@@ -620,41 +690,44 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         Future<void>.value());
   }
 
+  /// S-25: every answer to a request is ONE server transaction —
+  /// `approve_swap_request` / `reject_swap_request` / `cancel_swap_request`
+  /// lock the request, move only an OPEN one, apply exactly the proposal (or
+  /// restore the pre-edit snapshot, for a revert) and insert the
+  /// notifications composed here, all or nothing. The client used to run the
+  /// day, the status and the notices as separate writes: two people answering
+  /// at once, or a dropped connection, left contradictory states behind.
+  /// Returns whether this call changed anything — a retry of an answer that
+  /// already landed is a no-op ([SwapAlreadyAnswered] when the request was
+  /// answered otherwise).
+  Future<bool> _answer(String rpc, Map<String, dynamic> params,
+      List<NotificationDraft> drafts) async {
+    try {
+      final result = await _client.rpc<dynamic>(rpc, params: {
+        ...params,
+        'p_notifications': [
+          for (final d in drafts)
+            {
+              'recipient_profile_id': d.recipientProfileId,
+              'type': d.type,
+              'title': d.title,
+              'message': d.message,
+              'params': d.params,
+            }
+        ],
+      });
+      return result is Map && result['changed'] == true;
+    } on PostgrestException catch (e) {
+      if (isSwapAlreadyAnswered(e.message)) throw SwapAlreadyAnswered(e.message);
+      rethrow;
+    }
+  }
+
   @override
   Future<void> approveSwap(int swapRequestId,
       {String? approvalNote, required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-
-    // Apply the change to care_schedules — full-row update so the T-33/T-35
-    // echo travels with it.
-    final scheduleId = request.scheduleId;
-    if (scheduleId != null) {
-      final row = await _client
-          .from('care_schedules')
-          .select()
-          .eq('id', scheduleId)
-          .maybeSingle();
-      if (row != null) {
-        final updated = CareSchedule.fromJson(row).copyWith(
-          actualParentId: request.proposedActualParentId,
-          handoffTime: request.proposedHandoffTime,
-        );
-        await _client
-            .from('care_schedules')
-            .update(updated.toUpdateJson())
-            .eq('id', scheduleId);
-      }
-    }
-
     final note = normalizeFreeText(approvalNote); // F-44
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'approved',
-      'approval_note': note,
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeSwapApproved(
       scheduleDate: request.scheduleDate,
       requestingProfileId: request.requestingProfileId,
@@ -664,7 +737,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    final changed = await _answer('approve_swap_request',
+        {'p_id': swapRequestId, 'p_note': note}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'approved');
     _trackAnswer('approved', 'swap');
   }
@@ -673,14 +748,6 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> rejectSwap(int swapRequestId,
       {String? reason, required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'rejected',
-      'rejection_reason': reason,
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeSwapRejected(
       scheduleDate: request.scheduleDate,
       requestingProfileId: request.requestingProfileId,
@@ -689,7 +756,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    final changed = await _answer('reject_swap_request',
+        {'p_id': swapRequestId, 'p_reason': reason}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'rejected');
     _trackAnswer('rejected', 'swap');
   }
@@ -698,20 +767,15 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> cancelSwap(int swapRequestId,
       {required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'cancelled',
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeSwapCancelled(
       scheduleDate: request.scheduleDate,
       targetProfileId: request.targetProfileId,
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    final changed =
+        await _answer('cancel_swap_request', {'p_id': swapRequestId}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'cancelled');
     _trackAnswer('cancelled', 'swap');
   }
@@ -725,6 +789,8 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     bool restoreNotes = false,
     required Member myProfile,
     required List<Member> allProfiles,
+    int? childId,
+    int? scheduleId,
   }) async {
     final message = normalizeFreeText(requestMessage);
 
@@ -739,9 +805,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
 
     // Find the approved swap for this date to link back (F-26) and read the
     // day's current handoff time for the urgency tag.
-    final approvedRequest = await _approvedRequestForDate(scheduleDate);
+    final approvedRequest =
+        await _approvedRequestForDate(scheduleDate, childId: childId);
     String? currentHandoffTime;
-    final approvedScheduleId = approvedRequest?.scheduleId;
+    // F-07: the approved request's row, or — when a plan-mode switch took it —
+    // the lane's own row, which the server stamps the lane from.
+    final approvedScheduleId = approvedRequest?.scheduleId ?? scheduleId;
     if (approvedScheduleId != null) {
       final row = await _client
           .from('care_schedules')
@@ -752,14 +821,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     }
 
     final creationTag =
-        computePriorityTag(scheduleDate, currentHandoffTime, DateTime.now());
+        computePriorityTag(scheduleDate, currentHandoffTime, FamilyTime.now());
 
     final now = _nowUtcIso();
     final inserted = await _client
         .from('swap_requests')
         .insert({
           'schedule_date': CareSchedule.isoDate(scheduleDate),
-          'schedule_id': approvedRequest?.scheduleId,
+          'schedule_id': approvedScheduleId,
           'requesting_profile_id': myProfile.id,
           'target_profile_id': approverId,
           'previous_actual_parent_id': currentActualProfileId,
@@ -792,71 +861,11 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     await _sendSwapEmail(requestId, 'revert_requested');
   }
 
-  /// Restores the day to the full snapshot captured before the swap edit
-  /// (F-26). The branching is the pure [revertRestorePlan]; this only
-  /// executes it.
-  Future<void> _restorePreEditState(SwapRequest request) async {
-    final scheduleId = request.scheduleId;
-    if (scheduleId == null) return;
-    final row = await _client
-        .from('care_schedules')
-        .select()
-        .eq('id', scheduleId)
-        .maybeSingle();
-    if (row == null) return;
-    final schedule = CareSchedule.fromJson(row);
-
-    final preEditLogId = request.preEditLogId;
-    final oldData =
-        preEditLogId == null ? null : await _fetchOldData(preEditLogId);
-    final plan = revertRestorePlan(
-      hasPreEditLogId: preEditLogId != null,
-      oldData: oldData,
-      revertNotes: request.revertNotes,
-    );
-
-    switch (plan) {
-      case RevertClearActualOnly():
-        final updated = schedule.copyWith(actualParentId: null);
-        await _client
-            .from('care_schedules')
-            .update(updated.toUpdateJson())
-            .eq('id', scheduleId);
-      case RevertDeleteDay():
-        await _client.from('care_schedules').delete().eq('id', scheduleId);
-      case RevertRestoreFields():
-        final updated = schedule.copyWith(
-          scheduledParentId:
-              plan.scheduledParentId ?? schedule.scheduledParentId,
-          actualParentId: plan.actualParentId,
-          handoffTime: plan.handoffTime,
-          notes: plan.restoreNotes ? plan.notes : schedule.notes,
-        );
-        await _client
-            .from('care_schedules')
-            .update(updated.toUpdateJson())
-            .eq('id', scheduleId);
-    }
-  }
-
   @override
   Future<void> approveRevert(int swapRequestId,
       {String? approvalNote, required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-
-    if (request.scheduleId != null) {
-      await _restorePreEditState(request);
-    }
-
     final note = normalizeFreeText(approvalNote); // F-44
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'revert_approved',
-      'approval_note': note,
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeRevertApproved(
       scheduleDate: request.scheduleDate,
       requestingProfileId: request.requestingProfileId,
@@ -866,7 +875,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    // S-25: the restore (F-26/F-47) runs on the server, in the same
+    // transaction — `restore_pre_edit_state`, the function the auto-approval
+    // already used.
+    final changed = await _answer('approve_swap_request',
+        {'p_id': swapRequestId, 'p_note': note}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'revert_approved');
     _trackAnswer('approved', 'revert');
   }
@@ -875,14 +889,6 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> rejectRevert(int swapRequestId,
       {String? reason, required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'revert_rejected',
-      'rejection_reason': reason,
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeRevertRejected(
       scheduleDate: request.scheduleDate,
       requestingProfileId: request.requestingProfileId,
@@ -891,7 +897,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    final changed = await _answer('reject_swap_request',
+        {'p_id': swapRequestId, 'p_reason': reason}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'revert_rejected');
     _trackAnswer('rejected', 'revert');
   }
@@ -900,20 +908,15 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> cancelRevert(int swapRequestId,
       {required List<Member> allProfiles}) async {
     final request = await _fetchRequest(swapRequestId);
-    final now = _nowUtcIso();
-    await _client.from('swap_requests').update({
-      'status': 'revert_cancelled',
-      'resolved_at': now,
-      'updated_at': now,
-    }).eq('id', swapRequestId);
-
     final drafts = composeRevertCancelled(
       scheduleDate: request.scheduleDate,
       targetProfileId: request.targetProfileId,
       allProfiles: [for (final p in allProfiles) p.toView()],
       environmentPrefix: environmentPrefix,
     );
-    await _insertNotifications(drafts, swapRequestId);
+    final changed =
+        await _answer('cancel_swap_request', {'p_id': swapRequestId}, drafts);
+    if (!changed) return;
     await _sendSwapEmail(swapRequestId, 'revert_cancelled');
     _trackAnswer('cancelled', 'revert');
   }
@@ -927,8 +930,10 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       Future<void>.value());
 
   @override
-  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate) async {
-    final approvedRequest = await _approvedRequestForDate(scheduleDate);
+  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate,
+      {int? childId}) async {
+    final approvedRequest =
+        await _approvedRequestForDate(scheduleDate, childId: childId);
     final preEditLogId = approvedRequest?.preEditLogId;
     if (preEditLogId == null) return null;
     final snapshot = PreEditSnapshot.parse(await _fetchOldData(preEditLogId));
@@ -943,13 +948,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   @override
   Future<List<DayAccount>> fetchDayAccounts(
       DateTime start, DateTime end) async {
-    final rows = await _client
+    final rows = await _allPages(() => _client
         .from('day_accounts')
         .select()
         .gte('account_date', CareSchedule.isoDate(start))
         .lte('account_date', CareSchedule.isoDate(end))
         .order('account_date')
-        .order('created_at');
+        .order('created_at')
+        .order('id'));
     return rows.map(DayAccount.fromJson).toList();
   }
 
@@ -976,12 +982,18 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<List<DayAccountReply>> fetchDayAccountReplies(
       List<int> accountIds) async {
     if (accountIds.isEmpty) return const [];
-    final rows = await _client
-        .from('day_account_replies')
-        .select()
-        .inFilter('account_id', accountIds)
-        .order('created_at', ascending: true);
-    return rows.map(DayAccountReply.fromJson).toList();
+    final out = <DayAccountReply>[];
+    for (final chunk in _chunks(accountIds)) {
+      final rows = await _allPages(() => _client
+          .from('day_account_replies')
+          .select()
+          .inFilter('account_id', chunk)
+          .order('created_at', ascending: true)
+          .order('id', ascending: true));
+      out.addAll(rows.map(DayAccountReply.fromJson));
+    }
+    out.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return out;
   }
 
   @override
@@ -1096,10 +1108,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   @override
   Future<List<AppNotification>> fetchNotifications(int myProfileId) async {
     // Newest 100 — the history tab is a recent-activity view (web parity).
+    // U-65: without the Conversa's rows — one per text, so a 60-text argument
+    // pushed yesterday's approval out of the newest 100. The Conversa has its
+    // own counter, and "Todas" one line pointing at it.
     final rows = await _client
         .from('notifications')
         .select()
         .eq('recipient_profile_id', myProfileId)
+        .not('type', 'in', '(${PushRouting.chatTypes.join(',')})')
         .order('created_at', ascending: false)
         .limit(100);
     // F-55 PR 4: a "phone only" agenda row exists for the push to render
@@ -1172,6 +1188,28 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         .eq('token', token)
         .limit(1);
     return rows.isNotEmpty;
+  }
+
+  @override
+  Future<({bool accountHasPush, DateTime? newestUnreadAt})> fetchPushReach(
+      int myProfileId) async {
+    final devices = await _client
+        .from('push_subscriptions')
+        .select('id')
+        .eq('profile_id', myProfileId)
+        .limit(1);
+    final unread = await _client
+        .from('notifications')
+        .select('created_at')
+        .eq('recipient_profile_id', myProfileId)
+        .eq('is_read', false)
+        .order('created_at', ascending: false)
+        .limit(1);
+    final at = unread.isEmpty ? null : unread.first['created_at'] as String?;
+    return (
+      accountHasPush: devices.isNotEmpty,
+      newestUnreadAt: at == null ? null : DateTime.parse(at).toUtc(),
+    );
   }
 
   @override
@@ -1291,11 +1329,46 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       final row = data is List ? (data.isEmpty ? null : data.first) : data;
       if (row is! Map) return null;
       return InviteInfo.fromJson(Map<String, dynamic>.from(row));
-    } catch (_) {
-      // An unusable token must look identical to an unreachable server here:
-      // the screen shows "this invitation is not valid" either way.
+    } on PostgrestException {
+      // The server ANSWERED and refused: as unusable as an unknown token.
       return null;
+    } catch (_) {
+      // F-88: no answer at all (offline, timeout, the gateway unreachable) —
+      // never "convite inválido", which sends the reader back to the ex.
+      throw const InviteUnreachable();
     }
+  }
+
+  @override
+  Future<String> fetchInviteTokenStatus(String token) async {
+    if (!InviteFormRules.isTokenShaped(token)) return 'unusable';
+    try {
+      final status = await _client
+          .rpc<dynamic>('invite_token_status', params: {'p_token': token});
+      return status is String ? status : 'unusable';
+    } catch (_) {
+      return 'unusable';
+    }
+  }
+
+  @override
+  Future<PendingInvitationOffer?> fetchMyPendingInvitation() async {
+    final data = await _client.rpc<dynamic>('my_pending_invitation');
+    final row = data is List ? (data.isEmpty ? null : data.first) : data;
+    if (row is! Map || row['token'] == null) return null;
+    return PendingInvitationOffer(
+      token: '${row['token']}',
+      familyName: '${row['family_name'] ?? ''}',
+      inviterName: '${row['inviter_name'] ?? ''}',
+    );
+  }
+
+  @override
+  Future<void> joinInvitationFromEmptyFamily(String token) async {
+    await _client.rpc<dynamic>('join_invitation_from_empty_family', params: {
+      'p_token': token,
+      'p_policy_version': PolicyVersions.current,
+    });
   }
 
   @override
@@ -1306,8 +1379,13 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     required String role,
     required String familyName,
     required String languageCode,
+    String? referralCode,
+    String? referralChannel,
+    Acquisition? acquisition,
+    String? childFirstName,
   }) async {
     final AuthResponse response;
+    final childName = ChildRules.normalize(childFirstName);
     try {
       response = await _client.auth.signUp(
         email: email,
@@ -1323,6 +1401,23 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
           'family_name': familyName,
           'policy_version': PolicyVersions.current,
           'language': languageCode,
+          // U-61: the child's first name, when given — the server writes the
+          // family's first child and removes the key before the auth row is
+          // stored (a child's name never rests on auth.users).
+          if (childName.isNotEmpty) ChildRules.signupMetadataKey: childName,
+          // F-80: present only when the caller saw the flag on. The server
+          // removes both keys before the auth row is stored.
+          if (ReferralRules.parseCode(referralCode) case final code?) ...{
+            'referral_code': code,
+            'referral_channel':
+                referralChannel ?? ReferralRules.channel(isWeb: kIsWeb),
+          },
+          // T-101: the family's source, recorded once by the server; both
+          // keys are removed before the auth row is stored.
+          if (acquisition != null) ...{
+            AcquisitionRules.sourceMetadataKey: acquisition.source,
+            AcquisitionRules.campaignMetadataKey: ?acquisition.campaign,
+          },
         },
       );
     } on AuthException catch (e) {
@@ -1372,11 +1467,45 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   // ── F-57: social-login onboarding (deferred profile) ─────────────────────
 
   @override
+  Future<bool> fetchReferralEnabled() async {
+    try {
+      return await _client.rpc<dynamic>('referral_enabled') == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<String?> attributeReferral(
+      {required String code, required String channel}) async {
+    try {
+      final answer = await _client.rpc<dynamic>('attribute_referral',
+          params: {'p_code': code, 'p_channel': channel});
+      return answer is String ? answer : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<String?> fetchMyReferralCode() async {
+    try {
+      final code = await _client.rpc<dynamic>('my_referral_code');
+      return ReferralRules.parseCode(code is String ? code : null);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
   Future<void> completeOauthOnboarding({
     required String fullName,
     required String role,
     required String familyName,
+    Acquisition? acquisition,
+    String? childFirstName,
   }) async {
+    final childName = ChildRules.normalize(childFirstName);
     try {
       await _client.rpc<void>('complete_oauth_onboarding', params: {
         'p_full_name': fullName,
@@ -1386,6 +1515,13 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         // refuses a mismatch, so a stale client can never stamp a consent it
         // did not display.
         'p_policy_version': PolicyVersions.current,
+        // U-61: the child's first name, when given (defaulted on the server).
+        if (childName.isNotEmpty) 'p_child_first_name': childName,
+        // T-101: the family's source (null → the server reads `organic`).
+        if (acquisition != null) ...{
+          'p_acquisition_source': acquisition.source,
+          'p_acquisition_campaign': acquisition.campaign,
+        },
       });
     } on PostgrestException catch (e) {
       // The RPC's refusals are PT-BR user text by design — propagate the
@@ -1695,9 +1831,9 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         .lte('event_date', _isoDay(to));
     if (!includeDeleted) query = query.isFilter('deleted_at', null);
     // postgrest-dart orders DESCENDING unless told otherwise.
-    final rows = await query
+    final rows = await _allPages(() => query
         .order('event_date', ascending: true)
-        .order('id', ascending: true);
+        .order('id', ascending: true));
     return rows.map(ChildEvent.fromJson).toList();
   }
 
@@ -1815,22 +1951,76 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
           'verify_report_attestation',
           params: {'p_id': id}) as Map);
 
+  static const _chatColumns =
+      'id, author_profile_id, body, quote_id, quoted_day, created_at';
+
   @override
-  Future<List<ChatMessage>> fetchChatMessages() async {
-    final rows = await _client
+  Future<List<ChatMessage>> fetchChatPage({int? beforeId}) async {
+    var query = _client.from('chat_messages').select(_chatColumns);
+    if (beforeId != null) query = query.lt('id', beforeId);
+    // Newest first so the LIMIT keeps the newest; the screen reads oldest
+    // first, hence the reverse.
+    final rows = await query.order('id', ascending: false).limit(chatPageSize);
+    return rows.map(ChatMessage.fromJson).toList().reversed.toList();
+  }
+
+  @override
+  Future<List<ChatMessage>> fetchChatMessagesAfter(int afterId) async {
+    final rows = await _allPages(() => _client
         .from('chat_messages')
-        .select('id, author_profile_id, body, quote_id, quoted_day, created_at')
-        .order('id', ascending: true);
+        .select(_chatColumns)
+        .gt('id', afterId)
+        .order('id', ascending: true));
     return rows.map(ChatMessage.fromJson).toList();
   }
 
   @override
-  Future<List<ChatRead>> fetchChatReads() async {
-    final rows = await _client
-        .from('chat_reads')
-        .select('message_id, profile_id, read_at')
-        .order('read_at', ascending: true);
-    return rows.map(ChatRead.fromJson).toList();
+  Future<List<ChatMessage>> fetchChatMessagesForPeriod(
+      DateTime fromUtc, DateTime toUtcExclusive) async {
+    final rows = await _allPages(() => _client
+        .from('chat_messages')
+        .select(_chatColumns)
+        .gte('created_at', fromUtc.toUtc().toIso8601String())
+        .lt('created_at', toUtcExclusive.toUtc().toIso8601String())
+        .order('id', ascending: true));
+    final inPeriod = rows.map(ChatMessage.fromJson).toList();
+    // A reply quotes by id, and the quoted text may predate the period.
+    final have = {for (final m in inPeriod) m.id};
+    final missing = {
+      for (final m in inPeriod)
+        if (m.quoteId != null && !have.contains(m.quoteId)) m.quoteId!
+    }.toList();
+    return [...await fetchChatMessagesByIds(missing), ...inPeriod];
+  }
+
+  @override
+  Future<List<ChatMessage>> fetchChatMessagesByIds(List<int> ids) async {
+    final out = <ChatMessage>[];
+    for (final chunk in _chunks(ids)) {
+      final rows = await _allPages(() => _client
+          .from('chat_messages')
+          .select(_chatColumns)
+          .inFilter('id', chunk)
+          .order('id', ascending: true));
+      out.addAll(rows.map(ChatMessage.fromJson));
+    }
+    return out;
+  }
+
+  @override
+  Future<List<ChatRead>> fetchChatReads(List<int> messageIds) async {
+    final out = <ChatRead>[];
+    for (final chunk in _chunks(messageIds)) {
+      final rows = await _allPages(() => _client
+          .from('chat_reads')
+          .select('message_id, profile_id, read_at')
+          .inFilter('message_id', chunk)
+          .order('read_at', ascending: true)
+          .order('message_id', ascending: true)
+          .order('profile_id', ascending: true));
+      out.addAll(rows.map(ChatRead.fromJson));
+    }
+    return out;
   }
 
   @override
@@ -1881,6 +2071,19 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<bool> fetchChatPushPreview() async {
+    final rows =
+        await _client.from('chat_prefs').select('push_preview').limit(1);
+    return rows.isNotEmpty && rows.first['push_preview'] == true;
+  }
+
+  @override
+  Future<void> setChatPushPreview(bool on) async {
+    await _client
+        .rpc<dynamic>('set_chat_push_preview', params: {'p_on': on});
+  }
+
+  @override
   Future<int> fetchChatUnreadCount(int profileId) async {
     // postgrest-dart orders DESCENDING unless told; the newest mark is wanted.
     final last = await _client
@@ -1906,9 +2109,11 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     if (from != null) q = q.gte('spent_on', _isoDay(from));
     if (to != null) q = q.lte('spent_on', _isoDay(to));
     if (!includeDeleted) q = q.isFilter('deleted_at', null);
-    final rows = await q
+    // T-104: the balance is computed on the phone from EVERY row — a cut
+    // here is a wrong balance, so the whole list is paged in.
+    final rows = await _allPages(() => q
         .order('spent_on', ascending: false)
-        .order('id', ascending: false);
+        .order('id', ascending: false));
     return rows.map(Expense.fromJson).toList();
   }
 
@@ -1916,20 +2121,28 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<List<ExpenseHistoryEntry>> fetchExpenseHistory(
       List<int> expenseIds) async {
     if (expenseIds.isEmpty) return const [];
-    final rows = await _client
-        .from('expense_history')
-        .select()
-        .inFilter('expense_id', expenseIds)
-        .order('at', ascending: true);
-    return rows.map(ExpenseHistoryEntry.fromJson).toList();
+    final out = <ExpenseHistoryEntry>[];
+    for (final chunk in _chunks(expenseIds)) {
+      final rows = await _allPages(() => _client
+          .from('expense_history')
+          .select()
+          .inFilter('expense_id', chunk)
+          .order('at', ascending: true)
+          .order('id', ascending: true));
+      out.addAll(rows.map(ExpenseHistoryEntry.fromJson));
+    }
+    // Chunks interleave in time; the trail reads oldest first.
+    out.sort((a, b) => a.at.compareTo(b.at));
+    return out;
   }
 
   @override
   Future<List<ExpenseSettlement>> fetchSettlements() async {
-    final rows = await _client
+    final rows = await _allPages(() => _client
         .from('expense_settlements')
         .select()
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false)
+        .order('id', ascending: false));
     return rows.map(ExpenseSettlement.fromJson).toList();
   }
 
@@ -2013,17 +2226,20 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<int> requestSettlement(
           {int? childId,
           required int toProfileId,
-          required int amountCents}) async =>
+          required int amountCents,
+          String? reference}) async =>
       await _client.rpc<dynamic>('request_settlement', params: {
         'p_child_id': childId,
         'p_to': toProfileId,
         'p_amount': amountCents,
+        'p_reference': reference,
       }) as int;
 
   @override
-  Future<void> answerSettlement(int id, {required bool received}) async {
+  Future<void> answerSettlement(int id,
+      {required bool received, String? note}) async {
     await _client.rpc<dynamic>('answer_settlement',
-        params: {'p_id': id, 'p_received': received});
+        params: {'p_id': id, 'p_received': received, 'p_note': note});
   }
 
   @override
@@ -2035,6 +2251,13 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<void> remindSettlement({int? childId, required int toProfileId}) async {
     await _client.rpc<dynamic>('remind_settlement',
         params: {'p_child_id': childId, 'p_to': toProfileId});
+  }
+
+  @override
+  Future<int> requestPremiumFromAdmin({required String gate}) async {
+    final told = await _client.rpc<dynamic>('request_premium_from_admin',
+        params: {'p_gate': PremiumAskRules.normalizeGate(gate)});
+    return told is int ? told : 0;
   }
 
   @override
@@ -2170,15 +2393,24 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<ExportBundle> fetchExportData(int myProfileId) async {
     // All four reads are RLS-scoped: the export can only ever contain what
     // this member is already allowed to see in the app.
+    // T-104: a data export that stops at the first 1,000 rows is not the
+    // member's data — every list is paged in.
     final results = await Future.wait([
-      _client.from('care_schedules').select().order('schedule_date'),
-      _client.from('swap_requests').select().order('created_at'),
-      _client
+      _allPages(() => _client
+          .from('care_schedules')
+          .select()
+          .order('schedule_date')
+          .order('id')),
+      _allPages(() =>
+          _client.from('swap_requests').select().order('created_at').order('id')),
+      _allPages(() => _client
           .from('notifications')
           .select()
           .eq('recipient_profile_id', myProfileId)
-          .order('created_at'),
-      _client.from('activity_logs').select().order('created_at'),
+          .order('created_at')
+          .order('id')),
+      _allPages(() =>
+          _client.from('activity_logs').select().order('created_at').order('id')),
     ]);
     return ExportBundle(
       schedules: (results[0]).map(CareSchedule.fromJson).toList(),
@@ -2341,12 +2573,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   @override
   Future<List<CareSchedule>> fetchSchedulesForPeriod(
       DateTime start, DateTime end) async {
-    final rows = await _client
+    // T-104: a year is 365 rows per lane — three children pass the cap.
+    final rows = await _allPages(() => _client
         .from('care_schedules')
         .select()
         .gte('schedule_date', CareSchedule.isoDate(start))
         .lte('schedule_date', CareSchedule.isoDate(end))
-        .order('schedule_date');
+        .order('schedule_date')
+        .order('id'));
     return rows.map(CareSchedule.fromJson).toList();
   }
 
@@ -2366,12 +2600,13 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     // The web filters on `affected_date` — the DAY the change is about, not
     // when it was made — and orders newest-first for the timeline; the F-33
     // document re-sorts oldest-first in core.
-    final rows = await _client
+    final rows = await _allPages(() => _client
         .from('activity_logs')
         .select()
         .gte('affected_date', CareSchedule.isoDate(start))
         .lte('affected_date', CareSchedule.isoDate(end))
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false)
+        .order('id', ascending: false));
     return rows.map(ActivityLog.fromJson).toList();
   }
 
@@ -2379,11 +2614,12 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   Future<List<AccountLog>> fetchAccountLogsByAction(
       List<String> actions) async {
     if (actions.isEmpty) return const [];
-    final rows = await _client
+    final rows = await _allPages(() => _client
         .from('account_logs')
         .select()
         .inFilter('action', actions)
-        .order('created_at', ascending: true);
+        .order('created_at', ascending: true)
+        .order('id', ascending: true));
     return rows.map(AccountLog.fromJson).toList();
   }
 
@@ -2395,6 +2631,45 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
         .order('created_at', ascending: false)
         .range(offset, offset + auditPageSize - 1);
     return rows.map(AccountLog.fromJson).toList();
+  }
+
+  @override
+  Future<SwapRequest?> fetchDaySwapOrigin(DateTime date, {int? childId}) async {
+    final query = _client
+        .from('swap_requests')
+        .select()
+        .eq('schedule_date', CareSchedule.isoDate(date))
+        .eq('status', 'approved');
+    final rows = await (childId == null
+            ? query.isFilter('child_id', null)
+            : query.eq('child_id', childId))
+        .order('resolved_at', ascending: false)
+        .limit(1);
+    return rows.isEmpty ? null : SwapRequest.fromJson(rows.first);
+  }
+
+  @override
+  Future<Set<int>> fetchSwapBaseLogIds(List<int> logIds) async {
+    if (logIds.isEmpty) return const {};
+    final out = <int>{};
+    for (final chunk in _chunks(logIds)) {
+      final rows = await _client
+          .from('swap_requests')
+          .select('pre_edit_log_id')
+          .inFilter('pre_edit_log_id', chunk);
+      for (final r in rows) {
+        final id = r['pre_edit_log_id'];
+        if (id is int) out.add(id);
+      }
+    }
+    return out;
+  }
+
+  @override
+  Future<SwapRequest?> fetchSwapRequest(int id) async {
+    final row =
+        await _client.from('swap_requests').select().eq('id', id).maybeSingle();
+    return row == null ? null : SwapRequest.fromJson(row);
   }
 
   @override

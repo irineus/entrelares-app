@@ -51,6 +51,8 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:entrelares_app/screens/calendar_screen.dart';
+import 'package:entrelares_app/widgets/today_card.dart';
+import 'package:entrelares_app/services/custody_data_source.dart';
 import 'package:entrelares_app/services/onboarding_service.dart';
 import 'package:entrelares_db_contracts/models/day_account.dart';
 import 'package:entrelares_db_contracts/models/day_account_reply.dart';
@@ -82,12 +84,15 @@ import 'package:entrelares_app/theme/tokens.dart';
 import 'package:entrelares_app/widgets/account_button.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/chat_view.dart';
+import 'package:entrelares_app/widgets/ui/ui.dart';
+import 'package:entrelares_app/widgets/consent_row.dart';
 import 'package:entrelares_app/widgets/google_sign_in_button.dart';
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:entrelares_app/widgets/person_chip.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -182,14 +187,24 @@ const _material = Size(48, 48);
 const _wcag = Size(44, 44);
 const _google = Size(40, 40);
 
+/// F-07 (owner, 29/09/2026): the legend and lane chips above the month are
+/// 40 dp to touch — the Google button's floor — so two rows of them do not
+/// take the month grid's height.
+const _personChip = Size(40, 40);
+
 /// Where a smaller floor applies, as rects on the screen right now.
-({List<Rect> grids, List<Rect> google}) _exceptions(WidgetTester tester) => (
+({List<Rect> grids, List<Rect> google, List<Rect> chips}) _exceptions(
+        WidgetTester tester) => (
   grids: [
     for (final e in find.byType(GridView).evaluate())
       tester.getRect(find.byWidget(e.widget)),
   ],
   google: [
     for (final e in find.byType(GoogleSignInButton).evaluate())
+      tester.getRect(find.byWidget(e.widget)),
+  ],
+  chips: [
+    for (final e in find.byType(PersonChip).evaluate())
       tester.getRect(find.byWidget(e.widget)),
   ],
 );
@@ -236,6 +251,8 @@ Future<void> _expectTapTargets(WidgetTester tester, String where) async {
         ? _wcag
         : ex.google.any((g) => g.contains(bounds.center))
         ? _google
+        : ex.chips.any((g) => g.contains(bounds.center))
+        ? _personChip
         : _material;
     if (size.width < floor.width - 1e-10 ||
         size.height < floor.height - 1e-10) {
@@ -256,7 +273,8 @@ Future<void> _expectTapTargets(WidgetTester tester, String where) async {
     reason:
         '[$where] a target under its floor: a thumb misses it and a '
         'switch-access user cannot reach it. Material 48 dp; the month '
-        'grid 44 dp (WCAG 2.5.5, U-28); the Google button 40 dp (U-45).',
+        'grid 44 dp (WCAG 2.5.5, U-28); the Google button 40 dp (U-45); '
+        'the chips above the month 40 dp (F-07).',
   );
 }
 
@@ -269,6 +287,31 @@ Future<void> _expectLabelled(WidgetTester tester, String where) async {
         '[$where] a tappable node with no label and no tooltip is what '
         'TalkBack reads as "button":\n${r.reason}',
   );
+}
+
+/// U-64 — how many lines a paragraph was actually laid out on: the distinct
+/// tops of its glyph boxes. The tap and label gates never saw "Recente / s"
+/// — a word cut across two lines is still a labelled 48 dp target.
+int _lines(RenderParagraph p) {
+  final len = p.text.toPlainText().length;
+  return p
+      .getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: len))
+      .map((b) => b.top.round())
+      .toSet()
+      .length;
+}
+
+void _expectOneLine(WidgetTester tester, Finder text, String where) {
+  for (final e in text.evaluate()) {
+    final p = e.findRenderObject() is RenderParagraph
+        ? e.findRenderObject()! as RenderParagraph
+        : tester.renderObject<RenderParagraph>(find.descendant(
+            of: find.byWidget(e.widget), matching: find.byType(RichText)));
+    expect(_lines(p), 1,
+        reason: '[$where] "${p.text.toPlainText()}" breaks across lines');
+    expect(p.didExceedMaxLines, isFalse,
+        reason: '[$where] "${p.text.toPlainText()}" is cut');
+  }
 }
 
 Future<void> _measure(WidgetTester tester, String where) async {
@@ -369,6 +412,13 @@ List<String> _under(List<(String, Color, Color)> pairs, double floor) => [
 /// A month with the four things a cell can carry: today with a handoff time,
 /// a swapped day, a frozen day (overdue, awaiting the reader) and the rest
 /// unplanned.
+/// The fixture's frozen day: early in the month, and never today nor the
+/// planned neighbour. It used to be the 2nd outright, so on every 2nd of the
+/// month TODAY was frozen and the today-cell assertion below read a frozen
+/// label (02/10/2026).
+int _frozenDay(int d, int other) =>
+    [2, 3, 4].firstWhere((i) => i != d && i != other);
+
 cal.FakeCustodyDataSource _calendarSource() {
   final d = cal.today.day;
   final other = d < 28 ? d + 1 : d - 1;
@@ -378,11 +428,15 @@ cal.FakeCustodyDataSource _calendarSource() {
       cal.row(1, cal.dayOfMonth(d), 1, handoffTime: '18:00'),
       cal.row(2, cal.dayOfMonth(other), 2, actual: 1),
     ],
-  )..frozenRequests = [frz.swapReq(10, cal.dayOfMonth(2))];
+  )..frozenRequests = [frz.swapReq(10, cal.dayOfMonth(_frozenDay(d, other)))];
 }
 
 Widget _calendar(cal.FakeCustodyDataSource ds, {required bool dark}) => _host(
-  CalendarScreen(dataSource: ds, adminMode: AdminMode()),
+  CalendarScreen(
+      dataSource: ds,
+      adminMode: AdminMode(),
+      // F-07: the legend chips are targets in the app — measure them.
+      onOpenMember: (_, _) {}),
   dark: dark,
 );
 
@@ -474,8 +528,45 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _measure(tester, 'register step 1');
+      // U-64: an empty "Continuar" names every empty field ON the field, all
+      // at once — not one sentence under the button.
+      await tester.ensureVisible(reg.continueButton(pt));
+      await tester.tap(reg.continueButton(pt));
+      await tester.pumpAndSettle();
+      for (final key in [
+        K.registerErrorNameRequired,
+        K.registerErrorEmailRequired,
+        K.registerErrorPasswordShort,
+      ]) {
+        expect(
+            find.descendant(
+                of: find.byType(TextField), matching: find.text(pt[key])),
+            findsOneWidget,
+            reason: '${pt[key]} belongs on its field');
+        final error = tester.renderObject<RenderParagraph>(find.text(pt[key]));
+        expect(error.didExceedMaxLines, isFalse,
+            reason: '"${pt[key]}" is cut on its field');
+      }
+      await _measure(tester, 'register step 1, every field refused');
       await reg.goToFamilyStep(tester);
       await _measure(tester, 'register step 2');
+      // U-64: the consent sentence is ONE paragraph with its two documents
+      // as links inside — no 48 dp button padding a line in the middle of it.
+      final consent = find.byType(ConsentRow);
+      expect(
+          find.descendant(of: consent, matching: find.byType(TextButton)),
+          findsNothing);
+      final sentence = tester.renderObject<RenderParagraph>(find.descendant(
+          of: consent,
+          matching: find.byWidgetPredicate((w) =>
+              w is RichText &&
+              w.text.toPlainText().contains(pt[K.commonTermsOfUse]))));
+      expect(sentence.text.toPlainText(),
+          contains(pt[K.commonPrivacyPolicy]));
+      if (tester.platformDispatcher.textScaleFactor == 1.0) {
+        expect(_lines(sentence), lessThanOrEqualTo(2),
+            reason: 'the consent sentence fits two lines at 360 dp');
+      }
       // The consent box names what it accepts, as one sentence.
       expect(
         find.bySemanticsLabel(
@@ -498,6 +589,31 @@ void main() {
       await cal.openDay(tester, cal.today.day);
       expect(find.byKey(daySheetEditKey), findsNothing);
       await _measure(tester, 'day sheet editor');
+    });
+
+    // U-61: the founder's first run — the Hoje card pointing at the wizard,
+    // the first-steps strip over the calendar and the checklist sheet, its
+    // actions under the text and its two exits pinned (U-38's shape).
+    _scene('first steps: plan nudge, launcher and checklist sheet',
+        (tester, dark) async {
+      final ds = cal.FakeCustodyDataSource(members: [cal.ana], days: []);
+      await tester.pumpWidget(
+        _host(
+          CalendarScreen(
+              dataSource: ds,
+              adminMode: AdminMode(),
+              onboarding: OnboardingService(ds),
+              onOpenMember: (_, _) {}),
+          dark: dark,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(TodayCard.planNudgeKey), findsOneWidget);
+      await _measure(tester, 'calendar on the first run');
+      await tester.tap(find.text(pt[K.onbChecklistTitle]));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[K.onbChecklistReplayTour]), findsOneWidget);
+      await _measure(tester, 'first steps sheet');
     });
 
     // Owner's validation, 25/09/2026: the agenda mark on the worst cells —
@@ -623,6 +739,27 @@ void main() {
       await tester.tap(find.text(pt[K.calWizard]));
       await tester.pumpAndSettle();
       await _measure(tester, 'wizard');
+      // U-64: the chosen model is said whole — no suffix eating it — and the
+      // block rows sit on one line each: the number, the "×" and the bin on
+      // the fields' centre, not on hand-tuned top paddings.
+      final preset = tester.renderObject<RenderParagraph>(find.descendant(
+          of: find.byKey(const Key('wizPreset')),
+          matching: find.byType(RichText)).first);
+      expect(preset.didExceedMaxLines, isFalse,
+          reason: "the model's name is cut: ${preset.text.toPlainText()}");
+      for (final mark in ['1.', '2.']) {
+        final row = find
+            .ancestor(of: find.text(mark), matching: find.byType(Row))
+            .first;
+        final field = find.descendant(
+            of: row, matching: find.byType(DropdownButtonFormField<int>));
+        expect(
+            (tester.getCenter(find.text(mark)).dy -
+                    tester.getCenter(field).dy)
+                .abs(),
+            lessThan(1.0),
+            reason: "block $mark is off its field's centre");
+      }
     });
 
     // U-55: the admin's strip on a plan born without a handoff time, and the
@@ -688,7 +825,11 @@ void main() {
                   GoRoute(
                     path: '/',
                     builder: (_, _) =>
-                        CalendarScreen(dataSource: ds, adminMode: AdminMode()),
+                        CalendarScreen(
+      dataSource: ds,
+      adminMode: AdminMode(),
+      // F-07: the legend chips are targets in the app — measure them.
+      onOpenMember: (_, _) {}),
                   ),
                 ],
               ),
@@ -755,6 +896,33 @@ void main() {
       await _measure(tester, 'family rename row');
       expect(find.byTooltip(pt[K.commonSave]), findsOneWidget);
       expect(find.byTooltip(pt[K.commonCancel]), findsOneWidget);
+    });
+
+    // F-80 PR 2: the "Indique uma família" card, with the module on — the
+    // link line, the rule sentence and Compartilhar at 360 dp and 1,3×.
+    _scene('family referral card', (tester, dark) async {
+      // U-61: offered only to a complete, active family.
+      final ds = fam.source(settings: const {'feature.referral': 'true'})
+        ..onboardingFacts = const OnboardingFacts(hasAnyPlannedDay: true);
+      await tester.pumpWidget(
+        _host(
+          FamilyScreen(
+            dataSource: ds,
+            adminMode: AdminMode(),
+            sudo: SudoService(ds),
+            onOpenProfile: (_, _) {},
+            onOpenPlan: () {},
+          ),
+          dark: dark,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final card = find.byKey(const ValueKey('family-referral-card'));
+      await tester.scrollUntilVisible(card, 200,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+      expect(card, findsOne);
+      await _measure(tester, 'family referral card');
     });
 
     _scene('notifications', (tester, dark) async {
@@ -912,6 +1080,30 @@ void main() {
 
     // F-68: "Ajuda e contato", signed out (the heavier variant: it has the
     // e-mail field), with the technical preview open and an error banner up.
+    // F-103: the confirmation before granting admin — the list of powers,
+    // the warning and the notice line, at 360 dp and 1.3×.
+    _scene('admin change confirmation', (tester, dark) async {
+      await tester.pumpWidget(_host(
+          Builder(
+              builder: (context) => Scaffold(
+                    body: Center(
+                      child: TextButton(
+                        onPressed: () => showAppSheet<bool>(
+                          context: context,
+                          builder: (_) => const AdminChangeConfirmSheet(
+                              name: 'Bruno Lima', granting: true),
+                        ),
+                        child: const Text('open'),
+                      ),
+                    ),
+                  )),
+          dark: dark));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[KApp.adminPowerFamily]), findsOneWidget);
+      await _measure(tester, 'admin change confirmation');
+    });
+
     _scene('help', (tester, dark) async {
       await tester.pumpWidget(
         _host(
@@ -972,6 +1164,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ReportsAuditTab), findsOneWidget);
       await _measure(tester, 'reports audit');
+      // U-64: four segments at 360 dp broke "Recentes" into "Recente / s".
+      for (final key in [
+        K.auditTabRecent,
+        K.repByMonth,
+        K.repByYear,
+        K.auditTabAccount,
+      ]) {
+        _expectOneLine(tester, find.text(pt[key]), 'history filter');
+      }
       await tester.tap(find.text(pt[K.repTabPdf]));
       await tester.pumpAndSettle();
       expect(find.byType(ReportsPdfTab), findsOneWidget);
@@ -1070,6 +1271,32 @@ void main() {
         await _measure(tester, 'chat export sheet');
       });
     }
+
+    // U-66: the composer with its permanence line, a quote that is a way
+    // to the quoted text, and the search bar with "Ir para a data" and each
+    // result's "Ver na conversa" — at 360 dp and 1.3×.
+    _scene('chat thread, quote and search', (tester, dark) async {
+      final ds = chat.source()
+        ..chatMessages = [
+          chat.text(1, chat.bruno.id, 'A mensalidade da escola subiu'),
+          chat.text(2, chat.ana.id, 'Vamos conversar', quote: 1),
+        ];
+      await tester.pumpWidget(_host(
+          Scaffold(
+              body: ChatView(
+                  dataSource: ds, onOpenPlan: () {}, now: () => chat.today)),
+          dark: dark));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[KApp.chatComposerPermanent]), findsOneWidget);
+      await _measure(tester, 'chat thread with a quote');
+      await tester.tap(find.byKey(const ValueKey('chat-search')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byKey(const ValueKey('chat-search-field')), 'mensalidade');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('chat-show-1')), findsOneWidget);
+      await _measure(tester, 'chat search with results');
+    });
 
     _scene('custom roles', (tester, dark) async {
       await tester.pumpWidget(
@@ -1182,6 +1409,69 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('F-90: the bell sentence names BOTH numbers the badge adds', (
+      tester,
+    ) async {
+      await _usePhone(tester);
+      final handle = tester.ensureSemantics();
+      final ds =
+          cal.FakeCustodyDataSource(members: [cal.ana, cal.bruno], days: [])
+            ..pendingForMe = [
+              frz.swapReq(10, cal.dayOfMonth(cal.today.day)),
+              frz.swapReq(11, cal.dayOfMonth(cal.today.day)),
+            ];
+      final badge = NotificationBadge(ds);
+      await badge.refresh();
+      expect(badge.count, 2);
+      // Unread Conversa texts ride on the same badge.
+      badge.chatUnread = 3;
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: [
+          StatefulShellRoute.indexedStack(
+            builder: (_, _, shell) => HomeShell(
+              shell: shell,
+              adminMode: AdminMode(),
+              identity: AccountIdentity(),
+              onSignOut: () async {},
+              onOpenProfile: () {},
+              badge: badge,
+            ),
+            branches: [
+              for (final path in ['/', '/family', '/notifications', '/reports'])
+                StatefulShellBranch(
+                  routes: [
+                    GoRoute(
+                      path: path,
+                      builder: (_, _) => const Scaffold(body: SizedBox()),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        AppL10n(
+          l: pt,
+          setLanguage: (_) async {},
+          child: MaterialApp.router(
+            theme: AppTheme.light,
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('5'), findsOneWidget, reason: 'the badge adds both');
+      expect(
+        find.bySemanticsLabel(RegExp(
+            '${pt.format(K.navNotificationsManyPending, [2])}, '
+            '${pt.format(KApp.chatNewMany, [3])}')),
+        findsWidgets,
+      );
+      handle.dispose();
+    });
+
     testWidgets('an audit diff says which side each value is', (tester) async {
       await _usePhone(tester);
       final handle = tester.ensureSemantics();
@@ -1237,7 +1527,7 @@ void main() {
       final other = d < 28 ? d + 1 : d - 1;
       final empty = [
         for (var i = 3; i <= 28; i++) i,
-      ].firstWhere((i) => i != d && i != other);
+      ].firstWhere((i) => i != d && i != other && i != _frozenDay(d, other));
       final node = tester.getSemantics(
         find.bySemanticsLabel(
           RegExp('^$empty, ${pt[K.calAriaNoResponsible]}\$'),

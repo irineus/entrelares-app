@@ -43,7 +43,8 @@ const _paths = ['/', '/family', '/notifications', '/expenses', '/reports'];
 Widget _shellApp(Localization l,
     {required int selected,
     required ValueNotifier<bool> expensesTab,
-    ValueNotifier<bool>? chatTab}) {
+    ValueNotifier<bool>? chatTab,
+    NotificationBadge? badge}) {
   final router = GoRouter(
     initialLocation: _paths[selected],
     routes: [
@@ -56,8 +57,9 @@ Widget _shellApp(Localization l,
             onOpenProfile: () {},
             expensesTab: expensesTab,
             chatTab: chatTab,
-            badge: NotificationBadge(
-                FakeCustodyDataSource(members: const [], days: []))),
+            badge: badge ??
+                NotificationBadge(
+                    FakeCustodyDataSource(members: const [], days: []))),
         branches: [
           for (final path in _paths)
             StatefulShellBranch(routes: [
@@ -224,5 +226,34 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('nav-expenses')));
     await tester.pumpAndSettle();
     expect(find.text('page:/expenses'), findsOne);
+  });
+
+  // U-65: settle-ups waiting for my answer are counted on the tab where the
+  // answer is, and the tab says so to a screen reader.
+  testWidgets('the Despesas tab carries the settle-ups waiting for me',
+      (tester) async {
+    final l = Localization(AppLanguage.ptBr);
+    await useSize(tester, _phone, 1.0);
+    final badge = NotificationBadge(
+        FakeCustodyDataSource(members: const [], days: []));
+    await tester.pumpWidget(_shellApp(l,
+        selected: 0, expensesTab: ValueNotifier(true), badge: badge));
+    await tester.pumpAndSettle();
+    final mark = find.byKey(const ValueKey('nav-expenses-badge'));
+    expect(tester.widget<Badge>(mark.first).isLabelVisible, isFalse);
+
+    badge
+      ..settlementsToConfirm = 2
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      ..notifyListeners();
+    await tester.pumpAndSettle();
+    expect(tester.widget<Badge>(mark.first).isLabelVisible, isTrue);
+    final handle = tester.ensureSemantics();
+    await tester.pump();
+    expect(
+        find.bySemanticsLabel(RegExp(RegExp.escape(
+            l.format(KApp.expenseNavPending, [l[KApp.expenseNav], 2])))),
+        findsWidgets);
+    handle.dispose();
   });
 }

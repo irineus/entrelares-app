@@ -611,18 +611,26 @@ jobs:
   # (24/08/2026, owner decision — `docs/arquivamento-app.md`). It runs only from
   # `main`, only after BOTH gates are green, and the credentials are three secrets
   # that exist nowhere else in the workflow.
+  #
+  # S-23 (29/09/2026): those three live in the `production` Environment, whose
+  # deployment branch rule is `main` alone. The `if` below is written in this
+  # file, and a same-repo branch can edit this file — so the `if` keeps the job
+  # from RUNNING elsewhere, and only the Environment's rule keeps a branch from
+  # READING the secrets. The shape T-79 gave the Play upload key.
   db-prod:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
     needs: [verify, db-gate]
     runs-on: ubuntu-latest
+    environment: production
     # Queue, never cancel: a `db push` interrupted between two migrations leaves
     # production half-applied, and no later run can tell that from a clean state.
     concurrency:
       group: db-prod
       cancel-in-progress: false
     env:
-      # Account-scoped tokens; two named ones (ci-qa/ci-prod) give separate
-      # revocation and audit per pipeline.
+      # Since 10/09/2026 this is S-20's FULL-ACCOUNT legacy token (both orgs,
+      # every project) — a crutch until Supabase fixes the scoped path. The
+      # Environment is what keeps it out of every branch but `main`.
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_PROD }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
       PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
@@ -644,17 +652,19 @@ jobs:
           retry supabase db push
           deploy_functions "$PROJECT_REF"
 
-      # Self-disarming until the owner moves the credentials, so `main` does not
-      # go red for a piece of ops that has not happened yet. The note is loud on
-      # purpose: while this step is the one that runs, schema and app do NOT
-      # travel together, and the `entrelares-app` pipeline is still what applies
-      # migrations to production.
-      - name: Dizer por que o banco de produção não foi tocado
+      # This used to DISARM (24/08/2026: "ops that has not happened yet"). The
+      # ops happened long ago and no other pipeline applies migrations to
+      # production any more, so an empty token inside the `production`
+      # Environment is a misconfiguration — a secret moved to the wrong place,
+      # or deleted before its copy existed (S-23). Red, so `ops-alert` fires:
+      # a green run that touched nothing is T-68's silent non-publish.
+      - name: Recusar rodar sem as credenciais de produção
         if: env.SUPABASE_ACCESS_TOKEN == ''
         run: |
-          echo "### Banco de PRODUÇÃO não tocado por este repo" >> "$GITHUB_STEP_SUMMARY"
-          echo "Faltam \`SUPABASE_ACCESS_TOKEN_PROD\`, \`SUPABASE_DB_PASSWORD_PROD\` e \`SUPABASE_PROJECT_REF_PROD\`." >> "$GITHUB_STEP_SUMMARY"
-          echo "Enquanto isso quem aplica migrations em produção é o \`entrelares-app\`, e **schema e app não viajam juntos** — ver \`docs/arquivamento-app.md\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "### 🚨 Banco de PRODUÇÃO não tocado — falta credencial" >> "$GITHUB_STEP_SUMMARY"
+          echo "Vazio: \`SUPABASE_ACCESS_TOKEN_PROD\` no Environment \`production\` (S-23). Sem ele nenhuma migration chega a produção e o \`deploy-web\` não publica." >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=db-prod::SUPABASE_ACCESS_TOKEN_PROD vazio no Environment production (S-23)"
+          exit 1
 
   # ── T-53 stage 4 — the web channel ──────────────────────────────────────
   # Flutter Web REPLACES the Blazor PWA (tension 1), so this repo owns the
@@ -685,6 +695,10 @@ jobs:
     #     never serves an app whose schema failed to apply.
     needs: [verify, db-gate, web-e2e, db-prod]
     runs-on: ubuntu-latest
+    # S-23: the Cloudflare and Sentry tokens live in the `production`
+    # Environment (`main` only), for the reason `db-prod` states. The QA lanes
+    # hold their OWN Cloudflare token, `CLOUDFLARE_API_TOKEN_QA`.
+    environment: production
     # Queue, never cancel — same reason as `db-prod`, one step later: a publish
     # killed mid-upload can leave the channel serving a half-written build.
     concurrency:
@@ -694,6 +708,8 @@ jobs:
     # `if`, and a step cannot reliably test the `env:` it declares itself.
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Not a secret (it is in CLAUDE.md and the landing's wrangler.jsonc); it
+      # stays at repo level and serves both lanes.
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # T-66 (PR 3): the sourcemap upload, self-disarming like the publish
       # below. Org and project are NOT secrets — the DSN in `env.dart` already
@@ -739,9 +755,9 @@ jobs:
         run: |
           version=$(grep -m1 '^version:' app/pubspec.yaml | awk '{print $2}')
           echo "name=entrelares-app@$version" >> "$GITHUB_OUTPUT"
-      # Self-DISARMING, the same shape as the publish step below: with no token
-      # the deploy proceeds and says the stacks will read minified, instead of
-      # painting `main` red for ops that has not happened yet.
+      # Self-DISARMING: with no token the deploy proceeds and says the stacks
+      # will read minified. Unlike the publish (S-23), a missing Sentry token
+      # costs readable stacks, not the channel, so it stays a note.
       #
       # No `sourcemaps inject`: it stamps debug ids into the bundle AND expects
       # the events to carry them back, which a hand-written client does not
@@ -793,11 +809,9 @@ jobs:
       # created by the owner before the first run.
       - name: Install Wrangler
         run: npm install -g wrangler
-      # Self-DISARMING while the Cloudflare credentials do not exist in this
-      # repo — the same shape the app repo gives `E2E_ASAAS_WEBHOOK_TOKEN`: an
-      # absent secret arrives empty and the step skips instead of painting
-      # `main` red for a piece of ops that has not happened yet. The build
-      # above still runs on every push, so the channel cannot rot silently.
+      # Gated on the token so that, when it is empty, the ONE step that runs is
+      # the refusal at the end of this job — red, with the reason (S-23; until
+      # then an empty token skipped the publish and left `main` green).
       # (`secrets` is not readable from a job-level `if`; `env` is, from a
       # step-level one.)
       - name: Publish to Cloudflare Pages
@@ -825,11 +839,16 @@ jobs:
       - name: Refuse a served script the CSP would block
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: bash .github/smoke_web_csp.sh "https://${{ env.WEB_HOSTNAME }}"
-      - name: Say why nothing was published
+      # Red, not a note — same reasoning as `db-prod`'s step: the channel is
+      # live, so an empty token is a misplaced secret, and a green run that
+      # published nothing is the incident T-68 exists about (S-23).
+      - name: Refuse to finish without publishing
         if: env.CLOUDFLARE_API_TOKEN == ''
         run: |
-          echo "### Canal web: build OK, publicação PULADA" >> "$GITHUB_STEP_SUMMARY"
-          echo "Faltam os secrets \`CLOUDFLARE_API_TOKEN\` e \`CLOUDFLARE_ACCOUNT_ID\` neste repo (e o projeto Pages \`entrelares-web\`)." >> "$GITHUB_STEP_SUMMARY"
+          echo "### 🚨 Canal web: build OK, NADA publicado — falta credencial" >> "$GITHUB_STEP_SUMMARY"
+          echo "Vazio: \`CLOUDFLARE_API_TOKEN\` no Environment \`production\` (S-23). \`web.entrelares.app\` segue servindo o commit anterior." >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=deploy-web::CLOUDFLARE_API_TOKEN vazio no Environment production (S-23)"
+          exit 1
 
   # ── T-79 — the Android channel, published from here ─────────────────────
   # Until 22/09/2026 every `.aab` was built on the owner's machine and uploaded
@@ -955,9 +974,19 @@ jobs:
   # Behind `verify` AND `db-gate`: the build talks to the dev project, and it is
   # `db-gate` that brings this PR's migrations and functions there first.
   # Same-repo PRs only — a fork receives no secrets, by GitHub's design, and
-  # these secrets (the dev keystore, the App Distribution account, Cloudflare)
-  # are repo-level on purpose: an Environment limited to `main` is exactly what
-  # a PR must NOT be able to reach, and none of them publishes to users.
+  # these secrets (the dev keystore, the App Distribution account, the QA
+  # Cloudflare token) are repo-level on purpose: an Environment limited to
+  # `main` is exactly what a PR must NOT be able to reach.
+  #
+  # S-23 (29/09/2026): until then this comment said "none of them publishes to
+  # users", and the Cloudflare token was the exception it did not see — the
+  # SAME token deployed `entrelares-web`. The QA lanes now hold their own,
+  # `CLOUDFLARE_API_TOKEN_QA`. Know its limit: Cloudflare scopes Pages
+  # permissions to a whole ACCOUNT, never to one project, so this token can
+  # still deploy to the production project if a workflow tells it to. What the
+  # split buys is that the production token, Supabase and Sentry left PR reach,
+  # and each lane is revoked and audited on its own. Real isolation is a
+  # second Cloudflare account for the QA project — an open decision on S-23.
   qa-preview:
     if: >-
       github.event_name == 'pull_request'
@@ -975,7 +1004,9 @@ jobs:
       pull-requests: write
     env:
       FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_APP_DISTRIBUTION_SERVICE_ACCOUNT }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # The env NAME stays `CLOUDFLARE_API_TOKEN` — it is what wrangler reads.
+      # The SECRET is the QA lane's own (S-23).
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_QA }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       QA_ALIAS: pr-${{ github.event.pull_request.number }}
@@ -1107,8 +1138,9 @@ jobs:
     concurrency:
       group: qa-web
       cancel-in-progress: true
+    # No Environment, like qa-preview: the QA lane's own token (S-23).
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_QA }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4

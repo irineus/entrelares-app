@@ -218,7 +218,9 @@ List<pw.Widget> _header(CustodyReport report, Localization l) => [
         children: [
           _metaRow(l[K.pdfDocFamily], report.familyName),
           if (report.childName != null)
-            _metaRow(l[K.pdfDocChild], report.childName!),
+            _metaRow(
+                l[report.childCount > 1 ? K.pdfDocChildren : K.pdfDocChild],
+                report.childName!),
           _metaRow(
             l[K.pdfDocPeriod],
             l.format(K.pdfDocPeriodValue, [
@@ -249,9 +251,31 @@ pw.TableRow _metaRow(String label, String value) => pw.TableRow(children: [
       ),
     ]);
 
-List<pw.Widget> _summarySection(CustodyReport report, Localization l) => [
+List<pw.Widget> _summarySection(CustodyReport report, Localization l) =>
+    report.laneSections.isEmpty
+        ? _familySummary(report, l)
+        : [
+            _sectionTitle(l[K.pdfDocSection1]),
+            // F-07 (PR 5c): a per-child period — one table per lane.
+            for (final lane in report.laneSections) ...[
+              pw.SizedBox(height: 4),
+              pw.Text(lane.label,
+                  style: pw.TextStyle(
+                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 2),
+              ..._distribution(report, lane.caregivers, lane.totalSwaps, l),
+            ],
+          ];
+
+List<pw.Widget> _familySummary(CustodyReport report, Localization l) => [
       _sectionTitle(l[K.pdfDocSection1]),
-      if (report.caregivers.isEmpty)
+      ..._distribution(report, report.caregivers, report.totalSwaps, l),
+    ];
+
+List<pw.Widget> _distribution(CustodyReport report,
+        List<CaregiverStat> caregivers, int totalSwaps, Localization l) =>
+    [
+      if (caregivers.isEmpty)
         _paragraph(l[K.pdfDocEmptySummary])
       else ...[
         pw.Table(
@@ -269,7 +293,7 @@ List<pw.Widget> _summarySection(CustodyReport report, Localization l) => [
                 _cell(l[K.pdfDocColSwaps], bold: true),
               ],
             ),
-            for (final c in report.caregivers)
+            for (final c in caregivers)
               pw.TableRow(children: [
                 _cell(c.name),
                 _cell(c.role),
@@ -285,7 +309,7 @@ List<pw.Widget> _summarySection(CustodyReport report, Localization l) => [
             report.includesFutureSwaps
                 ? K.pdfDocTotalSwapsFuture
                 : K.pdfDocTotalSwaps,
-            [report.totalSwaps]))),
+            [totalSwaps]))),
       ],
     ];
 
@@ -379,7 +403,7 @@ List<pw.Widget> _historySection(CustodyReport report, Localization l) => [
                   pw.Padding(
                     padding: const pw.EdgeInsets.only(left: 10, top: 1),
                     child: pw.Text(
-                      '${change.label}: ${_changeValue(change)}',
+                      '${change.label}: ${_changeValue(change, l)}',
                       style: const pw.TextStyle(fontSize: 8.5),
                     ),
                   ),
@@ -521,34 +545,7 @@ List<pw.Widget> _expensesSection(
     if (e.isEmpty)
       _paragraph(l[KApp.expensePdfEmpty])
     else ...[
-      if (e.lines.isNotEmpty)
-        pw.Table(
-          border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-          columnWidths: const {
-            0: pw.FlexColumnWidth(1.2),
-            1: pw.FlexColumnWidth(3),
-            2: pw.FlexColumnWidth(1.4),
-            3: pw.FlexColumnWidth(1.4),
-            4: pw.FlexColumnWidth(1.6),
-          },
-          children: [
-            pw.TableRow(children: [
-              _cell(l[KApp.expenseDate], bold: true),
-              _cell(l[KApp.expenseDesc], bold: true),
-              _cell(l[KApp.expenseCategory], bold: true),
-              _cell(l[KApp.expenseAmount], bold: true),
-              _cell(l[KApp.expensePaidBy], bold: true),
-            ]),
-            for (final line in e.lines)
-              pw.TableRow(children: [
-                _cell(l.formatDate(line.date)),
-                _cell(line.description),
-                _cell(line.categoryLabel),
-                _cell(money(line.amountCents)),
-                _cell(line.paidByName),
-              ]),
-          ],
-        ),
+      if (e.lines.isNotEmpty) _expenseTable(e, l, money),
       if (e.totals.isNotEmpty) ...[
         pw.SizedBox(height: 6),
         for (final t in e.totals)
@@ -563,12 +560,50 @@ List<pw.Widget> _expensesSection(
             style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
         for (final p in e.payments)
           pw.Text(
-              l.format(KApp.expensePdfSettlement, [
-                l.formatDate(p.date),
-                p.fromName,
-                money(p.amountCents),
-                p.toName,
-              ]),
+              _withPaymentFacts(
+                  l.format(KApp.expensePdfSettlement, [
+                    l.formatDate(p.date),
+                    p.fromName,
+                    money(p.amountCents),
+                    p.toName,
+                  ]),
+                  l,
+                  reference: p.reference,
+                  noteBy: p.toName,
+                  note: p.note),
+              style: small),
+      ],
+      // F-93: what was recorded and never entered the balance — the payer's
+      // proof of the dispute, kept on paper.
+      if (e.unconfirmed.isNotEmpty) ...[
+        pw.SizedBox(height: 6),
+        pw.Text(l[KApp.expensePdfUnconfirmed],
+            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+        for (final u in e.unconfirmed)
+          pw.Text(
+              _withPaymentFacts(
+                  l.format(KApp.expensePdfUnconfirmedLine, [
+                    l.formatDateTime(u.recordedAt),
+                    u.fromName,
+                    money(u.amountCents),
+                    u.toName,
+                    switch (u.state) {
+                      ReportPaymentState.pending =>
+                        l[KApp.expensePdfStatusPending],
+                      ReportPaymentState.rejected =>
+                        l.format(KApp.expensePdfStatusRejected, [
+                          u.toName,
+                          l.formatDateTime(u.answeredAt ?? u.recordedAt),
+                        ]),
+                      ReportPaymentState.cancelled =>
+                        l.format(KApp.expensePdfStatusCancelled,
+                            [l.formatDateTime(u.answeredAt ?? u.recordedAt)]),
+                    },
+                  ]),
+                  l,
+                  reference: u.reference,
+                  noteBy: u.toName,
+                  note: u.note),
               style: small),
       ],
       if (e.changes.isNotEmpty) ...[
@@ -583,6 +618,55 @@ List<pw.Widget> _expensesSection(
       ],
     ],
   ];
+}
+
+/// F-93: a payment line plus what the payer and the receiver typed about it.
+String _withPaymentFacts(String line, Localization l,
+        {String? reference, required String noteBy, String? note}) =>
+    [
+      line,
+      if (reference != null) l.format(KApp.expenseReferenceLine, [reference]),
+      if (note != null) l.format(KApp.expenseNoteLine, [noteBy, note]),
+    ].join(' · ');
+
+/// F-96: the expense lines with the split per person and, when any line has
+/// one, the child — the two facts a lawyer asks first.
+pw.Widget _expenseTable(
+    ReportExpenses e, Localization l, String Function(int) money) {
+  final withChild = e.lines.any((x) => x.childName != null);
+  return pw.Table(
+    border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+    columnWidths: {
+      0: const pw.FlexColumnWidth(1.2),
+      1: const pw.FlexColumnWidth(2.4),
+      if (withChild) 2: const pw.FlexColumnWidth(1.1),
+      (withChild ? 3 : 2): const pw.FlexColumnWidth(1.2),
+      (withChild ? 4 : 3): const pw.FlexColumnWidth(1.3),
+      (withChild ? 5 : 4): const pw.FlexColumnWidth(1.4),
+      (withChild ? 6 : 5): const pw.FlexColumnWidth(2.4),
+    },
+    children: [
+      pw.TableRow(children: [
+        _cell(l[KApp.expenseDate], bold: true),
+        _cell(l[KApp.expenseDesc], bold: true),
+        if (withChild) _cell(l[KApp.expensePdfChild], bold: true),
+        _cell(l[KApp.expenseCategory], bold: true),
+        _cell(l[KApp.expenseAmount], bold: true),
+        _cell(l[KApp.expensePaidBy], bold: true),
+        _cell(l[KApp.expenseDetailSplit], bold: true),
+      ]),
+      for (final line in e.lines)
+        pw.TableRow(children: [
+          _cell(l.formatDate(line.date)),
+          _cell(line.description),
+          if (withChild) _cell(line.childName ?? '—'),
+          _cell(line.categoryLabel),
+          _cell(money(line.amountCents)),
+          _cell(line.paidByName),
+          _cell(line.splitText),
+        ]),
+    ],
+  );
 }
 
 /// F-35: the Conversa of the period, in order, as written — immutable on the
@@ -613,17 +697,22 @@ List<pw.Widget> _chatSection(
                   style: pw.TextStyle(
                       fontSize: 8.5, fontWeight: pw.FontWeight.bold)),
               pw.Text(c.body, style: const pw.TextStyle(fontSize: 8.5)),
+              if (c.readLine != null)
+                pw.Text(c.readLine!,
+                    style: const pw.TextStyle(
+                        fontSize: 7.5, color: PdfColors.grey700)),
             ],
           ),
         ),
   ];
 }
 
-/// Mirror of the web's document markup: a two-sided change reads `de → para`,
-/// a one-sided one prints whichever value exists.
-String _changeValue(AuditFieldChange change) =>
+/// Mirror of the web's document markup: a two-sided change reads "de X para
+/// Y", a one-sided one prints whichever value exists. F-96: in WORDS — the
+/// embedded Roboto has no "→", so the arrow never reached the paper.
+String _changeValue(AuditFieldChange change, Localization l) =>
     change.from != null && change.to != null
-        ? '${change.from} → ${change.to}'
+        ? l.format(KApp.pdfChangeFromTo, [change.from, change.to])
         : (change.to ?? change.from ?? '');
 
 pw.Widget _detail(String label, String value) => pw.Padding(

@@ -20,7 +20,26 @@ class CycleBlock {
 
 /// The preset ids, in menu order. The VALUES are pattern ids and never change
 /// with the language — only the labels do (U-13).
-const wizardPresetIds = ['7-7', '14-14', '1-1', '5-2-2-5', '2-2-3'];
+///
+/// Owner's QA of 3.1.10 (06/10/2026): the alternating weekends come FIRST —
+/// "the plan most families will use" — and the wizard opens on it
+/// ([wizardDefaultPreset]); the rest keep their order.
+const wizardPresetIds = [
+  // F-97 (owner, 05/10/2026): the most common Brazilian arrangement — the
+  // child lives with one parent, the other has every other weekend (Fri–Sun),
+  // optionally plus a Wednesday overnight. Both are 14-day cycles anchored on
+  // a FRIDAY ([wizardPresetAnchor]).
+  '3-11',
+  '3-2-1-6-1-1',
+  '7-7',
+  '14-14',
+  '1-1',
+  '5-2-2-5',
+  '2-2-3',
+];
+
+/// The quick model the wizard opens on (owner's QA of 3.1.10; it was 7/7).
+const wizardDefaultPreset = '3-11';
 
 /// Mirror of `ApplyPresetBlocks`: expands a preset id over the first two
 /// profiles ([profileIds] in roster order; missing slots become 0 and fail
@@ -46,8 +65,65 @@ List<CycleBlock> wizardPresetBlocks(String preset, List<int> profileIds) {
         CycleBlock(p1, 2),
         CycleBlock(p2, 3),
       ],
+    // F-97: "Fins de semana alternados (sex–dom)" — p2 has Fri, Sat, Sun;
+    // p1 the eleven days until the next weekend of p2.
+    '3-11' => [CycleBlock(p2, 3), CycleBlock(p1, 11)],
+    // F-97: "… + pernoite de quarta" — p2's weekend, p1 Mon–Tue, p2 Wednesday,
+    // p1 Thu through the next Tuesday (p1's own weekend), p2 Wednesday again,
+    // p1 Thursday.
+    '3-2-1-6-1-1' => [
+        CycleBlock(p2, 3),
+        CycleBlock(p1, 2),
+        CycleBlock(p2, 1),
+        CycleBlock(p1, 6),
+        CycleBlock(p2, 1),
+        CycleBlock(p1, 1),
+      ],
     _ => [CycleBlock(p1, 7), CycleBlock(p2, 7)],
   };
+}
+
+/// F-97: the weekday a preset's cycle must start on, or null when any day
+/// will do.
+///
+/// * the alternating weekends start on a FRIDAY (F-97);
+/// * 2-2-5-5 ('5-2-2-5') on a WEDNESDAY — its blocks only give each parent
+///   two fixed weekdays and alternate the weekends when the first five-day
+///   block runs Wednesday to Sunday (owner's QA of 3.1.10: started on a
+///   Sunday, one parent got "two weekends" and no fixed day; the landing's
+///   page already told readers to pick a Wednesday by hand);
+/// * 2/2/3 on a MONDAY — Mon–Tue, Wed–Thu, Fri–Sun, then the mirror week.
+///
+/// 7/7, 14/14 and 1/1 are the same whatever the weekday.
+int? wizardPresetAnchor(String preset) => const {
+      '3-11': DateTime.friday,
+      '3-2-1-6-1-1': DateTime.friday,
+      '5-2-2-5': DateTime.wednesday,
+      '2-2-3': DateTime.monday,
+    }[preset];
+
+/// F-97: [start] moved to the next [weekday] — or kept, when it already is
+/// one. Never earlier: a start in the past is refused anyway.
+DateTime snapToWeekday(DateTime start, int weekday) {
+  final d = dateOnly(start);
+  final ahead = (weekday - d.weekday + 7) % 7;
+  return DateTime(d.year, d.month, d.day + ahead);
+}
+
+/// F-97: a plan that CONTINUES one already written. [previousParentId] is
+/// D-1's effective carer. For a free-weekday cycle the blocks turn so the
+/// first one is the block right after the first block of that carer — a
+/// 7/7 ending on Mom's week continues with Dad's, not with Mom again. An
+/// anchored cycle ([anchored]) is never turned: its weekday alignment IS the
+/// pattern, and turning it would move the weekends; D-1 then only feeds the
+/// first day's handoff ([generateRotation]'s `previousParentId`).
+List<CycleBlock> continueCycle(List<CycleBlock> blocks,
+    {required int? previousParentId, required bool anchored}) {
+  if (anchored || previousParentId == null || blocks.length < 2) return blocks;
+  final i = blocks.indexWhere((b) => b.profileId == previousParentId);
+  if (i < 0) return blocks;
+  final from = (i + 1) % blocks.length;
+  return [...blocks.sublist(from), ...blocks.sublist(0, from)];
 }
 
 /// Mirror of `SetBlockDays`' `Math.Clamp(days, 1, 60)`.
@@ -158,13 +234,15 @@ class GeneratedDay {
 /// cycling through [blocks]. T-27: a handoff time lands only on TRANSITION
 /// days — and the wizard's local rule deliberately differs from the
 /// calendar's [isTransitionDay]: the FIRST generated day has no previous
-/// parent and gets NO handoff (custody isn't changing hands mid-plan there).
+/// parent and gets NO handoff (custody isn't changing hands mid-plan there) —
+/// unless [previousParentId] says who had D-1 (F-97).
 /// [end] arrives already clamped by [clampScheduleEnd] (F-39).
 List<GeneratedDay> generateRotation({
   required DateTime start,
   required DateTime end,
   required List<CycleBlock> blocks,
   ({int hour, int minute})? handoffTime,
+  int? previousParentId,
 }) {
   final result = <GeneratedDay>[];
   if (blocks.isEmpty) return result;
@@ -172,7 +250,8 @@ List<GeneratedDay> generateRotation({
   final last = dateOnly(end);
   var blockIndex = 0;
   var dayInBlock = 0;
-  int? previousParentId;
+  // F-97: D-1's carer when the plan continues one already written — the first
+  // generated day is then a real transition and gets the handoff time.
   while (current.isBefore(last)) {
     final block = blocks[blockIndex];
     final isTransition =
@@ -252,4 +331,59 @@ List<CycleRun> cycleStripRuns(List<GeneratedDay> days) {
     }
   }
   return runs;
+}
+
+/// Owner's QA of 3.1.14 (06/10/2026) — an anchored cycle that must start on
+/// [start] itself: CONTINUING a plan (the day after it ends) or filling a
+/// month from its 1st. Snapping to the anchor weekday there would leave the
+/// days in between with nobody; instead the cycle comes in already in step —
+/// the days before the anchor get whoever the pattern gives them (for the
+/// alternating weekends, the weekday parent) and the anchor weekday still
+/// opens a cycle.
+///
+/// A 14-day cycle can be in step in two ways (whose weekend comes first).
+/// When [previousParentId] (D-1's carer) matches the day before [start] in
+/// exactly one of them, that one wins — the plan goes on without a handoff
+/// the old one did not have. Otherwise the next anchor day opens the cycle,
+/// as a snapped start would.
+///
+/// The blocks come back turned (e.g. Ana 2 · Bruno 3 · Ana 9 for a 3/11
+/// started on a Wednesday): the same cycle, read from [start].
+List<CycleBlock> phaseAnchoredCycle(
+  List<CycleBlock> blocks, {
+  required DateTime start,
+  required int anchorWeekday,
+  int? previousParentId,
+}) {
+  final days = [
+    for (final b in blocks)
+      for (var i = 0; i < b.days; i++) b.profileId
+  ];
+  final length = days.length;
+  if (length == 0) return blocks;
+  final untilAnchor = (anchorWeekday - dateOnly(start).weekday + 7) % 7;
+  // Positions of [start] in the cycle that put the next anchor day at 0.
+  final base = (length - untilAnchor) % length;
+  final phases = <int>{
+    for (var k = 0; k < (length % 7 == 0 ? length ~/ 7 : 1); k++)
+      (base + 7 * k) % length
+  }.toList();
+  var phase = phases.first;
+  if (previousParentId != null && phases.length > 1) {
+    final matching = [
+      for (final p in phases)
+        if (days[(p - 1 + length) % length] == previousParentId) p
+    ];
+    if (matching.length == 1) phase = matching.single;
+  }
+  final turned = [...days.sublist(phase), ...days.sublist(0, phase)];
+  final result = <CycleBlock>[];
+  for (final id in turned) {
+    if (result.isNotEmpty && result.last.profileId == id) {
+      result[result.length - 1] = CycleBlock(id, result.last.days + 1);
+    } else {
+      result.add(CycleBlock(id, 1));
+    }
+  }
+  return result;
 }

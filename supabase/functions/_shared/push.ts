@@ -17,9 +17,13 @@
 // not just do.** A receipt for your own action (`swap_sent`, `revert_sent`,
 // `swap_approved_self`, `revert_approved_self`) reaches a person who is holding
 // the phone that produced it. The F-28 family fan-out (`swap_family_info`) is
-// information, not a call to action. Membership, account/family deletion,
-// e-mail quota and billing all already have an e-mail and a screen, and none of
-// them is time-critical the way a day starting tomorrow is.
+// information, not a call to action. Billing has an e-mail and a screen.
+//
+// F-59 (02/10/2026) moved the line for membership: someone joining, coming
+// back or leaving, and a family deletion asked for, refused, withdrawn or about
+// to run, used to reach the rest of the family by e-mail. E-mail is now kept
+// only where nothing else can reach the reader, so these push instead — the
+// wordings about SOMEONE ELSE only; the dispatcher filters the rest by `kind`.
 //
 // Anything outside PUSH_TYPES simply never reaches this module — the database
 // trigger filters first, and `renderPush` refuses a second time, because a
@@ -78,6 +82,46 @@ export const PUSH_TYPES: readonly string[] = [
 	// a params.push of false and the dispatcher never calls this. Lands on
 	// the Conversa tab. Never e-mail.
 	"chat_message",
+	// F-59. The membership notices, which used to be e-mail + in-app. Only the
+	// `kind`s about someone else reach this module (the dispatcher filters the
+	// rest), and none of them states a day of the plan — so they are rendered
+	// before the date guard below. All land on "Todas".
+	"member_joined",
+	"member_returned",
+	"account_deletion",
+	"family_deletion",
+	// F-77. The family's Premium trial ends (D-7, D-1) or ended. Nobody did
+	// anything: the trial runs out under the family, and only its admins
+	// can subscribe, so only they are written to. Lands on the plan page.
+	"premium_trial",
+	// F-80 PR 3. A family the reader's family referred paid and stayed paid, and
+	// the free month was delivered. Nobody in the family did anything today.
+	// States no day and names no family (params carries the kind alone),
+	// so it is rendered before the date guard. Lands on the plan page.
+	"referral_reward",
+	// F-81. An admin changed, on their own authority, a day that is (or was)
+	// the reader's — the reader did nothing, and found out by opening the
+	// calendar until now. ONE per action and recipient: `single` names the day
+	// and lands on it; `batch` names the first and last day and the count, and
+	// lands on Relatórios → Histórico. Never e-mail.
+	"day_admin_change",
+	// F-101. The invitation the reader sent expired unanswered — the second
+	// parent did not join, which is the activation step, and it stalled in
+	// silence. ONE per invitation, to the inviter only. States no day, so it is
+	// rendered before the date guard. Lands on Família, where "Compartilhar de
+	// novo" makes a new link. Never e-mail (F-59).
+	"invitation_expired",
+	// F-102. A member who is not an admin met a Premium gate and asked: "Bruno
+	// quer o Premium para a agenda da criança" — to the family's admins, at most
+	// once per requester per day (the RPC's guard). States no day, so it is
+	// rendered before the date guard. Lands on the plan page, where the
+	// subscribe button is. Never e-mail (F-59).
+	"premium_request",
+	// F-103. An admin granted or removed the reader's admin bit — the person
+	// it happened to used to find out when "Convidar" refused them. States no
+	// day, so it is rendered before the date guard. Lands on "Todas". Never
+	// e-mail (F-59).
+	"admin_changed",
 ];
 
 /// Catalog keys, spelled exactly as `K` spells them on the Dart side. The
@@ -97,6 +141,9 @@ const K = {
 
 	autoReminder: "notifRender.autoReminder",
 	autoReminderDeadline: "notifRender.autoReminder.deadline",
+	// F-94: the eve reminder — the same type with `kind: 'eve'`.
+	titleAutoReminderEve: "notifRender.title.autoReminder.eve",
+	autoReminderEve: "notifRender.autoReminder.eve",
 	autoApprovedRequester: "notifRender.autoApproved.requester",
 	autoApprovedApprover: "notifRender.autoApproved.approver",
 	swapRequestedTarget: "notifRender.swapRequested.target",
@@ -141,6 +188,9 @@ const K = {
 
 	titlePlanEnding: "notifRender.title.planEnding",
 	titlePlanEnded: "notifRender.title.planEnded",
+	titleTrialEnding: "notifRender.title.trialEnding",
+	titlePlanUnplanned: "notifRender.title.planUnplanned",
+	titleTrialEnded: "notifRender.title.trialEnded",
 	titleExpenseAdded: "notifRender.title.expenseAdded",
 	titleExpenseUpdated: "notifRender.title.expenseUpdated",
 	titleExpenseDeleted: "notifRender.title.expenseDeleted",
@@ -164,6 +214,7 @@ const K = {
 	expenseCategoryOther: "notifRender.expenseCategory.other",
 	titleChatMessage: "notifRender.title.chatMessage",
 	chatMessage: "notifRender.chatMessage",
+	chatMessageHidden: "notifRender.chatMessage.hidden",
 	titleAgendaNotice: "notifRender.title.agendaNotice",
 	titleAgendaReminder: "notifRender.title.agendaReminder",
 	agendaNotice: "notifRender.agendaNotice",
@@ -179,6 +230,44 @@ const K = {
 	agendaKindOther: "notifRender.agendaKind.other",
 	planEnding: "notifRender.planEnding",
 	planEnded: "notifRender.planEnded",
+	trialEnding: "notifRender.trialEnding",
+	planUnplanned: "notifRender.planUnplanned",
+	trialEnded: "notifRender.trialEnded",
+	titleReferralReward: "notifRender.title.referralReward",
+	referralReward: "notifRender.referralReward",
+	titlePremiumRequest: "notifRender.title.premiumRequest",
+	premiumRequest: "notifRender.premiumRequest",
+	premiumGateChat: "notifRender.premiumGate.chat",
+	premiumGateChatExport: "notifRender.premiumGate.chatExport",
+	premiumGateAgenda: "notifRender.premiumGate.agenda",
+	premiumGateExpenses: "notifRender.premiumGate.expenses",
+	premiumGatePdf: "notifRender.premiumGate.pdf",
+	premiumGateFamily: "notifRender.premiumGate.family",
+	titleDayAdminChangeSingle: "notifRender.title.dayAdminChange.single",
+	titleDayAdminChangeBatch: "notifRender.title.dayAdminChange.batch",
+	dayAdminChangeSingle: "notifRender.dayAdminChange.single",
+	dayAdminChangeBatch: "notifRender.dayAdminChange.batch",
+
+	titleMemberJoined: "notifRender.title.memberJoined",
+	titleInvitationExpired: "notifRender.title.invitationExpired",
+	titleMemberReturned: "notifRender.title.memberReturned",
+	titleMemberLeft: "notifRender.title.memberLeft",
+	titleFamilyDeletionRequested: "notifRender.title.familyDeletionRequested",
+	titleFamilyDeletionCancelled: "notifRender.title.familyDeletionCancelled",
+	titleFamilyDeletionWithdrawn: "notifRender.title.familyDeletionWithdrawn",
+	titleFamilyDeletionNear: "notifRender.title.familyDeletionNear",
+	memberJoined: "notifRender.memberJoined",
+	invitationExpired: "notifRender.invitationExpired",
+	titleAdminGranted: "notifRender.title.adminGranted",
+	titleAdminRevoked: "notifRender.title.adminRevoked",
+	adminGranted: "notifRender.adminGranted",
+	adminRevoked: "notifRender.adminRevoked",
+	memberReturned: "notifRender.memberReturned",
+	leaveOther: "notifRender.leave.other",
+	famDelRequestedOther: "notifRender.famDel.requestedOther",
+	famDelRefused: "notifRender.famDel.refused",
+	famDelWithdrawn: "notifRender.famDel.withdrawn",
+	famDelReminder: "notifRender.famDel.reminder",
 } as const;
 
 /// The strings themselves — byte-identical to `StringsPtBr`/`StringsEn` for
@@ -198,7 +287,9 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.revertRejected": "Reversão recusada",
 		"notifRender.title.revertCancelled": "Pedido de reversão cancelado",
 		"notifRender.autoReminder": "A solicitação do dia {0} será aprovada automaticamente se não houver resposta.",
-		"notifRender.autoReminder.deadline": "A solicitação do dia {0} será aprovada automaticamente em {1} às {2} se não houver resposta.",
+		"notifRender.autoReminder.deadline": "A solicitação do dia {0} será aprovada automaticamente se não houver resposta até {1}.",
+		"notifRender.title.autoReminder.eve": "Pedido para amanhã sem resposta",
+		"notifRender.autoReminder.eve": "{0} fez um pedido para amanhã, {1}, que ainda espera a sua resposta.",
 		"notifRender.autoApproved.requester": "A solicitação do dia {0} foi aprovada automaticamente por falta de resposta.",
 		"notifRender.autoApproved.approver": "A solicitação do dia {0} foi aprovada automaticamente. Você não respondeu dentro do prazo.",
 		"notifRender.swapRequested.target": "{0} solicitou que você fique responsável pela criança no dia {1}.{2}",
@@ -238,12 +329,32 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.planEnded": "O planejamento terminou",
 		"notifRender.planEnding": "O planejamento da família vai até {0}. Planeje os próximos meses.",
 		"notifRender.planEnded": "O último dia planejado foi {0}. Planeje os próximos meses no calendário.",
+		"notifRender.title.trialEnding": "A avaliação Premium termina em breve",
+		"notifRender.title.planUnplanned": "Falta planejar o primeiro mês",
+		"notifRender.planUnplanned": "O calendário da família ainda não tem nenhum dia planejado. Comece pelo primeiro mês.",
+		"notifRender.title.trialEnded": "A avaliação Premium terminou",
+		"notifRender.trialEnding": "A avaliação Premium da família vai até {0}. Para continuar com o Premium depois dessa data, veja o plano.",
+		"notifRender.trialEnded": "A avaliação Premium da família terminou em {0}. A família segue no plano gratuito, e o Premium pode ser assinado a qualquer momento.",
+		"notifRender.title.referralReward": "Um mês de Premium pela indicação",
+		"notifRender.referralReward": "Uma família que vocês indicaram assinou o Premium: a sua família ganhou um mês de Premium.",
+		"notifRender.title.premiumRequest": "Pedido de Premium",
+		"notifRender.premiumRequest": "{0} quer o Premium para {1}.",
+		"notifRender.premiumGate.chat": "escrever na Conversa",
+		"notifRender.premiumGate.chatExport": "exportar a Conversa em PDF",
+		"notifRender.premiumGate.agenda": "a agenda da criança",
+		"notifRender.premiumGate.expenses": "as despesas",
+		"notifRender.premiumGate.pdf": "o relatório em PDF",
+		"notifRender.premiumGate.family": "a família",
+		"notifRender.title.dayAdminChange.single": "Dia alterado no calendário",
+		"notifRender.title.dayAdminChange.batch": "Dias alterados no calendário",
+		"notifRender.dayAdminChange.single": "{0} alterou o dia {1} no calendário.",
+		"notifRender.dayAdminChange.batch": "{0} alterou {1} dias entre {2} e {3} no calendário.",
 		"notifRender.title.expenseAdded": "Despesa lançada",
 		"notifRender.title.expenseUpdated": "Despesa alterada",
 		"notifRender.title.expenseDeleted": "Despesa apagada",
-		"notifRender.expenseAdded": "{0} lançou uma despesa de {1} em {2}: {3}. {4}",
-		"notifRender.expenseUpdated": "{0} alterou uma despesa de {1} em {2}: {3}. {4}",
-		"notifRender.expenseDeleted": "{0} apagou uma despesa de {1} em {2}: {3}. {4}",
+		"notifRender.expenseAdded": "{0} lançou uma despesa de {1} em {2}: {4} ({3}).",
+		"notifRender.expenseUpdated": "{0} alterou uma despesa de {1} em {2}: {4} ({3}).",
+		"notifRender.expenseDeleted": "{0} apagou uma despesa de {1} em {2}: {4} ({3}).",
 		"notifRender.title.settlementRequested": "Confirme um acerto",
 		"notifRender.settlementRequested": "{0} registrou em {1} que pagou {2} a você. Confirme em Despesas se recebeu.",
 		"notifRender.title.settlementConfirmed": "Acerto confirmado",
@@ -261,6 +372,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.expenseCategory.other": "Outros",
 		"notifRender.title.chatMessage": "Conversa da família",
 		"notifRender.chatMessage": "{0}: {1}",
+		"notifRender.chatMessage.hidden": "Nova mensagem de {0} na Conversa",
 		"notifRender.title.agendaNotice": "Novo na agenda",
 		"notifRender.title.agendaReminder": "Lembrete da agenda",
 		"notifRender.agendaNotice": "{0} adicionou à agenda de {1}: {2}.{3}",
@@ -274,6 +386,26 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.agendaKind.free": "Livre",
 		"notifRender.agendaKind.note": "Nota",
 		"notifRender.agendaKind.other": "Outro",
+		"notifRender.title.memberJoined": "Novo responsável na família",
+		"notifRender.title.invitationExpired": "O convite expirou",
+		"notifRender.title.memberReturned": "Responsável voltou à família",
+		"notifRender.title.memberLeft": "Um responsável saiu",
+		"notifRender.title.familyDeletionRequested": "Exclusão da família solicitada",
+		"notifRender.title.familyDeletionCancelled": "Exclusão da família cancelada",
+		"notifRender.title.familyDeletionWithdrawn": "Exclusão da família retirada",
+		"notifRender.title.familyDeletionNear": "Exclusão da família se aproxima",
+		"notifRender.memberJoined": "{0} juntou-se à família. Confira o calendário para incluí-lo no planejamento.",
+		"notifRender.invitationExpired": "{0} não respondeu ao convite e o link expirou. Compartilhe de novo — um link pelo WhatsApp costuma funcionar melhor.",
+		"notifRender.title.adminGranted": "Você agora é administrador(a)",
+		"notifRender.title.adminRevoked": "Você deixou de ser administrador(a)",
+		"notifRender.adminGranted": "{0} tornou você administrador(a) da família.",
+		"notifRender.adminRevoked": "{0} removeu a sua permissão de administrador(a) da família.",
+		"notifRender.memberReturned": "{0} cancelou a saída e voltou à família.",
+		"notifRender.leave.other": "{0} saiu da família. Os dias futuros dessa pessoa foram liberados — verifique o calendário e reatribua o que for necessário.",
+		"notifRender.famDel.requestedOther": "{0} solicitou a exclusão da família. Se ninguém recusar até {1}, TODOS os dados (calendário, histórico e contas de todos) serão apagados definitivamente. Você pode recusar em Perfil > Exclusão da família — qualquer recusa cancela a exclusão.",
+		"notifRender.famDel.refused": "{0} recusou a exclusão da família. A solicitação foi encerrada e a família continua.",
+		"notifRender.famDel.withdrawn": "{0} retirou a solicitação de exclusão da família. A família continua normalmente.",
+		"notifRender.famDel.reminder": "A família será excluída definitivamente em {0}. Você ainda pode recusar em Perfil > Exclusão da família, ou exportar seus dados antes.",
 	},
 	"en": {
 		"notifRender.title.autoReminder": "Pending request awaiting your reply",
@@ -287,7 +419,9 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.revertRejected": "Revert declined",
 		"notifRender.title.revertCancelled": "Revert request cancelled",
 		"notifRender.autoReminder": "The request for {0} will be approved automatically if nobody replies.",
-		"notifRender.autoReminder.deadline": "The request for {0} will be approved automatically on {1} at {2} if nobody replies.",
+		"notifRender.autoReminder.deadline": "The request for {0} will be approved automatically if nobody replies by {1}.",
+		"notifRender.title.autoReminder.eve": "Request for tomorrow still unanswered",
+		"notifRender.autoReminder.eve": "{0} made a request for tomorrow, {1}, that is still waiting for your answer.",
 		"notifRender.autoApproved.requester": "The request for {0} was approved automatically for lack of a reply.",
 		"notifRender.autoApproved.approver": "The request for {0} was approved automatically. You did not reply before the deadline.",
 		"notifRender.swapRequested.target": "{0} asked you to be responsible for the child on {1}.{2}",
@@ -327,12 +461,32 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.title.planEnded": "Your plan has ended",
 		"notifRender.planEnding": "Your family's plan runs until {0}. Plan the next months.",
 		"notifRender.planEnded": "The last planned day was {0}. Plan the next months in the calendar.",
+		"notifRender.title.trialEnding": "Your Premium trial ends soon",
+		"notifRender.title.planUnplanned": "The first month still needs a plan",
+		"notifRender.planUnplanned": "Your family's calendar has no planned day yet. Start with the first month.",
+		"notifRender.title.trialEnded": "Your Premium trial has ended",
+		"notifRender.trialEnding": "Your family's Premium trial runs until {0}. To keep Premium after that date, see the plan.",
+		"notifRender.trialEnded": "Your family's Premium trial ended on {0}. The family stays on the free plan, and Premium can be subscribed at any time.",
+		"notifRender.title.referralReward": "A month of Premium for your referral",
+		"notifRender.referralReward": "A family you referred subscribed to Premium: your family got one month of Premium.",
+		"notifRender.title.premiumRequest": "Premium request",
+		"notifRender.premiumRequest": "{0} wants Premium for {1}.",
+		"notifRender.premiumGate.chat": "writing in the chat",
+		"notifRender.premiumGate.chatExport": "exporting the chat as PDF",
+		"notifRender.premiumGate.agenda": "the child's agenda",
+		"notifRender.premiumGate.expenses": "the expenses",
+		"notifRender.premiumGate.pdf": "the PDF report",
+		"notifRender.premiumGate.family": "the family",
+		"notifRender.title.dayAdminChange.single": "Day changed on the calendar",
+		"notifRender.title.dayAdminChange.batch": "Days changed on the calendar",
+		"notifRender.dayAdminChange.single": "{0} changed {1} on the calendar.",
+		"notifRender.dayAdminChange.batch": "{0} changed {1} days between {2} and {3} on the calendar.",
 		"notifRender.title.expenseAdded": "Expense added",
 		"notifRender.title.expenseUpdated": "Expense changed",
 		"notifRender.title.expenseDeleted": "Expense deleted",
-		"notifRender.expenseAdded": "{0} added an expense of {1} on {2}: {3}. {4}",
-		"notifRender.expenseUpdated": "{0} changed an expense of {1} on {2}: {3}. {4}",
-		"notifRender.expenseDeleted": "{0} deleted an expense of {1} on {2}: {3}. {4}",
+		"notifRender.expenseAdded": "{0} added an expense of {1} on {2}: {4} ({3}).",
+		"notifRender.expenseUpdated": "{0} changed an expense of {1} on {2}: {4} ({3}).",
+		"notifRender.expenseDeleted": "{0} deleted an expense of {1} on {2}: {4} ({3}).",
 		"notifRender.title.settlementRequested": "Confirm a settle-up",
 		"notifRender.settlementRequested": "{0} recorded on {1} that they paid you {2}. Confirm in Expenses whether you received it.",
 		"notifRender.title.settlementConfirmed": "Settle-up confirmed",
@@ -350,6 +504,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.expenseCategory.other": "Other",
 		"notifRender.title.chatMessage": "Family chat",
 		"notifRender.chatMessage": "{0}: {1}",
+		"notifRender.chatMessage.hidden": "New message from {0} in the chat",
 		"notifRender.title.agendaNotice": "New on the agenda",
 		"notifRender.title.agendaReminder": "Agenda reminder",
 		"notifRender.agendaNotice": "{0} added to the agenda for {1}: {2}.{3}",
@@ -363,6 +518,26 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.agendaKind.free": "Free time",
 		"notifRender.agendaKind.note": "Note",
 		"notifRender.agendaKind.other": "Other",
+		"notifRender.title.memberJoined": "New caregiver in the family",
+		"notifRender.title.invitationExpired": "The invitation expired",
+		"notifRender.title.memberReturned": "A caregiver is back",
+		"notifRender.title.memberLeft": "A caregiver left",
+		"notifRender.title.familyDeletionRequested": "Family deletion requested",
+		"notifRender.title.familyDeletionCancelled": "Family deletion cancelled",
+		"notifRender.title.familyDeletionWithdrawn": "Family deletion withdrawn",
+		"notifRender.title.familyDeletionNear": "Family deletion is near",
+		"notifRender.memberJoined": "{0} joined the family. Check the calendar to include them in the planning.",
+		"notifRender.invitationExpired": "{0} did not answer the invitation and the link expired. Share it again — a WhatsApp link usually works best.",
+		"notifRender.title.adminGranted": "You are now an admin",
+		"notifRender.title.adminRevoked": "You are no longer an admin",
+		"notifRender.adminGranted": "{0} made you an admin of the family.",
+		"notifRender.adminRevoked": "{0} removed your admin permission in the family.",
+		"notifRender.memberReturned": "{0} cancelled their departure and is back in the family.",
+		"notifRender.leave.other": "{0} left the family. That person's future days were freed — check the calendar and reassign whatever is needed.",
+		"notifRender.famDel.requestedOther": "{0} requested the deletion of the family. If nobody refuses by {1}, EVERYONE's data (calendar, history and accounts) will be permanently erased. You can refuse under Profile > Family deletion — a single refusal cancels the deletion.",
+		"notifRender.famDel.refused": "{0} refused to delete the family. The request is closed and the family continues.",
+		"notifRender.famDel.withdrawn": "{0} withdrew the family deletion request. The family continues normally.",
+		"notifRender.famDel.reminder": "The family will be permanently deleted on {0}. You can still refuse under Profile > Family deletion, or export your data first.",
 	},
 };
 
@@ -390,6 +565,31 @@ function splitDeadline(value: string | undefined): { date: string; time: string 
 	return { date: `${match[1]}-${match[2]}-${match[3]}`, time: `${match[4]}:${match[5]}` };
 }
 
+/// U-63: the deadline as a person says it — the twin of Dart's
+/// `formatDeadline` (core `date_formats.dart`) and of SQL's
+/// `pt_deadline_words`: "sábado, 10/10, à 0h" / "domingo, 11/10, às 18h30" ·
+/// "Saturday, 10 Oct, at 12 AM" / "Sunday, 11 Oct, at 6:30 PM". PT-BR says "à"
+/// for the singular hours (0h, 1h) and "às" for the rest.
+const PT_WEEKDAYS_FULL = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+const EN_WEEKDAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const EN_MONTHS_ABBREV = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function formatDeadlineIn(lang: Lang, deadline: { date: string; time: string }): string {
+	const [y, mo, d] = deadline.date.split("-").map(Number) as [number, number, number];
+	const [h, mi] = deadline.time.split(":").map(Number) as [number, number];
+	const weekday = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+	const dd = String(d).padStart(2, "0");
+	const mm = String(mi).padStart(2, "0");
+	if (lang === "en") {
+		const h12 = h % 12 === 0 ? 12 : h % 12;
+		const ampm = h < 12 ? "AM" : "PM";
+		const time = mi === 0 ? `${h12} ${ampm}` : `${h12}:${mm} ${ampm}`;
+		return `${EN_WEEKDAYS_FULL[weekday]}, ${dd} ${EN_MONTHS_ABBREV[mo - 1]}, at ${time}`;
+	}
+	const prep = h <= 1 ? "à" : "às";
+	const time = mi === 0 ? `${h}h` : `${h}h${mm}`;
+	return `${PT_WEEKDAYS_FULL[weekday]}, ${dd}/${String(mo).padStart(2, "0")}, ${prep} ${time}`;
+}
+
 /// F-34: "R$ 1.234,56" / "R$1,234.56" from integer cents (a string in params).
 function brl(lang: Lang, raw: string | undefined): string | null {
 	if (raw === undefined || !/^-?\d+$/.test(raw)) return null;
@@ -404,6 +604,62 @@ function brl(lang: Lang, raw: string | undefined): string | null {
 function fmt(lang: Lang, key: string, args: string[] = []): string {
 	const template = STRINGS[lang][key] ?? STRINGS["pt-BR"][key] ?? "";
 	return template.replace(/\{(\d+)\}/g, (whole, index) => args[Number(index)] ?? whole);
+}
+
+/// F-59: the pushable types that state no day of the plan.
+const MEMBERSHIP_TYPES: readonly string[] = [
+	"member_joined",
+	"member_returned",
+	"account_deletion",
+	"family_deletion",
+];
+
+/// F-59 — someone joined, came back or left; a family deletion was asked for,
+/// refused, withdrawn or is about to run. Each `kind` the dispatcher lets
+/// through has a branch; any other is a receipt for the reader's own action or
+/// a future writer's shape, and gets no push, never a guess.
+function renderMembership(lang: Lang, type: string, params: PushParams): PushCopy | null {
+	const who = params["name"] ?? fmt(lang, K.fbOtherCap);
+	const kind = params["kind"];
+	switch (type) {
+		case "member_joined":
+			if (params["name"] === undefined) return null;
+			return { title: fmt(lang, K.titleMemberJoined), body: fmt(lang, K.memberJoined, [who]) };
+		// F-101: the invitation the reader sent expired unanswered. `name` is the
+		// placeholder's name or the address; without it the row stays in-app.
+		case "invitation_expired":
+			if (params["name"] === undefined) return null;
+			return { title: fmt(lang, K.titleInvitationExpired), body: fmt(lang, K.invitationExpired, [who]) };
+		case "member_returned":
+			if (params["name"] === undefined) return null;
+			return { title: fmt(lang, K.titleMemberReturned), body: fmt(lang, K.memberReturned, [who]) };
+		case "account_deletion":
+			if (kind !== "other_left") return null;
+			return { title: fmt(lang, K.titleMemberLeft), body: fmt(lang, K.leaveOther, [who]) };
+		case "family_deletion": {
+			const isoDate = params["date"];
+			const date = isoDate ? formatDateIn(lang, isoDate) : null;
+			switch (kind) {
+				case "requested_other":
+					if (date === null) return null;
+					return {
+						title: fmt(lang, K.titleFamilyDeletionRequested),
+						body: fmt(lang, K.famDelRequestedOther, [who, date]),
+					};
+				case "refused":
+					return { title: fmt(lang, K.titleFamilyDeletionCancelled), body: fmt(lang, K.famDelRefused, [who]) };
+				case "withdrawn":
+					return { title: fmt(lang, K.titleFamilyDeletionWithdrawn), body: fmt(lang, K.famDelWithdrawn, [who]) };
+				case "reminder":
+					if (date === null) return null;
+					return { title: fmt(lang, K.titleFamilyDeletionNear), body: fmt(lang, K.famDelReminder, [date]) };
+				default:
+					return null;
+			}
+		}
+		default:
+			return null;
+	}
 }
 
 export interface PushCopy {
@@ -431,6 +687,48 @@ export function renderPush(
 	if (!PUSH_TYPES.includes(type)) return null;
 	if (params === null) return null;
 
+	// F-59: the membership notices name a person, not a day of the plan.
+	if (MEMBERSHIP_TYPES.includes(type)) return renderMembership(lang, type, params);
+
+	// F-80 PR 3: the referral reward states no day and names no one. An
+	// unknown kind is a future writer's shape — no push, never a guess.
+	if (type === "referral_reward") {
+		if (params["kind"] !== "granted") return null;
+		return { title: fmt(lang, K.titleReferralReward), body: fmt(lang, K.referralReward) };
+	}
+
+	// F-103: an admin granted or removed the reader's admin bit. States no day.
+	// An unknown kind is a future writer's shape — no push, never a guess.
+	if (type === "admin_changed") {
+		const name = params["name"];
+		if (name === undefined) return null;
+		if (params["kind"] === "granted") {
+			return { title: fmt(lang, K.titleAdminGranted), body: fmt(lang, K.adminGranted, [name]) };
+		}
+		if (params["kind"] === "revoked") {
+			return { title: fmt(lang, K.titleAdminRevoked), body: fmt(lang, K.adminRevoked, [name]) };
+		}
+		return null;
+	}
+
+	// F-102: a member asked the admins for Premium. States no day; `gate` is the
+	// F-79 token, rendered through a closed map — an unknown one reads as the
+	// generic words, never a hole.
+	if (type === "premium_request") {
+		if (params["kind"] !== "ask" || params["name"] === undefined) return null;
+		const gate = params["gate"];
+		const gateKey = gate === "chat" ? K.premiumGateChat
+			: gate === "chat-export" ? K.premiumGateChatExport
+			: gate === "agenda" ? K.premiumGateAgenda
+			: gate === "expenses" ? K.premiumGateExpenses
+			: gate === "pdf" ? K.premiumGatePdf
+			: K.premiumGateFamily;
+		return {
+			title: fmt(lang, K.titlePremiumRequest),
+			body: fmt(lang, K.premiumRequest, [params["name"], fmt(lang, gateKey)]),
+		};
+	}
+
 	const isoDate = params["date"];
 	const date = isoDate ? formatDateIn(lang, isoDate) : null;
 	if (date === null) return null;   // every pushable type states a day
@@ -451,6 +749,12 @@ export function renderPush(
 
 	switch (type) {
 		case "auto_reminder": {
+			// F-94: 19:00 on the eve of the day — who asked, and the day.
+			if (kind === "eve") {
+				titleKey = K.titleAutoReminderEve;
+				body = fmt(lang, K.autoReminderEve, [name ?? otherCap(), date]);
+				break;
+			}
 			titleKey = K.titleAutoReminder;
 			// F-60: the push says the INSTANT the request stops waiting, the
 			// same one the in-app sentence and the e-mail say. A row written
@@ -460,11 +764,7 @@ export function renderPush(
 			const deadline = splitDeadline(params["deadline"]);
 			body = deadline === null
 				? fmt(lang, K.autoReminder, [date])
-				: fmt(lang, K.autoReminderDeadline, [
-					date,
-					formatDateIn(lang, deadline.date),
-					formatTimeIn(lang, deadline.time) ?? deadline.time,
-				]);
+				: fmt(lang, K.autoReminderDeadline, [date, formatDeadlineIn(lang, deadline)]);
 			break;
 		}
 
@@ -616,6 +916,23 @@ export function renderPush(
 			} else if (kind === "ended") {
 				titleKey = K.titlePlanEnded;
 				body = fmt(lang, K.planEnded, [date]);
+			} else if (kind === "unplanned") {
+				// F-78: the plan never started; the sentence states no day.
+				titleKey = K.titlePlanUnplanned;
+				body = fmt(lang, K.planUnplanned);
+			} else {
+				return null;
+			}
+			break;
+
+		// F-77: the same two kinds, about the Premium trial's end.
+		case "premium_trial":
+			if (kind === "ending") {
+				titleKey = K.titleTrialEnding;
+				body = fmt(lang, K.trialEnding, [date]);
+			} else if (kind === "ended") {
+				titleKey = K.titleTrialEnded;
+				body = fmt(lang, K.trialEnded, [date]);
 			} else {
 				return null;
 			}
@@ -705,11 +1022,42 @@ export function renderPush(
 			break;
 		}
 
+		// F-81. An admin's direct change: one day, or several with the first
+		// (`date`), the last (`to`) and how many (`count`). An unknown kind or
+		// an off-shape batch is a future writer's — no push, never a guess.
+		case "day_admin_change": {
+			if (kind === "single") {
+				titleKey = K.titleDayAdminChangeSingle;
+				body = fmt(lang, K.dayAdminChangeSingle, [name ?? otherCap(), date]);
+			} else if (kind === "batch") {
+				const count = params["count"];
+				const last = params["to"];
+				if (!count || !/^\d+$/.test(count) || !last) return null;
+				titleKey = K.titleDayAdminChangeBatch;
+				body = fmt(lang, K.dayAdminChangeBatch, [
+					name ?? otherCap(),
+					count,
+					date,
+					formatDateIn(lang, last),
+				]);
+			} else {
+				return null;
+			}
+			break;
+		}
+
 		// F-35. Who wrote and the text (the server already cut it at 140).
+		// S-27: the text only for a reader who turned the preview on
+		// (`params.preview === "1"`); everyone else, and every row written
+		// before the switch existed, reads who wrote — never what.
 		case "chat_message": {
-			if (msg === undefined) return null;
 			titleKey = K.titleChatMessage;
-			body = fmt(lang, K.chatMessage, [name ?? otherCap(), msg]);
+			if (params["preview"] === "1") {
+				if (msg === undefined) return null;
+				body = fmt(lang, K.chatMessage, [name ?? otherCap(), msg]);
+			} else {
+				body = fmt(lang, K.chatMessageHidden, [name ?? otherCap()]);
+			}
 			break;
 		}
 
@@ -728,5 +1076,11 @@ export function renderPush(
 		? fmt(lang, K.tagOverdue)
 		: "";
 
-	return { title: prefix + fmt(lang, titleKey), body };
+	// F-07: a per-child plan's swap names its child after the heading, as the
+	// in-app renderer's `withChild` does; `params.child` is stamped by the
+	// database, so every writer carries it.
+	const child = (params["child"] ?? "").trim();
+	const lane = child === "" ? "" : ` · ${child}`;
+
+	return { title: prefix + fmt(lang, titleKey) + lane, body };
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'dart:async';
 
 import 'package:entrelares_core/entrelares_core.dart';
@@ -10,8 +12,10 @@ import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/subscription.dart';
 import '../env.dart';
 import '../services/analytics_service.dart';
+import '../services/checkout_note.dart';
 import '../services/custody_data_source.dart';
 import '../services/store_billing.dart';
+import '../services/store_purchases.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
@@ -55,10 +59,19 @@ class FamilyPlanScreen extends StatefulWidget {
   /// shows, so a missing service can never become a broken offer.
   final StoreBilling? storeBilling;
 
+  /// F-86: the app-level purchase listener. Null (tests, or a build without
+  /// one) makes the page run its own for as long as it is open.
+  final StorePurchaseCoordinator? purchases;
+
   /// Hands a URL to the system browser. Injectable for the same reason: WHERE
   /// the family is sent to pay is a money-critical fact worth asserting, and
   /// the plugin channel does not exist in a widget test.
   final Future<void> Function(String url)? openExternal;
+
+  /// F-102: the F-79 gate token the reader came from (`/family/plan?gate=…`),
+  /// so a member's "Avisar o administrador" says WHAT they wanted. Null is the
+  /// generic ask.
+  final String? gate;
 
   const FamilyPlanScreen({
     super.key,
@@ -67,7 +80,12 @@ class FamilyPlanScreen extends StatefulWidget {
     this.isStoreChannel = !kIsWeb,
     this.openExternal,
     this.storeBilling,
+    this.purchases,
+    this.gate,
   });
+
+  /// F-102: the member's "Avisar o administrador", for tests.
+  static const askAdminKey = Key('plan-ask-admin');
 
   @override
   State<FamilyPlanScreen> createState() => _FamilyPlanScreenState();
@@ -80,6 +98,11 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   Family? _family;
   Member? _me;
   PublicSettings _settings = PublicSettings.unloaded;
+
+  /// F-102: the roster, for the admins' names under the member's offer.
+  List<Member> _members = const [];
+  bool _asking = false;
+  bool _askedThisVisit = false;
 
   // F-32/T-39 premium. `_subscription` is bookkeeping only — entitlement
   // always comes from the family row through the mirror, never from here.
@@ -102,7 +125,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   // it. The choice is screen state only: nothing is charged until the CTA.
   String _offerCycle = 'annual';
   bool _storePurchasePending = false;
-  StreamSubscription<StorePurchase>? _storeSubscription;
+  StreamSubscription<StorePurchaseOutcome>? _outcomeSubscription;
+
+  /// F-86: the page's own coordinator, only when the app handed none.
+  StorePurchaseCoordinator? _ownPurchases;
 
   // F-43: payment history — lazy on first expand, cached afterwards.
   bool _historyOpen = false;
@@ -115,12 +141,22 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     super.initState();
     _load();
     final store = widget.storeBilling;
-    if (store != null) _storeSubscription = store.purchases.listen(_onPurchase);
+    var purchases = widget.purchases;
+    if (purchases == null && store != null) {
+      purchases = _ownPurchases = StorePurchaseCoordinator(
+          store: store, dataSource: widget.dataSource, analytics: widget.analytics);
+      unawaited(purchases.activate(restore: false));
+    }
+    if (purchases != null) {
+      _storePurchasePending = purchases.pending.value;
+      _outcomeSubscription = purchases.outcomes.listen(_onPurchaseOutcome);
+    }
   }
 
   @override
   void dispose() {
-    _storeSubscription?.cancel();
+    _outcomeSubscription?.cancel();
+    _ownPurchases?.dispose();
     super.dispose();
   }
 
@@ -145,6 +181,16 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     );
   }
 
+  /// F-79: whether THIS reader is looking at something they can buy — a price
+  /// card and "Assinar" are built. The same facts [_offerPanel] branches on,
+  /// read in one place so the funnel's `buyable` cannot disagree with the
+  /// screen.
+  bool get _offerBuyable {
+    if (_billingUi != BillingUi.offer || !_isAdmin) return false;
+    if (!_isStoreChannel) return true;
+    return _storeOfferState == StoreOffer.offer && _storeCycles.isNotEmpty;
+  }
+
   /// Play's payments policy forbids steering a Play-distributed app to an
   /// external purchase flow, so the store branch of the offer carries no price
   /// and no checkout link (Play Billing itself arrives in this batch, behind
@@ -166,9 +212,12 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         widget.dataSource.fetchOwnFamily(),
         widget.dataSource.fetchOwnProfile(),
         widget.dataSource.fetchPublicSettings(),
+        // F-102: who can subscribe, by name.
+        widget.dataSource.fetchMembers(),
       ]);
       final family = results[0] as Family?;
       final settings = PublicSettings(results[2] as Map<String, String>);
+      final members = results[3] as List<Member>;
 
       // T-39: the subscription row only matters while billing is on — with the
       // master switch off the section short-circuits to the F-32 waitlist, and
@@ -195,35 +244,41 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       }
 
       if (!mounted) return;
-      // F-48: first funnel step — the offer became VISIBLE. Guarded so a
-      // reload within the same visit (e.g. after a cancel) counts once. U-35:
-      // "visible" is THIS page now, not the Família tab.
-      final ui = computeBillingUi(
-        billingEnabled: settings.billingEnabled,
-        isPremium: plan.isPremium,
-        onTrial: plan.onTrial,
-        subscriptionStatus: subscription?.status,
-      );
-      if (ui == BillingUi.offer && !_paywallViewTracked) {
-        _paywallViewTracked = true;
-        widget.analytics?.trackEvent(AnalyticsEvents.premiumPaywallView,
-            props: analyticsFunnelProps(channel: _channel));
-      }
       setState(() {
         _subscription = subscription;
         _hasPremiumInterest = interest;
         _family = family;
         _me = results[1] as Member?;
+        _members = members;
         _settings = settings;
         _loading = false;
       });
+      // F-48: first funnel step — the offer became VISIBLE. Guarded so a
+      // reload within the same visit (e.g. after a cancel) counts once. U-35:
+      // "visible" is THIS page now, not the Família tab.
+      //
+      // F-79 (02/10/2026): same name, same moment — the series goes on — but
+      // the view now says WHO saw it. `admin` is whether this reader may pay
+      // at all (a member sees only "ask an administrator"), and `buyable` is
+      // whether a price card and "Assinar" were actually built for them (the
+      // store rail switched off, or a store that did not answer, leaves only
+      // a note). Before this date every view counted as a buyer.
+      if (_billingUi == BillingUi.offer && !_paywallViewTracked) {
+        _paywallViewTracked = true;
+        widget.analytics?.trackEvent(AnalyticsEvents.premiumPaywallView,
+            props: {
+              ...analyticsFunnelProps(channel: _channel),
+              'admin': _isAdmin,
+              'buyable': _offerBuyable,
+            });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _loadErrorKey = isSessionExpired(e.toString())
             ? KApp.sessionExpired
-            : KApp.errCalendarLoad;
+            : KApp.errFamilyLoad;
       });
     }
   }
@@ -354,6 +409,13 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
               channel: _channel,
               cycle: cycle,
               mode: avulso ? 'avulso' : 'recurring'));
+      // F-86: what the family has right now — the return page counts a
+      // payment only as a CHANGE against this.
+      writeCheckoutNote(jsonEncode(CheckoutBaseline(
+        premium: _planStatus.isPremium,
+        periodEndUtc: _subscription?.currentPeriodEnd?.toUtc(),
+        takenAtUtc: DateTime.now().toUtc(),
+      ).toJson()));
       await (widget.openExternal ?? _openExternal)(url);
       if (!mounted) return;
       // The payment happens outside the app and confirms ASYNCHRONOUSLY (the
@@ -455,59 +517,95 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     }
   }
 
-  /// A purchase update arrived. The client NEVER grants premium here: it hands
-  /// the token to the server, and only the reload that follows can show the
-  /// new plan.
-  Future<void> _onPurchase(StorePurchase purchase) async {
+  /// F-86: what the app-level listener did with a purchase update. The
+  /// verification and the acknowledgement already happened there — wherever
+  /// the reader was; this page only says so and reloads.
+  void _onPurchaseOutcome(StorePurchaseOutcome outcome) {
+    if (!mounted) return;
     final l = AppL10n.of(context).l;
-    if (purchase.status == StorePurchaseStatus.pending) {
-      setState(() => _storePurchasePending = true);
-      return;
-    }
-    if (!purchase.isOwned) {
-      setState(() => _storePurchasePending = false);
-      if (purchase.status == StorePurchaseStatus.failed) {
-        showAppSnack(context, purchase.errorMessage ?? l[KApp.storeErrPurchase],
+    switch (outcome.kind) {
+      case StorePurchaseOutcomeKind.pending:
+        setState(() => _storePurchasePending = true);
+      case StorePurchaseOutcomeKind.canceled:
+        setState(() => _storePurchasePending = false);
+      case StorePurchaseOutcomeKind.failed:
+        setState(() => _storePurchasePending = false);
+        showAppSnack(context, outcome.message ?? l[KApp.storeErrPurchase],
             type: AppSnackType.error);
-      }
-      return;
-    }
-
-    setState(() => _storePurchasePending = true);
-    try {
-      await widget.dataSource.verifyStorePurchase(
-        productId: purchase.productId,
-        purchaseToken: purchase.verificationToken ?? '',
-      );
-      // Acknowledge ONLY after the server accepted it — Play refunds an
-      // unacknowledged purchase after three days, and acknowledging one the
-      // server refused would strand the family without the entitlement.
-      await widget.storeBilling?.complete(purchase);
-      widget.analytics?.trackEvent(AnalyticsEvents.premiumCheckoutOutcome,
-          props: analyticsFunnelProps(
-              channel: _channel,
-              cycle: cycleForStoreProduct(purchase.productId),
-              mode: 'store',
-              outcome: 'confirmed'));
-      if (!mounted) return;
-      showAppSnack(context, l[KApp.storeToastActive]);
-      setState(() => _storePurchasePending = false);
-      await _load();
-    } on BillingRefused catch (e) {
-      if (!mounted) return;
-      setState(() => _storePurchasePending = false);
-      showAppSnack(context, e.serverMessage ?? l[KApp.storeErrPurchase],
-          type: AppSnackType.error);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _storePurchasePending = false);
-      showAppSnack(context, l[KApp.storeErrPurchase],
-          type: AppSnackType.error);
+      case StorePurchaseOutcomeKind.refused:
+        setState(() => _storePurchasePending = false);
+        showAppSnack(context, outcome.message ?? l[KApp.storeErrPurchase],
+            type: AppSnackType.error);
+      case StorePurchaseOutcomeKind.verified:
+        setState(() => _storePurchasePending = false);
+        showAppSnack(context, l[KApp.storeToastActive]);
+        unawaited(_load());
     }
   }
 
   /// U-31: a status line's mark is a vector icon in front of the sentence —
   /// it used to be an emoji INSIDE the catalog string.
+  /// F-102 (owner, 07/10/2026) — what a member who is NOT an admin reads
+  /// under the offer: WHO can subscribe, by name, and "Avisar o
+  /// administrador". The audit's father read "feita por um administrador" —
+  /// no name, no next step — and the server still refuses his checkout (who
+  /// may pay does not change). With no live admin to name (never, by the
+  /// ≥1-admin invariant — but a roster still loading) the old sentence stays.
+  List<Widget> _memberNotice(Localization l) {
+    final names = PremiumAskRules.adminFirstNames([
+      for (final m in _members)
+        (fullName: m.fullName, isAdmin: m.isAdmin, isActive: m.isActiveMember),
+    ]);
+    final joined = PremiumAskRules.joinNames(names, and: l[KApp.childAnd]);
+    if (joined == null) {
+      return [
+        _marked(Icons.info_outline, context.tokens.textMuted,
+            RichLabel.of(l, K.premAdminOnly)),
+      ];
+    }
+    return [
+      _marked(
+          Icons.info_outline,
+          context.tokens.textMuted,
+          Text(l.format(PremiumAskRules.sentenceKey(names.length), [joined]))),
+      const SizedBox(height: Spacing.sm),
+      Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: FilledButton.tonalIcon(
+          key: FamilyPlanScreen.askAdminKey,
+          icon: const Icon(Icons.campaign_outlined, size: 18),
+          label: Text(l[PremiumAskRules.askKey(names.length)]),
+          onPressed:
+              _asking || _askedThisVisit ? null : () => _askAdmin(l, joined),
+        ),
+      ),
+    ];
+  }
+
+  /// One push + in-app to the admins; the server allows one a day and says so
+  /// in its own words when it refuses.
+  Future<void> _askAdmin(Localization l, String joined) async {
+    final gate = PremiumAskRules.normalizeGate(widget.gate);
+    setState(() => _asking = true);
+    try {
+      await widget.dataSource.requestPremiumFromAdmin(gate: gate);
+      if (!mounted) return;
+      widget.analytics
+          ?.trackEvent(AnalyticsEvents.premiumAskAdmin, props: {'gate': gate});
+      setState(() {
+        _asking = false;
+        _askedThisVisit = true;
+      });
+      showAppSnack(context, l.format(KApp.premAskAdminSent, [joined]),
+          type: AppSnackType.success);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _asking = false);
+      showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
+  }
+
   Widget _marked(IconData icon, Color color, Widget label) => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -528,6 +626,15 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   Widget _premiumSection(Localization l) {
     final theme = Theme.of(context);
     final ui = _billingUi;
+    // F-79: with the offer on, the decision comes first. On a 360 dp phone
+    // the full benefit list (five to ten lines) used to push "Assinar" about
+    // two screens down; now the reader meets one line of value, the price and
+    // the button, and the list follows as the reasons. The free-essentials
+    // sentence and the secondary payment facts (Pix avulso, how to pay, the
+    // guarantee) come after it — every sentence the page said before, none
+    // dropped. Every other state keeps the old order: there, the list is
+    // what the family already has, or what the waitlist promises.
+    final offer = ui == BillingUi.offer ? _offerPanel(l) : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -542,61 +649,74 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
               children: [
                 _premiumBadge(l),
                 const SizedBox(height: 8),
-                RichLabel.of(l, K.premIntro, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 4),
-                RichLabel.of(
-                  l,
-                  ui == BillingUi.waitlist
-                      ? K.premIntroWaitlist
-                      : K.premIntroOffer,
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: Spacing.md),
-                // U-28: the benefits as a real list with aligned icons.
-                //
-                // This block is where a Free family decides to spend money, and
-                // it was the least composed thing on the screen: one `Text` per
-                // line with a literal `•` glued in front of an emoji, so a
-                // wrapping benefit restarted under its own bullet and the icons
-                // did not line up with each other. `AppBulletList` gives the
-                // hanging indent; the icons are the app's own, not emoji, so
-                // the list reads as a feature table rather than as chat.
-                // U-57: the two numbers are the live `free_caregivers` and
-                // `calendar_months_free` — what the server enforces.
-                AppBulletList(
-                  items: [
-                    l.format(K.premFeatureCaregivers,
-                        [_settings.freeCaregivers]),
-                    l.format(
-                        K.premFeatureHorizon, [_settings.calendarMonthsFree]),
-                    l[K.premFeaturePdf],
-                    l[K.premFeatureAdminMode],
-                    l[K.premFeatureRoles],
-                    // S-22: each phase-6 module lists itself while its flag
-                    // is on AND it is Premium-only (a gate the operator lifted
-                    // is not a benefit any more). The viewer cap is the live
-                    // `max_viewers` (U-57).
-                    for (final b in _phase6Benefits(l)) b.text,
-                  ],
-                  leadingIcons: [
-                    const Icon(Icons.group_outlined, size: TypeScale.subtitle),
-                    const Icon(Icons.event_available_outlined,
-                        size: TypeScale.subtitle),
-                    const Icon(Icons.picture_as_pdf_outlined,
-                        size: TypeScale.subtitle),
-                    const Icon(Icons.shield_outlined, size: TypeScale.subtitle),
-                    const Icon(Icons.sell_outlined, size: TypeScale.subtitle),
-                    for (final b in _phase6Benefits(l))
-                      Icon(b.icon, size: TypeScale.subtitle),
-                  ],
-                ),
-                const SizedBox(height: Spacing.md),
-                ..._premiumStateBlock(l, ui),
+                if (offer == null) ...[
+                  RichLabel.of(l, K.premIntro,
+                      style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 4),
+                  RichLabel.of(
+                    l,
+                    ui == BillingUi.waitlist
+                        ? K.premIntroWaitlist
+                        : K.premIntroOffer,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: Spacing.md),
+                  _benefitList(l),
+                  const SizedBox(height: Spacing.md),
+                  ..._premiumStateBlock(l, ui),
+                ] else ...[
+                  RichLabel.of(l, K.premIntroOffer,
+                      style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 4),
+                  ...offer.primary,
+                  const SizedBox(height: Spacing.md),
+                  _benefitList(l),
+                  const SizedBox(height: Spacing.sm),
+                  RichLabel.of(l, K.premIntro,
+                      style: theme.textTheme.bodyMedium),
+                  ...offer.secondary,
+                ],
                 ..._historyPanel(l),
               ],
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  // U-28: the benefits as a real list with aligned icons.
+  //
+  // This block is where a Free family decides to spend money, and it was the
+  // least composed thing on the screen: one `Text` per line with a literal `•`
+  // glued in front of an emoji, so a wrapping benefit restarted under its own
+  // bullet and the icons did not line up with each other. `AppBulletList`
+  // gives the hanging indent; the icons are the app's own, not emoji, so the
+  // list reads as a feature table rather than as chat.
+  // U-57: the two numbers are the live `free_caregivers` and
+  // `calendar_months_free` — what the server enforces.
+  Widget _benefitList(Localization l) {
+    final phase6 = _phase6Benefits(l);
+    return AppBulletList(
+      key: const ValueKey('premium-benefits'),
+      items: [
+        l.format(K.premFeatureCaregivers, [_settings.freeCaregivers]),
+        l.format(K.premFeatureHorizon, [_settings.calendarMonthsFree]),
+        l[K.premFeaturePdf],
+        l[K.premFeatureAdminMode],
+        l[K.premFeatureRoles],
+        // S-22: each phase-6 module lists itself while its flag is on AND it
+        // is Premium-only (a gate the operator lifted is not a benefit any
+        // more). The viewer cap is the live `max_viewers` (U-57).
+        for (final b in phase6) b.text,
+      ],
+      leadingIcons: [
+        const Icon(Icons.group_outlined, size: TypeScale.subtitle),
+        const Icon(Icons.event_available_outlined, size: TypeScale.subtitle),
+        const Icon(Icons.picture_as_pdf_outlined, size: TypeScale.subtitle),
+        const Icon(Icons.shield_outlined, size: TypeScale.subtitle),
+        const Icon(Icons.sell_outlined, size: TypeScale.subtitle),
+        for (final b in phase6) Icon(b.icon, size: TypeScale.subtitle),
       ],
     );
   }
@@ -640,7 +760,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       case BillingUi.manageScheduled:
         return _scheduledPanel(l);
       case BillingUi.offer:
-        return _offerPanel(l);
+        // [_premiumSection] lays the offer out itself (F-79); this branch
+        // only keeps the switch whole.
+        final offer = _offerPanel(l);
+        return [...offer.primary, ...offer.secondary];
       case BillingUi.waitlist:
         return _waitlistPanel(l);
     }
@@ -660,9 +783,29 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       if (renews != null)
         RichLabel.of(l, K.premActiveRenews,
             args: [l.formatDate(renews.toLocal())]),
-      if (_isAdmin) ..._cancelControls(l, isScheduled: false),
+      if (_isAdmin)
+        if (_isPlaySubscription)
+          ..._playManagedControls(l)
+        else
+          ..._cancelControls(l, isScheduled: false),
     ];
   }
+
+  /// F-84: whether the family's subscription row was written by the STORE
+  /// rail. Every managed panel branches on it: a Play subscription is Google's
+  /// to cancel, so our cancel and our Asaas dunning copy never reach it —
+  /// cancelling our row alone left Google charging while the snack said
+  /// "Assinatura cancelada".
+  bool get _isPlaySubscription => isStoreGateway(_subscription?.gateway);
+
+  /// F-84: what an admin sees instead of our cancel controls when Play owns
+  /// the subscription — on BOTH channels, since the web reader of a family
+  /// that bought on Android was offered the same false cancel.
+  List<Widget> _playManagedControls(Localization l) => [
+        const SizedBox(height: 8),
+        RichLabel.of(l, K.premPlayManaged),
+        _manageOnPlay(l),
+      ];
 
   List<Widget> _overduePanel(Localization l) {
     // U-22: the one state with a hard deadline — show it. Before
@@ -672,24 +815,68 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     // would lie.
     final deadline =
         graceDeadline(_subscription?.overdueSince, _settings.graceDays);
-    if (deadline != null && !deadline.isAfter(DateTime.now().toUtc())) {
-      return [
-        _marked(
+    // F-84: the Asaas copy sends the reader to "o e-mail de cobrança
+    // (remetente Asaas)", which a Play subscriber never receives — Play
+    // retries the charge itself and the fix is the payment method there.
+    final play = _isPlaySubscription;
+    final ended = deadline != null && !deadline.isAfter(DateTime.now().toUtc());
+    final status = ended
+        ? _marked(
             Icons.warning_amber_rounded,
             context.tokens.danger.solid,
-            RichLabel.of(l, K.premOverdueGraceEnded,
+            RichLabel.of(
+                l, play ? K.premPlayOverdueGraceEnded : K.premOverdueGraceEnded,
                 args: [l.formatDate(deadline.toLocal())]))
-      ];
-    }
+        : _marked(
+            Icons.warning_amber_rounded,
+            context.tokens.warning.solid,
+            deadline == null
+                ? RichLabel.of(l,
+                    play ? K.premPlayOverdueInGraceNoDate : K.premOverdueInGraceNoDate)
+                : RichLabel.of(
+                    l, play ? K.premPlayOverdueInGrace : K.premOverdueInGrace,
+                    args: [l.formatDate(deadline.toLocal())]));
     return [
-      _marked(
-          Icons.warning_amber_rounded,
-          context.tokens.warning.solid,
-          deadline == null
-              ? RichLabel.of(l, K.premOverdueInGraceNoDate)
-              : RichLabel.of(l, K.premOverdueInGrace,
-                  args: [l.formatDate(deadline.toLocal())])),
+      status,
+      if (_isAdmin && play)
+        _manageOnPlay(l)
+      // F-84: the open invoice, one tap away. Web only: on the store channel
+      // a link to pay outside Play is exactly what Play's payments policy
+      // forbids inside the app, so Android keeps the e-mail guidance.
+      else if (_isAdmin && !_isStoreChannel) ...[
+        const SizedBox(height: 8),
+        FilledButton(
+          key: const ValueKey('premium-pay-overdue'),
+          onPressed: _billingBusy ? null : () => _payOverdue(l),
+          child: Text(l[K.premOverduePay]),
+        ),
+      ],
     ];
+  }
+
+  /// F-84: opens the invoice still open on the gateway — the server reads it
+  /// from the ledger, or asks Asaas when the ledger has none. Nothing is paid
+  /// here; the payment confirms through the webhook like any other.
+  Future<void> _payOverdue(Localization l) async {
+    if (_billingBusy) return;
+    setState(() => _billingBusy = true);
+    try {
+      final url = await widget.dataSource.overdueInvoiceUrl();
+      await (widget.openExternal ?? _openExternal)(url);
+      if (!mounted) return;
+      setState(() => _billingBusy = false);
+    } on BillingRefused catch (e) {
+      if (!mounted) return;
+      setState(() => _billingBusy = false);
+      showAppSnack(context, e.serverMessage ?? l[K.errSaveFailed],
+          type: AppSnackType.error);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _billingBusy = false);
+      showAppSnack(
+          context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
+          type: AppSnackType.error);
+    }
   }
 
   List<Widget> _scheduledPanel(Localization l) {
@@ -717,7 +904,11 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
             if (methodKey != null) l[methodKey],
           ],
         ),
-      if (_isAdmin) ..._cancelControls(l, isScheduled: true),
+      if (_isAdmin)
+        if (_isPlaySubscription)
+          ..._playManagedControls(l)
+        else
+          ..._cancelControls(l, isScheduled: true),
     ];
   }
 
@@ -766,7 +957,12 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     ];
   }
 
-  List<Widget> _offerPanel(Localization l) {
+  /// The offer in two parts (F-79): [primary] is what the reader decides on —
+  /// what they already have, then the price and the button (or the note that
+  /// they cannot buy) — and goes ABOVE the benefit list; [secondary] is the
+  /// rest of the payment surface and goes below it.
+  ({List<Widget> primary, List<Widget> secondary}) _offerPanel(
+      Localization l) {
     final subscription = _subscription;
     final now = DateTime.now().toUtc();
     final stillPaid = paidUntil(
@@ -800,10 +996,18 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                   args: [l.formatDate(trialEnd.toLocal())])),
         const SizedBox(height: 4),
       ];
-      return [...status, ..._storeBranch(l)];
+      // A store that can sell puts the price and the button up top; every
+      // other store state is a note (or Play's own management link), which
+      // reads better after the list it refers to.
+      return _storeOfferState == StoreOffer.offer
+          ? (primary: [...status, ..._storeBranch(l)], secondary: const [])
+          : (
+              primary: status,
+              secondary: [const SizedBox(height: Spacing.sm), ..._storeBranch(l)]
+            );
     }
 
-    return [
+    final primary = [
       if (stillPaid != null) ...[
         // T-39 (QA): a canceled-but-paid subscription keeps its Premium until
         // the period end — say so, and that re-subscribing ADDS to that date
@@ -826,17 +1030,9 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
               RichLabel.of(l,
                   daysLeft == 1 ? K.premExpiringSoonOne : K.premExpiringSoonMany,
                   args: [daysLeft])),
-      ] else if (_planStatus.onTrial && trialEnd != null)
-        // F-46: a family paying DURING its trial starts the paid cycle at the
-        // trial end — say it before any checkout button.
-        _marked(
-            Icons.auto_awesome,
-            context.tokens.accent.solid,
-            RichLabel.of(l, K.premTrialAdditive,
-                args: [l.formatDate(trialEnd.toLocal())])),
+      ],
       if (!_isAdmin)
-        _marked(Icons.info_outline, context.tokens.textMuted,
-            RichLabel.of(l, K.premAdminOnly))
+        ..._memberNotice(l)
       else ...[
         if (canReactivate(
           subscriptionStatus: subscription?.status,
@@ -853,7 +1049,22 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         ] else
           ..._checkoutControls(l, primaryTaken: false),
       ],
+      // F-46: a family paying DURING its trial starts the paid cycle at the
+      // trial end. F-79: said right under "Assinar" rather than above the
+      // price — the same sentence, now where the reader asks "and my trial?".
+      if (stillPaid == null && _planStatus.onTrial && trialEnd != null) ...[
+        const SizedBox(height: Spacing.sm),
+        _marked(
+            Icons.auto_awesome,
+            context.tokens.accent.solid,
+            RichLabel.of(l, K.premTrialAdditive,
+                args: [l.formatDate(trialEnd.toLocal())])),
+      ],
     ];
+    return (
+      primary: primary,
+      secondary: _isAdmin ? _checkoutSecondary(l) : const <Widget>[],
+    );
   }
 
   // ── U-46: the offer as one decision at a time. The cycle picker and the
@@ -945,19 +1156,37 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   /// T-48: what the STORE channel may offer. With the rail off — or with a
   /// store that cannot answer — this is the T-38 neutral note, which is what
   /// Play always accepts and what the app shipped with until now.
+  StoreOffer get _storeOfferState => computeStoreOffer(
+        storeBillingEnabled: _settings.storeBillingEnabled,
+        storeAvailable: _storeAvailable,
+        hasProducts: _storeProducts.isNotEmpty,
+        purchasePending: _storePurchasePending,
+        // F-84: only while the Play subscription still pays — an expired
+        // one left the family free, and "managed" would hide the offer from
+        // a family that can buy again.
+        premiumThroughStore: _isPlaySubscription &&
+            paidUntil(
+                  subscriptionStatus: _subscription?.status,
+                  currentPeriodEndUtc: _subscription?.currentPeriodEnd,
+                  nowUtc: DateTime.now().toUtc(),
+                ) !=
+                null,
+      );
+
+  /// The cycles Play answered for, in the picker's order.
+  List<String> get _storeCycles => [
+        for (final cycle in const ['monthly', 'annual'])
+          if (_storeProducts.any((p) => p.cycle == cycle)) cycle,
+      ];
+
   List<Widget> _storeBranch(Localization l) {
-    final state = computeStoreOffer(
-      storeBillingEnabled: _settings.storeBillingEnabled,
-      storeAvailable: _storeAvailable,
-      hasProducts: _storeProducts.isNotEmpty,
-      purchasePending: _storePurchasePending,
-      premiumThroughStore: isStoreGateway(_subscription?.gateway),
-    );
-    return switch (state) {
+    return switch (_storeOfferState) {
       StoreOffer.neutralNote => [RichLabel.of(l, K.premStoreNote)],
       StoreOffer.pendingVerification => [Text(l[KApp.storePending])],
+      // F-84: its own sentence. It used to print the neutral note ("managed
+      // on the website, not in this app") right above Play's own link.
       StoreOffer.managed => [
-          RichLabel.of(l, K.premStoreNote),
+          RichLabel.of(l, K.premPlayNotRenewing),
           _manageOnPlay(l),
         ],
       StoreOffer.offer => _storeOffer(l),
@@ -965,19 +1194,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
   }
 
   List<Widget> _storeOffer(Localization l) {
-    if (!_isAdmin) {
-      return [
-        _marked(Icons.info_outline, context.tokens.textMuted,
-            RichLabel.of(l, K.premAdminOnly))
-      ];
-    }
-    // The cycles Play answered for, in the picker's order. A selected cycle
-    // the store did not answer for falls back to whatever it did — the card
-    // never shows a price for a product that does not exist.
-    final cycles = [
-      for (final cycle in const ['monthly', 'annual'])
-        if (_storeProducts.any((p) => p.cycle == cycle)) cycle,
-    ];
+    if (!_isAdmin) return _memberNotice(l);
+    // A selected cycle the store did not answer for falls back to whatever it
+    // did — the card never shows a price for a product that does not exist.
+    final cycles = _storeCycles;
     // The service already drops ids it does not recognise; this is the same
     // fail-closed default one layer up, so the card can never be built around
     // nothing.
@@ -1058,11 +1278,18 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     }
   }
 
+  /// The web rail's price for the cycle the picker holds — the card, the
+  /// subscribe button and the Pix avulso button all quote this one number.
+  String get _webOfferPrice => formatPriceBrl(_offerCycle == 'annual'
+      ? _settings.priceAnnualCents
+      : _settings.priceMonthlyCents);
+
+  /// The web rail's decision: picker, price card, "Assinar".
   List<Widget> _checkoutControls(Localization l, {required bool primaryTaken}) {
     final monthlyCents = _settings.priceMonthlyCents;
     final annualCents = _settings.priceAnnualCents;
     final annual = _offerCycle == 'annual';
-    final price = formatPriceBrl(annual ? annualCents : monthlyCents);
+    final price = _webOfferPrice;
     return [
       const SizedBox(height: 12),
       _cyclePicker(l, cycles: const ['monthly', 'annual']),
@@ -1091,7 +1318,15 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
             ? null
             : () => _startCheckout(l, _offerCycle, avulso: false),
       ),
-      const SizedBox(height: 8),
+    ];
+  }
+
+  /// The rest of the web rail's payment surface, below the benefit list
+  /// (F-79): the second way to pay, how paying works, and the guarantee.
+  List<Widget> _checkoutSecondary(Localization l) {
+    final price = _webOfferPrice;
+    return [
+      const SizedBox(height: Spacing.md),
       // F-48: Pix avulso — the no-recurrence rail. One single charge for one
       // period: no card on file, no auto-renew, renewing later is an explicit
       // new payment (additive). It follows the cycle chosen above.
@@ -1113,7 +1348,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
       _marked(
           Icons.verified_user_outlined,
           context.tokens.success.solid,
+          // F-79: the sentence ends on the address it promises — the support
+          // constant, never typed into the catalog.
           RichLabel.of(l, K.premGuarantee,
+              args: [SupportRules.supportEmail],
               style: Theme.of(context).textTheme.bodySmall)),
     ];
   }

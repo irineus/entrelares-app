@@ -19,7 +19,15 @@ import 'package:entrelares_app/services/offline_cache.dart';
 import 'package:entrelares_app/widgets/account_button.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'calendar_slice_test.dart'
-    show FakeCustodyDataSource, ana, bruno, dayOfMonth, futureDay, row, today;
+    show
+        FakeCustodyDataSource,
+        ana,
+        bruno,
+        dayOfMonth,
+        futureDay,
+        inGrid,
+        row,
+        today;
 import 'frozen_day_test.dart' show swapReq;
 
 final pt = Localization(AppLanguage.ptBr);
@@ -120,9 +128,9 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('B'), findsWidgets, reason: 'day 10 is Bruno\'s');
+      expect(inGrid('B'), findsWidgets, reason: 'day 10 is Bruno\'s');
       await tester.pumpAndSettle();
-      expect(find.text('B'), findsWidgets);
+      expect(inGrid('B'), findsWidgets);
       expect(find.textContaining(pt[KApp.offlineMonthNotLoaded]), findsNothing);
       expect(find.textContaining(pt[KApp.errCalendarLoad]), findsNothing);
       expect(status.value.dataAsOf, savedAt);
@@ -158,9 +166,10 @@ void main() {
 
       await tester.pumpWidget(calendarApp(ds, ConnectivityStatus(), cache));
       await tester.pump();
-      expect(find.text('B'), findsNothing);
+      expect(inGrid('B'), findsNothing);
       await tester.pumpAndSettle();
-      expect(find.text('B'), findsNothing);
+      expect(inGrid('B'), findsNothing);
+      expect(inGrid('A'), findsWidgets, reason: 'the finder reads the grid');
     });
 
     testWidgets('a copy of ANOTHER month fills the today card, not the grid',
@@ -191,7 +200,7 @@ void main() {
           calendarApp(ds, ConnectivityStatus()..lostServer(), cacheFor('u1')));
       await tester.pumpAndSettle();
 
-      expect(find.text('B'), findsNothing);
+      expect(inGrid('B'), findsNothing);
       expect(find.textContaining(pt[KApp.offlineMonthNotLoaded]),
           findsOneWidget);
     });

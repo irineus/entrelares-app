@@ -27,10 +27,31 @@ class ReportDay {
   final int scheduledParentId;
   final int? actualParentId;
 
+  /// F-07: the lane — null for a family day, the child in a per-child plan.
+  final int? childId;
+
   const ReportDay({
     required this.scheduleDate,
     required this.scheduledParentId,
     this.actualParentId,
+    this.childId,
+  });
+}
+
+/// F-07 (PR 5c) — section 1 of a per-child period: one distribution per lane.
+/// [childId] null is the family lane ("todas as crianças": the days planned
+/// before a switch to a plan per child, or after one back).
+class ReportLaneSection {
+  final int? childId;
+  final String label;
+  final List<CaregiverStat> caregivers;
+  final int totalSwaps;
+
+  const ReportLaneSection({
+    required this.childId,
+    required this.label,
+    required this.caregivers,
+    required this.totalSwaps,
   });
 }
 
@@ -51,6 +72,13 @@ class CaregiverStat {
   /// REALIZED (past) days where they were the real responsible.
   final int actualDays;
 
+  /// F-96: the planned days already behind us — the number [actualDays] is
+  /// compared with ("Planejado até hoje" × "Realizado", one horizon).
+  final int plannedToDate;
+
+  /// F-96: the planned days from today on ("Planejado restante").
+  final int plannedRemaining;
+
   /// U-20: `actual ?? scheduled` over the WHOLE period — approval writes
   /// `actual_parent_id` immediately, even for future days. Always computed;
   /// only SHOWN when the reader asked for the projection.
@@ -69,6 +97,8 @@ class CaregiverStat {
     required this.colorSlot,
     required this.plannedDays,
     required this.actualDays,
+    this.plannedToDate = 0,
+    this.plannedRemaining = 0,
     required this.projectedDays,
     required this.swapsGiven,
     required this.swapsReceived,
@@ -112,6 +142,14 @@ List<CaregiverStat> caregiverStats({
                 d.scheduleDate.isBefore(floor) &&
                 (d.actualParentId ?? d.scheduledParentId) == m.id)
             .length,
+        plannedToDate: days
+            .where((d) =>
+                d.scheduleDate.isBefore(floor) && d.scheduledParentId == m.id)
+            .length,
+        plannedRemaining: days
+            .where((d) =>
+                !d.scheduleDate.isBefore(floor) && d.scheduledParentId == m.id)
+            .length,
         projectedDays: days
             .where((d) => (d.actualParentId ?? d.scheduledParentId) == m.id)
             .length,
@@ -140,6 +178,20 @@ int totalVisibleSwaps({
     days
         .where((d) => isVisibleSwap(d,
             today: today, includeFutureSwaps: includeFutureSwaps))
+        .length;
+
+/// F-96: swaps already approved for days still ahead — counted APART from
+/// the realized ones, so "Total de trocas realizadas: 0" right after an
+/// approval no longer reads as "nothing happened".
+int futureAcceptedSwaps({
+  required List<ReportDay> days,
+  required DateTime today,
+}) =>
+    days
+        .where((d) =>
+            d.actualParentId != null &&
+            d.actualParentId != d.scheduledParentId &&
+            !d.scheduleDate.isBefore(dateOnly(today)))
         .length;
 
 /// Mirror of `ReportsSummary.HasData`: a period with no assignment at all
@@ -517,7 +569,8 @@ List<ReportAgendaItem> reportAgendaInOrder(Iterable<ReportAgendaItem> items) {
 }
 
 /// F-34: the expenses section — built by the caller from the period's live
-/// expenses, its confirmed payments and the trail of changes. Money in cents.
+/// expenses, its confirmed payments, the ones never confirmed (F-93) and the
+/// trail of changes. Money in cents.
 class ReportExpenseLine {
   final DateTime date;
   final String description;
@@ -525,12 +578,19 @@ class ReportExpenseLine {
   final int amountCents;
   final String paidByName;
 
+  /// F-96: whose expense it is (null = the family's own group) and the
+  /// split per person, already in words ("Ana R$ 360,00; Bruno R$ 840,00").
+  final String? childName;
+  final String splitText;
+
   const ReportExpenseLine({
     required this.date,
     required this.description,
     required this.categoryLabel,
     required this.amountCents,
     required this.paidByName,
+    this.childName,
+    this.splitText = '',
   });
 }
 
@@ -549,11 +609,48 @@ class ReportExpensePayment {
   final String toName;
   final int amountCents;
 
+  /// F-93: the payer's reference (e.g. the Pix id) and the receiver's note.
+  final String? reference;
+  final String? note;
+
   const ReportExpensePayment({
     required this.date,
     required this.fromName,
     required this.toName,
     required this.amountCents,
+    this.reference,
+    this.note,
+  });
+}
+
+/// F-93: how a payment that never entered the balance ended — still waiting,
+/// refused by the receiver, or taken back by whoever recorded it.
+enum ReportPaymentState { pending, rejected, cancelled }
+
+/// F-93: a payment recorded and NOT confirmed. It stays on paper because it
+/// is the payer's proof of the dispute; it never counts in the balance.
+class ReportExpenseUnconfirmed {
+  /// When it was recorded (local).
+  final DateTime recordedAt;
+
+  /// When it was refused or taken back (local); null while it waits.
+  final DateTime? answeredAt;
+  final String fromName;
+  final String toName;
+  final int amountCents;
+  final ReportPaymentState state;
+  final String? reference;
+  final String? note;
+
+  const ReportExpenseUnconfirmed({
+    required this.recordedAt,
+    required this.fromName,
+    required this.toName,
+    required this.amountCents,
+    required this.state,
+    this.answeredAt,
+    this.reference,
+    this.note,
   });
 }
 
@@ -574,17 +671,22 @@ class ReportExpenses {
   final List<ReportExpenseLine> lines;
   final List<ReportExpenseTotal> totals;
   final List<ReportExpensePayment> payments;
+  final List<ReportExpenseUnconfirmed> unconfirmed;
   final List<ReportExpenseChange> changes;
 
   const ReportExpenses({
     this.lines = const [],
     this.totals = const [],
     this.payments = const [],
+    this.unconfirmed = const [],
     this.changes = const [],
   });
 
   bool get isEmpty =>
-      lines.isEmpty && payments.isEmpty && changes.isEmpty;
+      lines.isEmpty &&
+      payments.isEmpty &&
+      unconfirmed.isEmpty &&
+      changes.isEmpty;
 }
 
 /// F-35: one Conversa text as the PDF prints it — built by the caller from
@@ -596,21 +698,31 @@ class ReportChatLine {
   final String? replyTo;
   final DateTime? citedDay;
 
+  /// F-96: "Lida por Ana (03/10 09:12)" or "Não lida até a emissão" — the
+  /// read marks the product sells, on paper.
+  final String? readLine;
+
   const ReportChatLine({
     required this.atLocal,
     required this.authorName,
     required this.body,
     this.replyTo,
     this.citedDay,
+    this.readLine,
   });
 }
 
 class CustodyReport {
   final String familyName;
 
-  /// Optional free-text child name typed at generation (not stored — there is
-  /// no child entity yet; multi-child is F-07). Omitted when blank.
+  /// The child line of the header: the registered names already joined
+  /// (F-55/F-07), or the free text typed at generation when the agenda is
+  /// off. Omitted when blank.
   final String? childName;
+
+  /// F-07: how many children [childName] names — the header says *Crianças*
+  /// above one. The free text counts as one.
+  final int childCount;
 
   final DateTime periodStart;
   final DateTime periodEnd;
@@ -624,6 +736,11 @@ class CustodyReport {
   final List<CaregiverStat> caregivers;
   final int totalSwaps;
   final List<ReportAuditEntry> auditEntries;
+
+  /// F-07 (PR 5c): one distribution per lane when the period has any child's
+  /// day — section 1 prints these instead of [caregivers]. Empty for a
+  /// single-plan period, which prints exactly what it always did.
+  final List<ReportLaneSection> laneSections;
 
   /// U-20: built with "considerar trocas futuras já aceitas" — the projected
   /// column is printed and every swap count includes accepted future swaps.
@@ -653,6 +770,7 @@ class CustodyReport {
   const CustodyReport({
     required this.familyName,
     required this.childName,
+    this.childCount = 1,
     required this.periodStart,
     required this.periodEnd,
     required this.generatedAtLocal,
@@ -661,6 +779,7 @@ class CustodyReport {
     required this.caregivers,
     required this.totalSwaps,
     required this.auditEntries,
+    this.laneSections = const [],
     required this.includesFutureSwaps,
     this.caregiverTimelines = const [],
     this.dayAccounts = const [],
@@ -678,6 +797,7 @@ class CustodyReport {
 CustodyReport buildCustodyReport({
   required String familyName,
   required String? childName,
+  int childCount = 1,
   required DateTime start,
   required DateTime end,
   required DateTime today,
@@ -696,6 +816,8 @@ CustodyReport buildCustodyReport({
   // F-45: log id → the swap request whose resolution produced it. A report
   // without the lookup (or a log without a request) simply omits the origin.
   Map<int, SwapOrigin> resolutionOrigins = const {},
+  // F-96: the logs that are a swap request's base write (pre_edit_log_id).
+  Set<int> swapBaseLogIds = const {},
   bool includeAcceptedFutureSwaps = false,
   // F-61: the caregivers' account facts and trail. Enrichment like the
   // origins — absent, section 2 prints its empty line and the rest stands.
@@ -710,6 +832,11 @@ CustodyReport buildCustodyReport({
   ReportExpenses? expenses,
   // F-35: the Conversa section, already in order. Null leaves it out.
   List<ReportChatLine>? chat,
+  // F-07 (PR 5c): child id → first name, in the family's order — the lane
+  // sections' labels and order. A lane whose child is gone keeps its days
+  // under the family label.
+  Map<int, String> childNames = const {},
+  String allChildrenLabel = '',
 }) {
   final stats = caregiverStats(
     members: members,
@@ -721,6 +848,39 @@ CustodyReport buildCustodyReport({
   final visible =
       reportCaregivers(stats, includeFutureSwaps: includeAcceptedFutureSwaps);
 
+  // F-07 (PR 5c): a period with any child's day is read per lane.
+  final laneSections = <ReportLaneSection>[];
+  if (days.any((d) => d.childId != null)) {
+    int? laneOf(ReportDay d) =>
+        d.childId != null && childNames.containsKey(d.childId) ? d.childId : null;
+    final lanes = <int?>[
+      if (days.any((d) => laneOf(d) == null)) null,
+      for (final id in childNames.keys)
+        if (days.any((d) => laneOf(d) == id)) id,
+    ];
+    for (final lane in lanes) {
+      final laneDays = [for (final d in days) if (laneOf(d) == lane) d];
+      laneSections.add(ReportLaneSection(
+        childId: lane,
+        label: lane == null ? allChildrenLabel : childNames[lane]!,
+        caregivers: reportCaregivers(
+            caregiverStats(
+              members: members,
+              days: laneDays,
+              today: today,
+              includeFutureSwaps: includeAcceptedFutureSwaps,
+              roleLabelOf: roleLabelOf,
+            ),
+            includeFutureSwaps: includeAcceptedFutureSwaps),
+        totalSwaps: totalVisibleSwaps(
+          days: laneDays,
+          today: today,
+          includeFutureSwaps: includeAcceptedFutureSwaps,
+        ),
+      ));
+    }
+  }
+
   final entries = [...auditLogs]
     ..sort((a, b) => a.createdAtLocal.compareTo(b.createdAtLocal));
 
@@ -729,12 +889,14 @@ CustodyReport buildCustodyReport({
     childName: (childName == null || childName.trim().isEmpty)
         ? null
         : childName.trim(),
+    childCount: childCount,
     periodStart: dateOnly(start),
     periodEnd: dateOnly(end),
     generatedAtLocal: generatedAtLocal,
     generatedBy: generatedBy,
     appVersion: appVersion,
     caregivers: visible,
+    laneSections: laneSections,
     totalSwaps: totalVisibleSwaps(
       days: days,
       today: today,
@@ -742,7 +904,8 @@ CustodyReport buildCustodyReport({
     ),
     auditEntries: [
       for (final log in entries)
-        _entryFor(log, resolutionOrigins[log.id], members, diffFor, l),
+        _entryFor(log, resolutionOrigins[log.id], members, diffFor, l,
+            swapBaseLogIds: swapBaseLogIds),
     ],
     includesFutureSwaps: includeAcceptedFutureSwaps,
     caregiverTimelines: accounts.isEmpty
@@ -767,8 +930,9 @@ ReportAuditEntry _entryFor(
   SwapOrigin? origin,
   List<MemberView> members,
   List<AuditFieldChange> Function(AuditLogView) diffFor,
-  Localization l,
-) {
+  Localization l, {
+  Set<int> swapBaseLogIds = const {},
+}) {
   String? performer;
   if (log.performedById != null) {
     for (final m in members) {
@@ -776,12 +940,14 @@ ReportAuditEntry _entryFor(
     }
   }
 
+  final changes = diffFor(log);
   return ReportAuditEntry(
     affectedDate: dateOnly(log.affectedDate),
     timestampLocal: log.createdAtLocal,
-    actionLabel: reportActionLabel(log.action, l),
+    actionLabel: reportActionLabel(log.action, l,
+        swapAsked: isSwapAskedBase(log, swapBaseLogIds, changes)),
     performedBy: performer ?? l[K.pdfDocSystem],
-    changes: diffFor(log),
+    changes: changes,
     originText:
         origin == null ? null : resolutionOriginText(origin, members, l),
     originMessage: origin?.requestMessage,

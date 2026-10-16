@@ -26,8 +26,10 @@ TodayCard card({
   DateTime? nextHandoff,
   bool viewingCurrentMonth = true,
   bool showInviteNudge = false,
+  bool showPlanNudge = false,
   VoidCallback? onGoToToday,
   VoidCallback? onInvite,
+  VoidCallback? onPlan,
 }) =>
     TodayCard(
       glance: glance ??
@@ -43,8 +45,10 @@ TodayCard card({
       nextHandoffDate: nextHandoff,
       viewingCurrentMonth: viewingCurrentMonth,
       showInviteNudge: showInviteNudge,
+      showPlanNudge: showPlanNudge,
       onGoToToday: onGoToToday ?? () {},
       onInvite: onInvite ?? () {},
+      onPlan: onPlan,
     );
 
 void main() {
@@ -69,7 +73,7 @@ void main() {
     expect(find.text('Responsável hoje'), findsOneWidget);
     expect(find.text('Bruno Lima'), findsOneWidget);
     expect(find.text('B'), findsOneWidget, reason: 'naive avatar letter');
-    expect(find.text('Próxima troca'), findsOneWidget);
+    expect(find.text('Próxima entrega'), findsOneWidget);
     expect(find.text('sáb, 22/08'), findsOneWidget);
     expect(find.text('em 3 dias'), findsOneWidget);
     // Current month: the card is not tappable, no hint.
@@ -120,7 +124,25 @@ void main() {
     expect(find.text('Dia sem responsável'), findsOneWidget);
     expect(
         find.text('Toque em um dia no calendário para definir'), findsOneWidget);
-    expect(find.text('Próxima troca'), findsNothing);
+    expect(find.text('Próxima entrega'), findsNothing);
+  });
+
+  testWidgets('U-61: the plan nudge wins over the invite nudge and the empty '
+      'hint, and opens the wizard', (tester) async {
+    var planned = false;
+    await tester.pumpWidget(wrap(card(
+      showPlanNudge: true,
+      showInviteNudge: true,
+      onPlan: () => planned = true,
+    )));
+
+    expect(find.byKey(TodayCard.planNudgeKey), findsOneWidget);
+    expect(find.text('Nenhum dia planejado ainda'), findsOneWidget);
+    expect(find.text('Convide o outro responsável'), findsNothing);
+    expect(find.text('Dia sem responsável'), findsNothing);
+
+    await tester.tap(find.text('Planejar'));
+    expect(planned, isTrue);
   });
 
   testWidgets('the F-31 invite nudge wins over the responsible row',

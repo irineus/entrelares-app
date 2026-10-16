@@ -83,7 +83,7 @@ class _FamilyAdminModeScreenState extends State<FamilyAdminModeScreen> {
         _loading = false;
         _loadErrorKey = isSessionExpired(e.toString())
             ? KApp.sessionExpired
-            : KApp.errCalendarLoad;
+            : KApp.errFamilyLoad;
       });
     }
   }
@@ -130,10 +130,10 @@ class _FamilyAdminModeScreenState extends State<FamilyAdminModeScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           // The mode is an admin's tool; someone else who lands here (a typed
-          // URL) reads the same sentence the invitation block gives them.
+          // URL) is told so — U-67: it used to say only admins send invites.
           if (!_isAdmin)
             AppCard(
-                child: Text(l[K.famOnlyAdminsInvite],
+                child: Text(l[KApp.adminModeOnlyAdmins],
                     style: Theme.of(context).textTheme.bodySmall))
           else
             _adminModeCard(l),

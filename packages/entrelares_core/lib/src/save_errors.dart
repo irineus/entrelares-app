@@ -33,6 +33,21 @@ bool isStaleDayConflict(String raw) => raw.contains('salvou este dia primeiro');
 bool isDayConflict(String raw) =>
     isUniqueDayConflict(raw) || isStaleDayConflict(raw);
 
+/// S-25: the answer RPCs refuse a request that is no longer open (answered,
+/// cancelled or auto-approved meanwhile) with this sentence. A batch reads it
+/// as "already settled" and moves on instead of aborting.
+bool isSwapAlreadyAnswered(String raw) =>
+    raw.contains('não está mais pendente');
+
+/// F-99: `enforce_handoff_party` refused a time change from someone at neither
+/// end of the handoff (the marker is our trigger's own, a stable contract).
+bool isHandoffPartyRefusal(String raw) => raw.contains('HANDOFF_PARTY');
+
+/// S-25: a write refused because the day is frozen by an open request — on a
+/// batch re-run, the day whose request the previous attempt already opened.
+bool isFrozenDayRefusal(String raw) =>
+    raw.contains('tem uma solicitação pendente');
+
 /// T-35: true when the update was rejected for carrying NO concurrency echo —
 /// the signature of a client build older than T-35. It must NOT be treated as
 /// a day conflict: reloading the month cannot fix it, only reloading the APP
@@ -157,6 +172,10 @@ String translateSaveError(String raw, String fallback, Localization l) {
   if (isNetworkFailure(raw) || _isGatewayStatus(fields.code)) {
     return fallback;
   }
+
+  // F-99: the database's marker for a handoff time changed by someone at
+  // neither end of the handoff — said in the reader's language.
+  if (isHandoffPartyRefusal(raw)) return l[KApp.errHandoffParty];
 
   if (fields.code == '23505') {
     if (message != null &&

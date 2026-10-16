@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../deep_link_urls.dart';
 import 'package:entrelares_db_contracts/models/invite_info.dart';
 import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/consent_row.dart';
 import '../widgets/role_picker.dart';
 import '../widgets/ui/ui.dart';
 
@@ -40,6 +40,12 @@ class OauthOnboardingScreen extends StatefulWidget {
   /// is the only other door.
   final Future<void> Function() onSignOut;
 
+  /// F-88: the kept invitation turned out dead (expired, revoked, used).
+  final VoidCallback? onInviteDead;
+
+  /// F-89: "Ajuda e contato".
+  final VoidCallback? onHelp;
+
   /// The profile now exists — `main.dart` re-resolves the phase and routes.
   final Future<void> Function() onCompleted;
 
@@ -47,14 +53,29 @@ class OauthOnboardingScreen extends StatefulWidget {
   /// calendar shows before the tour. Called before the sign-in that lands.
   final void Function(InviteInfo invite)? onInviteeJoined;
 
+  /// F-80 — this session just FOUNDED a family (never on the claim branch):
+  /// `main.dart` attributes a pending referral code, if the module is on.
+  /// Called before [onCompleted], and not awaited.
+  final VoidCallback? onFamilyFounded;
+
+  /// T-101 — where the family about to be founded came from (`main.dart`:
+  /// the web boot URL's verdict, or the Android install's). Asked only on the
+  /// founder branch, bounded to 3 s; null or a slow answer is `organic` on
+  /// the server.
+  final Future<Acquisition?> Function()? acquisition;
+
   const OauthOnboardingScreen({
     super.key,
     this.onInviteeJoined,
+    this.onFamilyFounded,
+    this.acquisition,
     required this.dataSource,
     this.analytics,
     required this.prefs,
     this.initialInviteToken,
     required this.onSignOut,
+    this.onInviteDead,
+    this.onHelp,
     required this.onCompleted,
   });
 
@@ -65,6 +86,9 @@ class OauthOnboardingScreen extends StatefulWidget {
 class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
   final _fullName = TextEditingController();
   final _familyName = TextEditingController();
+
+  /// U-61: the child's first name, OPTIONAL (the register form's field).
+  final _childName = TextEditingController();
 
   String? _role;
   bool _acceptedTerms = false;
@@ -110,15 +134,34 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
   void dispose() {
     _fullName.dispose();
     _familyName.dispose();
+    _childName.dispose();
     super.dispose();
   }
 
+  /// F-88: the invitation could not be checked — the form waits for a retry
+  /// instead of becoming the FOUNDER form, which made a second family.
+  bool _inviteUnreachable = false;
+
   Future<void> _resolveInvite(String token) async {
-    final info = await widget.dataSource.fetchInviteInfo(token);
+    InviteInfo? info;
+    try {
+      info = await widget.dataSource.fetchInviteInfo(token);
+    } on InviteUnreachable {
+      if (!mounted) return;
+      setState(() {
+        _loadingInvite = false;
+        _inviteUnreachable = true;
+      });
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _loadingInvite = false;
+      _inviteUnreachable = false;
       if (info == null) {
+        // F-88: a dead token is forgotten, so the next sign-up on this
+        // device is not told about it.
+        widget.onInviteDead?.call();
         // The stash outlived the invitation (expired, revoked, already used).
         // The founder form stays available below — being locked out of the
         // whole product over a dead token would be worse.
@@ -180,16 +223,41 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
   }
 
   Future<void> _submitFounder() async {
+    // U-61: optional, validated only when filled (the RPC's own sentence).
+    final childName = ChildRules.normalize(_childName.text);
+    final childError =
+        childName.isEmpty ? null : ChildRules.validateName(childName);
+    if (childError != null) {
+      setState(() {
+        _busy = false;
+        _errorText = childError;
+        _errorKey = null;
+      });
+      return;
+    }
+    Acquisition? acquisition;
+    try {
+      acquisition =
+          await widget.acquisition?.call().timeout(const Duration(seconds: 3));
+    } catch (_) {
+      acquisition = null;
+    }
     try {
       await widget.dataSource.completeOauthOnboarding(
         fullName: _fullName.text.trim(),
         role: _role!,
         familyName: _familyName.text.trim(),
+        acquisition: acquisition,
+        childFirstName: childName.isEmpty ? null : childName,
       );
       if (!mounted) return;
       // T-37: same funnel event the register form emits — the channel is in
-      // the pageview, never a person.
-      widget.analytics?.trackEvent(AnalyticsEvents.familyCreated);
+      // the pageview, never a person. U-61: whether the child was named.
+      widget.analytics?.trackEvent(AnalyticsEvents.familyCreated,
+          props: {'child': childName.isEmpty ? 'none' : 'named'});
+      // F-80: the family now exists and this session founded it — the one
+      // moment `attribute_referral` accepts. Fire-and-forget by contract.
+      widget.onFamilyFounded?.call();
       await _clearPendingToken();
       await widget.onCompleted();
     } on OnboardingRefused catch (e) {
@@ -268,6 +336,33 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
         ],
       );
     }
+    if (_inviteUnreachable) {
+      return Column(
+        key: const ValueKey('invite-unreachable'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l[KApp.inviteUnreachableTitle],
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 12),
+          Text(l[KApp.inviteUnreachableBody], textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () {
+              final token = _inviteToken;
+              if (token == null) return;
+              setState(() {
+                _inviteUnreachable = false;
+                _loadingInvite = true;
+              });
+              _resolveInvite(token);
+            },
+            child: Text(l[KApp.inviteRetry]),
+          ),
+        ],
+      );
+    }
     if (_migrationWarning) return _migrationState(l);
     return _form(l);
   }
@@ -284,6 +379,9 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
               [_migrationFamilyName ?? '', _invite?.familyName ?? ''])),
           const SizedBox(height: 8),
           Text(l[K.registerMigrationBody2]),
+          const SizedBox(height: 8),
+          // F-101: the way to keep both families (F-30 stays deferred).
+          Text(l[KApp.registerMigrationOtherEmail]),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: _busy
@@ -334,6 +432,21 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
                   ]),
             textAlign: TextAlign.center,
           ),
+          // F-88: the invitation names an address, and the claim refuses any
+          // other — say so BEFORE the form, while switching accounts still
+          // costs nothing (the invitation stays kept).
+          if (_sessionEmail != null &&
+              invite.invitedEmail.trim().toLowerCase() !=
+                  _sessionEmail!.trim().toLowerCase()) ...[
+            const SizedBox(height: 12),
+            AppBanner(
+              key: const ValueKey('invite-email-mismatch'),
+              tone: context.tokens.warning,
+              icon: Icons.alternate_email,
+              message: l.format(KApp.inviteEmailMismatch,
+                  [invite.invitedEmail, _sessionEmail!]),
+            ),
+          ],
         ] else ...[
           Text(l[KApp.onbFounderTitle],
               textAlign: TextAlign.center,
@@ -383,6 +496,16 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
             child: Text(l[KApp.onbSwitchAccount]),
           ),
         ),
+        // F-89: the onboarding is confined; Help is not.
+        if (widget.onHelp != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              key: const ValueKey('onboarding-help'),
+              onPressed: widget.onHelp,
+              child: Text(l[KApp.helpLoginLink]),
+            ),
+          ),
         if (invite == null) ...[
           const SizedBox(height: 12),
           AppTextField(
@@ -404,6 +527,14 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
           RolePicker(
             selected: _role,
             onSelected: (role) => setState(() => _role = role),
+          ),
+          const SizedBox(height: 16),
+          // U-61: the register form's optional child field, same words.
+          AppTextField(
+            label: l[KApp.registerChildName],
+            helper: l[KApp.registerChildNameHint],
+            controller: _childName,
+            maxLength: ChildRules.maxNameLength,
           ),
         ],
         const SizedBox(height: 20),
@@ -446,43 +577,10 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: _acceptedTerms,
-              // U-32: the sentence beside the box is three texts and two
-              // buttons, none of them the box's own — a screen reader heard
-              // an unnamed checkbox. The box carries the whole sentence.
-              semanticLabel: '${l[K.registerConsentAccept]} '
-                  '${l[K.commonPrivacyPolicy]} '
-                  '${l[K.registerConsentAnd]} '
-                  '${l[K.commonTermsOfUse]}',
-              onChanged: (value) =>
-                  setState(() => _acceptedTerms = value ?? false),
-            ),
-            Expanded(
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(l[K.registerConsentAccept],
-                      style: theme.textTheme.bodySmall),
-                  TextButton(
-                    onPressed: () => _openWebPage(DeepLinkUrls.privacy),
-                    child: Text(l[K.commonPrivacyPolicy],
-                        style: theme.textTheme.bodySmall),
-                  ),
-                  Text(l[K.registerConsentAnd],
-                      style: theme.textTheme.bodySmall),
-                  TextButton(
-                    onPressed: () => _openWebPage(DeepLinkUrls.terms),
-                    child: Text(l[K.commonTermsOfUse],
-                        style: theme.textTheme.bodySmall),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        ConsentRow(
+          value: _acceptedTerms,
+          onChanged: (v) => setState(() => _acceptedTerms = v),
+          onOpen: _openWebPage,
         ),
         // Empty in PT-BR by construction — the binding version IS the
         // Portuguese one, so only an English reader is told so.

@@ -195,13 +195,14 @@ npx supabase functions deploy billing-checkout     --project-ref <project-ref>
 
 | Function | Purpose |
 |---|---|
-| `send-swap-email` | Transactional e-mails (Resend) for every workflow event, the F-24 `reminder`/`auto_approved` types, the F-15 `invitation` type; computes the F-20 priority tag at send time |
-| `auto-approve-expired` | Cron worker (F-24): calls the `auto_approve_expired()` RPC (24 h reminders + 48 h auto-approval) and dispatches e-mails via `send-swap-email` |
+| `send-swap-email` | Since F-59 (02/10/2026) the F-15 `invitation` e-mail ONLY. The swap-workflow types (request, answers, cancellations, reverts, the F-24 `reminder`/`auto_approved`) are push + in-app; Android builds already in Production still call them, and they get 200 `{skipped: "push_only"}` |
+| `auto-approve-expired` | Cron worker (F-24): calls the `auto_approve_expired()` RPC (24 h reminders + 48 h auto-approval). The rows it writes push through the notifications trigger; no e-mail since F-59 |
 | `register-invitee` | F-15 invite sign-up: `admin.createUser` + profile/family wiring for a user joining via an invitation link (first casualty if the JWT key is on ES256 — see S-16) |
 | `elevate` | S-10 sudo elevation: opens the short-lived window the guarded destructive actions require. Two proofs since S-21 — the current password, or a one-time code mailed through `send-account-email`, which is the only door a Google session has |
 | `purge-deleted` | S-11 cron worker: hard-deletes accounts (and families) past their 30-day grace. Also carries the retention/notice duties added since: `purge_old_notifications` (S-13, read notices > 6 months), **`purge_stale_invitations`** (S-15/A-4, never-accepted invitations > 30 days — what makes the invite e-mail's purge promise true) and **`billing_grace_warnings_due`** (S-15/B-3, warns admins by e-mail before the Premium grace expires; the RPC writes the in-app notice, the e-mail here is the best-effort twin), `purge_old_support_requests` (F-68, 12 months) and **`purge_old_member_activity`** (T-78, `member_activity_days` older than 400 days plus any removed account's rows — the period §11 of the policy promises) |
-| `send-push-notification` | F-09: the push dispatcher. Fired by an AFTER INSERT trigger on `notifications` (pg_net, hence `--no-verify-jwt` and the secret key on `apikey`), so push, in-app and e-mail are three renderings of ONE event. Pushes ten types only — the rule is "push only what the recipient did not just do" — renders the copy per recipient from `_shared/push.ts` in that reader's language, and deletes the tokens FCM retires. **Fails closed and quiet on every branch**: no `FCM_SERVICE_ACCOUNT`, no device, or an unrenderable payload each answer 200 with a reason (arming: section 11) |
-| `send-account-email` | S-11 account-lifecycle e-mails (deletion scheduled/cancelled, family-deletion consent); mirrors the F-20 priority tag in `America/Sao_Paulo`. S-15/B-3 added `premium_grace_ending` — the only type that e-mails ONLY the subject (a family admin), since billing is admin-only. S-21 added `elevation_code`, the odd one out: keyed by `userId` (the subject may have no profile yet), secret-key callers only (`elevate`), and the destination address is read from `auth.users` instead of trusted from the payload |
+| `send-push-notification` | F-09: the push dispatcher. Fired by an AFTER INSERT trigger on `notifications` (pg_net, hence `--no-verify-jwt` and the secret key on `apikey`), so push and in-app are two renderings of ONE event (e-mail is a third only where F-59 kept it). Pushes the types in `PUSH_TYPES` only — since F-59 also the membership notices, by `kind` — and the rule is "push only what the recipient did not just do" — renders the copy per recipient from `_shared/push.ts` in that reader's language, and deletes the tokens FCM retires. **Fails closed and quiet on every branch**: no `FCM_SERVICE_ACCOUNT`, no device, or an unrenderable payload each answer 200 with a reason (arming: section 11) |
+| `send-account-email` | S-11 account-lifecycle e-mails. Since F-59 (02/10/2026): the leaver's OWN confirmation, the family-deletion request (requester + every other member) and its D-3 reminder, and the post-purge farewell. Someone joining, coming back or leaving (to the others), a deletion refused or withdrawn, and F-70's plan end are push + in-app; their types answer 200 `{skipped: "push_only"}` for the builds that still ask. S-15/B-3 added `premium_grace_ending` — the only type that e-mails ONLY the subject (a family admin), since billing is admin-only. S-21 added `elevation_code`, the odd one out: keyed by `userId` (the subject may have no profile yet), secret-key callers only (`elevate`), and the destination address is read from `auth.users` instead of trusted from the payload |
+| `weekly-bulletin` | T-99 cron worker (Mondays 12:00 UTC): e-mails the operator (`contato@`) the weekly sales bulletin from `admin_weekly_sales_bulletin()` — counts only. Secret key on `apikey` (hence `--no-verify-jwt`); `{"dry_run": true}` returns the subject and HTML without sending (the DB gate uses it); kill switch `ops.weekly_bulletin.enabled` |
 
 | `billing-webhook` | T-39: receives Asaas events (auth = the `ASAAS_WEBHOOK_TOKEN` shared secret in `asaas-access-token`, hence `--no-verify-jwt`). **Idempotent by the provider's event id** — a redelivery is recorded and ignored — and applies every effect through `set_family_plan`, adopting the subscription created by the payment link (`externalReference family:<id>`, link-id fallback) |
 | `billing-checkout` | T-39: called with the **user's** JWT and admin-only (guard chain 401→403→409→503); creates the Asaas Payment Link (`RECURRENT`, `dueDateLimitDays` — the API rejects it without one) so payer data is typed only on the provider's PCI page, and handles `cancel` honouring the period already paid. Refuses everything while `billing.enabled` is false; gateway failures are audited as `CHECKOUT_ERROR` in the ledger |
@@ -214,6 +215,17 @@ npx supabase functions deploy billing-checkout     --project-ref <project-ref>
 >
 > An outdated `send-swap-email` used to silently build **0 e-mails** for unknown
 > types — the historical gotcha the automated redeploy-on-every-push eliminates.
+
+> **What is still e-mail (F-59, 02/10/2026).** The owner's rule: e-mail only where nothing
+> else can reach the reader, or where a written promise names e-mail. That is the auth links
+> (`send-auth-email`: sign-up, recovery, e-mail change), the S-21 sudo code, the invitation,
+> the F-68 support confirmation, the family-deletion request + its D-3 reminder, the
+> post-purge farewell, the Premium grace warning (the Terms promise it by e-mail) and the
+> leaver's own confirmation. Everything else is push + in-app, and a reader without push is
+> walked to it by the *Ativar notificações* card on Hoje. The F-38 monthly quota retired with
+> the swap e-mails (its counter, functions and keys were dropped). A new e-mail type needs the
+> same justification — it spends the per-account Resend allowance (100/day, shared with GoTrue
+> and, since 02/09/2026, with a second product's domain).
 
 ---
 
@@ -310,6 +322,122 @@ from the notifications trigger) live in `plan_end_reminders_due()`. Check a run:
 select jobname, schedule from cron.job where jobname = 'plan-end-reminders-daily';
 select * from public.plan_end_reminders order by sent_at desc limit 20;
 ```
+
+### 4.6-bis The `trial-end-reminders` cron (F-77) — nothing to do by hand
+
+Created by its own migration (`20261002170000_f77_trial_end_reminders.sql`):
+**`trial-end-reminders-daily`**, `0 12 * * *`, beside F-70's. No e-mail twin
+(F-59), so there is no Edge Function — the job is `SELECT
+public.trial_end_reminders_due();` itself and needs no Vault read (the push
+trigger reads its own). It tells a family's ADMINS that the Premium trial ends
+(D-7, D-1) or ended — the `ended` only after a D-7/D-1 of the same end (no
+backfill) — and skips a family that pays on either rail or has a pending
+deletion. Check a run, and the conversion it exists for (reminded families
+that subscribed by their trial end + 7 days):
+```sql
+select jobname, schedule from cron.job where jobname = 'trial-end-reminders-daily';
+select * from public.trial_end_reminders order by sent_at desc limit 20;
+select count(distinct t.family_id) filter (where s.family_id is not null) as converted,
+       count(distinct t.family_id) as reminded
+  from public.trial_end_reminders t
+  left join public.subscriptions s
+    on s.family_id = t.family_id and s.status in ('active','scheduled','overdue')
+   and s.created_at <= t.trial_ends_at + interval '7 days'
+ where t.stage in ('d7','d1') and t.trial_ends_at + interval '7 days' < now();
+```
+
+### 4.6-ter The `unplanned-family-nudges` cron (F-78) — nothing to do by hand
+
+Created by `20261002180000_f78_unplanned_nudge.sql`: **`unplanned-family-nudges-daily`**,
+`0 12 * * *`, the job being `SELECT public.unplanned_family_nudges_due();`. A
+family with no `care_schedules` row in any lane `onboarding.unplanned_nudge_hours`
+(default 48) after it was created is told once — every active, non-viewer member
+with an account — as a `plan_ending` row of kind `unplanned` (push + in-app, no
+e-mail). The first run is the one-time backfill for the families already dormant.
+Check a run, and the measure it exists for (nudged families that planned within
+7 days):
+```sql
+select jobname, schedule from cron.job where jobname = 'unplanned-family-nudges-daily';
+select count(*) filter (where exists (
+         select 1 from public.care_schedules cs
+          where cs.family_id = n.family_id and cs.created_at <= n.sent_at + interval '7 days')) as planned,
+       count(*) as nudged
+  from public.unplanned_family_nudges n
+ where n.sent_at + interval '7 days' < now();
+```
+
+### 4.6-quater The `weekly-bulletin` cron (T-99) — nothing to do by hand
+
+Created by `20261002190000_t99_weekly_bulletin.sql`: **`weekly-bulletin`**,
+`0 12 * * 1` (Mondays, 09:00 in Brasília), calling the `weekly-bulletin` Edge
+Function with the SAME Vault secrets as 4.6 (`functions_base_url`, `secret_key`
+on `apikey`) — a project armed for push is armed for this. The function reads
+`admin_weekly_sales_bulletin()` (service role only: the week that just ended vs
+the one before, a 4-week trend and a snapshot — counts, dates and closed enums,
+never a name, an e-mail or a family id) and e-mails it to
+`contato@entrelares.app` (`OPERATOR_INBOX` overrides), subject `Boletim semanal —
+semana de DD/MM a DD/MM` (`[Dev] ` outside production). One send per week: the
+week is claimed in `weekly_bulletin_sends` before the send and released if Resend
+refuses. Kill switch: `ops.weekly_bulletin.enabled` (operator console). On the
+dev project the numbers include the E2E families — switch it off there if the
+`[Dev]` copy is noise. Since **T-101** (04/10/2026) the bulletin opens with the
+`real_cohort` block: every family created on or after `acquisition.real_cohort_start`
+(São Paulo; L-31 moves it to the launch day by migration) counted under its
+`families.acquisition_source` — written once at creation, from the Play Install
+Referrer or `/register?src=` — and the internal test cohort apart. The campaign
+token stays out of the e-mail; read it here when needed. Check a run, or read the
+numbers without sending:
+```sql
+select jobname, schedule from cron.job where jobname = 'weekly-bulletin';
+select * from public.weekly_bulletin_sends order by week_start desc limit 5;
+select public.admin_weekly_sales_bulletin();             -- the week that just ended
+select public.admin_weekly_sales_bulletin(current_date); -- the week in progress
+-- T-101: the real cohort by source and campaign (the e-mail shows no campaign)
+select acquisition_source, acquisition_campaign, count(*) from public.families
+ where created_at >= (public.acquisition_real_cohort_start()::timestamp at time zone 'America/Sao_Paulo')
+ group by 1, 2 order by 3 desc;
+```
+
+### 4.6-quinquies The referral reward crons (F-80 PR 3) — two owner/operator steps
+
+Created by `20261002210000_f80_referral_rewards.sql`. Both do nothing while
+`feature.referral` is off — and it is **ON in production since 03/10/2026**
+(F-82, `20261003150000_f82_referral_live.sql`, with privacy policy 2.1 and Terms
+1.4). The Terms state the two numbers the jobs read — 30 days without a refund
+(`referral.hold_days`) and 12 months a calendar year (`referral.yearly_cap`) —
+so a console edit of either needs the Terms updated in the same delivery.
+
+- **`referral-rewards-daily`**, `0 12 * * *`: `SELECT public.referral_rewards_due();`
+  — the whole state machine in SQL. The referred family's first PAID payment
+  (Asaas CONFIRMED/RECEIVED, a Play verification with `paymentState` 1, Play
+  RTDN 1/2) → `paid`; a refund, chargeback or Play revoke before `qualifies_at`
+  (`first_paid_at + referral.hold_days`) → `cancelled`; a clean window →
+  `qualified` → the referrer's free month: `trial` (+30 days on
+  `trial_ends_at`) or `paid_period` (+30 days on a canceled-with-time
+  `current_period_end`) are delivered and notified (`referral_reward`, push +
+  in-app); an Asaas subscriber → `pending_rail` / `asaas_manual`; a Play
+  subscriber → `pending_rail` / `play_queued`; over `referral.yearly_cap` this
+  calendar year (São Paulo) → `capped`, for good.
+- **`referral-rewards-play-daily`**, `15 12 * * *`: calls the `referral-rewards`
+  Edge Function with the 4.6 Vault secrets. It defers each queued Play
+  subscription by one month (`purchases.subscriptions.defer`), writes Play's new
+  expiry to `current_period_end` and settles the row. It needs the BILLING
+  service account (`PLAY_SERVICE_ACCOUNT`) to hold **Manage orders and
+  subscriptions** in the Play Console; without it the row reads
+  `play_permission_denied` and is retried every day.
+
+The Asaas rail is manual on purpose (no subscription-update call exists, and the
+gate has no Asaas mock): for each `asaas_manual` row, move the referrer's
+subscription next due date one month in the Asaas dashboard, then record it —
+this also moves our `current_period_end` one month and notifies the family:
+```sql
+select referred_family_id, referrer_family_id, reward_rail, reward_pending_reason, rewarded_at
+  from public.family_referrals where status = 'pending_rail' order by rewarded_at;
+select public.referral_reward_delivered(<referred_family_id>);
+select status, count(*) from public.family_referrals group by status;
+```
+A `play_in_flight` row is a deferral whose answer never arrived; the next run
+reconciles it against Play (never resends blind). `play_error` waits for a human.
 
 ### 4.7 The `public-settings` feed (T-81) — what the landing may read
 
@@ -2452,13 +2580,16 @@ them back, which a hand-written client does not send. Matching here is by releas
 exactly why step 2 is worth a test.
 
 **The secret this needs — armed 11/09/2026.** The upload step disarms itself while
-`SENTRY_AUTH_TOKEN` is absent (the same shape as the Cloudflare publish beside it): the deploy
-still publishes and the run summary says the stacks will read minified.
+`SENTRY_AUTH_TOKEN` is absent: the deploy still publishes and the run summary says the stacks will
+read minified. (The Cloudflare publish beside it used to disarm the same way; since S-23 an empty
+Cloudflare token is RED — a missing Sentry token costs readable stacks, a missing Cloudflare one
+costs the channel.)
 
 To arm it (or to rotate it): Sentry → Settings → **Organization Tokens** → Create New
 Organization Token (https://irineu-pinheiro.sentry.io/settings/auth-tokens/new-token/), then add
-the value as the repository secret `SENTRY_AUTH_TOKEN`
-(https://github.com/irineus/entrelares-app/settings/secrets/actions).
+the value as the secret `SENTRY_AUTH_TOKEN` of the **`production` Environment**
+(https://github.com/irineus/entrelares-app/settings/environments) — never at repository level,
+which every same-repo branch can read (S-23, 29/09/2026).
 
 **An organization token's scope is not chosen — it is fixed at `org:ci`**, which the screen spells
 out as *Source Map Upload, Release Creation, Code Mappings*. That is exactly what the three

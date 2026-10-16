@@ -25,6 +25,8 @@
 /// and it died with the cutover.)
 library;
 
+import '../family_time.dart';
+import 'k_app.dart';
 import 'localization.dart';
 
 const _enMonthsAbbrev = [
@@ -139,6 +141,38 @@ extension DateFormats on Localization {
   String weekdayAbbrev(int weekday) => isEnglish
       ? _enWeekdaysAbbrev[weekday - 1]
       : _ptWeekdaysAbbrev[weekday - 1];
+
+  /// U-63 — a DEADLINE, as a person says it: `sábado, 10/10, à 0h` /
+  /// `domingo, 11/10, às 18h30` · `Saturday, 10 Oct, at 12 AM` /
+  /// `Sunday, 11 Oct, at 6:30 PM`. "10/10/2026 00:00" was a timestamp, and
+  /// midnight read as a time that belongs to no day. PT-BR says "à" for the
+  /// singular hours (0h, 1h) and "às" for the rest.
+  String formatDeadline(DateTime moment) {
+    if (isEnglish) {
+      final h = moment.hour % 12 == 0 ? 12 : moment.hour % 12;
+      final ampm = moment.hour < 12 ? 'AM' : 'PM';
+      final time = moment.minute == 0 ? '$h $ampm' : '$h:${_two(moment.minute)} $ampm';
+      return '${_enWeekdaysFull[moment.weekday - 1]}, ${_two(moment.day)} '
+          '${_enMonthsAbbrev[moment.month - 1]}, at $time';
+    }
+    final prep = moment.hour <= 1 ? 'à' : 'às';
+    final time = moment.minute == 0
+        ? '${moment.hour}h'
+        : '${moment.hour}h${_two(moment.minute)}';
+    return '${_ptWeekdaysFull[moment.weekday - 1]}, ${_two(moment.day)}/'
+        '${_two(moment.month)}, $prep $time';
+  }
+
+  /// T-105 — a deadline on the FAMILY's clock (America/Sao_Paulo, where the
+  /// server decides it), with "(horário de Brasília)" when this device reads
+  /// another clock — a parent in Manaus is otherwise an hour off without
+  /// knowing it. [deviceDiffers] defaults to this device ([FamilyTime]).
+  String formatFamilyDeadline(DateTime moment, {bool? deviceDiffers}) {
+    final base = formatDeadline(moment);
+    return (deviceDiffers ?? FamilyTime.deviceDiffers())
+        ? '$base ${this[KApp.familyTimeSuffix]}'
+        : base;
+  }
 
   /// The Today card's date line, mirroring `TodayCard.razor`'s
   /// `"dddd, dd 'de' MMMM"` pt-BR / `"dddd, MMMM d"` en-US:

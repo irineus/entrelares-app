@@ -27,6 +27,7 @@ Future<String?> showQuickSwapSheet({
   required CustodyDataSource dataSource,
   required Member myProfile,
   required List<Member> allProfiles,
+  int? childId,
 }) {
   return showAppSheet<String>(
     context: context,
@@ -36,6 +37,7 @@ Future<String?> showQuickSwapSheet({
       dataSource: dataSource,
       myProfile: myProfile,
       allProfiles: allProfiles,
+      childId: childId,
     ),
   );
 }
@@ -47,12 +49,16 @@ class _QuickSwapSheet extends StatefulWidget {
   final Member myProfile;
   final List<Member> allProfiles;
 
+  /// F-07: the lane the selection lives in (null in a single-plan family).
+  final int? childId;
+
   const _QuickSwapSheet({
     required this.plan,
     required this.daysByIso,
     required this.dataSource,
     required this.myProfile,
     required this.allProfiles,
+    this.childId,
   });
 
   @override
@@ -108,6 +114,9 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
       final requests = widget.plan.requests;
       var swapCount = 0;
       var conflictCount = 0;
+      // S-25: a re-run after a partial failure meets the days whose request
+      // the first attempt already opened — frozen now. Settled, not failed.
+      var alreadyCount = 0;
       var processed = 0;
       for (final r in requests) {
         processed++;
@@ -129,6 +138,7 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
           notes: existing?.notes,
           revision: existing?.revision ?? 0,
           revisionToken: existing?.revisionToken ?? '',
+          childId: widget.childId,
         );
         try {
           if (existing == null) {
@@ -136,7 +146,8 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
           } else {
             await widget.dataSource.updateDay(base);
           }
-          final refreshed = await widget.dataSource.fetchDay(r.date);
+          final refreshed = await widget.dataSource
+              .fetchDay(r.date, childId: widget.childId);
           // No handoff is proposed: the T-27 triggers re-evaluate the
           // transitions when the request is approved.
           await widget.dataSource.createSwapRequest(
@@ -148,7 +159,9 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
           );
           swapCount++;
         } catch (e) {
-          if (isWorkflowConflict(e.toString())) {
+          if (isFrozenDayRefusal(e.toString())) {
+            alreadyCount++;
+          } else if (isWorkflowConflict(e.toString())) {
             conflictCount++;
           } else {
             rethrow;
@@ -167,6 +180,13 @@ class _QuickSwapSheetState extends State<_QuickSwapSheet> {
                 ? K.bulkConflictSuffixOne
                 : K.bulkConflictSuffixMany,
             [conflictCount]);
+      }
+      if (alreadyCount > 0) {
+        summary += l.format(
+            alreadyCount == 1
+                ? KApp.quickSwapAlreadyOne
+                : KApp.quickSwapAlreadyMany,
+            [alreadyCount]);
       }
       if (mounted) Navigator.of(context).pop(summary);
     } catch (e) {

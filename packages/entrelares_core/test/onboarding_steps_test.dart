@@ -1,10 +1,10 @@
 /// Mirror of `entrelares-app` `Entrelares.Tests/OnboardingStepsTests.cs` — same
-/// cases, same verdicts.
+/// cases, same verdicts — plus U-61's shape (07/10/2026).
 ///
-/// The two facts worth reading twice: a fresh founder sees 0 of 3, and an
-/// INVITEE arrives with 2 of 3 already ticked. The second is not a special
-/// case in the code — it falls out of reading real family state, which is the
-/// whole design.
+/// The facts worth reading twice: a fresh founder sees 0 of 3, in the
+/// founder's order (plan → invite → understand); an INVITEE sees no checklist
+/// at all — their first run is U-58's welcome; and the push ask is not a step
+/// here any more, so the intro's "três" is the count.
 library;
 
 import 'package:entrelares_core/entrelares_core.dart';
@@ -12,16 +12,16 @@ import 'package:test/test.dart';
 
 void main() {
   group('shape', () {
-    test('four steps, in activation order', () {
+    test('three steps, in the founder\'s order (U-61)', () {
       expect(OnboardingSteps.all, [
-        OnboardingStep.inviteCoCaregiver,
+        // Plan first: a family that never plans never invites either (F-78's
+        // 20 of 30 single-member families), and the Hoje card points here.
         OnboardingStep.planTheDays,
+        OnboardingStep.inviteCoCaregiver,
         OnboardingStep.understandSwaps,
-        // F-09, and last on purpose: the only step that asks for something
-        // from OUTSIDE the product, and the only one whose prompt cannot be
-        // re-offered once refused.
-        OnboardingStep.enablePush,
       ]);
+      expect(OnboardingSteps.visibleIn(const OnboardingSignals()),
+          OnboardingSteps.all);
     });
 
     test('every step carries its four copy keys', () {
@@ -44,51 +44,16 @@ void main() {
       ];
       expect(keys.toSet(), hasLength(keys.length));
     });
-  });
 
-  group('enablePush (F-09)', () {
-    const onAndroid = OnboardingSignals(pushSupported: true);
-
-    test('is absent from a build with no push transport', () {
-      // The web channel. A step that can never be finished keeps the card on
-      // screen forever, at "3 de 4", for the rest of that person's life.
-      expect(OnboardingSteps.visibleIn(const OnboardingSignals()),
-          isNot(contains(OnboardingStep.enablePush)));
-      expect(OnboardingSteps.visibleIn(onAndroid),
-          contains(OnboardingStep.enablePush));
-    });
-
-    test('the count and the "all done" verdict follow the visible steps', () {
-      // Everything the product can ask of a web reader is done, so the card
-      // has nothing left to say and must go — even though `all` still holds a
-      // fourth step this build cannot offer.
-      const webDone = OnboardingSignals(
-        hasOtherActiveMember: true,
-        hasAnyPlannedDay: true,
-        hasTakenPartInASwap: true,
-      );
-      expect(OnboardingSteps.doneCount(webDone), 3);
-      expect(OnboardingSteps.allDone(webDone), isTrue);
-      expect(OnboardingSteps.shouldShowChecklist(webDone), isFalse);
-
-      // The same family on Android still has one thing to do.
-      final androidDone = webDone.copyWith(pushSupported: true);
-      expect(OnboardingSteps.doneCount(androidDone), 3);
-      expect(OnboardingSteps.allDone(androidDone), isFalse);
-      expect(OnboardingSteps.shouldShowChecklist(androidDone), isTrue);
-
-      expect(
-          OnboardingSteps.allDone(androidDone.copyWith(hasPushEnabled: true)),
-          isTrue);
-    });
-
-    test('closes on real state, never on a sheet having been shown', () {
-      expect(OnboardingSteps.isDone(OnboardingStep.enablePush, onAndroid),
-          isFalse);
-      expect(
-          OnboardingSteps.isDone(OnboardingStep.enablePush,
-              onAndroid.copyWith(hasPushEnabled: true)),
-          isTrue);
+    test('the intro counts the steps — "três" is three (U-61)', () {
+      // The audit read "Três coisas transformam…" over a list of four. The
+      // push step left the checklist for the F-59 strip; the sentence stays
+      // and the list matches it, in both languages.
+      expect(OnboardingSteps.all, hasLength(3));
+      expect(Localization(AppLanguage.ptBr)[K.onbChecklistIntro],
+          startsWith('Três'));
+      expect(Localization(AppLanguage.en)[K.onbChecklistIntro],
+          startsWith('Three'));
     });
   });
 
@@ -181,7 +146,7 @@ void main() {
 
   group('progress and visibility', () {
     const fresh = OnboardingSignals();
-    const invitee = OnboardingSignals(
+    const joinedFamily = OnboardingSignals(
       hasOtherActiveMember: true,
       hasAnyPlannedDay: true,
     );
@@ -197,9 +162,24 @@ void main() {
       expect(OnboardingSteps.shouldShowChecklist(fresh), isTrue);
     });
 
-    test('an invitee arrives with 2 of 3 already done', () {
-      expect(OnboardingSteps.doneCount(invitee), 2);
-      expect(OnboardingSteps.shouldShowChecklist(invitee), isTrue);
+    test('a founder whose family already has a member and a plan is 2 of 3',
+        () {
+      expect(OnboardingSteps.doneCount(joinedFamily), 2);
+      expect(OnboardingSteps.shouldShowChecklist(joinedFamily), isTrue);
+    });
+
+    test('U-61: the invitee never sees the checklist on their own — the '
+        'ticks would be the founder\'s, not theirs', () {
+      final invitee = joinedFamily.copyWith(joinedByInvitation: true);
+      expect(OnboardingSteps.shouldShowChecklist(invitee), isFalse);
+      // Nothing done, nothing dismissed: still not theirs.
+      expect(
+          OnboardingSteps.shouldShowChecklist(
+              fresh.copyWith(joinedByInvitation: true)),
+          isFalse);
+      // An explicit "show it again" from the profile is honoured.
+      expect(OnboardingSteps.shouldShowChecklist(invitee, reopened: true),
+          isTrue);
     });
 
     test('finishing removes the card', () {
@@ -228,6 +208,37 @@ void main() {
     }
   });
 
+  group('firstRunActive (U-61)', () {
+    const fresh = OnboardingSignals();
+    const finished = OnboardingSignals(
+      hasOtherActiveMember: true,
+      hasAnyPlannedDay: true,
+      hasOpenedSwapExplanation: true,
+    );
+
+    test('a founder with work left and the card up is inside the first run',
+        () {
+      expect(OnboardingSteps.firstRunActive(fresh), isTrue);
+      expect(
+          OnboardingSteps.firstRunActive(
+              fresh.copyWith(hasAnyPlannedDay: true)),
+          isTrue);
+    });
+
+    test('it ends by finishing or by dismissing — and never began for the '
+        'invitee', () {
+      expect(OnboardingSteps.firstRunActive(finished), isFalse);
+      expect(
+          OnboardingSteps.firstRunActive(
+              fresh.copyWith(checklistDismissed: true)),
+          isFalse);
+      expect(
+          OnboardingSteps.firstRunActive(
+              fresh.copyWith(joinedByInvitation: true)),
+          isFalse);
+    });
+  });
+
   group('copyWith', () {
     test('Home ORs the loaded signal with the month it already holds', () {
       const loaded = OnboardingSignals(hasOtherActiveMember: true);
@@ -239,10 +250,13 @@ void main() {
 
     test('leaves untouched fields alone', () {
       const signals = OnboardingSignals(
-          hasOpenInvitation: true, checklistDismissed: true);
+          hasOpenInvitation: true,
+          checklistDismissed: true,
+          joinedByInvitation: true);
       final copy = signals.copyWith(hasAnyPlannedDay: true);
       expect(copy.hasOpenInvitation, isTrue);
       expect(copy.checklistDismissed, isTrue);
+      expect(copy.joinedByInvitation, isTrue);
     });
   });
 }

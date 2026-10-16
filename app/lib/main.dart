@@ -48,6 +48,8 @@ import 'services/account_identity.dart';
 import 'services/activity_tracker.dart';
 import 'services/admin_mode.dart';
 import 'services/analytics_service.dart';
+import 'services/auth_failed.dart';
+import 'services/invite_note.dart';
 import 'services/appearance.dart';
 import 'services/boot_handoff.dart';
 import 'services/connectivity_status.dart';
@@ -56,7 +58,9 @@ import 'services/crash_reporter.dart';
 import 'services/custody_data_source.dart';
 import 'services/google_identity.dart';
 import 'services/handoff_nudge_prefs.dart';
+import 'services/push_today_prefs.dart';
 import 'services/install_hint.dart';
+import 'services/install_referrer.dart';
 import 'services/installed_app.dart';
 import 'services/notification_badge.dart';
 import 'services/offline_cache.dart';
@@ -67,11 +71,13 @@ import 'services/push_service.dart';
 import 'services/refresh_guard_client.dart';
 import 'services/session_gate.dart';
 import 'services/store_billing.dart';
+import 'services/store_purchases.dart';
 import 'services/sudo_service.dart';
 import 'services/support_service.dart';
 import 'services/supabase_custody_data_source.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_l10n.dart';
+import 'widgets/app_snack.dart';
 import 'widgets/chat_view.dart';
 import 'widgets/app_width_cap.dart';
 import 'widgets/app_splash.dart';
@@ -219,12 +225,25 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   // half-drawn offer.
   final StoreBilling? _storeBilling = kIsWeb ? null : PlayStoreBilling();
 
+  /// F-86: the one purchase listener, alive with the app — a purchase that
+  /// settles while the reader is on the calendar is verified and
+  /// acknowledged all the same. Activated with the authenticated phase.
+  late final StorePurchaseCoordinator? _purchases = _storeBilling == null
+      ? null
+      : StorePurchaseCoordinator(
+          store: _storeBilling, dataSource: _dataSource, analytics: _analytics);
+
   // F-14: session-scoped, like the web's scoped AdminModeService — never
   // persisted; leaving the authenticated phase always deactivates it.
   final _adminMode = AdminMode();
   late Localization _l;
   final _refresh = _RouterRefresh();
   _AuthPhase _phase = _AuthPhase.gate;
+
+  /// F-87: the `error_code` the boot address carried (web), and the e-mail
+  /// typed on the login, handed to the recovery form — memory only.
+  String? _authLinkError;
+  String? _pendingResetEmail;
 
   /// F-68: the screen "Ajuda e contato" was opened from, for its diagnostics —
   /// the route is sanitized in core before it can leave the device.
@@ -248,7 +267,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   // S-04 — inactivity timeout (mirror in InactivityPolicy). The web resets on
   // click/touch/key/scroll; every one of those starts as a pointer-down here.
   // Background time counts, same as the web's timer running in a hidden tab:
-  // the resume hook re-checks immediately.
+  // the resume hook re-checks immediately. F-92: WEB ONLY — on Android the
+  // device lock protects the session (InactivityPolicy.appliesTo).
   DateTime _lastInteraction = DateTime.now();
   Timer? _inactivityTimer;
 
@@ -297,6 +317,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         builder: (_, _) => LoginScreen(
           onSignIn: _signIn,
           onForgotPassword: () => _router.go('/reset-password'),
+          onForgotPasswordFor: (email) {
+            _pendingResetEmail = email.isEmpty ? null : email;
+            _router.go('/reset-password');
+          },
+          onResendConfirmation: _resendConfirmation,
+          linkErrorCode: _authLinkError,
           onSignUp: () => _router.go('/register'),
           onHelp: () => _openHelp(from: '/login'),
           prefs: widget.prefs,
@@ -323,9 +349,13 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           dataSource: _dataSource,
           analytics: _analytics,
           inviteToken: InviteFormRules.inviteTokenFrom(state.uri),
+          referralCode: _pendingReferralCode,
+          installReferrer: _installReferrer,
+          acquisition: _pendingAcquisition,
           onSignIn: _signIn,
           onInviteeJoined: _welcomeInvitee,
           onBackToLogin: () => _router.go('/login'),
+          onResendConfirmation: _resendConfirmation,
           googleEnabled: AuthProviders.googleEnabled(),
           // F-57: the invite branch hands its token over, and the stash has
           // to happen HERE — the OAuth redirect leaves the widget tree behind.
@@ -347,10 +377,14 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           // F-71: the native door never leaves the app, so the invitation
           // stays in memory instead of in the prefs stash.
           initialInviteToken: _pendingInviteToken,
+          onInviteDead: _forgetPendingInvite,
           onInviteeJoined: _welcomeInvitee,
+          onFamilyFounded: _attributePendingReferral,
+          acquisition: _founderAcquisition,
           onSignOut: _signOut,
+          onHelp: () => _openHelp(from: '/onboarding'),
           onCompleted: () async {
-            _pendingInviteToken = null;
+            _forgetPendingInvite();
             await _resolveAuthedPhase();
             if (mounted) _router.go('/');
           },
@@ -359,8 +393,10 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       GoRoute(
         path: '/reset-password',
         builder: (_, _) => ResetPasswordScreen(
-          onSendReset: (email) => _client.auth.resetPasswordForEmail(email,
-              redirectTo: DeepLinkUrls.updatePasswordFor(_l.current)),
+          initialEmail: _pendingResetEmail,
+          onSendReset: (email) => _auth(() => _client.auth.resetPasswordForEmail(
+              email,
+              redirectTo: DeepLinkUrls.updatePasswordFor(_l.current))),
           onBackToLogin: () => _router.go('/login'),
         ),
       ),
@@ -407,11 +443,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         path: '/update-password',
         builder: (_, _) => UpdatePasswordScreen(
           hasSession: _client.auth.currentSession != null,
-          onUpdatePassword: (newPassword) async {
-            await _client.auth
-                .updateUser(UserAttributes(password: newPassword));
-          },
+          onUpdatePassword: (newPassword) => _auth(() => _client.auth
+              .updateUser(UserAttributes(password: newPassword))),
           onDone: () => _router.go('/'),
+          onRequestNewLink: () => _router.go('/reset-password'),
+          onBackToLogin: () => _router.go('/login'),
         ),
       ),
       // S-11: outside the shell on purpose — a member on their way out has no
@@ -422,6 +458,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           dataSource: _dataSource,
           sudo: _sudo,
           onSignOut: _signOut,
+          onHelp: () => _openHelp(from: '/leaving'),
           onReturned: () {
             _isLeaving = false;
             _router.go('/');
@@ -448,6 +485,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         builder: (_, _) => PolicyUpdateScreen(
           dataSource: _dataSource,
           onSignOut: _signOut,
+          onHelp: () => _openHelp(from: '/policy-update'),
           onAccepted: () {
             _consentState = ConsentGateState.upToDate;
             _router.go('/');
@@ -470,6 +508,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
             appHandoff: _appHandoff,
             playInvite: _playInvite,
             installHint: _installHint,
+            calendarStripShowing: _calendarStripShowing,
             connectivity: appConnectivity,
             tourKeys: _tourKeys,
             expensesTab: _expensesTab,
@@ -478,7 +517,23 @@ class _EntrelaresAppState extends State<EntrelaresApp>
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/',
-              builder: (_, _) => CalendarScreen(
+              builder: (_, state) {
+                // F-78: the web's push lands on `/?plan=first` (the service
+                // worker cannot call Dart); the request is consumed once and
+                // the address cleaned.
+                if (state.uri.queryParameters['plan'] == 'first') {
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _openWizardOnToday());
+                }
+                // F-81: the same for an admin's change of ONE day —
+                // `/?day=YYYY-MM-DD` opens that day's sheet, once.
+                final askedDay = AdminChangeRules.parseIsoDay(
+                    state.uri.queryParameters['day']);
+                if (askedDay != null) {
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _openDay(askedDay));
+                }
+                return CalendarScreen(
                   dataSource: _dataSource,
                   connectivity: appConnectivity,
                   offlineCache: _offlineCache,
@@ -488,11 +543,30 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   tourKeys: _tourKeys,
                   onOpenFamily: () => _router.go('/family'),
                   onOpenNotifications: () => _router.go('/notifications'),
-                  onOpenPlan: () => _router.go('/family/plan'),
+                  onOpenPlan: () => _router.go('/family/plan?gate=agenda'),
                   onOpenChildren: () => _router.go('/family/children'),
+                  onOpenHistory: () => _openAuditTrail(
+                      '${DateTime.now().millisecondsSinceEpoch}'),
+                  onOpenChat: () => _router.go(Uri(
+                      path: '/notifications',
+                      queryParameters: {
+                        'tab': 'chat',
+                        'n': '${DateTime.now().millisecondsSinceEpoch}',
+                      }).toString()),
+                  // F-07 (owner's QA, 29/09/2026): a carer's legend chip.
+                  onOpenMember: (target, id) => _router.go(switch (target) {
+                    MemberLinkTarget.ownProfile => '/family/profile',
+                    MemberLinkTarget.memberProfile => '/family/profile/$id',
+                    MemberLinkTarget.family => '/family',
+                  }),
                   handoffNudgePrefs: _handoffNudgePrefs,
+                  push: _push,
+                  installFacts: _browserFacts,
+                  pushTodayPrefs: _pushTodayPrefs,
+                  systemStripShowing: _calendarStripShowing,
                   planRequest: _planRequest,
-                  dayRequest: _dayRequest),
+                  dayRequest: _dayRequest);
+              },
             ),
           ]),
           // U-35: the branch's navigator reports to the roster's observer, so
@@ -534,10 +608,15 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                 // U-35: what used to be three sections of the Família scroll.
                 GoRoute(
                   path: 'plan',
-                  builder: (_, _) => FamilyPlanScreen(
+                  // F-102: `?gate=<token>` says which Premium gate brought the
+                  // reader, so a member's "Avisar o administrador" says what
+                  // they wanted.
+                  builder: (_, state) => FamilyPlanScreen(
                     dataSource: _dataSource,
                     analytics: _analytics,
                     storeBilling: _storeBilling,
+                    purchases: _purchases,
+                    gate: state.uri.queryParameters['gate'],
                   ),
                 ),
                 GoRoute(
@@ -551,8 +630,11 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                 ),
                 GoRoute(
                   path: 'children',
-                  builder: (_, _) =>
-                      FamilyChildrenScreen(dataSource: _dataSource),
+                  builder: (_, _) => FamilyChildrenScreen(
+                    dataSource: _dataSource,
+                    analytics: _analytics,
+                    onOpenPlan: () => _router.go('/family/plan'),
+                  ),
                 ),
                 GoRoute(
                   path: 'delete',
@@ -570,6 +652,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                     dataSource: _dataSource,
                     sudo: _sudo,
                     onOpenFamily: () => _router.go('/family'),
+                    onOpenPlan: () => _router.go('/family/plan'),
                     onReopenOnboarding: ({required bool replayTour}) async {
                       // U-29: "Ver o tour de novo" asks for the TOUR — it no
                       // longer reopens the checklist banner as a side effect,
@@ -591,6 +674,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                     GoRoute(
                       path: ':id',
                       builder: (_, state) => ProfileScreen(
+                        // F-07 (owner's QA, 29/09/2026): the page's key is
+                        // the ROUTE's, not the id's, so going from one
+                        // member's profile to another's (the calendar's key,
+                        // with the Família branch still on the first) kept
+                        // the old State — and its old member on screen.
+                        key: ValueKey(state.pathParameters['id']),
                         dataSource: _dataSource,
                         sudo: _sudo,
                         profileId:
@@ -634,6 +723,24 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                           _router.go('/');
                         },
                         onOpenExpenses: () => _router.go('/expenses'),
+                        onOpenPlan: () => _router.go('/family/plan'),
+                        // F-101: an expired invitation's "Compartilhar de
+                        // novo" lives on the Família card.
+                        onOpenFamily: () => _router.go('/family'),
+                        // F-81: an admin's direct change — the day, or the
+                        // Histórico when it was several.
+                        onOpenDay: _openDay,
+                        onOpenAuditTrail: (id) => _openAuditTrail('$id'),
+                        // U-65: "Abrir a Conversa" — the Comunicação's own
+                        // tab, re-applied by a fresh nonce.
+                        onOpenChat: embedded
+                            ? () => _router.go(Uri(
+                                  path: '/notifications',
+                                  queryParameters: {
+                                    'tab': 'chat',
+                                    'n': '${DateTime.now().millisecondsSinceEpoch}',
+                                  }).toString())
+                            : null,
                         onApprovalSeen: () =>
                             unawaited(_reviewPrompt.approvalSeen()),
                         embedded: embedded,
@@ -648,7 +755,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                           landingNonce: '${landing?.name}:$nonce',
                           chat: ChatView(
                             dataSource: _dataSource,
-                            onOpenPlan: () => _router.go('/family/plan'),
+                            onOpenPlan: () => _router.go('/family/plan?gate=chat'),
                             onOpenDay: (day) {
                               _dayRequest.value = day;
                               _router.go('/');
@@ -669,13 +776,21 @@ class _EntrelaresAppState extends State<EntrelaresApp>
               path: '/expenses',
               builder: (_, _) => ExpensesScreen(
                   dataSource: _dataSource,
-                  onOpenPlan: () => _router.go('/family/plan')),
+                  onOpenPlan: () => _router.go('/family/plan?gate=expenses')),
             ),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/reports',
-              builder: (_, _) => ReportsScreen(
+              // F-81: `?tab=history` opens on the Histórico (a push or a row
+              // about an admin's batch change). The key follows `n`, so a
+              // second landing re-applies the tab the reader moved away from.
+              builder: (_, state) => ReportsScreen(
+                  key: ValueKey('reports:${state.uri.queryParameters['tab']}:'
+                      '${state.uri.queryParameters['n']}'),
+                  initialTab: state.uri.queryParameters['tab'] == 'history'
+                      ? ReportsScreen.historyTab
+                      : 0,
                   dataSource: _dataSource,
                   onOpenCalendar: () => _router.go('/'),
                   // F-76: a search result opens its day in the month view,
@@ -683,7 +798,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   onOpenDay: (day) {
                     _dayRequest.value = day;
                     _router.go('/');
-                  }),
+                  },
+                  // F-79: the PDF upsell's "Ver o Premium".
+                  onOpenPlan: () => _router.go('/family/plan?gate=pdf')),
             ),
           ]),
         ],
@@ -773,12 +890,37 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// gives.
   final _installHint = ValueNotifier<InstallHintBanner?>(null);
 
+  /// Owner's QA of 3.1.10: the calendar's "one system strip at a time", told
+  /// to the shell (which holds its own offers back meanwhile).
+  final _calendarStripShowing = ValueNotifier<bool>(false);
+
   /// U-55: the "Definir horário" strip's dismissal, per family, per device.
   late final _handoffNudgePrefs = SharedHandoffNudgePrefs(widget.prefs);
+  late final _pushTodayPrefs = SharedPushTodayPrefs(widget.prefs);
 
   /// F-70: Notificações → calendar, carrying the day the wizard opens on.
   /// The calendar consumes it (sets it back to null) once it opens.
   final _planRequest = ValueNotifier<DateTime?>(null);
+
+  /// F-81 — the calendar with [day]'s sheet open (the Conversa's door).
+  void _openDay(DateTime day) {
+    _dayRequest.value = DateTime(day.year, day.month, day.day);
+    _router.go('/');
+  }
+
+  /// F-81 — Relatórios → Histórico; [nonce] makes a second landing apply.
+  void _openAuditTrail(String nonce) => _router.go(Uri(
+      path: '/reports',
+      queryParameters: {
+        'tab': 'history',
+        if (nonce.isNotEmpty) 'n': nonce,
+      }).toString());
+
+  /// F-78 — the calendar with the wizard open on today.
+  void _openWizardOnToday() {
+    _planRequest.value = FamilyTime.today();
+    _router.go('/');
+  }
 
   /// What the browser says about itself (U-51's seam), read ONCE: the shell
   /// strip and the Notificações step (U-54) must agree on the same answer.
@@ -866,6 +1008,25 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     WidgetsBinding.instance.addObserver(this);
     _gate = SessionGate(_client.auth);
     _analytics = AnalyticsService(language: widget.initialLanguage.code);
+    // F-80: the referral code of a sign-up link, read from the address the
+    // browser opened BEFORE the router exists — so before any pageview — and
+    // kept in memory only. The pageview path drops the query anyway
+    // (`sanitizeAnalyticsPath`); the code is never a prop of any event.
+    _pendingReferralCode = kIsWeb ? ReferralRules.codeFromUri(Uri.base) : null;
+    // T-101: where a web founder came from (`/register?src=…`), read from the
+    // same boot address, memory only, never a prop of any event.
+    _pendingAcquisition = kIsWeb ? AcquisitionRules.fromUri(Uri.base) : null;
+    // F-87: an expired or used e-mail link lands on the redirect with
+    // `error_code` in the fragment — the login says so instead of nothing.
+    _authLinkError = kIsWeb ? authLinkErrorCode(Uri.base) : null;
+    // F-88: an invitation opened on a signed-in device (offered once the
+    // session settles), and the one a previous visit kept.
+    _bootInviteToken = kIsWeb && Uri.base.path == '/register'
+        ? InviteFormRules.inviteTokenFrom(Uri.base)
+        : null;
+    unawaited(readInviteNote().then((token) {
+      if (token != null) _pendingInviteToken ??= token;
+    }));
     _dataSource = SupabaseCustodyDataSource(_client,
         environmentPrefix:
             environmentTitlePrefix(isProduction: Env.current.isProduction),
@@ -899,11 +1060,54 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       }));
       final landing =
           PushRouting.landingFor(data['type'], kind: data['kind']);
+      // F-77: the trial's end asks one thing, and the plan page answers it.
+      if (landing == NotificationLanding.plan) {
+        _router.go('/family/plan');
+        return;
+      }
+      // F-101: the invitation expired — the Família page, where the card
+      // offers "Compartilhar de novo".
+      if (landing == NotificationLanding.family) {
+        _router.go('/family');
+        return;
+      }
+      // U-65: a settle-up to confirm, its reminder or an expense — Despesas,
+      // where the answer is, not a row in "Todas" with a second tap.
+      if (landing == NotificationLanding.expenses) {
+        _router.go('/expenses');
+        return;
+      }
+      // F-78: a family that never planned is taken to the wizard on today.
+      if (landing == NotificationLanding.planFirst) {
+        _openWizardOnToday();
+        return;
+      }
+      // F-81: an admin changed one of my days — that day; several — the
+      // Histórico. A `single` with no real day falls to "Todas" below, the
+      // same fallback the web worker takes. U-65: an agenda notice or
+      // reminder opens its day the same way.
+      if (landing == NotificationLanding.day) {
+        final day = AdminChangeRules.parseIsoDay(data['date']);
+        if (day != null) {
+          _openDay(day);
+          return;
+        }
+      }
+      if (landing == NotificationLanding.auditTrail) {
+        _openAuditTrail(data['notificationId'] ?? '');
+        return;
+      }
       final query = {
         'tab': switch (landing) {
           NotificationLanding.incoming => 'incoming',
           NotificationLanding.history => 'history',
           NotificationLanding.chat => 'chat',
+          NotificationLanding.plan => 'history',
+          NotificationLanding.planFirst => 'history',
+          NotificationLanding.day => 'history',
+          NotificationLanding.auditTrail => 'history',
+          NotificationLanding.family => 'history',
+          NotificationLanding.expenses => 'history',
         },
         if ((data['notificationId'] ?? '').isNotEmpty)
           'n': data['notificationId']!,
@@ -989,6 +1193,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     }
     _inactivityTimer?.cancel();
     _adminMode.dispose();
+    _purchases?.dispose();
     _storeBilling?.dispose();
     _onboarding.dispose();
     _sudo.dispose();
@@ -1002,6 +1207,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     _appHandoff.dispose();
     _playInvite.dispose();
     _installHint.dispose();
+    _calendarStripShowing.dispose();
     _planRequest.dispose();
     super.dispose();
   }
@@ -1042,13 +1248,21 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _activity.reset();
       _idleTimeout = InactivityPolicy.timeout;
       _expensesTab.value = false;
+      _badge.expensesOn = false;
       _chatTab.value = false;
       _badge.chatOn = false;
+      _purchases?.deactivate();
     }
     if (phase == _AuthPhase.authed) {
+      // F-86: verify what Play holds for this account — held purchases, and
+      // one restore per process.
+      unawaited(_purchases?.activate());
       _lastInteraction = DateTime.now();
-      _inactivityTimer ??= Timer.periodic(
-          InactivityPolicy.pollInterval, (_) => _checkInactivity());
+      // F-92: web only — Android has no idle sign-out.
+      if (InactivityPolicy.appliesTo(isWeb: kIsWeb)) {
+        _inactivityTimer ??= Timer.periodic(
+            InactivityPolicy.pollInterval, (_) => _checkInactivity());
+      }
       unawaited(_loadIdleTimeout());
       unawaited(_loadExpensesTab());
       unawaited(_loadChatTab());
@@ -1069,6 +1283,13 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       _resolveInstallHint();
       // T-78: the day this member used the app, on this channel.
       _touchActivity();
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (_bootInviteToken != null) {
+          await _offerInviteForAnotherAccount();
+        } else {
+          await _offerPendingInvitation();
+        }
+      });
       _trackAuthedEntry();
     } else {
       _badge.stop();
@@ -1326,6 +1547,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       final me = await _dataSource.fetchOwnProfile();
       if (_phase == _AuthPhase.authed) {
         _expensesTab.value = me != null && !me.isViewer;
+        // U-65: the tab's badge counts the settle-ups waiting for me.
+        _badge.expensesOn = _expensesTab.value;
+        if (_badge.expensesOn) unawaited(_badge.refresh());
       }
     } catch (_) {/* the tab stays hidden */}
   }
@@ -1347,6 +1571,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   }
 
   void _checkInactivity() {
+    if (!InactivityPolicy.appliesTo(isWeb: kIsWeb)) return;
     if (_phase != _AuthPhase.authed) return;
     if (!InactivityPolicy.expired(
         _lastInteraction, DateTime.now(), _idleTimeout)) {
@@ -1388,16 +1613,41 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     }
   }
 
+  /// F-87: an auth call, its failure classified from GoTrue's `code` and
+  /// HTTP status — the screens choose the sentence from a closed kind and
+  /// never match English text.
+  Future<void> _auth(Future<Object?> Function() call) async {
+    try {
+      await call();
+    } on AuthException catch (e) {
+      throw AuthFailed(
+          classifyAuthFailure(
+              code: e.code,
+              status: int.tryParse(e.statusCode ?? ''),
+              message: e.message),
+          e.code ?? e.message);
+    } catch (e) {
+      throw AuthFailed(classifyAuthFailure(message: e.toString()), '$e');
+    }
+  }
+
+  /// F-87: the sign-up confirmation, again — to the same redirect the
+  /// sign-up used, so the link lands on the login like the first one.
+  Future<void> _resendConfirmation(String email) => _auth(() => _client.auth
+      .resend(type: OtpType.signup, email: email, emailRedirectTo: DeepLinkUrls.login));
+
   Future<void> _signIn(String email, String password) async {
     // T-78: named BEFORE the await — the auth listener sees the same session
     // arrive while anonymous and must not call it an e-mail link.
     _signInMethod = 'password';
     try {
-      await _client.auth.signInWithPassword(email: email, password: password);
+      await _auth(() =>
+          _client.auth.signInWithPassword(email: email, password: password));
     } catch (_) {
       _signInMethod = null;
       rethrow;
     }
+    _authLinkError = null;
     _expiredReason = SessionExpiredReason.none;
     await _resolveAuthedPhase();
   }
@@ -1423,7 +1673,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   Future<void> _signInWithGoogleIdToken(String idToken,
       {String? inviteToken}) async {
     final token = inviteToken?.trim() ?? '';
-    _pendingInviteToken = token.isEmpty ? null : token;
+    // F-88: a sign-in WITHOUT an invitation (the login, or "Entrar com outra
+    // conta") keeps the one already kept; one with an invitation replaces it.
+    if (token.isNotEmpty) {
+      _pendingInviteToken = token;
+      unawaited(writeInviteNote(token));
+    }
     // T-78: named BEFORE the await — the auth listener sees the session
     // arrive while anonymous and must not call it an e-mail link.
     _signInMethod = 'google';
@@ -1445,6 +1700,175 @@ class _EntrelaresAppState extends State<EntrelaresApp>
   /// F-71 — the invitation a native Google sign-in started from, kept until
   /// the onboarding screen claims it or the session ends.
   String? _pendingInviteToken;
+
+  /// F-88: the invitation was claimed, or is dead — nothing left to keep.
+  void _forgetPendingInvite() {
+    _pendingInviteToken = null;
+    unawaited(clearInviteNote());
+  }
+
+  /// F-88: offered once per process — "Agora não" is an answer.
+  bool _pendingInvitationAsked = false;
+
+  /// F-88: a founder alone in an empty family, whose verified e-mail was
+  /// invited elsewhere ("baixa o Entrelares, te convidei" — and they opened
+  /// the app and founded their own). The server decides who qualifies.
+  Future<void> _offerPendingInvitation() async {
+    if (_pendingInvitationAsked) return;
+    _pendingInvitationAsked = true;
+    PendingInvitationOffer? offer;
+    try {
+      offer = await _dataSource.fetchMyPendingInvitation();
+    } catch (_) {
+      return;
+    }
+    if (offer == null) return;
+    final context = _router.routerDelegate.navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    final l = _l;
+    final join = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('invite-offer'),
+        title: Text(l[KApp.inviteOfferTitle]),
+        content: Text(l.format(
+            KApp.inviteOfferBody, [offer!.inviterName, offer.familyName])),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l[KApp.inviteNotNow]),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l[KApp.inviteOfferJoin]),
+          ),
+        ],
+      ),
+    );
+    if (join != true) return;
+    try {
+      await _dataSource.joinInvitationFromEmptyFamily(offer.token);
+    } catch (e) {
+      final messenger = _router.routerDelegate.navigatorKey.currentContext;
+      if (messenger != null && messenger.mounted) {
+        showAppSnack(messenger,
+            translateSaveError(e.toString(), l[K.errSaveFailed], l),
+            type: AppSnackType.error);
+      }
+      return;
+    }
+    _onboarding.pendingInviteeWelcome = InviteeWelcome(
+        familyName: offer.familyName, inviterName: offer.inviterName);
+    await _resolveAuthedPhase();
+    if (mounted) _router.go('/');
+  }
+
+  /// F-88: `/register?invite=` opened on a device already signed in — the
+  /// router sends a session home, and the invitation used to vanish without
+  /// a word. Read from the boot address (web), offered once.
+  String? _bootInviteToken;
+
+  Future<void> _offerInviteForAnotherAccount() async {
+    final token = _bootInviteToken;
+    _bootInviteToken = null;
+    if (token == null) return;
+    InviteInfo? invite;
+    try {
+      invite = await _dataSource.fetchInviteInfo(token);
+    } catch (_) {
+      return;
+    }
+    final me = _client.auth.currentUser?.email ?? '';
+    if (invite == null ||
+        invite.invitedEmail.trim().toLowerCase() == me.trim().toLowerCase()) {
+      return;
+    }
+    final context = _router.routerDelegate.navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    final l = _l;
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('invite-other-account'),
+        title: Text(l[KApp.inviteSignedInTitle]),
+        content: Text(l.format(KApp.inviteSignedInBody, [
+          me,
+          invite!.inviterName,
+          invite.familyName,
+          invite.invitedEmail,
+        ])),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l[KApp.inviteNotNow]),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l[KApp.inviteSignOutContinue]),
+          ),
+        ],
+      ),
+    );
+    if (leave != true) return;
+    await _signOut();
+    if (mounted) _router.go('/register?invite=$token');
+  }
+
+  /// F-80 — the code a `/register?ref=` link opened the web app with. Memory
+  /// only: no prefs (Android Auto Backup copies them) and no browser storage —
+  /// the Google door (F-71) never leaves the page, and the e-mail sign-up
+  /// hands the code to the server inside the sign-up itself.
+  String? _pendingReferralCode;
+
+  /// T-101 — the source a web boot on `/register` carried (null elsewhere —
+  /// `organic` — and on Android, where the Install Referrer answers).
+  Acquisition? _pendingAcquisition;
+
+  /// T-101 — where a Google founder's family came from: the web boot URL's
+  /// verdict, or the Android install's. Never throws.
+  Future<Acquisition?> _founderAcquisition() async {
+    if (kIsWeb) return _pendingAcquisition ?? Acquisition.organic;
+    return _installReferrer?.acquisition();
+  }
+
+  /// F-80 PR 2 — the Android door: the Install Referrer reader, null on the
+  /// web. Asked only where a founder is made and only with the flag on.
+  final InstallReferrer? _installReferrer = InstallReferrer.forThisPlatform();
+
+  /// F-80 — a Google founder just created the family: attribute the pending
+  /// code, if any, ONLY when `feature.referral` is on. Fire-and-forget — a
+  /// referral never delays nor fails an onboarding — and used once.
+  ///
+  /// PR 2: on Android there is no `?ref=` link; the code is the one the Play
+  /// install carried, read from the Install Referrer API only AFTER the flag
+  /// answered "on" (dark, nothing is read). This is the first authenticated
+  /// moment that `attribute_referral` accepts (a family born in the last
+  /// 24 h, its founder calling) — the e-mail founder's code went in the
+  /// sign-up metadata instead (register screen).
+  void _attributePendingReferral() {
+    final linkCode = _pendingReferralCode;
+    _pendingReferralCode = null;
+    final install = _installReferrer;
+    if (linkCode == null && install == null) return;
+    unawaited(() async {
+      Map<String, String> values;
+      try {
+        values = await _dataSource.fetchPublicSettings();
+      } catch (_) {
+        return;
+      }
+      if (!PublicSettings(values).referralEnabled) return;
+      final code = linkCode ?? await install?.code();
+      if (code == null) return;
+      final channel = ReferralRules.channel(isWeb: kIsWeb);
+      final answer =
+          await _dataSource.attributeReferral(code: code, channel: channel);
+      if (answer == ReferralRules.attributed) {
+        unawaited(_analytics.trackEvent(AnalyticsEvents.referralSignup,
+            props: {'channel': channel}));
+      }
+    }());
+  }
 
   /// F-57 — a validated session is AUTHED only if it has a profile; a
   /// deferred OAuth sign-up has none yet and lives on the onboarding screen.
@@ -1539,7 +1963,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     // Set BEFORE the call: the auth event may arrive before or after the
     // await returns, and only this flag makes that order irrelevant.
     _userSignOut = true;
-    _pendingInviteToken = null;
+    // F-88: the kept invitation survives a sign-out — "Entrar com outra
+    // conta" after picking the wrong Google account must not drop it.
     _onboarding.pendingInviteeWelcome = null;
     await _gate.signOutSafely();
     _identity.clear();

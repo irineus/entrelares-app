@@ -106,7 +106,7 @@ void main() {
     test('deleted and kept, by reason, joined with the middle dot', () {
       const r = ScheduleRangeResult(deleted: 5, keptFrozen: 1, keptSwap: 2);
       expect(clearRangeSummary(_pt, r),
-          '5 dias apagados · 1 dia mantido (solicitação pendente) · '
+          '5 dias apagados · 1 dia mantido (com pedido pendente) · '
           '2 dias mantidos (troca aprovada)');
       expect(clearRangeSummary(_en, r),
           '5 days cleared · 1 day kept (pending request) · '
@@ -132,7 +132,7 @@ void main() {
       expect(
           wizardReplaceSummary(_pt, r),
           'Plano gerado com sucesso! 90 dias criados. 88 dias do plano '
-          'anterior foram substituídos. 1 dia mantido (solicitação pendente) '
+          'anterior foram substituídos. 1 dia mantido (com pedido pendente) '
           '· 1 dia mantido (troca aprovada).');
       expect(
           wizardReplaceSummary(_en, r),

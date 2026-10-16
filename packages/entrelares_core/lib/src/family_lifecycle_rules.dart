@@ -119,9 +119,36 @@ abstract final class FamilyLifecycleRules {
     required bool isLeaving,
     required String location,
   }) =>
-      isLeaving && location != leavingRoute && location != loginRoute;
+      isLeaving &&
+      location != leavingRoute &&
+      location != loginRoute &&
+      // F-89: someone confined to the exit can still ask for help.
+      location != helpRoute;
 
   static const String leavingRoute = '/leaving';
   static const String loginRoute = '/login';
   static const String policyUpdateRoute = '/policy-update';
+  static const String helpRoute = '/help';
+
+  /// F-89: the family goes with this member when no CAREGIVER stays — a
+  /// viewer only follows the plan and keeps no family alive (F-50). The
+  /// exit screen read "Sua conta será apagada" to the last caregiver of a
+  /// family with a viewer, while the server removed the whole family.
+  static bool isFamilyRemoval({
+    required int myId,
+    required Iterable<({int id, bool isActiveMember, bool isViewer})> members,
+  }) =>
+      !members.any((m) => m.id != myId && m.isActiveMember && !m.isViewer);
+
+  /// F-89: an admin leaving a family whose subscription still charges is
+  /// told so, with the way to cancel first — the money keeps going after
+  /// they are gone.
+  static bool leavesAPayingSubscription({
+    required bool isAdmin,
+    required String? subscriptionStatus,
+  }) =>
+      isAdmin &&
+      (subscriptionStatus == 'active' ||
+          subscriptionStatus == 'scheduled' ||
+          subscriptionStatus == 'overdue');
 }

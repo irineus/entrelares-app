@@ -49,6 +49,22 @@ void main() {
           today);
     });
 
+    test('F-78: "unplanned" opens on its own day, never in the past', () {
+      expect(
+          PlanEndRules.actionStart(
+              'plan_ending', '{"kind":"unplanned","date":"2026-11-12"}', today),
+          DateTime(2026, 11, 12));
+      expect(
+          PlanEndRules.actionStart(
+              'plan_ending', '{"kind":"unplanned","date":"2026-01-02"}', today),
+          today);
+      expect(PlanEndRules.isUnplanned('{"kind":"unplanned","date":"2026-11-12"}'),
+          isTrue);
+      expect(PlanEndRules.isUnplanned('{"kind":"ending","date":"2026-11-12"}'),
+          isFalse);
+      expect(PlanEndRules.isUnplanned('not json'), isFalse);
+    });
+
     test('another type, an unknown kind, no date or bad JSON offer nothing', () {
       for (final (type, json) in [
         ('billing', '{"kind":"ending","date":"2026-11-12"}'),

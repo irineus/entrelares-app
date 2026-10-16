@@ -20,6 +20,7 @@ import 'package:entrelares_db_contracts/models/invite_info.dart';
 import 'package:entrelares_app/screens/register_screen.dart';
 import 'package:entrelares_app/services/analytics_service.dart';
 import 'package:entrelares_app/services/custody_data_source.dart';
+import 'package:entrelares_app/services/install_referrer.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/role_picker.dart';
 
@@ -41,6 +42,8 @@ Future<void> pumpRegister(
   WidgetTester tester, {
   required FakeCustodyDataSource dataSource,
   String? inviteToken,
+  String? referralCode,
+  InstallReferrer? installReferrer,
   AppLanguage language = AppLanguage.ptBr,
   List<String>? signIns,
   VoidCallback? onBackToLogin,
@@ -61,6 +64,8 @@ Future<void> pumpRegister(
         dataSource: dataSource,
         analytics: analytics,
         inviteToken: inviteToken,
+        referralCode: referralCode,
+        installReferrer: installReferrer,
         onSignIn: (email, password) async => signIns?.add(email),
         onInviteeJoined: onInviteeJoined,
         onBackToLogin: onBackToLogin ?? () {},
@@ -160,6 +165,31 @@ void main() {
       expect(
           find.widgetWithText(TextField, l[K.registerFamilyName]), findsNothing);
       expect(ds.signUps, isEmpty);
+    });
+
+    // U-64 (T-103 audit): an empty Continuar said ONE sentence under the
+    // button, and only the first. Every empty field says it, on itself; typing
+    // answers that field alone.
+    testWidgets('an empty Continuar names every field on the field itself',
+        (tester) async {
+      await pumpRegister(tester, dataSource: source());
+      await tapVisible(tester, continueButton(l));
+      await tester.pumpAndSettle();
+
+      Finder onField(String label, String key) => find.descendant(
+          of: find.widgetWithText(TextField, label),
+          matching: find.text(l[key]));
+      expect(onField(l[K.registerFullName], K.registerErrorNameRequired),
+          findsOne);
+      expect(onField(l[K.commonEmail], K.registerErrorEmailRequired), findsOne);
+      expect(onField(l[K.commonPassword], K.registerErrorPasswordShort),
+          findsOne);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFullName]), 'Ana');
+      await tester.pump();
+      expect(find.text(l[K.registerErrorNameRequired]), findsNothing);
+      expect(find.text(l[K.registerErrorEmailRequired]), findsOne);
     });
 
     testWidgets('a valid account moves on without touching the server',
@@ -274,8 +304,76 @@ void main() {
       expect(ds.signUps.single['role'], 'mother');
       expect(ds.signUps.single['familyName'], 'Souza');
       expect(ds.signUps.single['language'], AppLanguage.ptBrCode);
+      // U-61: the child's name is optional — nothing typed, nothing sent.
+      expect(ds.signUps.single['childFirstName'], isNull);
       expect(find.text(l[K.registerConfirmEmailTitle]), findsOne);
       expect(find.textContaining('ana@example.com'), findsOne);
+    });
+
+    testWidgets('U-61: the child\'s first name is offered on step 2, optional, '
+        'and travels trimmed with the sign-up', (tester) async {
+      final ds = source();
+      await pumpRegister(tester, dataSource: ds);
+      await goToFamilyStep(tester);
+
+      final field = find.widgetWithText(TextField, l[KApp.registerChildName]);
+      expect(field, findsOne);
+      expect(find.text(l[KApp.registerChildNameHint]), findsOne);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
+      await tester.enterText(field, '  Sofia  ');
+      await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
+      await acceptTerms(tester);
+      await tapVisible(tester, submitButton(l));
+      await tester.pumpAndSettle();
+
+      expect(ds.signUps, hasLength(1));
+      expect(ds.signUps.single['childFirstName'], 'Sofia');
+    });
+
+    testWidgets("U-61: the field caps the name at the server's 40 characters "
+        '— nothing longer can even be typed', (tester) async {
+      // `ChildRules.validateName` stays as the guard behind the field; the
+      // field itself (maxLength) is what keeps a 41st character out, so the
+      // sentence the RPC would answer is never needed here.
+      final ds = source();
+      await pumpRegister(tester, dataSource: ds);
+      await goToFamilyStep(tester);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
+      await tester.enterText(
+          find.widgetWithText(TextField, l[KApp.registerChildName]),
+          'A' * (ChildRules.maxNameLength + 1));
+      await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
+      await acceptTerms(tester);
+      await tapVisible(tester, submitButton(l));
+      await tester.pumpAndSettle();
+
+      expect(ds.signUps, hasLength(1));
+      expect((ds.signUps.single['childFirstName'] as String).length,
+          ChildRules.maxNameLength);
+    });
+
+    testWidgets('F-87: the confirm screen tells about spam and lets a '
+        'mistyped address be fixed, everything typed kept', (tester) async {
+      final ds = source();
+      await pumpRegister(tester, dataSource: ds);
+      await goToFamilyStep(tester);
+      await tester.enterText(
+          find.widgetWithText(TextField, l[K.registerFamilyName]), 'Souza');
+      await tapVisible(tester, find.widgetWithText(ChoiceChip, 'Mãe'));
+      await acceptTerms(tester);
+      await tapVisible(tester, submitButton(l));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l[KApp.registerCheckSpam]), findsOne);
+      await tapVisible(tester, find.byKey(const ValueKey('register-fix-email')));
+      await tester.pumpAndSettle();
+      expect(find.text(l[K.registerConfirmEmailTitle]), findsNothing);
+      // Back on the account step, the address is there to be corrected.
+      expect(find.text('ana@example.com'), findsOne);
     });
 
     testWidgets('a role behind "Outro…" is two taps and stays on screen',
@@ -385,6 +483,32 @@ void main() {
       expect(find.textContaining('Ana Souza'), findsOne);
       expect(find.textContaining('Souza'), findsWidgets);
       expect(find.textContaining('Pai'), findsOne);
+    });
+
+    testWidgets('F-88: no answer is not "inválido" — retry, and the token '
+        'is still there', (tester) async {
+      final ds = source()
+        ..inviteInfo = invite
+        ..inviteUnreachableTimes = 1;
+      await pumpRegister(tester, dataSource: ds, inviteToken: validToken);
+
+      expect(find.byKey(const ValueKey('invite-unreachable')), findsOne);
+      expect(find.text(l[K.registerInviteInvalidTitle]), findsNothing);
+      await tapVisible(tester, find.text(l[KApp.inviteRetry]));
+      await tester.pumpAndSettle();
+
+      expect(ds.inviteLookups, 2);
+      expect(find.text(l[K.registerInvitedTitle]), findsOne);
+    });
+
+    testWidgets('F-88: an invitation already accepted says "é só entrar"',
+        (tester) async {
+      final ds = source()
+        ..inviteInfo = null
+        ..inviteTokenStatus = 'accepted';
+      await pumpRegister(tester, dataSource: ds, inviteToken: validToken);
+      expect(find.byKey(const ValueKey('invite-accepted')), findsOne);
+      expect(find.text(l[K.registerInviteInvalidTitle]), findsNothing);
     });
 
     testWidgets('hides the family name and the role grid', (tester) async {

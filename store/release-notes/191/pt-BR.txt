@@ -1,0 +1,1 @@
+Novidade: quando a pessoa administradora altera dias direto no calendário, os responsáveis daqueles dias recebem uma notificação, com o dia alterado, ou o período quando são vários dias de uma vez. Tocar na notificação abre o dia, ou o Histórico no caso de vários dias.

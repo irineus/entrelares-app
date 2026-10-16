@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import '../widgets/ui/ui.dart';
 import '../theme/tokens.dart';
 import 'package:printing/printing.dart';
@@ -53,6 +54,11 @@ class ReportsPdfTab extends StatefulWidget {
   /// Hosted inside a sheet's own scroll view (U-59): no scroll of its own.
   final bool embedded;
 
+  /// F-79: where the upsell's "Ver o Premium" lands (`/family/plan`). Null
+  /// keeps the upsell a sentence with no button — the plan page is the app's
+  /// own screen, so the store build may carry it (no external checkout).
+  final VoidCallback? onOpenPlan;
+
   const ReportsPdfTab({
     super.key,
     required this.dataSource,
@@ -63,6 +69,7 @@ class ReportsPdfTab extends StatefulWidget {
     this.initialIncludeChat = false,
     this.analyticsSource = 'reports',
     this.embedded = false,
+    this.onOpenPlan,
   });
 
   @override
@@ -95,6 +102,20 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   /// registered name(s) and the free field disappears (owner, 24/09/2026).
   /// Null keeps today's free field — flag off, or no child yet.
   String? _registeredChildNames;
+
+  /// F-07: how many children [_registeredChildNames] names — above one, the
+  /// header and this tab say *Crianças*.
+  int _registeredChildCount = 1;
+
+  /// F-07 (PR 5c): child id → first name, in order, for the per-lane tables.
+  Map<int, String> _childNamesById = const {};
+
+  /// F-96: the registered children the header names — a picker in place of
+  /// the free text (all chosen until the reader says otherwise).
+  Set<int> _pickedChildren = {};
+
+  /// F-96: where the ready card is, so a generation scrolls to it.
+  final GlobalKey _readyKey = GlobalKey();
 
   /// F-55: the agenda is on for this build — the PDF prints section 5.
   bool _agendaOn = false;
@@ -165,9 +186,13 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       _chatOn = settings.chatEnabled;
       _attestOn = settings.reportAttestationEnabled;
       if (_attestOn) unawaited(_loadAttestations());
-      if (!settings.childAgendaEnabled) return null;
+      // F-96: the children registered (F-55/F-07) are offered whatever the
+      // agenda flag says — the free text only when there is none.
       final children = await widget.dataSource.fetchChildren();
-      if (!mounted) return null;
+      if (!mounted || children.isEmpty) return null;
+      _registeredChildCount = children.length;
+      _childNamesById = {for (final c in children) c.id: c.firstName};
+      _pickedChildren = {for (final c in children) c.id};
       return ChildRules.joinNames([for (final c in children) c.firstName],
           and: AppL10n.of(context).l[KApp.childAnd]);
     } catch (_) {
@@ -220,6 +245,12 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
                     .labelKey],
             amountCents: e.amountCents,
             paidByName: name(e.paidBy),
+            // F-96: whose expense, and each person's part.
+            childName: e.childId == null ? null : _childNamesById[e.childId],
+            splitText: [
+              for (final s in e.shares)
+                '${name(s.profileId).split(' ').first} ${money(s.shareCents)}'
+            ].join('; '),
           ),
       ],
       totals: [
@@ -239,22 +270,55 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               fromName: name(s.fromProfile),
               toName: name(s.toProfile),
               amountCents: s.amountCents,
+              reference: s.reference,
+              note: s.answerNote,
             ),
       ],
+      // F-93: recorded in the period and never confirmed — still waiting,
+      // refused or taken back. Out of the balance, kept in the record.
+      unconfirmed: [
+        for (final s in settlements)
+          if (!s.isConfirmed && inPeriod(s.createdAt.toLocal()))
+            ReportExpenseUnconfirmed(
+              recordedAt: s.createdAt.toLocal(),
+              answeredAt: s.answeredAt?.toLocal(),
+              fromName: name(s.fromProfile),
+              toName: name(s.toProfile),
+              amountCents: s.amountCents,
+              state: s.isRejected
+                  ? ReportPaymentState.rejected
+                  : s.isCancelled
+                      ? ReportPaymentState.cancelled
+                      : ReportPaymentState.pending,
+              reference: s.reference,
+              note: s.answerNote,
+            ),
+      ].reversed.toList(),
       changes: [
         for (final h in history)
           if (h.action != 'created' && h.oldData != null)
             ReportExpenseChange(
               atLocal: h.at.toLocal(),
               actorName: name(h.actorId),
-              text: l.format(
-                  h.action == 'updated'
-                      ? KApp.expensePdfUpdated
-                      : KApp.expensePdfDeleted,
-                  [
-                    '${h.oldData!['description'] ?? ''}',
-                    money(int.tryParse('${h.oldData!['amount_cents']}') ?? 0),
-                  ]),
+              // F-93: an edit prints every field it moved — payer, date,
+              // category, each person's part — not only description/amount.
+              text: h.action == 'updated'
+                  ? l.format(KApp.expensePdfUpdated, [
+                      '${h.oldData!['description'] ?? ''}',
+                      () {
+                        final lines = ExpenseDiff.describe(
+                            ExpenseDiff.between(h.oldData, h.newData),
+                            l,
+                            name);
+                        return lines.isEmpty
+                            ? l[KApp.expenseDiffNone]
+                            : lines.join('; ');
+                      }(),
+                    ])
+                  : l.format(KApp.expensePdfDeleted, [
+                      '${h.oldData!['description'] ?? ''}',
+                      money(int.tryParse('${h.oldData!['amount_cents']}') ?? 0),
+                    ]),
             ),
       ],
     );
@@ -271,9 +335,36 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
       return l[KApp.chatFormerMember];
     }
 
-    final all = await widget.dataSource.fetchChatMessages();
-    final byId = {for (final m in all) m.id: m};
     final endExclusive = DateTime(end.year, end.month, end.day + 1);
+    // T-104: the period's texts, paged in on the server side of the filter —
+    // the whole table in one request was cut at the newest end, and a PDF of
+    // last month said nothing was written. The quoted texts come along.
+    final all = await widget.dataSource
+        .fetchChatMessagesForPeriod(start.toUtc(), endExclusive.toUtc());
+    final byId = {for (final m in all) m.id: m};
+    // F-96: the read marks, as of the emission. Best-effort: without them the
+    // texts still print, and no line claims a reading it could not check.
+    List<ChatMark>? marks;
+    try {
+      marks = [
+        for (final r in await widget.dataSource
+            .fetchChatReads([for (final m in all) m.id]))
+          (messageId: r.messageId, profileId: r.profileId, readAt: r.readAt)
+      ];
+    } catch (_) {
+      marks = null;
+    }
+    String? readLine(int id, int author) {
+      if (marks == null) return null;
+      final readers = ChatRules.readersOf(id, author, marks);
+      if (readers.isEmpty) return l[KApp.chatPdfNotRead];
+      return l.format(KApp.chatReadBy, [
+        readers
+            .map((r) => l.format(KApp.chatReadEntry,
+                [name(r.profileId), l.formatDateTimeShort(r.readAt.toLocal())]))
+            .join(', ')
+      ]);
+    }
     return [
       for (final m in all)
         if (!m.createdAt.toLocal().isBefore(start) &&
@@ -287,6 +378,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
                 : '${name(byId[m.quoteId]!.authorProfileId)}, '
                     '${l.formatDateTimeShort(byId[m.quoteId]!.createdAt.toLocal())}',
             citedDay: m.quotedDay,
+            readLine: readLine(m.id, m.authorProfileId),
           ),
     ];
   }
@@ -333,6 +425,12 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         origins = await widget.dataSource
             .fetchResolutionOrigins([for (final log in logs) log.id]);
       } catch (_) {/* the report stays useful without the origins */}
+      // F-96: a swap request's no-op base write prints as the request.
+      var swapBases = const <int>{};
+      try {
+        swapBases = await widget.dataSource
+            .fetchSwapBaseLogIds([for (final log in logs) log.id]);
+      } catch (_) {/* it prints as "atualizou", as before */}
       // F-61: the caregivers' account trail for section 2 — the same
       // contract: a failure costs the section's lines, never the document.
       var accountEvents = const <AccountLog>[];
@@ -417,7 +515,14 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
 
       final report = buildCustodyReport(
         familyName: family?.name ?? l[K.pdfDocFallbackFamily],
-        childName: _registeredChildNames ?? _childName.text,
+        childName: _registeredChildNames == null
+            ? _childName.text
+            : _pickedNames(l),
+        childCount:
+            _registeredChildNames == null ? 1 : _pickedChildren.length,
+        // F-07 (PR 5c): the lane sections' labels, in the family's order.
+        childNames: _childNamesById,
+        allChildrenLabel: l[KApp.calLaneAll],
         start: start,
         end: end,
         today: widget.now(),
@@ -427,6 +532,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               scheduleDate: d.scheduleDate,
               scheduledParentId: d.scheduledParentId,
               actualParentId: d.actualParentId,
+              childId: d.childId,
             ),
         ],
         members: [for (final m in members) m.toView()],
@@ -439,6 +545,7 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         appVersion: Env.appVersion,
         l: l,
         resolutionOrigins: origins,
+        swapBaseLogIds: swapBases,
         includeAcceptedFutureSwaps: _includeFutureSwaps,
         accounts: [
           for (final m in members)
@@ -539,11 +646,22 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         _report = report;
         _bytes = bytes;
       });
+      // F-96: the result is shown — the ready card lands below the fold, so
+      // the tab scrolls to it and a screen reader hears that it exists.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _readyKey.currentContext;
+        if (ctx != null && ctx.mounted) {
+          unawaited(Scrollable.ensureVisible(ctx,
+              duration: const Duration(milliseconds: 300)));
+        }
+      });
+      unawaited(SemanticsService.sendAnnouncement(
+          View.of(context), l[KApp.pdfReadyAnnounce], TextDirection.ltr));
     } catch (e) {
       if (!mounted) return;
       setState(() => _errorText = isSessionExpired(e.toString())
           ? sessionExpiredMessage(l)
-          : l.format(K.pdfErrGenerate, [e.toString()]));
+          : translateSaveError(e.toString(), l[K.pdfErrGenerate], l));
     } finally {
       if (mounted) setState(() => _generating = false);
     }
@@ -594,14 +712,14 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
         else if (_loadErrorRaw != null)
           _banner(isSessionExpired(_loadErrorRaw!)
               ? sessionExpiredMessage(l)
-              : l.format(K.pdfErrLoad, [_loadErrorRaw!]))
+              : translateSaveError(_loadErrorRaw!, l[K.pdfErrLoad], l))
         else if (!_isPremium)
           _upsell(l)
         else ...[
           _filterCard(l),
           if (_report != null && _bytes != null) ...[
             const SizedBox(height: 12),
-            _readyCard(l),
+            KeyedSubtree(key: _readyKey, child: _readyCard(l)),
           ],
           if (_attestOn && _attestations.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -613,8 +731,9 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
   }
 
   /// The F-33 gate. **Neutral by design** (T-38): it says what the report is
-  /// and stops — the plan/checkout surface belongs to the billing batch, and a
-  /// store build may never carry an external checkout link.
+  /// and carries no price and no external checkout link — a store build may
+  /// never have one. F-79: it does open the app's OWN plan page, like every
+  /// other Premium gate, when the shell hands it [ReportsPdfTab.onOpenPlan].
   Widget _upsell(Localization l) => Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -636,6 +755,23 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
               const SizedBox(height: 8),
               RichLabel.of(l, K.pdfUpsellText,
                   style: Theme.of(context).textTheme.bodyMedium),
+              if (widget.onOpenPlan case final openPlan?) ...[
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  key: const ValueKey('pdf-upsell-plan'),
+                  icon: const Icon(Icons.auto_awesome),
+                  label: Text(l[K.pdfUpsellButton]),
+                  onPressed: () {
+                    // F-79: the one Premium gate that had no door counted no
+                    // click either; `pdf` starts its own row in the gate split.
+                    unawaited(widget.dataSource.analytics?.trackEvent(
+                            AnalyticsEvents.premiumGateClick,
+                            props: {'gate': 'pdf'}) ??
+                        Future<void>.value());
+                    openPlan();
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -745,12 +881,31 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
                   controller: _childName,
                   maxLength: 80,
                 )
-              else
+              else if (_registeredChildCount == 1)
                 AppListRow(
                   key: const ValueKey('pdf-registered-child'),
                   label: l[K.pdfChildName],
                   value: _registeredChildNames,
+                )
+              else ...[
+                // F-96: the registered children, picked — never typed again.
+                AppFieldLabel(l[KApp.pdfChildrenPick]),
+                Wrap(
+                  key: const ValueKey('pdf-children-picker'),
+                  spacing: Spacing.sm,
+                  children: [
+                    for (final e in _childNamesById.entries)
+                      FilterChip(
+                        key: ValueKey('pdf-child-${e.key}'),
+                        label: Text(e.value),
+                        selected: _pickedChildren.contains(e.key),
+                        onSelected: (on) => setState(() => on
+                            ? _pickedChildren.add(e.key)
+                            : _pickedChildren.remove(e.key)),
+                      ),
+                  ],
                 ),
+              ],
               // U-20: the same option as the on-screen Resumo — the numbers of
               // the two must agree.
               SwitchListTile(
@@ -904,6 +1059,18 @@ class _ReportsPdfTabState extends State<ReportsPdfTab> {
           context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
           type: AppSnackType.error);
     }
+  }
+
+  /// F-96: the picked children's names, joined the way the header joins
+  /// them; null when none is picked (the header then names no child).
+  String? _pickedNames(Localization l) {
+    final names = [
+      for (final e in _childNamesById.entries)
+        if (_pickedChildren.contains(e.key)) e.value
+    ];
+    return names.isEmpty
+        ? null
+        : ChildRules.joinNames(names, and: l[KApp.childAnd]);
   }
 
   Widget _readyCard(Localization l) {

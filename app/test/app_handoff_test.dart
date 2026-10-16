@@ -25,6 +25,7 @@ void main() {
   Widget shellApp({
     ValueListenable<AppHandoffBanner?>? handoff,
     ValueListenable<FamilyDeletionBanner?>? deletion,
+    ValueListenable<bool>? calendarStrip,
     AppLanguage language = AppLanguage.ptBr,
   }) {
     final router = GoRouter(
@@ -39,6 +40,7 @@ void main() {
               onOpenProfile: () {},
               appHandoff: handoff,
               deletionBanner: deletion,
+              calendarStripShowing: calendarStrip,
               badge: NotificationBadge(
                   FakeCustodyDataSource(members: const [], days: []))),
           branches: [
@@ -85,6 +87,37 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(en[KApp.handoffBanner]), findsOneWidget);
+    });
+
+    // Owner's QA of 3.1.10: one strip at a time over the calendar. While the
+    // calendar shows one of its own (notifications, first steps), the
+    // crossing waits; it comes back the moment that strip is gone.
+    testWidgets('it waits while the calendar shows a strip of its own',
+        (tester) async {
+      final strip = ValueNotifier(true);
+      await tester.pumpWidget(
+          shellApp(handoff: ValueNotifier(offer()), calendarStrip: strip));
+      await tester.pumpAndSettle();
+      expect(find.text(pt[KApp.handoffBanner]), findsNothing);
+
+      strip.value = false;
+      await tester.pumpAndSettle();
+      expect(find.text(pt[KApp.handoffBanner]), findsOneWidget);
+    });
+
+    testWidgets('a scheduled deletion is a state, and never waits',
+        (tester) async {
+      await tester.pumpWidget(shellApp(
+          deletion: ValueNotifier(FamilyDeletionBanner(
+            scheduledFor: DateTime(2026, 9, 30),
+            allAgreed: false,
+            iAmRequester: false,
+            onTap: () {},
+          )),
+          calendarStrip: ValueNotifier(true)));
+      await tester.pumpAndSettle();
+      expect(find.textContaining(pt[K.layoutFamilyDeletionRequested]),
+          findsOneWidget);
     });
 
     testWidgets('it never covers the app it sits above', (tester) async {

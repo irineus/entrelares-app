@@ -10,6 +10,10 @@
 #   pull request that changes the APK → `qa-preview` job:
 #       android preview        — dev APK → Firebase App Distribution
 #
+#   owner dispatch → approval on `play-production` → `play-listing` workflow (T-98):
+#       android listing        — store/listing-*.txt (+ phone screenshots) → the
+#                                Main store listing, never pasted in the Console
+#
 # Lanes are named per platform with the SAME names (`beta`, `promote`), so T-40
 # adds `ios beta` (TestFlight internal) and `ios promote` (App Store phased
 # release) beside these and the workflow only switches the platform.
@@ -103,6 +107,87 @@ def release_notes_metadata(code)
     File.write(File.join(dir, "#{code}.txt"), text)
   end
   metadata
+end
+
+# T-98 — the Main store listing, published from `store/` (owner, 02/10/2026):
+# the copy is edited in a PR, never in the Console, where nothing is versioned.
+#
+# The format of `store/listing-<lang>.txt`, read here and by
+# `app/test/play_listing_test.dart` with the SAME rules — change one, change
+# the other:
+#   - a header is a whole line `=== <label> (<= <N> <unit>) ===`;
+#   - exactly THREE sections, in this order: app name, short description, full
+#     description — position decides the field, and the `<N>` its header
+#     declares must be Play's limit for that position (a swap is refused);
+#   - a section's text is every line up to the next header, with the leading
+#     and trailing whitespace removed (Ruby's `strip`); nothing but blank lines
+#     before the first header; name and short description are one line;
+#   - length is counted in characters (code points), against Play's limits.
+# The file suffix IS the Play locale code: listing-pt-BR.txt → `pt-BR`.
+LISTING_DIR = File.expand_path("../store", __dir__)
+LISTING_LANGUAGES = %w[pt-BR en-US].freeze
+LISTING_HEADER = /\A=== .+ \(<= (\d+) [^)]*\) ===\z/
+LISTING_FIELDS = [["title", 30], ["short_description", 80], ["full_description", 4000]].freeze
+
+# Phone screenshots, `store/screenshots/<lang>/phone-<n>.png` (T-97). Play shows
+# them in upload order and takes 2 to 8 per language.
+SCREENSHOT_DIR = File.expand_path("../store/screenshots", __dir__)
+SCREENSHOT_NAME = /\Aphone-([1-9]\d*)\.png\z/
+SCREENSHOT_RANGE = (2..8).freeze
+
+# One language's listing, as supply's field names => text. Refuses, before
+# anything reaches Play, a file that breaks the format or a limit.
+def listing_fields(lang)
+  path = File.join(LISTING_DIR, "listing-#{lang}.txt")
+  UI.user_error!("No listing at store/listing-#{lang}.txt") unless File.file?(path)
+  sections = []
+  File.read(path, encoding: "UTF-8").gsub("\r\n", "\n").split("\n", -1).each do |line|
+    if (header = LISTING_HEADER.match(line))
+      sections << { limit: Integer(header[1], 10), lines: [] }
+    elsif sections.empty?
+      UI.user_error!("#{path}: text before the first `=== … ===` header") unless line.strip.empty?
+    else
+      sections.last[:lines] << line
+    end
+  end
+  unless sections.size == LISTING_FIELDS.size
+    UI.user_error!("#{path} has #{sections.size} sections; the format has #{LISTING_FIELDS.size}")
+  end
+  LISTING_FIELDS.each_with_index.to_h do |(field, limit), i|
+    text = sections[i][:lines].join("\n").strip
+    unless sections[i][:limit] == limit
+      UI.user_error!("#{path}: section #{i + 1} declares <= #{sections[i][:limit]}, but #{field} is #{limit} on Play")
+    end
+    UI.user_error!("#{path}: #{field} is empty") if text.empty?
+    if field != "full_description" && text.include?("\n")
+      UI.user_error!("#{path}: #{field} must be one line")
+    end
+    if text.length > limit
+      UI.user_error!("#{path}: #{field} has #{text.length} characters; Play takes #{limit}")
+    end
+    [field, text]
+  end
+end
+
+# The phone set of one language, in display order — numeric, so phone-10
+# follows phone-9. Empty when the folder does not exist: that language's
+# screenshots on Play are then left exactly as they are.
+def phone_screenshots(lang)
+  dir = File.join(SCREENSHOT_DIR, lang)
+  return [] unless File.directory?(dir)
+  shots = Dir.children(dir).select { |name| name.start_with?("phone-") }.map do |name|
+    match = SCREENSHOT_NAME.match(name)
+    UI.user_error!("store/screenshots/#{lang}/#{name} is not phone-<n>.png") unless match
+    [Integer(match[1], 10), File.join(dir, name)]
+  end.sort_by(&:first)
+  numbers = shots.map(&:first)
+  unless numbers == (1..numbers.size).to_a
+    UI.user_error!("store/screenshots/#{lang}/ must number phone-1.png … phone-N.png with no gap — has #{numbers.inspect}")
+  end
+  unless shots.empty? || SCREENSHOT_RANGE.cover?(shots.size)
+    UI.user_error!("store/screenshots/#{lang}/ has #{shots.size} phone screenshots; Play takes #{SCREENSHOT_RANGE.min} to #{SCREENSHOT_RANGE.max}")
+  end
+  shots.map(&:last)
 end
 
 platform :android do
@@ -273,6 +358,99 @@ platform :android do
     else
       UI.user_error!("action must be promote, rollout or halt — got '#{action}'")
     end
+  end
+
+  # The Main store listing, from `store/` — only through the `play-listing`
+  # workflow, behind the owner's approval on `play-production` (T-98, owner
+  # 02/10/2026). Name, short and full description in both languages, every
+  # time; phone screenshots only with `upload_screenshots:true`.
+  #
+  #   dry_run:true             Play validates the whole edit, nothing commits.
+  #   upload_screenshots:true  each language's phone set is REPLACED by
+  #                            store/screenshots/<lang>/phone-<n>.png, in that
+  #                            order; a language with no folder keeps what Play
+  #                            has. Off (the default), no image is touched.
+  #
+  # Nothing else moves: no binary, no track, no release notes, no icon, no
+  # feature graphic, no contact details (supply 2.240.1 writes only
+  # title/short/full — `video` stays, read back from Play — plus the image
+  # types that have files in the scratch folder).
+  desc "Publish the store listing (and, if asked, the phone screenshots) from store/"
+  lane :listing do |options|
+    dry_run = options[:dry_run].to_s == "true"
+    screenshots = options[:upload_screenshots].to_s == "true"
+
+    metadata = Dir.mktmpdir("listing-")
+    sent_shots = {}
+    lengths = []
+    LISTING_LANGUAGES.each do |lang|
+      dir = File.join(metadata, lang)
+      FileUtils.mkdir_p(dir)
+      listing_fields(lang).each do |field, text|
+        File.write(File.join(dir, "#{field}.txt"), text)
+        lengths << "- `#{lang}` #{field}: #{text.length} caracteres"
+      end
+      next unless screenshots
+
+      shots = phone_screenshots(lang)
+      next if shots.empty?
+
+      # supply uploads a type's files in name order; a two-digit name keeps
+      # the numeric order phone_screenshots already settled.
+      phone = File.join(dir, "images", "phoneScreenshots")
+      FileUtils.mkdir_p(phone)
+      shots.each_with_index do |src, i|
+        FileUtils.cp(src, File.join(phone, format("%02d.png", i + 1)))
+      end
+      sent_shots[lang] = shots.size
+    end
+    if screenshots && sent_shots.empty?
+      UI.user_error!(
+        "upload_screenshots:true, but store/screenshots/<lang>/ holds no " \
+        "phone-<n>.png in any language — nothing to send."
+      )
+    end
+
+    # supply hangs every metadata upload on ONE release of `track` (even with
+    # changelogs skipped it refuses "Could not find release for version code"
+    # without one — `perform_upload_meta`, 2.240.1). Internal always holds
+    # the latest build (T-79); naming its code picks exactly one release, and
+    # with no binary, no promote and no rollout the track itself is only READ.
+    anchor = google_play_track_version_codes(
+      package_name: PLAY_PACKAGE, track: "internal", json_key_data: play_key
+    ).max
+    UI.user_error!("Internal testing holds no build to anchor the edit on") if anchor.nil?
+
+    upload_to_play_store(
+      package_name: PLAY_PACKAGE,
+      json_key_data: play_key,
+      track: "internal",
+      version_code: anchor,
+      metadata_path: metadata,
+      validate_only: dry_run,
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_metadata: false,
+      skip_upload_screenshots: !screenshots,
+      # With screenshots on: a remote image that is not the local one at the
+      # same position is DELETED, an identical prefix is kept, the rest goes
+      # up — the phone set ends up exactly the local one (supply's
+      # `upload_screenshots`). Only types with local files are touched.
+      sync_image_upload: true
+    )
+
+    shots_line = if !screenshots
+                   "capturas não tocadas"
+                 else
+                   sent_shots.map { |lang, n| "#{n} capturas `#{lang}`" }.join(", ")
+                 end
+    summary(
+      "### Ficha da Play: #{dry_run ? 'VALIDADA (dry run), nada publicado' : 'ENVIADA ao Google para revisão'} " \
+      "— nome e descrições em #{LISTING_LANGUAGES.join(' e ')}; #{shots_line}"
+    )
+    lengths.each { |line| summary(line) }
   end
 
   # A PR's dev APK on the owner's phone, through Firebase App Distribution on

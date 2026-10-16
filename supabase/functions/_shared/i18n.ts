@@ -87,8 +87,6 @@ export interface CommonStrings {
   automaticNote: string;
   greeting: (name: string) => string;
   signature: string;
-  openCalendar: string;
-  messageLabel: string;
 }
 
 const COMMON: Record<Lang, CommonStrings> = {
@@ -97,16 +95,12 @@ const COMMON: Record<Lang, CommonStrings> = {
     automaticNote: "Esta é uma mensagem automática. Não responda a este e-mail.",
     greeting: (name) => `Olá, ${name}.`,
     signature: "Entrelares",
-    openCalendar: "Abrir calendário →",
-    messageLabel: "Mensagem",
   },
   en: {
     htmlLang: "en",
     automaticNote: "This is an automated message. Please do not reply to this e-mail.",
     greeting: (name) => `Hello, ${name}.`,
     signature: "Entrelares",
-    openCalendar: "Open calendar →",
-    messageLabel: "Message",
   },
 };
 
@@ -156,92 +150,10 @@ export function formatTimeIn(lang: Lang, timeStr: string | null): string | null 
 // ── send-swap-email ──────────────────────────────────────────────────────────
 
 export interface SwapStrings {
-  tagUrgent: string;
-  tagOverdue: string;
   fallbackOtherCaregiver: string;
-  fallbackRequester: string;
   fallbackFamily: string;
 
-  bannerUrgent: string;
-  bannerOverdue: string;
-  handoffLine: (time: string) => string;
-
-  subjRequested: (date: string) => string;
-  subjApproved: (date: string) => string;
-  subjRejected: (date: string) => string;
-  subjCancelled: (date: string) => string;
-  subjReverted: (date: string) => string;
-  subjRevertRequested: (date: string) => string;
-  subjRevertApproved: (date: string) => string;
-  subjRevertRejected: (date: string) => string;
-  subjRevertCancelled: (date: string) => string;
-  // F-60: the reminder states the INSTANT the request auto-approves —
-  // `deadlineDate`/`deadlineTime` in the recipient's own format, joined by
-  // the preposition each language wants.
-  subjReminder: (date: string, isRevert: boolean, deadlineDate: string, deadlineTime: string) => string;
-  subjAutoApproved: (date: string, isRevert: boolean) => string;
   subjInvitation: (inviter: string) => string;
-  /** T-82: the heads-up threshold is `email_quota.warn_percent`. */
-  subjCap80: (percent: number) => string;
-  subjCapLast: string;
-
-  requestedTitle: string;
-  requestedHeading: string;
-  requestedTarget: (who: string, date: string) => string;
-  requestedRequester: (who: string, date: string) => string;
-  requestedCta: string;
-  requestedButton: string;
-
-  revertRequestedTitle: string;
-  revertRequestedHeading: string;
-  revertRequestedBody: (who: string, date: string) => string;
-  revertRequestedCta: string;
-  revertRequestedButton: string;
-
-  revertApprovedTitle: string;
-  revertApprovedHeading: string;
-  revertApprovedBody: (who: string, date: string) => string;
-
-  revertRejectedTitle: string;
-  revertRejectedHeading: string;
-  revertRejectedBody: (who: string, date: string) => string;
-  seeHistory: string;
-
-  revertCancelledTitle: string;
-  revertCancelledHeading: string;
-  revertCancelledBody: (who: string, date: string) => string;
-
-  approvedTitle: string;
-  approvedHeading: string;
-  approvedTarget: (who: string, date: string) => string;
-  approvedRequester: (who: string, date: string) => string;
-  approvedCalendarNote: string;
-
-  rejectedTitle: string;
-  rejectedHeading: string;
-  rejectedBody: (who: string, date: string) => string;
-  seeRequestHistory: string;
-
-  cancelledTitle: string;
-  cancelledHeading: string;
-  cancelledBody: (who: string, date: string) => string;
-
-  revertedTitle: string;
-  revertedHeading: string;
-  revertedBody: (date: string) => string;
-
-  reminderTitle: string;
-  reminderBanner: (deadlineDate: string, deadlineTime: string) => string;
-  reminderHeading: (deadlineDate: string, deadlineTime: string) => string;
-  reminderBody: (date: string, isRevert: boolean, deadlineDate: string, deadlineTime: string) => string;
-  reminderCta: string;
-  reminderButton: string;
-
-  autoApprovedTitle: string;
-  autoApprovedHeading: string;
-  autoApprovedApprover: (date: string, isRevert: boolean) => string;
-  autoApprovedRequester: (date: string, isRevert: boolean) => string;
-  autoApprovedCalendarNote: string;
 
   invitationTitle: string;
   invitationHeading: string;
@@ -260,104 +172,14 @@ export interface SwapStrings {
   // as family planning data; only the e-mail is purged with the invitation.
   invitationPrivacyPlaceholder: string;
   invitationPrivacyLink: string;
-
-  cap80Title: string;
-  cap80Heading: string;
-  cap80Body: (percent: number) => string;
-  cap80Note: string;
-  cap80Upsell: string;
-  capLastTitle: string;
-  capLastHeading: string;
-  capLastBody: string;
-  capLastNote: string;
-  capLastUpsell: string;
-  capButton: string;
 }
 
 const SWAP: Record<Lang, SwapStrings> = {
   "pt-BR": {
-    tagUrgent: "[URGENTE] ",
-    tagOverdue: "[ATRASADO] ",
     fallbackOtherCaregiver: "O outro responsável",
-    fallbackRequester: "O solicitante",
     fallbackFamily: "sua família",
 
-    bannerUrgent: "URGENTE — menos de 24h para o horário de entrega",
-    bannerOverdue: "ATRASADO — o horário de entrega já passou",
-    handoffLine: (time) => `Horário de entrega/retirada: <strong>${time}</strong>`,
-
-    subjRequested: (d) => `Nova solicitação de troca para ${d}`,
-    subjApproved: (d) => `Troca aprovada para ${d}`,
-    subjRejected: (d) => `Troca recusada para ${d}`,
-    subjCancelled: (d) => `Solicitação de troca cancelada — ${d}`,
-    subjReverted: (d) => `Troca desfeita — ${d}`,
-    subjRevertRequested: (d) => `Pedido de reversão de troca — ${d}`,
-    subjRevertApproved: (d) => `Reversão confirmada — ${d}`,
-    subjRevertRejected: (d) => `Reversão recusada — ${d}`,
-    subjRevertCancelled: (d) => `Pedido de reversão cancelado — ${d}`,
-    subjReminder: (d, r, dd, dt) => `[Auto-aprovação em ${dd} às ${dt}] ${r ? "Reversão" : "Troca"} do dia ${d}`,
-    subjAutoApproved: (d, r) => `${r ? "Reversão" : "Troca"} do dia ${d} aprovada automaticamente`,
     subjInvitation: (i) => `${i} convidou você para o Entrelares`,
-    subjCap80: (p) => `Vocês já usaram ${p}% dos e-mails do mês`,
-    subjCapLast: "Este é o último e-mail do mês (plano gratuito)",
-
-    requestedTitle: "Nova solicitação de troca",
-    requestedHeading: "Nova solicitação de troca",
-    requestedTarget: (w, d) => `<strong>${w}</strong> solicitou que você fique responsável pela criança no dia <strong>${d}</strong>.`,
-    requestedRequester: (w, d) => `<strong>${w}</strong> solicitou ficar responsável pela criança no dia <strong>${d}</strong> no seu lugar.`,
-    requestedCta: "Abra o aplicativo para aprovar ou recusar a solicitação.",
-    requestedButton: "Ver solicitação",
-
-    revertRequestedTitle: "Pedido de reversão de troca",
-    revertRequestedHeading: "Pedido de reversão de troca",
-    revertRequestedBody: (w, d) => `<strong>${w}</strong> quer reverter a troca de guarda do dia <strong>${d}</strong> para o responsável original.`,
-    revertRequestedCta: "Abra o aplicativo para confirmar ou recusar a reversão.",
-    revertRequestedButton: "Ver pedido de reversão",
-
-    revertApprovedTitle: "Reversão confirmada",
-    revertApprovedHeading: "Reversão confirmada!",
-    revertApprovedBody: (w, d) => `<strong>${w}</strong> confirmou a reversão da troca do dia <strong>${d}</strong>. O calendário voltou ao estado original.`,
-
-    revertRejectedTitle: "Reversão recusada",
-    revertRejectedHeading: "Reversão recusada",
-    revertRejectedBody: (w, d) => `<strong>${w}</strong> recusou reverter a troca do dia <strong>${d}</strong>. A troca permanece ativa.`,
-    seeHistory: "Ver histórico →",
-
-    revertCancelledTitle: "Pedido de reversão cancelado",
-    revertCancelledHeading: "Pedido de reversão cancelado",
-    revertCancelledBody: (w, d) => `<strong>${w}</strong> cancelou o pedido de reversão da troca para o dia <strong>${d}</strong>. A troca original permanece ativa.`,
-
-    approvedTitle: "Troca aprovada",
-    approvedHeading: "Troca aprovada!",
-    approvedTarget: (w, d) => `<strong>${w}</strong> aceitou ficar com a criança no dia <strong>${d}</strong>.`,
-    approvedRequester: (w, d) => `<strong>${w}</strong> aceitou que você fique com a criança no dia <strong>${d}</strong>.`,
-    approvedCalendarNote: "O calendário foi atualizado automaticamente.",
-
-    rejectedTitle: "Troca recusada",
-    rejectedHeading: "Troca recusada",
-    rejectedBody: (w, d) => `<strong>${w}</strong> recusou a troca de guarda para o dia <strong>${d}</strong>. Nenhuma alteração foi feita no calendário.`,
-    seeRequestHistory: "Ver histórico de solicitações →",
-
-    cancelledTitle: "Solicitação cancelada",
-    cancelledHeading: "Solicitação cancelada",
-    cancelledBody: (w, d) => `<strong>${w}</strong> cancelou a solicitação de troca para o dia <strong>${d}</strong>.`,
-
-    revertedTitle: "Troca desfeita",
-    revertedHeading: "Troca desfeita",
-    revertedBody: (d) => `A troca de guarda que você havia aceitado para o dia <strong>${d}</strong> foi desfeita pelo responsável planejado. O calendário voltou ao estado original.`,
-
-    reminderTitle: "Solicitação pendente aguardando resposta",
-    reminderBanner: (dd, dt) => `Aprovação automática em ${dd} às ${dt}`,
-    reminderHeading: (dd, dt) => `Você tem até ${dd} às ${dt} para responder`,
-    reminderBody: (d, r, dd, dt) => `A solicitação de ${r ? "reversão" : "troca"} do dia <strong>${d}</strong> será <strong>aprovada automaticamente em ${dd} às ${dt}</strong> se você não responder.`,
-    reminderCta: "Abra o aplicativo para aprovar ou recusar agora.",
-    reminderButton: "Responder solicitação",
-
-    autoApprovedTitle: "Aprovada automaticamente",
-    autoApprovedHeading: "Aprovada automaticamente",
-    autoApprovedApprover: (d, r) => `A solicitação de ${r ? "reversão" : "troca"} do dia <strong>${d}</strong> foi aprovada automaticamente. Você não respondeu dentro do prazo.`,
-    autoApprovedRequester: (d, r) => `A solicitação de ${r ? "reversão" : "troca"} do dia <strong>${d}</strong> foi aprovada automaticamente por falta de resposta.`,
-    autoApprovedCalendarNote: "O calendário foi atualizado.",
 
     invitationTitle: "Convite para o Entrelares",
     invitationHeading: "Você foi convidado(a)!",
@@ -371,102 +193,12 @@ const SWAP: Record<Lang, SwapStrings> = {
     invitationPrivacy: "Seu nome e e-mail foram inseridos sob o legítimo interesse de quem convidou você. Caso este convite não seja aceito, seu registro será permanentemente expurgado de nossos sistemas em até <strong>30 dias</strong>. Saiba mais na",
     invitationPrivacyPlaceholder: "Seu e-mail foi inserido sob o legítimo interesse de quem convidou você e, caso este convite não seja aceito, será permanentemente expurgado de nossos sistemas em até <strong>30 dias</strong>. O nome e o papel informados por quem convidou fazem parte do planejamento da família dessa pessoa, que pode editá-los ou removê-los a qualquer momento. Saiba mais na",
     invitationPrivacyLink: "Política de Privacidade",
-
-    cap80Title: "Vocês estão chegando no limite de e-mails do mês",
-    cap80Heading: "Chegando no limite de e-mails",
-    cap80Body: (p) => `A sua família já usou <strong>${p}% dos e-mails deste mês</strong> no plano gratuito.`,
-    cap80Note: "Não se preocupe: as <strong>notificações dentro do app</strong> (pedidos e aprovações de troca) continuam <strong>sem limite</strong> — apenas a cópia por e-mail pode pausar ao fim do mês.",
-    cap80Upsell: "Quer um limite bem maior de e-mails? Conheça o <strong>Premium</strong>.",
-    capLastTitle: "Este é o último e-mail do mês",
-    capLastHeading: "Último e-mail do mês",
-    capLastBody: "A sua família atingiu o limite de e-mails deste mês no plano gratuito — <strong>este é o último e-mail que enviaremos até a virada do mês</strong>.",
-    capLastNote: "As <strong>notificações dentro do app</strong> seguem <strong>normais e sem limite</strong>: vocês continuam vendo cada pedido e aprovação de troca em tempo real.",
-    capLastUpsell: "Para voltar a receber e-mails imediatamente, ative o <strong>Premium</strong> (limite de e-mails bem maior).",
-    capButton: "Ver o Premium",
   },
   en: {
-    tagUrgent: "[URGENT] ",
-    tagOverdue: "[OVERDUE] ",
     fallbackOtherCaregiver: "The other caregiver",
-    fallbackRequester: "The requester",
     fallbackFamily: "your family",
 
-    bannerUrgent: "URGENT — less than 24h to the handover time",
-    bannerOverdue: "OVERDUE — the handover time has passed",
-    handoffLine: (time) => `Handover time: <strong>${time}</strong>`,
-
-    subjRequested: (d) => `New swap request for ${d}`,
-    subjApproved: (d) => `Swap approved for ${d}`,
-    subjRejected: (d) => `Swap declined for ${d}`,
-    subjCancelled: (d) => `Swap request cancelled — ${d}`,
-    subjReverted: (d) => `Swap undone — ${d}`,
-    subjRevertRequested: (d) => `Swap revert request — ${d}`,
-    subjRevertApproved: (d) => `Revert confirmed — ${d}`,
-    subjRevertRejected: (d) => `Revert declined — ${d}`,
-    subjRevertCancelled: (d) => `Revert request cancelled — ${d}`,
-    subjReminder: (d, r, dd, dt) => `[Auto-approval on ${dd} at ${dt}] ${r ? "Revert" : "Swap"} for ${d}`,
-    subjAutoApproved: (d, r) => `${r ? "Revert" : "Swap"} for ${d} approved automatically`,
     subjInvitation: (i) => `${i} invited you to Entrelares`,
-    subjCap80: (p) => `You have used ${p}% of this month's e-mails`,
-    subjCapLast: "This is the last e-mail of the month (free plan)",
-
-    requestedTitle: "New swap request",
-    requestedHeading: "New swap request",
-    requestedTarget: (w, d) => `<strong>${w}</strong> asked you to be responsible for the child on <strong>${d}</strong>.`,
-    requestedRequester: (w, d) => `<strong>${w}</strong> asked to be responsible for the child on <strong>${d}</strong> in your place.`,
-    requestedCta: "Open the app to approve or decline the request.",
-    requestedButton: "View request",
-
-    revertRequestedTitle: "Swap revert request",
-    revertRequestedHeading: "Swap revert request",
-    revertRequestedBody: (w, d) => `<strong>${w}</strong> wants to revert the custody swap for <strong>${d}</strong> back to the original caregiver.`,
-    revertRequestedCta: "Open the app to confirm or decline the revert.",
-    revertRequestedButton: "View revert request",
-
-    revertApprovedTitle: "Revert confirmed",
-    revertApprovedHeading: "Revert confirmed!",
-    revertApprovedBody: (w, d) => `<strong>${w}</strong> confirmed the revert of the swap for <strong>${d}</strong>. The calendar is back to its original state.`,
-
-    revertRejectedTitle: "Revert declined",
-    revertRejectedHeading: "Revert declined",
-    revertRejectedBody: (w, d) => `<strong>${w}</strong> declined to revert the swap for <strong>${d}</strong>. The swap stays active.`,
-    seeHistory: "View history →",
-
-    revertCancelledTitle: "Revert request cancelled",
-    revertCancelledHeading: "Revert request cancelled",
-    revertCancelledBody: (w, d) => `<strong>${w}</strong> cancelled the revert request for the swap on <strong>${d}</strong>. The original swap stays active.`,
-
-    approvedTitle: "Swap approved",
-    approvedHeading: "Swap approved!",
-    approvedTarget: (w, d) => `<strong>${w}</strong> agreed to have the child on <strong>${d}</strong>.`,
-    approvedRequester: (w, d) => `<strong>${w}</strong> agreed that you have the child on <strong>${d}</strong>.`,
-    approvedCalendarNote: "The calendar was updated automatically.",
-
-    rejectedTitle: "Swap declined",
-    rejectedHeading: "Swap declined",
-    rejectedBody: (w, d) => `<strong>${w}</strong> declined the custody swap for <strong>${d}</strong>. No change was made to the calendar.`,
-    seeRequestHistory: "View request history →",
-
-    cancelledTitle: "Request cancelled",
-    cancelledHeading: "Request cancelled",
-    cancelledBody: (w, d) => `<strong>${w}</strong> cancelled the swap request for <strong>${d}</strong>.`,
-
-    revertedTitle: "Swap undone",
-    revertedHeading: "Swap undone",
-    revertedBody: (d) => `The custody swap you had accepted for <strong>${d}</strong> was undone by the scheduled caregiver. The calendar is back to its original state.`,
-
-    reminderTitle: "Pending request awaiting your reply",
-    reminderBanner: (dd, dt) => `Automatic approval on ${dd} at ${dt}`,
-    reminderHeading: (dd, dt) => `You have until ${dd} at ${dt} to reply`,
-    reminderBody: (d, r, dd, dt) => `The ${r ? "revert" : "swap"} request for <strong>${d}</strong> will be <strong>approved automatically on ${dd} at ${dt}</strong> if you do not reply.`,
-    reminderCta: "Open the app to approve or decline now.",
-    reminderButton: "Reply to request",
-
-    autoApprovedTitle: "Approved automatically",
-    autoApprovedHeading: "Approved automatically",
-    autoApprovedApprover: (d, r) => `The ${r ? "revert" : "swap"} request for <strong>${d}</strong> was approved automatically. You did not reply before the deadline.`,
-    autoApprovedRequester: (d, r) => `The ${r ? "revert" : "swap"} request for <strong>${d}</strong> was approved automatically for lack of a reply.`,
-    autoApprovedCalendarNote: "The calendar was updated.",
 
     invitationTitle: "Invitation to Entrelares",
     invitationHeading: "You have been invited!",
@@ -480,18 +212,6 @@ const SWAP: Record<Lang, SwapStrings> = {
     invitationPrivacy: "Your name and e-mail were entered under the legitimate interest of whoever invited you. If this invitation is not accepted, your record is permanently purged from our systems within <strong>30 days</strong>. Read more in the",
     invitationPrivacyPlaceholder: "Your e-mail was entered under the legitimate interest of whoever invited you and, if this invitation is not accepted, it is permanently purged from our systems within <strong>30 days</strong>. The name and role they entered are part of that person's own family planning, which they can edit or remove at any time. Read more in the",
     invitationPrivacyLink: "Privacy Policy",
-
-    cap80Title: "You are approaching this month's e-mail limit",
-    cap80Heading: "Approaching the e-mail limit",
-    cap80Body: (p) => `Your family has already used <strong>${p}% of this month's e-mails</strong> on the free plan.`,
-    cap80Note: "Nothing to worry about: the <strong>notifications inside the app</strong> (swap requests and approvals) carry on <strong>with no limit</strong> — only the e-mail copy may pause at the end of the month.",
-    cap80Upsell: "Want a much higher e-mail limit? Take a look at <strong>Premium</strong>.",
-    capLastTitle: "This is the last e-mail of the month",
-    capLastHeading: "Last e-mail of the month",
-    capLastBody: "Your family reached this month's e-mail limit on the free plan — <strong>this is the last e-mail we will send until the month turns</strong>.",
-    capLastNote: "The <strong>notifications inside the app</strong> carry on <strong>as normal and with no limit</strong>: you keep seeing every swap request and approval in real time.",
-    capLastUpsell: "To start receiving e-mails again straight away, activate <strong>Premium</strong> (a much higher e-mail limit).",
-    capButton: "See Premium",
   },
 };
 
@@ -504,17 +224,10 @@ export interface AccountStrings {
   // literal "30 dias" inside send-account-email, in every language.
   fallbackThirtyDays: string;
   subjLeftSelf: string;
-  subjLeftOthers: (who: string) => string;
-  subjJoined: (who: string) => string;
-  subjReturned: (who: string) => string;
   subjGraceEnding: string;
-  subjPlanEnding: (date: string) => string;
-  subjPlanEnded: string;
   subjFdRequesterSelf: string;
   subjFdRequesterOthers: (deadline: string) => string;
   subjFdReminder: (deadline: string) => string;
-  subjFdRefused: string;
-  subjFdWithdrawn: string;
   subjFdCompleted: (family: string) => string;
 
   selfHeading: string;
@@ -530,25 +243,6 @@ export interface AccountStrings {
   graceBody: string;
   graceHowTo: string;
 
-  // F-70 — the family's own plan is running out (D-7) or already ran out.
-  planEndingHeading: string;
-  planEndingIntro: (date: string) => string;
-  planEndedHeading: string;
-  planEndedIntro: (date: string) => string;
-  planHowTo: string;
-  planButton: string;
-
-  othersHeading: string;
-  othersBody: (who: string) => string;
-  othersHistory: string;
-
-  joinedHeading: string;
-  joinedBody: (who: string) => string;
-  joinedClosing: string;
-
-  returnedHeading: string;
-  returnedBody: (who: string) => string;
-
   fdRequesterHeading: string;
   fdRequesterIntro: (deadline: string) => string;
   fdRequesterBullet1: string;
@@ -563,12 +257,6 @@ export interface AccountStrings {
   fdOthersBullet2: string;
   fdOthersBullet3: string;
   fdOthersBullet4: string;
-
-  fdRefusedHeading: string;
-  fdRefusedBody: (who: string) => string;
-
-  fdWithdrawnHeading: string;
-  fdWithdrawnBody: (who: string) => string;
 
   fdReminderHeading: string;
   fdReminderIntro: (deadline: string) => string;
@@ -594,17 +282,10 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
   "pt-BR": {
     fallbackThirtyDays: "30 dias",
     subjLeftSelf: "Sua saída da família foi solicitada",
-    subjLeftOthers: (w) => `${w} saiu da família`,
-    subjJoined: (w) => `${w} entrou na família`,
-    subjReturned: (w) => `${w} voltou à família`,
     subjGraceEnding: "Seu Premium está prestes a ser interrompido",
-    subjPlanEnding: (d) => `O planejamento da família vai até ${d}`,
-    subjPlanEnded: "O planejamento da família terminou",
     subjFdRequesterSelf: "Você solicitou a exclusão da família",
     subjFdRequesterOthers: (d) => `Exclusão da família solicitada — responda até ${d}`,
     subjFdReminder: (d) => `A família será excluída em ${d}`,
-    subjFdRefused: "Exclusão da família cancelada",
-    subjFdWithdrawn: "Exclusão da família retirada",
     subjFdCompleted: (f) => `A família "${f}" foi excluída`,
 
     selfHeading: "Saída da família solicitada",
@@ -620,24 +301,6 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
     graceBody: "Se a cobrança não for regularizada até lá, a família <strong>voltará ao Plano Gratuito</strong>. <strong>Nenhum dado é apagado</strong> — o calendário, as trocas e todo o histórico continuam intactos; apenas os recursos Premium ficam indisponíveis até uma nova contratação.",
     graceHowTo: "Para resolver, abra o aplicativo em <strong>Família &gt; Assinatura</strong>.",
 
-    planEndingHeading: "O planejamento termina em breve",
-    planEndingIntro: (d) => `O planejamento da sua família no calendário vai até <strong>${d}</strong>. Depois dessa data, nenhum dia tem responsável definido.`,
-    planEndedHeading: "O planejamento terminou",
-    planEndedIntro: (d) => `O último dia planejado no calendário da sua família foi <strong>${d}</strong>. Desde então, nenhum dia tem responsável definido.`,
-    planHowTo: "Para planejar os próximos meses, abra a notificação no aplicativo — o assistente já começa no primeiro dia sem responsável.",
-    planButton: "Planejar os próximos meses",
-
-    othersHeading: "Um responsável saiu da família",
-    othersBody: (w) => `<strong>${w}</strong> solicitou a saída da família. Os <strong>dias futuros</strong> que estavam sob responsabilidade dessa pessoa foram <strong>liberados</strong> — abra o calendário para <strong>verificar e reatribuir</strong> o que for necessário.`,
-    othersHistory: "O histórico passado permanece inalterado.",
-
-    joinedHeading: "Novo responsável na família",
-    joinedBody: (w) => `<strong>${w}</strong> <strong>juntou-se à família</strong>. A partir de agora essa pessoa também pode ser incluída no planejamento do calendário e nas trocas.`,
-    joinedClosing: "Abra o aplicativo para conferir.",
-
-    returnedHeading: "Um responsável voltou à família",
-    returnedBody: (w) => `<strong>${w}</strong> <strong>cancelou a saída e voltou à família</strong>. Essa pessoa volta a participar normalmente do calendário e das trocas.`,
-
     fdRequesterHeading: "Exclusão da família solicitada",
     fdRequesterIntro: (d) => `Você solicitou a <strong>exclusão da família</strong>. Como os dados são compartilhados, todos os demais responsáveis foram avisados e têm até <strong>${d}</strong> para se manifestar:`,
     fdRequesterBullet1: "Se <strong>ninguém recusar</strong> até essa data, <strong>TODOS os dados</strong> (calendário, histórico, auditoria e as contas de todos os responsáveis) serão <strong>apagados definitivamente</strong>.",
@@ -652,12 +315,6 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
     fdOthersBullet2: "<strong>Se você não responder, o silêncio vale como concordância.</strong>",
     fdOthersBullet3: "<strong>Uma única recusa cancela a exclusão</strong> — a família continua.",
     fdOthersBullet4: "Antes do prazo, você pode <strong>exportar seus dados</strong> em Perfil.",
-
-    fdRefusedHeading: "Exclusão da família cancelada",
-    fdRefusedBody: (w) => `<strong>${w}</strong> <strong>recusou</strong> a exclusão da família. A solicitação foi <strong>encerrada</strong> e a família continua normalmente — nada foi apagado.`,
-
-    fdWithdrawnHeading: "Exclusão da família retirada",
-    fdWithdrawnBody: (w) => `<strong>${w}</strong> <strong>retirou</strong> a solicitação de exclusão da família. A família continua normalmente — nada foi apagado.`,
 
     fdReminderHeading: "A exclusão da família se aproxima",
     fdReminderIntro: (d) => `A família será <strong>excluída definitivamente em ${d}</strong> — calendário, histórico, auditoria e as contas de todos os responsáveis.`,
@@ -677,17 +334,10 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
   en: {
     fallbackThirtyDays: "30 days",
     subjLeftSelf: "Your departure from the family was requested",
-    subjLeftOthers: (w) => `${w} left the family`,
-    subjJoined: (w) => `${w} joined the family`,
-    subjReturned: (w) => `${w} is back in the family`,
     subjGraceEnding: "Your Premium is about to be interrupted",
-    subjPlanEnding: (d) => `Your family's plan runs until ${d}`,
-    subjPlanEnded: "Your family's plan has ended",
     subjFdRequesterSelf: "You requested the deletion of the family",
     subjFdRequesterOthers: (d) => `Family deletion requested — reply by ${d}`,
     subjFdReminder: (d) => `The family will be deleted on ${d}`,
-    subjFdRefused: "Family deletion cancelled",
-    subjFdWithdrawn: "Family deletion withdrawn",
     subjFdCompleted: (f) => `The family "${f}" was deleted`,
 
     selfHeading: "Departure from the family requested",
@@ -703,24 +353,6 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
     graceBody: "If the charge is not settled by then, the family <strong>goes back to the Free plan</strong>. <strong>No data is deleted</strong> — the calendar, the swaps and the whole history stay intact; only the Premium features become unavailable until a new subscription.",
     graceHowTo: "To sort it out, open the app under <strong>Family &gt; Subscription</strong>.",
 
-    planEndingHeading: "Your plan ends soon",
-    planEndingIntro: (d) => `Your family's plan in the calendar runs until <strong>${d}</strong>. After that date, no day has a caregiver set.`,
-    planEndedHeading: "Your plan has ended",
-    planEndedIntro: (d) => `The last planned day in your family's calendar was <strong>${d}</strong>. Since then, no day has a caregiver set.`,
-    planHowTo: "To plan the next months, open the notification in the app — the wizard already starts on the first day without a caregiver.",
-    planButton: "Plan the next months",
-
-    othersHeading: "A caregiver left the family",
-    othersBody: (w) => `<strong>${w}</strong> requested to leave the family. The <strong>future days</strong> that were under that person's responsibility were <strong>released</strong> — open the calendar to <strong>check and reassign</strong> whatever is needed.`,
-    othersHistory: "The past history stays unchanged.",
-
-    joinedHeading: "New caregiver in the family",
-    joinedBody: (w) => `<strong>${w}</strong> <strong>joined the family</strong>. From now on that person can also be included in the calendar planning and in swaps.`,
-    joinedClosing: "Open the app to have a look.",
-
-    returnedHeading: "A caregiver is back in the family",
-    returnedBody: (w) => `<strong>${w}</strong> <strong>cancelled their departure and is back in the family</strong>. That person takes part in the calendar and in swaps as normal again.`,
-
     fdRequesterHeading: "Family deletion requested",
     fdRequesterIntro: (d) => `You requested the <strong>deletion of the family</strong>. Because the data is shared, all the other caregivers were notified and have until <strong>${d}</strong> to respond:`,
     fdRequesterBullet1: "If <strong>nobody refuses</strong> by that date, <strong>ALL the data</strong> (calendar, history, audit trail and every caregiver's account) will be <strong>permanently erased</strong>.",
@@ -735,12 +367,6 @@ const ACCOUNT: Record<Lang, AccountStrings> = {
     fdOthersBullet2: "<strong>If you do not reply, silence counts as agreement.</strong>",
     fdOthersBullet3: "<strong>A single refusal cancels the deletion</strong> — the family continues.",
     fdOthersBullet4: "Before the deadline, you can <strong>export your data</strong> under Profile.",
-
-    fdRefusedHeading: "Family deletion cancelled",
-    fdRefusedBody: (w) => `<strong>${w}</strong> <strong>refused</strong> the deletion of the family. The request was <strong>closed</strong> and the family continues as normal — nothing was deleted.`,
-
-    fdWithdrawnHeading: "Family deletion withdrawn",
-    fdWithdrawnBody: (w) => `<strong>${w}</strong> <strong>withdrew</strong> the family deletion request. The family continues as normal — nothing was deleted.`,
 
     fdReminderHeading: "The family deletion is near",
     fdReminderIntro: (d) => `The family will be <strong>permanently deleted on ${d}</strong> — calendar, history, audit trail and every caregiver's account.`,

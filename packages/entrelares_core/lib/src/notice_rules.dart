@@ -34,6 +34,7 @@
 /// is null — the single rule the sheet states out loud, in both directions.
 library;
 
+import 'localization/k_app.dart';
 import 'localization/k.dart';
 import 'localization/localization.dart';
 import 'swap_rules.dart' show normalizeFreeText;
@@ -133,23 +134,23 @@ const int noticeAnswerNoteMaxLength = noticeNoteMaxLength;
 /// * [dayParentId] — the carer whose day it is;
 /// * [previousParentId] — yesterday's carer, who only ADDS a person when today
 ///   is a transition day (otherwise it is the same person). Theirs is the
-///   handover that is happening;
-/// * [nextHandoffParentId] — the carer of the next day with a different
-///   responsible. Theirs is the collection that is coming.
+///   handover that is happening.
 ///
-/// Nulls are dropped: an unplanned day has no carer, and a family with no
-/// future handoff inside the scan window has no third end. A frozen member
-/// (S-11) and a pending one with no account (F-56) are filtered by the caller
-/// — this function answers ROLE, not eligibility to act.
+/// Owner, 06/10/2026 (QA of 3.1.10): ONLY these two. The third end F-52 had —
+/// whoever receives the child at the NEXT handoff — let a parent whose next
+/// day was two days away send "atraso, alguém pode buscar?" about a day that
+/// was entirely the other parent's.
+///
+/// Nulls are dropped: an unplanned day has no carer. A frozen member (S-11)
+/// and a pending one with no account (F-56) are filtered by the caller — this
+/// function answers ROLE, not eligibility to act.
 Set<int> noticeSenderIds({
   required int? dayParentId,
   required int? previousParentId,
-  required int? nextHandoffParentId,
 }) =>
     {
       ?dayParentId,
       ?previousParentId,
-      ?nextHandoffParentId,
     };
 
 /// The requests [senderId] may make about this day.
@@ -248,6 +249,14 @@ String noticeNoteSuffix(Localization l, String? note) {
 }
 
 /// The whole sentence, in the reader's language.
+///
+/// [mine] (F-98): the author reads herself in the second person — "Você
+/// avisou que vai atrasar…", never her own name in the third.
+///
+/// [childName] (U-61): the author's own line says the child's name when the
+/// family has exactly one (`ChildRules.singleName`). The OTHER readers' line
+/// is the notification's text (`K.notifRender*`), shared with the stored
+/// row and left as it is.
 String noticeSentence({
   required Localization l,
   required String senderName,
@@ -255,8 +264,28 @@ String noticeSentence({
   required int? etaMinutes,
   required NoticeRequest request,
   String? note,
+  bool mine = false,
+  String? childName,
 }) =>
-    l.format(
+    mine
+        ? l.format(
+            switch (request) {
+              NoticeRequest.info => KApp.noticeMineInfo,
+              NoticeRequest.pickup => childName == null
+                  ? KApp.noticeMinePickup
+                  : KApp.noticeMinePickupNamed,
+              NoticeRequest.keep => childName == null
+                  ? KApp.noticeMineKeep
+                  : KApp.noticeMineKeepNamed,
+            },
+            [
+              noticeReasonClause(l, reason),
+              noticeEtaClause(l, etaMinutes),
+              noticeNoteSuffix(l, note),
+              childName ?? '',
+            ],
+          )
+        : l.format(
       switch (request) {
         NoticeRequest.info => K.notifRenderDayNoticeInfo,
         NoticeRequest.pickup => K.notifRenderDayNoticePickup,

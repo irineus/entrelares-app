@@ -449,13 +449,18 @@ class GateFixture {
   /// DESTRUCTIVE tests — leaving a member mutates the family, so it must not
   /// touch the shared [familyId] the rest of the gate uses. Purged (and its
   /// auth users removed) in [dispose].
-  Future<ThrowawayFamily> createFamily(String tag) async {
+  ///
+  /// [founderMetadata] is merged into the founder's sign-up metadata — F-80
+  /// sends its `referral_code` through it, the way the register form does.
+  Future<ThrowawayFamily> createFamily(String tag,
+      {Map<String, dynamic> founderMetadata = const {}}) async {
     final adminEmail = testEmail('$tag-adm');
     _userIds.add(await _admin.createConfirmedUser(adminEmail, password, {
       'full_name': 'E2E $tag Adm',
       'role': 'father',
       'family_name': '${TestEnv.e2eFamilyPrefix}$runId-$tag',
       'policy_version': PolicyVersions.current,
+      ...founderMetadata,
     }));
     final adminClient = await signIn(adminEmail);
     final adminProfile = (await _profilesOf(adminClient)).single;
@@ -482,6 +487,24 @@ class GateFixture {
       memberProfile: memberProfile,
       familyId: adminProfile.familyId!,
     );
+  }
+
+  /// F-88: a founder ALONE in a family of their own — no member, nothing
+  /// planned: the shape the pending-invitation offer is for.
+  Future<({SupabaseClient client, Member profile, String email})>
+      createSoloFounder(String tag) async {
+    final email = testEmail('$tag-solo');
+    _userIds.add(await _admin.createConfirmedUser(email, password, {
+      'full_name': 'E2E $tag Solo',
+      'role': 'mother',
+      'family_name': '${TestEnv.e2eFamilyPrefix}$runId-$tag-solo',
+      'policy_version': PolicyVersions.current,
+    }));
+    final client = await signIn(email);
+    final profile = (await _profilesOf(client)).single;
+    _extraFamilyIds.add(profile.familyId!);
+    await _markOnboarded([profile.id]);
+    return (client: client, profile: profile, email: email);
   }
 
   // ── Seeding helpers ──────────────────────────────────────────────────────

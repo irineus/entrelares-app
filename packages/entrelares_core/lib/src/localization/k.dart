@@ -223,9 +223,6 @@ abstract final class K {
   static const String quickSwapConfirm = 'quickSwap.confirm';
   static const String navGuardSelectedOne = 'navGuard.selectedOne';
   static const String navGuardSelectedMany = 'navGuard.selectedMany';
-  static const String navGuardBody = 'navGuard.body';
-  static const String navGuardYes = 'navGuard.yes';
-  static const String navGuardNo = 'navGuard.no';
 
   // ── Today card ──
   static const String cardBackToCurrentMonth = 'card.backToCurrentMonth';
@@ -541,6 +538,13 @@ abstract final class K {
   static const String premStorePaidUntilPeriod = 'prem.store.paidUntilPeriod';
   static const String premStoreTrialUntil = 'prem.store.trialUntil';
   static const String premStoreNote = 'prem.store.note';
+  static const String premPlayManaged = 'prem.play.managed';
+  static const String premPlayNotRenewing = 'prem.play.notRenewing';
+  static const String premPlayOverdueGraceEnded = 'prem.play.overdue.graceEnded';
+  static const String premPlayOverdueInGrace = 'prem.play.overdue.inGrace';
+  static const String premPlayOverdueInGraceNoDate =
+      'prem.play.overdue.inGraceNoDate';
+  static const String premOverduePay = 'prem.overdue.pay';
   static const String premPaidUntilAvulso = 'prem.paidUntil.avulso';
   static const String premPaidUntilPeriod = 'prem.paidUntil.period';
   static const String premExpiringSoonOne = 'prem.expiringSoon.one';
@@ -723,6 +727,8 @@ abstract final class K {
   static const String pdfDocSubtitle = 'pdf.doc.subtitle';
   static const String pdfDocFamily = 'pdf.doc.family';
   static const String pdfDocChild = 'pdf.doc.child';
+  // F-07: the header label when the family has more than one child.
+  static const String pdfDocChildren = 'pdf.doc.children';
   static const String pdfDocPeriod = 'pdf.doc.period';
   static const String pdfDocPeriodValue = 'pdf.doc.periodValue';
   static const String pdfDocCriterion = 'pdf.doc.criterion';
@@ -780,6 +786,10 @@ abstract final class K {
   // stored PT-BR sentence would have taken away from an English reader.
   static const String notifRenderAutoReminderDeadline =
       'notifRender.autoReminder.deadline';
+  // F-94: the same type with `kind: 'eve'` — 19:00 on the eve of the day.
+  static const String notifRenderTitleAutoReminderEve =
+      'notifRender.title.autoReminder.eve';
+  static const String notifRenderAutoReminderEve = 'notifRender.autoReminder.eve';
   static const String notifRenderAutoApprovedRequester = 'notifRender.autoApproved.requester';
   static const String notifRenderAutoApprovedApprover = 'notifRender.autoApproved.approver';
   static const String notifRenderFamilyAutoSwap = 'notifRender.family.autoSwap';
@@ -836,6 +846,16 @@ abstract final class K {
   static const String notifRenderTitleFamilyDeletionWithdrawn = 'notifRender.title.familyDeletionWithdrawn';
   static const String notifRenderTitleFamilyDeletionNear = 'notifRender.title.familyDeletionNear';
   static const String notifRenderMemberJoined = 'notifRender.memberJoined';
+  /// F-101: the invitation the reader sent expired unanswered (`name` =
+  /// the placeholder's name or the address).
+  static const String notifRenderTitleInvitationExpired = 'notifRender.title.invitationExpired';
+  static const String notifRenderInvitationExpired = 'notifRender.invitationExpired';
+
+  /// F-103: an admin granted or removed the reader's admin bit (`name` = who).
+  static const String notifRenderTitleAdminGranted = 'notifRender.title.adminGranted';
+  static const String notifRenderTitleAdminRevoked = 'notifRender.title.adminRevoked';
+  static const String notifRenderAdminGranted = 'notifRender.adminGranted';
+  static const String notifRenderAdminRevoked = 'notifRender.adminRevoked';
   static const String notifRenderMemberReturned = 'notifRender.memberReturned';
   static const String notifRenderLeaveSelf = 'notifRender.leave.self';
   static const String notifRenderLeaveSelfLast = 'notifRender.leave.selfLast';
@@ -899,8 +919,41 @@ abstract final class K {
   static const String notifRenderPlanEnding = 'notifRender.planEnding';
   static const String notifRenderPlanEnded = 'notifRender.planEnded';
   static const String notifPlanAction = 'notif.planAction';
+  // ── The first month to plan (F-78) ──
+  static const String notifRenderTitlePlanUnplanned = 'notifRender.title.planUnplanned';
+  static const String notifRenderPlanUnplanned = 'notifRender.planUnplanned';
+  static const String notifPlanFirstAction = 'notif.planFirstAction';
   static const String calPlanEnding = 'cal.planEnd.ending';
   static const String calPlanEnded = 'cal.planEnd.ended';
+
+  // ── Premium trial ending (F-77) ──
+  static const String notifRenderTitleTrialEnding = 'notifRender.title.trialEnding';
+  static const String notifRenderTitleTrialEnded = 'notifRender.title.trialEnded';
+  static const String notifRenderTrialEnding = 'notifRender.trialEnding';
+  static const String notifRenderTrialEnded = 'notifRender.trialEnded';
+  static const String notifTrialAction = 'notif.trialAction';
+
+  // ── Referral reward (F-80 PR 3) ──
+  static const String notifRenderTitleReferralReward = 'notifRender.title.referralReward';
+  static const String notifRenderReferralReward = 'notifRender.referralReward';
+  /// F-102: a member asked the admins for Premium; `gate` names what the
+  /// Premium gate guarded (the F-79 token), through a closed map.
+  static const String notifRenderTitlePremiumRequest = 'notifRender.title.premiumRequest';
+  static const String notifRenderPremiumRequest = 'notifRender.premiumRequest';
+  static const String notifRenderPremiumGateChat = 'notifRender.premiumGate.chat';
+  static const String notifRenderPremiumGateChatExport = 'notifRender.premiumGate.chatExport';
+  static const String notifRenderPremiumGateAgenda = 'notifRender.premiumGate.agenda';
+  static const String notifRenderPremiumGateExpenses = 'notifRender.premiumGate.expenses';
+  static const String notifRenderPremiumGatePdf = 'notifRender.premiumGate.pdf';
+  static const String notifRenderPremiumGateFamily = 'notifRender.premiumGate.family';
+
+  // ── An admin changed the reader's days directly (F-81) ──
+  static const String notifRenderTitleDayAdminChangeSingle = 'notifRender.title.dayAdminChange.single';
+  static const String notifRenderTitleDayAdminChangeBatch = 'notifRender.title.dayAdminChange.batch';
+  static const String notifRenderDayAdminChangeSingle = 'notifRender.dayAdminChange.single';
+  static const String notifRenderDayAdminChangeBatch = 'notifRender.dayAdminChange.batch';
+  static const String notifDayAdminChangeDayAction = 'notif.dayAdminChange.dayAction';
+  static const String notifDayAdminChangeTrailAction = 'notif.dayAdminChange.trailAction';
 
   // ── Shared expenses (F-34) ──
   static const String notifRenderTitleExpenseAdded = 'notifRender.title.expenseAdded';
@@ -927,6 +980,10 @@ abstract final class K {
   // ── The family chat (F-35) ──
   static const String notifRenderTitleChatMessage = 'notifRender.title.chatMessage';
   static const String notifRenderChatMessage = 'notifRender.chatMessage';
+
+  /// S-27: the Conversa push WITHOUT the text — the default for everyone; the
+  /// text reaches the lock screen only for a reader who turned the preview on.
+  static const String notifRenderChatMessageHidden = 'notifRender.chatMessage.hidden';
 
   // ── The agenda speaks (F-55 PR 4) ──
   // The kind labels repeat `KApp.agendaKind*` on purpose: the push catalog
@@ -957,8 +1014,6 @@ abstract final class K {
   static const String notifEmptyHistory = 'notif.empty.history';
   static const String notifRevertPendingBadge = 'notif.badge.revertPending';
   static const String notifPendingBadge = 'notif.badge.pending';
-  static const String notifLabelRequester = 'notif.label.requester';
-  static const String notifLabelRevertTo = 'notif.label.revertTo';
   static const String notifLabelTo = 'notif.label.to';
   static const String notifLabelProposed = 'notif.label.proposed';
   static const String notifLabelYourMessage = 'notif.label.yourMessage';
@@ -994,7 +1049,6 @@ abstract final class K {
   static const String sumEmptyTitle = 'rep.sum.emptyTitle';
   static const String sumEmptyBody = 'rep.sum.emptyBody';
   static const String sumEmptyAction = 'rep.sum.emptyAction';
-  static const String sumPlanned = 'rep.sum.planned';
   static const String sumActual = 'rep.sum.actual';
   static const String sumProjected = 'rep.sum.projected';
   static const String sumGiven = 'rep.sum.given';
@@ -1441,9 +1495,6 @@ abstract final class K {
     quickSwapConfirm,
     navGuardSelectedOne,
     navGuardSelectedMany,
-    navGuardBody,
-    navGuardYes,
-    navGuardNo,
     cardBackToCurrentMonth,
     cardGreeting,
     cardInviteTitle,
@@ -1725,6 +1776,12 @@ abstract final class K {
     premStorePaidUntilPeriod,
     premStoreTrialUntil,
     premStoreNote,
+    premPlayManaged,
+    premPlayNotRenewing,
+    premPlayOverdueGraceEnded,
+    premPlayOverdueInGrace,
+    premPlayOverdueInGraceNoDate,
+    premOverduePay,
     premPaidUntilAvulso,
     premPaidUntilPeriod,
     premExpiringSoonOne,
@@ -1895,6 +1952,7 @@ abstract final class K {
     pdfDocSubtitle,
     pdfDocFamily,
     pdfDocChild,
+    pdfDocChildren,
     pdfDocPeriod,
     pdfDocPeriodValue,
     pdfDocCriterion,
@@ -1942,6 +2000,8 @@ abstract final class K {
     notifRenderTitleCalendarUpdated,
     notifRenderAutoReminder,
     notifRenderAutoReminderDeadline,
+    notifRenderTitleAutoReminderEve,
+    notifRenderAutoReminderEve,
     notifRenderAutoApprovedRequester,
     notifRenderAutoApprovedApprover,
     notifRenderFamilyAutoSwap,
@@ -1995,6 +2055,12 @@ abstract final class K {
     notifRenderTitleFamilyDeletionNear,
     notifRenderMemberJoined,
     notifRenderMemberReturned,
+    notifRenderTitleInvitationExpired,
+    notifRenderInvitationExpired,
+    notifRenderTitleAdminGranted,
+    notifRenderTitleAdminRevoked,
+    notifRenderAdminGranted,
+    notifRenderAdminRevoked,
     notifRenderLeaveSelf,
     notifRenderLeaveSelfLast,
     notifRenderLeaveOther,
@@ -2043,8 +2109,32 @@ abstract final class K {
     notifRenderPlanEnding,
     notifRenderPlanEnded,
     notifPlanAction,
+    notifRenderTitlePlanUnplanned,
+    notifRenderPlanUnplanned,
+    notifPlanFirstAction,
     calPlanEnding,
     calPlanEnded,
+    notifRenderTitleTrialEnding,
+    notifRenderTitleTrialEnded,
+    notifRenderTrialEnding,
+    notifRenderTrialEnded,
+    notifTrialAction,
+    notifRenderTitleReferralReward,
+    notifRenderReferralReward,
+    notifRenderTitlePremiumRequest,
+    notifRenderPremiumRequest,
+    notifRenderPremiumGateChat,
+    notifRenderPremiumGateChatExport,
+    notifRenderPremiumGateAgenda,
+    notifRenderPremiumGateExpenses,
+    notifRenderPremiumGatePdf,
+    notifRenderPremiumGateFamily,
+    notifRenderTitleDayAdminChangeSingle,
+    notifRenderTitleDayAdminChangeBatch,
+    notifRenderDayAdminChangeSingle,
+    notifRenderDayAdminChangeBatch,
+    notifDayAdminChangeDayAction,
+    notifDayAdminChangeTrailAction,
     notifRenderTitleExpenseAdded,
     notifRenderTitleExpenseUpdated,
     notifRenderTitleExpenseDeleted,
@@ -2068,6 +2158,7 @@ abstract final class K {
     notifRenderExpenseCategoryOther,
     notifRenderTitleChatMessage,
     notifRenderChatMessage,
+    notifRenderChatMessageHidden,
     notifRenderTitleAgendaNotice,
     notifRenderTitleAgendaReminder,
     notifRenderAgendaNotice,
@@ -2091,8 +2182,6 @@ abstract final class K {
     notifEmptyHistory,
     notifRevertPendingBadge,
     notifPendingBadge,
-    notifLabelRequester,
-    notifLabelRevertTo,
     notifLabelTo,
     notifLabelProposed,
     notifLabelYourMessage,
@@ -2126,7 +2215,6 @@ abstract final class K {
     sumEmptyTitle,
     sumEmptyBody,
     sumEmptyAction,
-    sumPlanned,
     sumActual,
     sumProjected,
     sumGiven,

@@ -59,14 +59,16 @@ class OnboardingService extends ChangeNotifier {
     required List<Member> members,
     bool force = false,
   }) async {
-    final pushSupported = push?.supported ?? false;
-    final hasPushEnabled = push?.state == PushState.on;
-
     final dismissed = me.onboardingDismissedAt != null;
+    // U-61: the role rides with every answer — it tells the founder's first
+    // run from the invitee's (U-58's welcome), and the short-circuit below
+    // must not lose it.
+    final invitee = me.joinedViaInvite;
     // The whole point of the short-circuit: a dismissed card asks nothing of
     // the network on every calendar open.
     if (dismissed && !force && !checklistReopened) {
-      return const OnboardingSignals(checklistDismissed: true);
+      return OnboardingSignals(
+          checklistDismissed: true, joinedByInvitation: invitee);
     }
 
     // F-50: a viewer is not the second caregiver the checklist asks for.
@@ -95,8 +97,7 @@ class OnboardingService extends ChangeNotifier {
       hasOpenedSwapExplanation: explained,
       hasTakenPartInASwap: facts.hasTakenPartInASwap,
       checklistDismissed: dismissed,
-      pushSupported: pushSupported,
-      hasPushEnabled: hasPushEnabled,
+      joinedByInvitation: invitee,
     );
   }
 

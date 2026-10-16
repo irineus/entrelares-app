@@ -28,6 +28,19 @@ abstract final class AnalyticsEvents {
   static const inviteSent = 'invite_sent'; // email = none/sent/link_only
   static const inviteNudgeShown = 'invite_nudge_shown'; // once — T-76, 18/09/2026
   static const inviteNudgeClick = 'invite_nudge_click'; // T-76, 18/09/2026
+  // F-80, 02/10/2026 — built dark: no event until `feature.referral` is on.
+  // A founder's sign-up carried a referral code the server took: e-mail
+  // sign-up = the account was created carrying a valid-shaped code (the
+  // server attributes in the same transaction and drops an unknown code
+  // silently, so this may count a few the ledger does not); Google = the
+  // RPC answered `attributed`. `family_referrals` is the exact count (T-99).
+  // `channel` only — never the code.
+  static const referralSignup = 'referral-signup';
+  // F-80 PR 2, 02/10/2026 — built dark: the Família card's share sheet was
+  // opened (the card exists only while `feature.referral` is on). Whether
+  // anything was actually sent is the share sheet's secret. `channel` only —
+  // never the code, never the link.
+  static const referralShare = 'referral-share';
 
   // ── Planning and the swap workflow ──────────────────────────────────────
   static const wizardStarted = 'wizard-started'; // T-78, 23/09/2026
@@ -59,6 +72,15 @@ abstract final class AnalyticsEvents {
   static const playInviteOpen = 'play-invite-open'; // F-72, 27/09/2026
   static const playInviteDismiss = 'play-invite-dismiss'; // F-72, 27/09/2026
   static const inviteeWelcomeView = 'invitee-welcome-view'; // once — U-58, 28/09/2026
+  // U-61, 08/10/2026 — the founder's first run, as it is actually taken:
+  // which checklist step was tapped (`step`: plan / invite / swaps / tour),
+  // how the tour ended (`outcome`: finished / skipped) and the Hoje card's
+  // "Planejar" on a family with no plan (the F-31 nudge's sibling; from this
+  // date `invite_nudge_shown` waits behind it, so its denominator shrinks —
+  // the T-76/U-35 cliff again, read the series from here).
+  static const checklistAction = 'checklist-action';
+  static const tourEnded = 'tour-ended';
+  static const planNudgeClick = 'plan-nudge-click';
   // F-73, 28/09/2026: the app ASKED Play for the review sheet. Play decides
   // whether it shows and never says whether anyone reviewed.
   static const reviewPromptRequested = 'review-prompt-requested';
@@ -68,6 +90,10 @@ abstract final class AnalyticsEvents {
   // ── Monetization (T-37/F-48, 19/08/2026; paywall-view moved with U-35) ──
   static const premiumGateClick = 'premium-gate-click';
   static const premiumPaywallView = 'premium-paywall-view';
+  // F-102, 08/10/2026: a member who cannot pay told the admins they want
+  // Premium (`gate` = the F-79 token, or `premium`). The server allows one
+  // a day; a refused tap is not counted.
+  static const premiumAskAdmin = 'premium-ask-admin';
   static const premiumInterest = 'premium-interest';
   static const premiumCheckoutStart = 'premium-checkout-start';
   static const premiumCheckoutReturn = 'premium-checkout-return';
@@ -84,11 +110,15 @@ abstract final class AnalyticsCatalog {
   static const Map<String, Set<String>> props = {
     AnalyticsEvents.signupStarted: {'type'},
     AnalyticsEvents.signupStep: {'step'},
-    AnalyticsEvents.familyCreated: {},
+    // U-61, 08/10/2026: `child` = named / none — whether the founder gave
+    // the child's first name on step 2. Never the name.
+    AnalyticsEvents.familyCreated: {'child'},
     AnalyticsEvents.inviteeJoined: {},
     AnalyticsEvents.inviteSent: {'email'},
     AnalyticsEvents.inviteNudgeShown: {'channel'},
     AnalyticsEvents.inviteNudgeClick: {'channel'},
+    AnalyticsEvents.referralSignup: {'channel'},
+    AnalyticsEvents.referralShare: {'channel'},
     AnalyticsEvents.wizardStarted: {},
     AnalyticsEvents.wizardCompleted: {'created', 'replaced', 'handoff'},
     AnalyticsEvents.swapRequested: {'scenario'},
@@ -118,11 +148,19 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.playInviteOpen: {},
     AnalyticsEvents.playInviteDismiss: {},
     AnalyticsEvents.inviteeWelcomeView: {'channel', 'member'},
+    AnalyticsEvents.checklistAction: {'step'},
+    AnalyticsEvents.tourEnded: {'outcome'},
+    AnalyticsEvents.planNudgeClick: {'channel'},
     AnalyticsEvents.reviewPromptRequested: {},
     AnalyticsEvents.preferenceChanged: {'pref', 'value'},
     AnalyticsEvents.supportContactSent: {'category', 'signed_in'},
     AnalyticsEvents.premiumGateClick: {'gate'},
-    AnalyticsEvents.premiumPaywallView: {'channel'},
+    // F-79 (02/10/2026): `admin` (may this reader pay at all) and `buyable`
+    // (were a price card and "Assinar" built for them) — before that date
+    // every view counted as a buyer, the member who can only ask an
+    // administrator and the store build with nothing on sale included.
+    AnalyticsEvents.premiumPaywallView: {'channel', 'admin', 'buyable'},
+    AnalyticsEvents.premiumAskAdmin: {'gate'},
     AnalyticsEvents.premiumInterest: {'source', 'trial'},
     AnalyticsEvents.premiumCheckoutStart: _funnel,
     AnalyticsEvents.premiumCheckoutReturn: _funnel,
@@ -163,10 +201,20 @@ abstract final class AnalyticsCatalog {
   /// The notification types `notification-open` may name; anything else is
   /// reported as `other`. The ten F-09 push types, the F-52 aviso, the F-70
   /// plan end (from 23/09/2026 — its opens are that item's success measure),
-  /// the F-55 agenda notice and reminder (from 24/09/2026), and the three
+  /// the F-55 agenda notice and reminder (from 24/09/2026), the F-59
+  /// membership notices (from 02/10/2026, when they stopped being e-mail), the
+  /// F-77 Premium trial's end (from 02/10/2026 — its opens are the first step
+  /// of that item's funnel), the F-80 referral reward (counts once the module
+  /// is on), the F-81 admin's direct change (from 03/10/2026) and the three
   /// things a row in *Para você* opens.
   static const notificationTypes = {
     'plan_ending',
+    'invitation_expired',
+    'admin_changed',
+    'premium_request',
+    'premium_trial',
+    'referral_reward',
+    'day_admin_change',
     'agenda_notice',
     'agenda_reminder',
     'expense_changed',
@@ -187,6 +235,10 @@ abstract final class AnalyticsCatalog {
     'day_notice',
     'swap_request',
     'revert_request',
+    'member_joined',
+    'member_returned',
+    'account_deletion',
+    'family_deletion',
   };
 
   static String notificationType(String? type) =>

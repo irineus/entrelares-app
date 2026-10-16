@@ -277,3 +277,21 @@ bool bulkDayIsNoOp(BulkDayFields existing, BulkDayFields proposed) =>
     proposed.actualParentId == existing.actualParentId &&
     proposed.notes == existing.notes &&
     proposed.handoffTime == existing.handoffTime;
+
+/// F-100 (T-103 audit) — a holiday or a school vacation is edited as ONE
+/// range: press the first day, tap the last. Every day from [a] to [b]
+/// (either order), inclusive, never past the planning horizon [horizon]
+/// (F-39 — beyond it no day can be written, so none is selected).
+List<DateTime> selectionRange(DateTime a, DateTime b, {DateTime? horizon}) {
+  var from = DateTime(a.year, a.month, a.day);
+  var to = DateTime(b.year, b.month, b.day);
+  if (to.isBefore(from)) (from, to) = (to, from);
+  if (horizon != null) {
+    final cap = DateTime(horizon.year, horizon.month, horizon.day);
+    if (to.isAfter(cap)) to = cap;
+  }
+  return [
+    for (var d = from; !d.isAfter(to); d = DateTime(d.year, d.month, d.day + 1))
+      d,
+  ];
+}

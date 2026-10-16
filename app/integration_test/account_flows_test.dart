@@ -34,7 +34,7 @@ import 'e2e_proof.dart';
 import 'e2e_wait.dart';
 
 const policyVersion =
-    String.fromEnvironment('E2E_POLICY_VERSION', defaultValue: '2026-09-25');
+    String.fromEnvironment('E2E_POLICY_VERSION', defaultValue: '2026-10-03');
 
 const pack = String.fromEnvironment('E2E_PACK', defaultValue: 'full');
 
@@ -138,9 +138,12 @@ void main() {
     await tester.enterText(
         find.widgetWithText(TextField, l[K.commonEmail]).first, invitee);
     await tester.pumpAndSettle();
-    await tapVisible(tester, find.byType(DropdownButtonFormField<int>).first);
-    // The role list is the family's own; any built-in serves.
-    await tester.tap(find.text(RoleCatalog.translate('grandmother')).last);
+    // F-101: the role is the sign-up's picker — a shortlist chip (U-44);
+    // "Avó" is one of the six.
+    await tapVisible(
+        tester,
+        find.widgetWithText(
+            ChoiceChip, RoleCatalog.translate('grandmother')).first);
     await tester.pumpAndSettle();
     await tapVisible(tester, find.text(l[K.famSendInvite]));
 

@@ -53,3 +53,7 @@ e2e.local.env
 # T-94: written by tool/db_gate_local.sh for the local stack's functions (dummy
 # Resend key, per-run webhook token) and removed on exit.
 supabase/functions/.env
+
+# store/ads/video: the renderer's dependency and its per-run frame dump
+store/ads/video/node_modules/
+store/ads/video/tmp/

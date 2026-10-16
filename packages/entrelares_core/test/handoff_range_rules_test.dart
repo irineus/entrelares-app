@@ -109,12 +109,12 @@ void main() {
               pt,
               const HandoffRangeResult(
                   updated: 12, keptFrozen: 1, keptExisting: 2)),
-          '12 trocas com horário definido · 2 trocas já tinham horário '
-          '(mantido) · 1 dia mantido (solicitação pendente)');
+          '12 entregas com horário definido · 2 entregas já tinham horário '
+          '(mantido) · 1 dia mantido (com pedido pendente)');
       expect(
           handoffRangeSummary(pt,
               const HandoffRangeResult(updated: 1, keptFrozen: 0, keptExisting: 0)),
-          '1 troca com horário definido');
+          '1 entrega com horário definido');
     });
 
     test('nothing to fill says so', () {

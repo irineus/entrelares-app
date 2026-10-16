@@ -1,13 +1,16 @@
 import 'package:entrelares_core/entrelares_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../deep_link_urls.dart';
 import 'package:entrelares_db_contracts/models/invite_info.dart';
 import '../services/analytics_service.dart';
 import '../services/custody_data_source.dart';
+import '../services/install_referrer.dart';
+import '../widgets/resend_confirmation_button.dart';
 import '../widgets/app_l10n.dart';
+import '../widgets/consent_row.dart';
 import '../widgets/google_sign_in_button.dart';
 import '../widgets/role_picker.dart';
 
@@ -46,6 +49,9 @@ class RegisterScreen extends StatefulWidget {
 
   final VoidCallback onBackToLogin;
 
+  /// F-87: re-sends the confirmation e-mail from the sign-up's last screen.
+  final Future<void> Function(String email)? onResendConfirmation;
+
   /// F-57 — the Google door on BOTH branches. Consent is NOT collected here
   /// for that path: the redirect leaves this form behind, and the onboarding
   /// screen collects it where the profile is actually created (S-13). The
@@ -63,6 +69,29 @@ class RegisterScreen extends StatefulWidget {
   /// calendar shows before the tour. Called before the sign-in that lands.
   final void Function(InviteInfo invite)? onInviteeJoined;
 
+  /// F-80 — the referral code the sign-up link carried (`?ref=`), already
+  /// shaped by [ReferralRules.parseCode]; null for almost everyone. Read by
+  /// `main.dart` from the boot URL, never from analytics. It reaches the
+  /// server ONLY on the founder branch and only when `referral_enabled`
+  /// answered true — dark, nothing leaves.
+  final String? referralCode;
+
+  /// F-80 PR 2 — the Android door: the code the Play install carried, read
+  /// through the Install Referrer API. Non-null only on an Android build
+  /// (`main.dart`), and asked only on the founder branch, with no `?ref=`
+  /// code, AFTER `referral_enabled` answered true — dark, nothing is read.
+  /// Read before the sign-up because the e-mail founder has no session until
+  /// the address is confirmed; the code rides in the sign-up metadata with
+  /// `referral_channel: 'android'`, which the PR 1 triggers accept.
+  final InstallReferrer? installReferrer;
+
+  /// T-101 — where a WEB founder came from, read by `main.dart` from the boot
+  /// URL (`/register?src=…&cmp=…`, or `?ref=`) through
+  /// [AcquisitionRules.fromUri]. Null on Android — there the source is the
+  /// Install Referrer's ([installReferrer]) — and on a web boot that did not
+  /// open `/register`, which is `organic`.
+  final Acquisition? acquisition;
+
   const RegisterScreen({
     this.analytics,
     this.onInviteeJoined,
@@ -70,10 +99,14 @@ class RegisterScreen extends StatefulWidget {
     required this.dataSource,
     required this.onSignIn,
     required this.onBackToLogin,
+    this.onResendConfirmation,
     this.googleEnabled,
     this.onSignInWithGoogle,
     this.onGoogleIdToken,
     this.inviteToken,
+    this.referralCode,
+    this.installReferrer,
+    this.acquisition,
   });
 
   @override
@@ -84,6 +117,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _fullName = TextEditingController();
   final _email = TextEditingController();
   final _familyName = TextEditingController();
+
+  /// U-61: the child's first name, OPTIONAL — the one child datum the policy
+  /// allows (S-15) and the field F-55's Crianças page keeps.
+  final _childName = TextEditingController();
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
 
@@ -93,6 +130,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _loadingInvite = false;
   bool _inviteInvalid = false;
+
+  /// F-88: the invitation could not be checked (no answer) — retry, never
+  /// "inválido".
+  bool _inviteUnreachable = false;
+
+  /// F-88: the invitation was already accepted — "é só entrar".
+  bool _inviteAccepted = false;
   InviteInfo? _invite;
 
   bool _busy = false;
@@ -100,6 +144,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   /// The catalog KEY of the current error, so a language switch re-renders it.
   String? _errorKey;
+
+  /// U-64 — the account step's errors, each on its own field and all at once,
+  /// instead of the first one as a sentence under the button.
+  Map<AccountField, String> _fieldErrors = const {};
 
   /// A message the SERVER wrote (the Edge Function's PT-BR text) — shown
   /// verbatim instead of a key, never collapsed into a generic sentence.
@@ -122,16 +170,80 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool get _isInvited => _invite != null;
 
+  /// F-80 — the code to send with the founder's sign-up, resolved once: the
+  /// flag is asked first and the code (the link's, or the Install Referrer's
+  /// on Android) only counts when it answered "on". Null means there was
+  /// nothing to ask; a slow or failed answer is "no code".
+  Future<String?>? _referralCode;
+
+  /// The server's word for where [_referralCode] came from.
+  String _referralChannel = ReferralRules.channel(isWeb: kIsWeb);
+
   bool get _onFamilyStep => !_isInvited && _step == 1;
+
+  /// T-101 — where this founder came from, resolved once at mount: the web
+  /// link's verdict, or the Android install's. Null where there is nothing to
+  /// say (an invitee, a host with neither door).
+  Future<Acquisition?>? _acquisition;
 
   @override
   void initState() {
     super.initState();
     final token = widget.inviteToken;
-    if (token != null && token.trim().isNotEmpty) {
+    final invited = token != null && token.trim().isNotEmpty;
+    if (invited) {
       _loadingInvite = true;
       _resolveInvite(token.trim());
     }
+    if (!invited) {
+      _referralCode = _resolveReferral();
+      _acquisition = _resolveAcquisition();
+    }
+  }
+
+  /// T-101 — on the web the boot URL decided ([RegisterScreen.acquisition];
+  /// none is `organic`); on Android the Install Referrer decides, read for
+  /// every founder whatever `feature.referral` says. Never throws.
+  Future<Acquisition?>? _resolveAcquisition() {
+    if (kIsWeb) return Future.value(widget.acquisition ?? Acquisition.organic);
+    // A referral code in hand wins without asking Play (the precedence).
+    if (widget.referralCode != null) return Future.value(Acquisition.referral);
+    final link = widget.acquisition;
+    if (link != null) return Future.value(link);
+    final install = widget.installReferrer;
+    if (install == null) return null;
+    return install.acquisition();
+  }
+
+  /// The source to send with the sign-up — a slow answer is no answer (the
+  /// server then records `organic`); a sign-up never waits on it.
+  Future<Acquisition?> _acquisitionToSend() async {
+    final pending = _acquisition;
+    if (pending == null) return null;
+    try {
+      return await pending.timeout(const Duration(seconds: 3));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// F-80 — null when there is nothing to ask (no `?ref=` code and no
+  /// Install Referrer reader); otherwise the flag first, then the code.
+  Future<String?>? _resolveReferral() {
+    final linkCode = widget.referralCode;
+    final install = widget.installReferrer;
+    if (linkCode == null && install == null) return null;
+    if (linkCode == null) {
+      _referralChannel = ReferralRules.channel(isWeb: false);
+    }
+    return () async {
+      try {
+        if (!await widget.dataSource.fetchReferralEnabled()) return null;
+        return linkCode ?? await install!.code();
+      } catch (_) {
+        return null;
+      }
+    }();
   }
 
   @override
@@ -139,16 +251,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _fullName.dispose();
     _email.dispose();
     _familyName.dispose();
+    _childName.dispose();
     _password.dispose();
     _confirmPassword.dispose();
     super.dispose();
   }
 
   Future<void> _resolveInvite(String token) async {
-    final info = await widget.dataSource.fetchInviteInfo(token);
+    InviteInfo? info;
+    try {
+      info = await widget.dataSource.fetchInviteInfo(token);
+    } on InviteUnreachable {
+      if (!mounted) return;
+      setState(() {
+        _loadingInvite = false;
+        _inviteUnreachable = true;
+      });
+      return;
+    }
+    // F-88: an unusable token is told apart only when it was ACCEPTED.
+    final accepted = info == null &&
+        await widget.dataSource.fetchInviteTokenStatus(token) == 'accepted';
     if (!mounted) return;
     setState(() {
       _loadingInvite = false;
+      _inviteUnreachable = false;
+      _inviteAccepted = accepted;
       if (info == null) {
         _inviteInvalid = true;
         return;
@@ -183,6 +311,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         _errorKey = errorKey;
         _errorText = null;
+        _fieldErrors = RegisterRules.accountStepFieldErrors(
+          fullName: _fullName.text,
+          email: _email.text,
+          password: _password.text,
+          confirmPassword: _confirmPassword.text,
+        );
         _returnToAccountStepFor(errorKey);
       });
       return;
@@ -192,6 +326,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _busy = true;
       _errorKey = null;
       _errorText = null;
+      _fieldErrors = const {};
     });
 
     // T-37: funnel entry — the sign-up TYPE and nothing else.
@@ -205,8 +340,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  Future<void> _submitFounder(Localization l) async {
+  /// F-80 — the code to send with the founder's sign-up, or null: only when
+  /// one came in AND the server said the module is on. A slow or failed
+  /// answer is "off" — the sign-up never waits on a referral.
+  Future<String?> _referralToSend() async {
+    final pending = _referralCode;
+    if (pending == null) return null;
     try {
+      return await pending.timeout(const Duration(seconds: 3));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _submitFounder(Localization l) async {
+    // U-61: an optional field, validated only when filled — the RPC's own
+    // sentence, on this step, before anything reaches the server.
+    final childName = ChildRules.normalize(_childName.text);
+    final childError =
+        childName.isEmpty ? null : ChildRules.validateName(childName);
+    if (childError != null) {
+      setState(() {
+        _busy = false;
+        _errorKey = null;
+        _errorText = childError;
+      });
+      return;
+    }
+    try {
+      final referral = await _referralToSend();
+      final acquisition = await _acquisitionToSend();
       await widget.dataSource.signUpFounder(
         email: _email.text.trim(),
         password: _password.text,
@@ -214,10 +377,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
         role: _role!,
         familyName: _familyName.text.trim(),
         languageCode: l.current.code,
+        referralCode: referral,
+        referralChannel: referral == null ? null : _referralChannel,
+        acquisition: acquisition,
+        childFirstName: childName.isEmpty ? null : childName,
       );
       if (!mounted) return;
-      // T-37: a founder created a new family (activation funnel).
-      widget.analytics?.trackEvent(AnalyticsEvents.familyCreated);
+      // T-37: a founder created a new family (activation funnel). U-61:
+      // whether the child was named — never the name.
+      widget.analytics?.trackEvent(AnalyticsEvents.familyCreated,
+          props: {'child': childName.isEmpty ? 'none' : 'named'});
+      // F-80: the account was created carrying a referral (the server
+      // attributed it in the same transaction). The channel, never the code.
+      if (referral != null) {
+        widget.analytics?.trackEvent(AnalyticsEvents.referralSignup,
+            props: {'channel': _referralChannel});
+      }
       // The account exists but is unusable until the e-mail is confirmed —
       // this screen is the end of the founder's flow, not a step in it.
       setState(() {
@@ -236,18 +411,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   /// U-44 — "Continuar": the account step's own checks, and only those.
   void _continueToFamily() {
-    final errorKey = RegisterRules.accountStepErrorKey(
+    final errors = RegisterRules.accountStepFieldErrors(
       fullName: _fullName.text,
       email: _email.text,
       password: _password.text,
       confirmPassword: _confirmPassword.text,
     );
     setState(() {
-      _errorKey = errorKey;
+      _fieldErrors = errors;
+      _errorKey = null;
       _errorText = null;
-      if (errorKey == null) _step = 1;
+      if (errors.isEmpty) _step = 1;
     });
-    if (errorKey == null && !_familyStepTracked) {
+    if (errors.isEmpty && !_familyStepTracked) {
       _familyStepTracked = true;
       // T-37: where the founder funnel loses people between the two steps —
       // the step's NAME, nothing typed on it.
@@ -270,6 +446,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_isInvited && RegisterRules.accountStepErrorKeys.contains(errorKey)) {
       _step = 0;
     }
+    // U-64: an error that belongs to a field is said ON the field — a GoTrue
+    // refusal of the address on the e-mail, a short password on the password
+    // — and the sentence under the button goes.
+    final field = RegisterRules.accountFieldFor(errorKey);
+    if (field != null) {
+      _errorKey = null;
+      _fieldErrors = {..._fieldErrors, field: errorKey};
+    }
+  }
+
+  String? _fieldError(Localization l, AccountField field) {
+    final key = _fieldErrors[field];
+    return key == null ? null : l[key];
+  }
+
+  /// Typing in a field answers its error; the others stay until the next try.
+  void _clearFieldError(AccountField field) {
+    if (!_fieldErrors.containsKey(field)) return;
+    setState(() => _fieldErrors = {..._fieldErrors}..remove(field));
   }
 
   Future<void> _submitInvite(
@@ -322,6 +517,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final l = AppL10n.of(context).l;
     final showsForm = !_loadingInvite &&
         !_inviteInvalid &&
+        !_inviteUnreachable &&
         !_signUpDone &&
         !_migrationWarning;
     // U-44: the system back on the family step returns to the account step
@@ -351,6 +547,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _body(Localization l) {
     if (_loadingInvite) return _loadingInviteState(l);
+    if (_inviteUnreachable) return _inviteUnreachableState(l);
+    if (_inviteInvalid && _inviteAccepted) return _inviteAcceptedState(l);
     if (_inviteInvalid) return _inviteInvalidState(l);
     if (_signUpDone) return _confirmEmailState(l);
     if (_migrationWarning) return _migrationState(l);
@@ -363,6 +561,50 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const CircularProgressIndicator(),
           const SizedBox(height: 16),
           Text(l[K.registerCheckingInvite], textAlign: TextAlign.center),
+        ],
+      );
+
+  Widget _inviteUnreachableState(Localization l) => Column(
+        key: const ValueKey('invite-unreachable'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l[KApp.inviteUnreachableTitle],
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 12),
+          Text(l[KApp.inviteUnreachableBody], textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () {
+              final token = widget.inviteToken;
+              if (token == null) return;
+              setState(() {
+                _inviteUnreachable = false;
+                _loadingInvite = true;
+              });
+              _resolveInvite(token);
+            },
+            child: Text(l[KApp.inviteRetry]),
+          ),
+        ],
+      );
+
+  Widget _inviteAcceptedState(Localization l) => Column(
+        key: const ValueKey('invite-accepted'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l[KApp.inviteAcceptedTitle],
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 12),
+          Text(l[KApp.inviteAcceptedBody], textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: widget.onBackToLogin,
+            child: Text(l[K.registerGoToLogin]),
+          ),
         ],
       );
 
@@ -400,10 +642,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
               style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           Text(l[K.registerConfirmEmailBody], textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          // F-87: the e-mail that never arrives is usually in spam.
+          Text(l[KApp.registerCheckSpam],
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: widget.onBackToLogin,
             child: Text(l[K.registerGoToLogin]),
+          ),
+          if (widget.onResendConfirmation != null) ...[
+            const SizedBox(height: 12),
+            ResendConfirmationButton(
+              email: _email.text,
+              onResend: widget.onResendConfirmation!,
+            ),
+          ],
+          // F-87: a mistyped address is a dead end without this — back to
+          // the account step with everything typed kept.
+          TextButton(
+            key: const ValueKey('register-fix-email'),
+            onPressed: () => setState(() {
+              _signUpDone = false;
+              _step = 0;
+              _errorKey = null;
+              _errorText = null;
+            }),
+            child: Text(l[KApp.registerFixEmail]),
           ),
         ],
       );
@@ -422,6 +688,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
               [_migrationFamilyName ?? '', _invite?.familyName ?? ''])),
           const SizedBox(height: 8),
           Text(l[K.registerMigrationBody2]),
+          const SizedBox(height: 8),
+          // F-101: the way to keep BOTH families, said before the only button
+          // that erases one (F-30 stays deferred).
+          Text(l[KApp.registerMigrationOtherEmail]),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: _busy
@@ -566,6 +836,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
           selected: _role,
           onSelected: (role) => setState(() => _role = role),
         ),
+        const SizedBox(height: 16),
+        // U-61 (owner, 07/10/2026): optional. It becomes the family's first
+        // child (F-55) and the app says the name where it said "a criança".
+        // The consent sentence below already names the first name as the
+        // only child datum — this field is exactly that datum.
+        AppTextField(
+          label: l[KApp.registerChildName],
+          helper: l[KApp.registerChildNameHint],
+          controller: _childName,
+          maxLength: ChildRules.maxNameLength,
+        ),
         const SizedBox(height: 20),
         _consentBlock(l, isInvited: false),
         const SizedBox(height: 20),
@@ -603,6 +884,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         label: l[K.registerFullName],
         hint: l[K.registerFullNamePlaceholder],
         controller: _fullName,
+        errorText: _fieldError(l, AccountField.name),
+        onChanged: (_) => _clearFieldError(AccountField.name),
         maxLength: RegisterRules.maxNameLength,
         textCapitalization: TextCapitalization.words,
         autofillHints: const [AutofillHints.name],
@@ -613,6 +896,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         label: l[K.commonEmail],
         hint: l[K.commonEmailPlaceholder],
         controller: _email,
+        errorText: _fieldError(l, AccountField.email),
+        onChanged: (_) => _clearFieldError(AccountField.email),
         // The invitation names the address — the trigger refuses any other.
         readOnly: readOnly,
         keyboardType: TextInputType.emailAddress,
@@ -639,6 +924,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           label: l[K.commonPassword],
           hint: l[K.registerPasswordPlaceholder],
           controller: _password,
+          errorText: _fieldError(l, AccountField.password),
+          onChanged: (_) => _clearFieldError(AccountField.password),
           obscureText: _obscured,
           autofillHints: const [AutofillHints.newPassword],
           suffixIcon: IconButton(
@@ -653,6 +940,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           label: l[K.commonConfirmPassword],
           hint: l[K.registerConfirmPasswordPlaceholder],
           controller: _confirmPassword,
+          errorText: _fieldError(l, AccountField.confirmPassword),
+          onChanged: (_) => _clearFieldError(AccountField.confirmPassword),
           obscureText: _obscured,
         ),
       ];
@@ -692,43 +981,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: _acceptedTerms,
-              // U-32: the sentence beside the box is three texts and two
-              // buttons, none of them the box's own — a screen reader heard
-              // an unnamed checkbox. The box carries the whole sentence.
-              semanticLabel: '${l[K.registerConsentAccept]} '
-                  '${l[K.commonPrivacyPolicy]} '
-                  '${l[K.registerConsentAnd]} '
-                  '${l[K.commonTermsOfUse]}',
-              onChanged: (value) =>
-                  setState(() => _acceptedTerms = value ?? false),
-            ),
-            Expanded(
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(l[K.registerConsentAccept],
-                      style: theme.textTheme.bodySmall),
-                  TextButton(
-                    onPressed: () => _openWebPage(DeepLinkUrls.privacy),
-                    child: Text(l[K.commonPrivacyPolicy],
-                        style: theme.textTheme.bodySmall),
-                  ),
-                  Text(l[K.registerConsentAnd],
-                      style: theme.textTheme.bodySmall),
-                  TextButton(
-                    onPressed: () => _openWebPage(DeepLinkUrls.terms),
-                    child: Text(l[K.commonTermsOfUse],
-                        style: theme.textTheme.bodySmall),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        ConsentRow(
+          value: _acceptedTerms,
+          onChanged: (v) => setState(() => _acceptedTerms = v),
+          onOpen: _openWebPage,
         ),
         // Empty in PT-BR by construction — the binding version IS the
         // Portuguese one, so only an English reader is told so.

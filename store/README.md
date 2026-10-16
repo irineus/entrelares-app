@@ -25,8 +25,12 @@ points at them; this directory is about the *presence*, not the pipeline.
 
 - The copy is versioned here: [`listing-pt-BR.txt`](listing-pt-BR.txt) and
   [`listing-en-US.txt`](listing-en-US.txt) — app name, short description and full description,
-  with the Play character limits noted inline. **Edit the files, review in a PR, then paste into
-  the Console** — never draft in the Console directly, where nothing is versioned.
+  each under a `=== <label> (<= N …) ===` header that states Play's limit. **Since T-98
+  (02/10/2026) nothing is pasted into the Console: edit the files → PR → after the merge,
+  dispatch the `play-listing` workflow — dry run first, then for real — and approve it on the
+  `play-production` Environment** ([§9](#9--publishing-the-listing--the-play-listing-workflow-t-98)).
+  Never draft in the Console, and never edit the text there either: the next dispatch writes
+  the files over whatever the Console holds.
 - **Both files were re-verified sentence by sentence against the code on 28/08/2026 (T-57)**,
   and three claims moved. *"Funciona também offline"* / *"Works offline too"* was **deleted**:
   it was written for the Blazor PWA's service worker, the cutover falsified it, and **T-18 is
@@ -36,7 +40,7 @@ points at them; this directory is about the *presence*, not the pipeline.
   PDF report is named as Premium, which is where `reports_pdf_tab.dart` gates it. In their
   place the bullet list gained the web channel, which does exist. **A listing is a claim about
   the system (the S-15 rule): re-read it against the code before every republish, and never
-  paste a sentence a test could not defend.**
+  publish a sentence a test could not defend.**
 - **Re-verified again on 27/09/2026, after T-59 made the listing public** — a month of features
   had shipped past the 28/08 text. What moved, with the code that makes each sentence true:
   - **"aprovada automaticamente após 48 horas" was FALSE** since F-60: the window is anchored
@@ -59,13 +63,20 @@ points at them; this directory is about the *presence*, not the pipeline.
     price (the store price is Play's), and the vocabulary is `vocabulary_test`'s.
   - en-US also stopped saying "after a divorce" (pt says *pais separados*) and "approved
     swaps" (read as if only approved swaps were free).
-- **English translation** (the app is bilingual since U-13): at the top of the Main store
-  listing page → **Manage translations** → **Add your own translation** → **English (United
-  States) – en-US** → paste from `listing-en-US.txt`. The default language stays pt-BR.
+- **English translation** (the app is bilingual since U-13): the listing carries an **English
+  (United States) – en-US** translation beside the default pt-BR, and `play-listing` writes
+  both languages on every run — the file suffix is the Play locale code. The default language
+  stays pt-BR, and it is chosen in the Console, not by the workflow.
 - **Categories**: app category **Parenting** (fallback: Lifestyle). Tags: family, calendar.
 - **Contact details**: e-mail `suporte@entrelares.app`; website `https://entrelares.app`.
-- **Screenshots (phone)** — **current since 28/08/2026** ([T-57](../backlog/archive/phase-7.md)).
-  The Console and the landing share one set, and it is now TWO sets: `pt-BR` from
+- **Screenshots (phone)** — **generated from the app's own widgets since T-97 (02/10/2026)**:
+  [`screenshots/pt-BR/`](screenshots/pt-BR/) and [`screenshots/en-US/`](screenshots/en-US/).
+  See [§1.1](#11--phone-screenshots-generated-t-97). Play has carried the generated set since
+  02/10/2026 (`play-listing` run 37088097075, 8 pt-BR + 8 en-US). The paragraph below is the
+  T-57 set, which the Console carried until then and which the landing and
+  `app/web/screenshots/` keep using.
+- **The T-57 photographs** — current on the landing since 28/08/2026 ([T-57](../backlog/archive/phase-7.md)),
+  and on the Console until T-97 replaced them there (02/10/2026). They are TWO sets: `pt-BR` from
   `entrelares-site/public/img/screenshots/`, `en-US` from `.../screenshots/en/`, eight frames
   each at 1080×1920 with a `webp`+`png` pair. They photograph the **Flutter** app in production
   configuration, under the U-27 visual system — the previous ones were the **Blazor** client,
@@ -82,6 +93,66 @@ points at them; this directory is about the *presence*, not the pipeline.
   because `web/manifest.json` names them and the web channel's `img-src` allows only its own
   origin — pointed at the landing, Chrome fetched them on every load and our CSP refused all
   six. Copy them over in the same delivery; `web_channel_test` fails a `src` that does not ship.
+
+### 1.1 · Phone screenshots, generated (T-97)
+
+**One command regenerates both sets:**
+
+```
+cd app && fvm flutter test store_screenshots/
+```
+
+It writes `store/screenshots/pt-BR/phone-<n>.png` and `store/screenshots/en-US/phone-<n>.png`,
+1080×1920 (Play's 9∶16), numbered in **listing order**, and empties both folders of
+`phone-*.png` first — a scene taken out of the list cannot leave an old image behind to be
+uploaded by mistake. A run takes about 20 seconds.
+
+**Nothing on the phone is drawn by hand.** The harness (`app/store_screenshots/`) pumps the
+app's real shell and screens — `HomeShell` with the five branches `main.dart` builds, every
+module flag at its production value (S-22, F-75, F-07) — against the same
+`FakeCustodyDataSource` the widget suites use (`test/calendar_slice_test.dart`), filled with a
+**fictional family**: Ana (mother, the signed-in admin) and Bruno (father), Lia and Theo, the
+grandmother Rosa and the nanny Carla as a Visualizador. The phone is the 360×740 dp screen the
+U-32 suite measures every page on, in the light theme, with the real Inter and Material icons
+loaded from the test bundle's `FontManifest.json`; a finger opens sheets and switches tabs the
+way the widget suites do. `store_frame.dart` only places that screen inside a phone outline
+under a fixed caption band (same phone size and position on every image), every colour a
+`tokens.dart` token. What the family typed — the swap message, the Conversa, the expenses, the
+agenda — is written in each screenshot's language.
+
+**Why it is not in CI.** The directory sits outside `test/`, and the CI's bare `flutter test`
+discovers `test/` only, so the gate never renders PNGs. `flutter analyze` does read it — it has
+to stay clean — and it imports the fakes from `test/`, so a change to the data source interface
+that breaks it shows up there.
+
+**The dates move with the run.** The calendar reads `DateTime.now()` and takes no clock, so
+every date in the fixture is relative to the day the command runs: the month on screen is
+always the current one, populated. The flip side is that two runs on different days produce
+different images — **regenerate, then approve what was regenerated**.
+
+| n | Screen | PT-BR caption | en-US caption | Plan |
+|---|---|---|---|---|
+| 1 | Calendar: the month, today's caregiver card, a swapped day, a pending request's bell | Quem fica com as crianças, dia a dia | Who has the kids, day by day | Free — two caregivers, no module |
+| 2 | Day sheet: Bruno's pending swap request with his message, Aprovar/Recusar | Trocas de dia pedidas e respondidas no app | Day swaps, asked and answered in the app | Free — swaps have no gate |
+| 3 | Relatórios → PDF: the year's report generated, the verifiable reports issued | Relatório em PDF verificável | A verifiable PDF report | **Premium** — `reports_pdf_tab.dart` shows the upsell when `!_isPremium`; the QR (F-64) is issued only for Premium |
+| 4 | Família: two parents, the grandmother as a third caregiver, the nanny as Visualizador | Avó, babá e quem mais cuida | Grandma, the nanny and everyone who helps | **Premium** — a third caregiver is beyond `free_caregivers` |
+| 5 | Day sheet: a day's agenda for both children | A agenda de cada criança | Each child's agenda | **Premium** — every kind but the note (`AgendaKind.isStructured`, `agenda.premium_only`) |
+| 6 | Comunicação → Conversa: the permanent-record notice, two messages, a cited day | A conversa da família, registrada | The family chat, on record | **Premium** — `chat.premium_only` (`chat_view.dart`) |
+| 7 | Despesas: the balance, the activity list | As despesas das crianças, divididas | The kids' expenses, shared | **Premium** — `expenses.premium_only` (`expenses_screen.dart`) |
+| 8 | Relatórios → Resumo: the year in days per parent | Quantos dias com cada um | How many days with each parent | Free — the Resumo has no gate |
+
+Each caption also has a one-line detail under the headline (in `store_screenshots_test.dart`,
+next to the scene). The rules the captions follow are the listing's: **every sentence true of
+the code (S-15)**; **a Premium scene carries the "Premium" pill**, so no image sells a Premium
+feature as free; **no number an operator can change** — trial days, months of calendar,
+caregiver counts (U-57); no emoji (U-31). The harness fails a caption that does not fit its
+two lines, and an overflow anywhere on the phone fails the scene, as it does in the widget
+suites.
+
+**The owner approves the PNGs before `play-listing` uploads them** (§9; the first set was approved on 02/10/2026). Play serves its own copies: the
+pt-BR set goes to the Main store listing's *Phone screenshots*, the en-US set to *Manage
+translations → English (United States)*. A change to a screen, a caption or the scene list
+means a new run, a new look, and a new approval.
 
 ## 2 · Brand assets
 
@@ -231,7 +302,8 @@ say which one is blocking: sweep the whole list.
   All features are reachable from the bottom navigation."* Keep the account alive — Google
   re-reviews on later releases too.
 - **Data Safety** — declare. **Re-verified against the CODE on 12/09/2026 (S-18) and again on
-  24/09/2026 for phase 6 (S-22: F-55, F-50, F-64, F-34, F-35)**, the way the
+  24/09/2026 for phase 6 (S-22: F-55, F-50, F-64, F-34, F-35)** and on 03/10/2026 for the
+  referral (F-82 — no new data type, see *Other actions*), the way the
   listing was in T-57: every row names the function or table that makes it true, so the next
   sweep compares the row with the code and not with the previous sweep. The Console form is
   answered by the owner from this table; **step 5 of the wizard (*Preview*) must match it line
@@ -242,13 +314,13 @@ say which one is blocking: sweep the whole list.
   | Personal info → Name | Yes — required, linked | No | App functionality | `profiles.name`, shown to the family; since **F-55** also `children.first_name` — the child's first name, typed by the family's admin (`add_child`), the ONLY dedicated child field |
   | Personal info → Email address | Yes — required, linked | No | App functionality | GoTrue login + the transactional e-mails (`send-*-email`); since F-68 also the reply address of a support request (`support_requests.reply_email`, typed by a signed-out person) |
   | Personal info → User IDs | Yes — required, linked | No | App functionality | the account id (`auth.uid()` / `profiles.id`); Play's own example of a User ID is *"an account ID"* |
-  | Financial info → Other financial info | Yes — optional, linked | No | App functionality | **F-34** `expenses` (amount in cents, category, description, date, who paid) + `expense_shares` + `expense_settlements` (payments between caregivers, confirmed by the receiver) + the append-only `expense_history`. Typed by the caregivers; no payment instrument, no money moved; never shown to a viewer |
+  | Financial info → Other financial info | Yes — optional, linked | No | App functionality | **F-34** `expenses` (amount in cents, category, description, date, who paid) + `expense_shares` + `expense_settlements` (payments between caregivers, confirmed by the receiver; since **F-93** an optional `reference` the payer types — e.g. the Pix transaction id — and an optional `answer_note` the receiver writes with the answer, both read by the family's caregivers in the app and the PDF) + the append-only `expense_history`. Typed by the caregivers; no payment instrument, no money moved; never shown to a viewer |
 | Financial info → Purchase history | Yes — required, linked | No | App functionality | `billing-store-verify` writes `subscriptions.store_purchase_token` and the `billing_events` ledger; the RTDN webhook writes the lifecycle. **Marked 25/08/2026** — the store rail is LIVE since 23/08 |
-  | Messages → Other in-app messages | Yes — optional, linked | No | App functionality | F-44 `request_message` / `approval_note` / `rejection_reason`: free text one caregiver writes, the server stores, the OTHER caregiver reads — inside the app, the e-mail and the push. Since **F-68** also the *Ajuda e contato* message (`send-support-request` → `support_requests.message`, 12-month retention), read by the team. Since **F-35** the family chat: `chat_messages.body` (`send_chat_message`), permanent, read by the whole family (viewers included), its first 140 characters in the `chat_message` push |
+  | Messages → Other in-app messages | Yes — optional, linked | No | App functionality | F-44 `request_message` / `approval_note` / `rejection_reason`: free text one caregiver writes, the server stores, the OTHER caregiver reads — inside the app, the e-mail and the push. Since **F-68** also the *Ajuda e contato* message (`send-support-request` → `support_requests.message`, 12-month retention), read by the team. Since **F-35** the family chat: `chat_messages.body` (`send_chat_message`), permanent, read by the whole family (viewers included); its first 140 characters reach the `chat_message` push ONLY for a reader who turned the preview on (S-27, 08/10/2026 — default: "Nova mensagem de <Nome> na Conversa"). The collected data and this answer do not change |
   | App info and performance → Other app performance data | Yes — optional, linked | No | App functionality | F-68: only when *Incluir informações técnicas* stays ticked — app version, channel, OS/browser family, language, the route with no query (`support_requests.diagnostics`, the function keeps five keys and drops the rest) |
   | App activity → Other user-generated content | Yes — optional, linked | No | App functionality | Since **F-55** the agenda: `child_events` (kind, times, `body`, child; the day notes are converted into agenda Notes at S-22) and `child_routines`; before it `care_schedules.notes` (the day note), `families.name` and, since **F-67** (21/09/2026), `day_accounts.body` — the *relato do dia*, free text a member appends to a past day, read by the family and printed in the F-33 PDF (same category, same operator, so the Console answer does not change); and, since **F-75** (28/09/2026, behind `feature.day_account_replies`), `day_account_replies.body` — another caregiver's reply appended under a relato, read by the family and printed with it (same category again, no Console change) — Play's own example of this row is *"notes"* |
-  | App activity → Other actions | Yes — optional, linked | No | App functionality | **F-35** `chat_reads` — who read which chat text and when, shown to the family; `chat_prefs.push_muted`. **F-64** `report_attestations` — that a verifiable PDF was issued: period, a summary of counts with caregivers as INITIALS, the SHA-256 of the file (no document body), public by an unguessable id, purged after `report_attestation.valid_months` |
-| App activity → App interactions | Yes — required, **linked** (since T-78) | No | Analytics | Two sources, one row — Play asks per data TYPE, so the stricter answer wins. (1) Umami (`analytics_service.dart`): cookieless, no device id, paths sanitized by `sanitizeAnalyticsPath`; dev flavour sends nothing — not linked on its own. (2) **T-78 (23/09/2026)**: `member_activity_days` — one row per member × day (America/Sao_Paulo) × channel (`android`/`web`/`web-installed`) the app was used on, written by `touch_activity`; no hour, no IP, no user agent; service role only (no family member reads it); purged after 400 days and when the account is removed. That row IS linked to the account, so the whole type is. Policy §3/§11 name it |
+  | App activity → Other actions | Yes — optional, linked | No | App functionality | **F-35** `chat_reads` — who read which chat text and when, shown to the family; `chat_prefs.push_muted`. **F-64** `report_attestations` — that a verifiable PDF was issued: period, a summary of counts with caregivers as INITIALS, the SHA-256 of the file (no document body), public by an unguessable id, purged after `report_attestation.valid_months`. Since **F-82** (03/10/2026, the referral of F-80 turned on): `family_referrals` — which family a NEW family came from (the referring family, the code, the sign-up channel `web`/`android`, the status and its dates: first payment, end of the refund window, reward or cancellation and why) and `family_referral_codes` (one random 10-symbol code per family); service role only, no family reads either table. On Android the code arrives through the **Play Install Referrer** (`install_referrer.dart` + `InstallReferrerChannel.kt`), read once at sign-up: only the `ref` value is kept (`ReferralRules.codeFromInstallReferrer`), the rest of the string is discarded and nothing is written on the device. Same category, same purpose and same operator as this row's other sources, so the Console answer does not change — policy 2.1 §3/§7/§11 name it |
+| App activity → App interactions | Yes — required, **linked** (since T-78) | No | Analytics | Two sources, one row — Play asks per data TYPE, so the stricter answer wins. (1) Umami (`analytics_service.dart`): cookieless, no device id, paths sanitized by `sanitizeAnalyticsPath`; dev flavour sends nothing — not linked on its own. (2) **T-78 (23/09/2026)**: `member_activity_days` — one row per member × day (America/Sao_Paulo) × channel (`android`/`web`/`web-installed`) the app was used on, written by `touch_activity`; no hour, no IP, no user agent; service role only (no family member reads it); purged after 400 days and when the account is removed. That row IS linked to the account, so the whole type is. Policy §3/§11 name it. (3) **T-101 (04/10/2026)**: `families.acquisition_source` + `acquisition_campaign` — where a NEW family came from (a closed word: `google_app`, `google_search`, `meta`, `referral`, `organic`, `unknown`, and our own ad-campaign token), written ONCE at creation by a server trigger; on Android decided from the **Play Install Referrer** at sign-up (`AcquisitionRules.fromInstallReferrer`: only the verdict and the token leave the device, the string is never sent nor stored), on the web from `/register?src=…&cmp=…`. No pixel, no SDK, no new operator; the bulletin (T-99) reads it as counts per source. Same type, same purpose (Analytics), so the Console answer does not change — policy §3 names it |
   | App info and performance → Crash logs | Yes — not linked | No | Analytics | T-66 crash sink (Sentry): exception type, scrubbed message, stack, release/environment/channel — no user, no breadcrumbs, no route args (`crash_rules.dart`) |
   | Location → Approximate location | Yes — not linked | No | Analytics | NOT requested from the device: Sentry derives country + city from the IP of the crash report at ingest and KEEPS it after discarding the address (measured, T-66). The policy §7 says so since L-24, so the form has to |
   | Device or other IDs | Yes — optional, linked | No | App functionality | the FCM registration token (`push_subscriptions.token`), written only after the user turns push on (F-09); Play's own example of this row is *"Firebase installation ID"* |
@@ -419,3 +491,45 @@ legacy `com.guardacompartilhada.app` and came out with **T-52** (09/09/2026), on
 was deleted; `web_channel_test` now asserts its ABSENCE, so it cannot drift back in. If the
 browser bar ever comes back on an installed app, that file in PRODUCTION is the first thing to
 check.
+
+## 9 · Publishing the listing — the `play-listing` workflow (T-98)
+
+The Main store listing leaves `store/` the way a build does: through a workflow the owner
+dispatches and approves, never through the Console's text boxes (owner, 02/10/2026).
+
+1. **Edit `listing-pt-BR.txt` / `listing-en-US.txt` in a PR.** `app/test/play_listing_test.dart`
+   parses both with the rules the lane uses and fails the PR on a broken file or a field over
+   Play's limit — **30** (name), **80** (short), **4000** (full) characters. The format: three
+   `=== <label> (<= N …) ===` headers, in the order name → short → full; the `N` must be Play's
+   limit for that position, so a swapped section is refused; each text is everything up to the
+   next header, trimmed; name and short are one line. The test reads the header pattern and the
+   field order from the Fastfile, so the two cannot drift.
+2. **After the merge — dry run.** [Actions → play-listing](https://github.com/irineus/entrelares-app/actions/workflows/play-listing.yml)
+   → *Run workflow* on `main`, `dry_run` ticked (the default) → **Approve** on `play-production`.
+   Play validates the whole edit and nothing is committed; the run summary lists the
+   character count of every field.
+3. **For real.** The same dispatch with `dry_run` unticked, approved again. **A green run means
+   the change was SENT, not that it is live**: Google reviews a listing change like a release,
+   and the Console's **Publishing overview** says when it is published.
+4. **Screenshots** go up only with `upload_screenshots` ticked (default off), and only after the
+   owner approved the PNGs. Each language's phone set is then **replaced** by
+   `store/screenshots/<lang>/phone-<n>.png` — 2 to 8 files, numbered from 1 with no gap, shown in
+   that order; an identical prefix already on Play is kept, the rest deleted and re-sent. A
+   language with no folder keeps exactly what Play has.
+
+What the lane never touches: binaries, tracks, release notes, the icon, the feature graphic
+(both still re-uploaded by hand, §2/§3), the promo video, categories and contact details. supply
+hangs a metadata edit on one release of a track, so the lane names the build **Internal testing**
+holds — read, not changed; Internal must hold a build (it always has since T-79). The job shares
+the `play-production` concurrency group with `play-promote`: one Play edit from the owner's
+workflows at a time.
+
+**The service account.** The workflow authenticates as `PLAY_RELEASE_SERVICE_ACCOUNT`, the
+release account of T-79 (Environment secret), which needs, on this app, the Play Console
+permission to edit the store listing — **Manage store presence** — besides the release ones.
+There are **two** service accounts on this Play account, and they are easy to mix up: the
+**billing** one (`PLAY_SERVICE_ACCOUNT`, read by the Edge Functions to verify purchases,
+[`supabase/README.md`](../supabase/README.md) §9-bis) and the **release** one. A run that fails
+with *"The caller does not have permission"* almost always means the permission was granted to
+the OTHER account: compare the `client_email` inside the secret's JSON with the list in
+**Users and permissions** before changing anything else.

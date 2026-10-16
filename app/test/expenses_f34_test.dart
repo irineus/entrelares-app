@@ -233,8 +233,163 @@ void main() {
         findsOne);
     await tester.tap(find.byKey(const ValueKey('settlement-confirm-9')));
     await tester.pumpAndSettle();
+    // F-93: the answer is final, so it is asked first — amount and person.
+    expect(ds.expenseWrites, isEmpty);
+    expect(
+        find.text(l.format(KApp.expenseAnswerYesAsk, [brl(5000), 'Bruno Lima'])),
+        findsOne);
+    await tester.tap(find.descendant(
+        of: find.byKey(const ValueKey('settlement-answer-sheet')),
+        matching: find.text(l[KApp.expenseConfirm])));
+    await tester.pumpAndSettle();
     expect(ds.expenseWrites, ['answer:9:true']);
     expect(find.text(l[KApp.expenseBalanceEven]), findsOne);
+  });
+
+  // F-93: a mis-tap on "Não recebi" was permanent; now the sheet asks, and
+  // backing out writes nothing.
+  testWidgets('backing out of the answer sheet writes nothing',
+      (tester) async {
+    final ds = source()
+      ..expenses = [expense(1)]
+      ..settlements = [
+        ExpenseSettlement(
+            id: 9,
+            fromProfile: 2,
+            toProfile: 1,
+            amountCents: 5000,
+            status: 'pending',
+            createdAt: DateTime.utc(2026, 9, 20),
+            reference: 'E2E-PIX-123'),
+      ];
+    await pump(tester, ds);
+    expect(find.text(l.format(KApp.expenseReferenceLine, ['E2E-PIX-123'])),
+        findsOne);
+    await tester.tap(find.byKey(const ValueKey('settlement-reject-9')));
+    await tester.pumpAndSettle();
+    expect(
+        find.text(l.format(KApp.expenseAnswerNoAsk, [brl(5000), 'Bruno Lima'])),
+        findsOne);
+    await tester.tap(find.text(l[K.commonCancel]).last);
+    await tester.pumpAndSettle();
+    expect(ds.expenseWrites, isEmpty);
+    expect(find.byKey(const ValueKey('settlement-reject-9')), findsOne);
+  });
+
+  testWidgets(
+      'a refused payment stays in the list with its badge and the note, '
+      'out of the balance', (tester) async {
+    final ds = source()
+      ..expenses = [expense(1)]
+      ..settlements = [
+        ExpenseSettlement(
+            id: 9,
+            fromProfile: 2,
+            toProfile: 1,
+            amountCents: 5000,
+            status: 'pending',
+            createdAt: DateTime.utc(2026, 9, 20)),
+      ];
+    await pump(tester, ds);
+    await tester.tap(find.byKey(const ValueKey('settlement-reject-9')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('settlement-answer-note')),
+        '  chegou só uma parte ');
+    await tester.tap(find.descendant(
+        of: find.byKey(const ValueKey('settlement-answer-sheet')),
+        matching: find.text(l[KApp.expenseReject])));
+    await tester.pumpAndSettle();
+    expect(ds.expenseWrites, ['answer:9:false:chegou só uma parte']);
+    // Still in the activity, badged, and the debt is untouched.
+    expect(find.byKey(const ValueKey('payment-9')), findsOne);
+    expect(find.byKey(const ValueKey('payment-badge-9')), findsOne);
+    expect(find.text(l[KApp.expenseBadgeRejected]), findsOne);
+    expect(find.text(l[KApp.expenseOutOfBalance]), findsOne);
+    expect(
+        find.text(l.format(
+            KApp.expenseNoteLine, ['Ana', 'chegou só uma parte'])),
+        findsOne);
+    expect(find.text(l.format(KApp.expenseHeadGets, [brl(5000)])), findsOne);
+  });
+
+  testWidgets('a taken-back payment reads as such, out of the balance',
+      (tester) async {
+    final ds = source()
+      ..expenses = [expense(1)]
+      ..settlements = [
+        ExpenseSettlement(
+            id: 9,
+            fromProfile: 2,
+            toProfile: 1,
+            amountCents: 5000,
+            status: 'cancelled',
+            createdAt: DateTime.utc(2026, 9, 20),
+            answeredAt: DateTime.utc(2026, 9, 21)),
+      ];
+    await pump(tester, ds);
+    expect(find.text(l[KApp.expenseBadgeCancelled]), findsOne);
+    expect(find.text(l[KApp.expenseOutOfBalance]), findsOne);
+    expect(find.text(l.format(KApp.expenseHeadGets, [brl(5000)])), findsOne);
+  });
+
+  testWidgets('the payment carries the optional reference', (tester) async {
+    final ds = source(members: const [bruno, ana])
+      ..expenseActorId = 2
+      ..expenses = [expense(1)];
+    await pump(tester, ds);
+    await tester.tap(find.byKey(const ValueKey('expenses-pay-1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('settle-reference')), ' E2E-PIX-9 ');
+    await tester.tap(find.text(l[KApp.expenseSettle]).last);
+    await tester.pumpAndSettle();
+    expect(ds.expenseWrites, ['settle:1:5000:E2E-PIX-9']);
+  });
+
+  testWidgets('an edit lists every field it moved, the split included',
+      (tester) async {
+    final ds = source()
+      ..expenses = [expense(1)]
+      ..expenseHistory = [
+        ExpenseHistoryEntry(
+          id: 41,
+          expenseId: 1,
+          action: 'updated',
+          actorId: 2,
+          at: DateTime.utc(2026, 9, 12, 13),
+          oldData: {
+            'description': 'Mensalidade',
+            'amount_cents': 10000,
+            'category': 'school',
+            'paid_by': 1,
+            'spent_on': '2026-09-10',
+            'shares': [
+              {'profile_id': 1, 'weight': 3000, 'share_cents': 3000},
+              {'profile_id': 2, 'weight': 7000, 'share_cents': 7000},
+            ],
+          },
+          newData: {
+            'description': 'Mensalidade',
+            'amount_cents': 10000,
+            'category': 'school',
+            'paid_by': 2,
+            'spent_on': '2026-09-10',
+            'shares': [
+              {'profile_id': 1, 'weight': 5000, 'share_cents': 5000},
+              {'profile_id': 2, 'weight': 5000, 'share_cents': 5000},
+            ],
+          },
+        ),
+      ];
+    await pump(tester, ds);
+    await tester.tap(find.byKey(const ValueKey('expense-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Quem pagou: de Ana Souza para Bruno Lima'), findsOne);
+    expect(
+        find.text('Divisão: Ana Souza de ${brl(3000)} para ${brl(5000)}; '
+            'Bruno Lima de ${brl(7000)} para ${brl(5000)}'),
+        findsOne);
   });
 
   testWidgets('a new expense sends the split the reader chose',

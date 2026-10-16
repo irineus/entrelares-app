@@ -15,13 +15,20 @@ class Family {
   final DateTime? trialEndsAt;
   final DateTime? compPremiumAt;
 
+  /// F-07: `single` (one plan for every child — every family until F-07) or
+  /// `per_child`. Written only by `set_schedule_mode`.
+  final String scheduleMode;
+
   const Family({
     required this.id,
     this.name = '',
     required this.plan,
     this.trialEndsAt,
     this.compPremiumAt,
+    this.scheduleMode = 'single',
   });
+
+  bool get isPerChild => scheduleMode == 'per_child';
 
   factory Family.fromJson(Map<String, dynamic> json) => Family(
         id: json['id'] as int,
@@ -29,6 +36,7 @@ class Family {
         plan: (json['plan'] as String?) ?? 'free',
         trialEndsAt: _utc(json['trial_ends_at'] as String?),
         compPremiumAt: _utc(json['comp_premium_at'] as String?),
+        scheduleMode: (json['schedule_mode'] as String?) ?? 'single',
       );
 
   static DateTime? _utc(String? wire) =>

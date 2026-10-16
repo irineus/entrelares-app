@@ -87,7 +87,7 @@ void main() {
     expect(call.to, isNull, reason: 'every future transition, no bound');
     expect(call.time, '18:30:00');
     // The server's counts are the closing line.
-    expect(find.text('2 trocas com horário definido'), findsOneWidget);
+    expect(find.text('2 entregas com horário definido'), findsOneWidget);
     // The reload finds the times: the strip has nothing left to offer.
     expect(_strip, findsNothing);
   });

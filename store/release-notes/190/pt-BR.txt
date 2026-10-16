@@ -1,0 +1,1 @@
+Melhorias internas e de estabilidade, e a preparação de um recurso que chega em breve. Tudo o que você já usa continua igual.

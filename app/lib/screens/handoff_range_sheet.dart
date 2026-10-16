@@ -14,22 +14,30 @@ import '../widgets/ui/ui.dart';
 /// which already have a time — the server answers all three, and the counts
 /// it returns are the closing line. Pops with that line; the caller shows it
 /// and reloads.
+///
+/// F-85: [childId] is the lane the calendar is on (null in a single-plan
+/// family). The calendar refuses *Todas* before opening, and the RPC reads a
+/// null child as EVERY lane — so the lane must travel, or the sheet asked for
+/// one child and wrote them all.
 Future<String?> showHandoffRangeSheet({
   required BuildContext context,
   required CustodyDataSource dataSource,
   required DateTime today,
+  int? childId,
 }) =>
     showAppSheet<String>(
       context: context,
-      builder: (context) =>
-          _HandoffRangeSheet(dataSource: dataSource, today: today),
+      builder: (context) => _HandoffRangeSheet(
+          dataSource: dataSource, today: today, childId: childId),
     );
 
 class _HandoffRangeSheet extends StatefulWidget {
   final CustodyDataSource dataSource;
   final DateTime today;
+  final int? childId;
 
-  const _HandoffRangeSheet({required this.dataSource, required this.today});
+  const _HandoffRangeSheet(
+      {required this.dataSource, required this.today, this.childId});
 
   @override
   State<_HandoffRangeSheet> createState() => _HandoffRangeSheetState();
@@ -55,7 +63,8 @@ class _HandoffRangeSheetState extends State<_HandoffRangeSheet> {
     });
     try {
       final result = await widget.dataSource.setHandoffTimeRange(
-          dateOnly(widget.today), null, (hour: time.hour, minute: time.minute));
+          dateOnly(widget.today), null, (hour: time.hour, minute: time.minute),
+          childId: widget.childId);
       if (!mounted) return;
       Navigator.of(context).pop(handoffRangeSummary(l, result));
     } catch (e) {

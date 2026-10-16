@@ -48,6 +48,53 @@ CaregiverStat _statOf(List<CaregiverStat> stats, int id) =>
     stats.firstWhere((s) => s.profileId == id);
 
 void main() {
+  // F-96: one horizon for planned × actual, and the future counted apart.
+  group('F-96 · until today and ahead', () {
+    final today = DateTime(2026, 8, 19);
+    final days = [
+      ReportDay(scheduleDate: DateTime(2026, 8, 15), scheduledParentId: 1),
+      ReportDay(
+          scheduleDate: DateTime(2026, 8, 17),
+          scheduledParentId: 1,
+          actualParentId: 2),
+      ReportDay(scheduleDate: DateTime(2026, 8, 19), scheduledParentId: 1),
+      ReportDay(
+          scheduleDate: DateTime(2026, 8, 21),
+          scheduledParentId: 2,
+          actualParentId: 1),
+    ];
+    test('planned to date and remaining split on today', () {
+      final ana = caregiverStats(
+              members: const [MemberView(id: 1, fullName: 'Ana')],
+              days: days,
+              today: today,
+              includeFutureSwaps: false)
+          .single;
+      expect(ana.plannedToDate, 2);
+      expect(ana.plannedRemaining, 1, reason: 'today counts as ahead');
+      expect(ana.actualDays, 1);
+    });
+    test('an accepted swap ahead is counted apart', () {
+      expect(futureAcceptedSwaps(days: days, today: today), 1);
+      expect(
+          totalVisibleSwaps(days: days, today: today, includeFutureSwaps: false),
+          1);
+    });
+    test('the base write of a swap request reads as the request', () {
+      final pt = Localization(AppLanguage.ptBr);
+      final log = AuditLogView(
+          id: 7, affectedDate: _d, createdAtLocal: _d, action: 'UPDATE');
+      expect(isSwapAskedBase(log, {7}, const []), isTrue);
+      expect(isSwapAskedBase(log, {8}, const []), isFalse);
+      expect(
+          isSwapAskedBase(log, {7}, const [AuditFieldChange('x', 'a', 'b')]),
+          isFalse,
+          reason: 'a base that changed a field is an edit, said as one');
+      expect(reportActionLabel('UPDATE', pt, swapAsked: true),
+          pt[KApp.pdfSwapAsked]);
+    });
+  });
+
   // F-67: section 4 reads by the day told, then by the instant written.
   test('relatos are ordered by day, then by the instant written', () {
     final a = ReportDayAccount(
@@ -645,4 +692,52 @@ void main() {
       expect(reportYearRange(2026).length, 4);
     });
   });
+
+  // F-07 (PR 5c): a per-child period is read per lane in section 1.
+  group('lane sections', () {
+    final l = Localization(AppLanguage.ptBr);
+    CustodyReport build(List<ReportDay> days) => buildCustodyReport(
+          familyName: 'Família Prado',
+          childName: 'Lia e Theo',
+          start: DateTime(2026, 8, 15),
+          end: DateTime(2026, 8, 16),
+          today: _today,
+          days: days,
+          members: _members,
+          auditLogs: const [],
+          roleLabelOf: (_) => 'Papel',
+          diffFor: (_) => const [],
+          generatedBy: 'Ana Prado',
+          generatedAtLocal: DateTime(2026, 8, 19, 21, 5),
+          appVersion: '3.0.14+178',
+          l: l,
+          childNames: const {20: 'Lia', 10: 'Theo'},
+          allChildrenLabel: 'Todas as crianças',
+        );
+
+    test('a single-plan period has none — section 1 is unchanged', () {
+      expect(build(_period()).laneSections, isEmpty);
+    });
+
+    test("one table per lane, the family's days first, children in order", () {
+      final report = build([
+        ReportDay(scheduleDate: DateTime(2026, 8, 15), scheduledParentId: 1),
+        ReportDay(
+            scheduleDate: DateTime(2026, 8, 16),
+            scheduledParentId: 2,
+            childId: 10),
+        ReportDay(
+            scheduleDate: DateTime(2026, 8, 16),
+            scheduledParentId: 1,
+            childId: 20),
+      ]);
+      expect([for (final s in report.laneSections) s.label],
+          ['Todas as crianças', 'Lia', 'Theo']);
+      final theo = report.laneSections.last;
+      expect([for (final c in theo.caregivers) c.name], ['Bruno Prado']);
+      expect(theo.caregivers.single.plannedDays, 1);
+    });
+  });
 }
+
+final _d = DateTime(2026, 8, 19);

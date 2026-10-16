@@ -2,6 +2,7 @@ import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import '../widgets/ui/ui.dart';
 
+import '../services/auth_failed.dart';
 import '../widgets/app_l10n.dart';
 
 /// The deep-link landing of the recovery e-mail — port of
@@ -20,11 +21,18 @@ class UpdatePasswordScreen extends StatefulWidget {
   /// "Ir para o calendário" on the success view.
   final VoidCallback onDone;
 
+  /// F-87: the way out of an expired or used link — a new reset e-mail, or
+  /// the login.
+  final VoidCallback? onRequestNewLink;
+  final VoidCallback? onBackToLogin;
+
   const UpdatePasswordScreen(
       {super.key,
       required this.onUpdatePassword,
       required this.hasSession,
-      required this.onDone});
+      required this.onDone,
+      this.onRequestNewLink,
+      this.onBackToLogin});
 
   @override
   State<UpdatePasswordScreen> createState() => _UpdatePasswordScreenState();
@@ -42,8 +50,9 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
   /// Catalog key of a local validation error (mirror), or null.
   String? _errorKey;
 
-  /// Verbatim server error text, when the update itself failed.
-  String? _serverError;
+  /// F-87: the catalog key of a failed update — `same_password` and
+  /// `weak_password` used to reach the reader as a raw English exception.
+  String? _serverErrorKey;
 
   Future<void> _submit() async {
     if (_busy || !widget.hasSession) return;
@@ -51,7 +60,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
         _password.text, _confirm.text);
     setState(() {
       _errorKey = errorKey;
-      _serverError = null;
+      _serverErrorKey = null;
     });
     if (errorKey != null) return;
 
@@ -60,7 +69,16 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
       await widget.onUpdatePassword(_password.text);
       if (mounted) setState(() => _done = true);
     } catch (e) {
-      if (mounted) setState(() => _serverError = e.toString());
+      if (mounted) {
+        setState(() => _serverErrorKey = switch (AuthFailed.of(e)) {
+              AuthFailure.samePassword => KApp.authErrSamePassword,
+              AuthFailure.weakPassword => K.authErrPasswordWeak,
+              AuthFailure.rateLimited => K.authErrRateLimited,
+              AuthFailure.network => K.authErrConnection,
+              AuthFailure.expiredLink => K.updatePwdErrorSession,
+              _ => K.authErrPasswordUpdate,
+            });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -110,12 +128,27 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall),
                       const SizedBox(height: 24),
-                      if (!widget.hasSession)
+                      if (!widget.hasSession) ...[
                         Text(l[K.updatePwdErrorSession],
                             textAlign: TextAlign.center,
                             style:
-                                TextStyle(color: theme.colorScheme.error))
-                      else ...[
+                                TextStyle(color: theme.colorScheme.error)),
+                        // F-87: an expired or used link was a red sentence
+                        // and no way forward.
+                        if (widget.onRequestNewLink != null) ...[
+                          const SizedBox(height: 20),
+                          FilledButton(
+                            key: const ValueKey('update-pwd-request-new'),
+                            onPressed: widget.onRequestNewLink,
+                            child: Text(l[KApp.updatePwdRequestNew]),
+                          ),
+                        ],
+                        if (widget.onBackToLogin != null)
+                          TextButton(
+                            onPressed: widget.onBackToLogin,
+                            child: Text(l[K.registerBackToLogin]),
+                          ),
+                      ] else ...[
                         AppTextField(
                           label: l[K.updatePwdNewPassword],
                           controller: _password,
@@ -151,12 +184,12 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                                       strokeWidth: 2))
                               : Text(l[K.updatePwdSubmit]),
                         ),
-                        if (_errorKey != null || _serverError != null) ...[
+                        if (_errorKey != null || _serverErrorKey != null) ...[
                           const SizedBox(height: 12),
                           Text(
                               _errorKey != null
                                   ? l[_errorKey!]
-                                  : _serverError!,
+                                  : l[_serverErrorKey!],
                               textAlign: TextAlign.center,
                               style:
                                   TextStyle(color: theme.colorScheme.error)),

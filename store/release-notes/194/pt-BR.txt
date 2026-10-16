@@ -1,0 +1,1 @@
+Melhoria interna: ao criar uma família, o app passa a registrar de onde veio o cadastro (de um anúncio, de uma indicação ou de nenhum desses), sem pixel e sem nada enviado a terceiros. Nada muda no uso do calendário.

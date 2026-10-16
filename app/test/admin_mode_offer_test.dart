@@ -159,6 +159,13 @@ void main() {
 
       await activate(tester);
       expect(mode.isActive, isTrue);
+      // U-60: "Limpar dia" asks before it deletes.
+      expect(ds.deleted, isEmpty);
+      await tapSheet(
+          tester,
+          find.descendant(
+              of: find.byKey(const ValueKey('day-sheet-clear-confirm')),
+              matching: find.text(pt[K.editorClearDay])));
       expect(ds.deleted, [7]);
       await settleSnack(tester);
     });
@@ -227,7 +234,10 @@ void main() {
   testWidgets('wizard: ticking "substituir" asks, and "Ativar" ticks it',
       (tester) async {
     final mode = AdminMode();
-    final ds = FakeCustodyDataSource(members: [anaAdmin, bruno], days: []);
+    // F-97: the box exists only when the range holds planned days.
+    final ahead = DateTime(today.year, today.month, today.day + 5);
+    final ds = FakeCustodyDataSource(
+        members: [anaAdmin, bruno], days: [row(9, ahead, anaAdmin.id)]);
     await tester.pumpWidget(app(ds, adminMode: mode));
     await tester.pumpAndSettle();
 

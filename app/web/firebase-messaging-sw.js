@@ -119,17 +119,67 @@ const ACTIONABLE_TYPES = ['swap_requested', 'revert_requested', 'auto_reminder']
 const ACTIONABLE_KINDS = ['pickup', 'keep'];
 // F-35: a chat notice opens the Conversa itself, where the text is.
 const CHAT_TYPES = ['chat_message'];
+// F-77: a notice about the Premium trial's end opens the plan page, where the
+// subscribe button is.
+// F-80 PR 3: so does the referral reward — the new end shows there.
+// F-102: a member's ask for Premium lands there too.
+const PLAN_TYPES = ['premium_trial', 'referral_reward', 'premium_request'];
+// F-101: the invitation the reader sent expired — the Família page is where
+// "Compartilhar de novo" makes a new link.
+const FAMILY_TYPES = ['invitation_expired'];
+// F-78: a `plan_ending` that says the plan never started opens the calendar
+// with the wizard on today (`/?plan=first`, read by the app's `/` route).
+const PLAN_FIRST_KINDS = ['unplanned'];
+// F-81: an admin's direct change of the reader's days. One day opens the
+// calendar with that day's sheet (`/?day=YYYY-MM-DD`, read once by the app's
+// `/` route); several open Relatórios → Histórico (`/reports?tab=history`).
+const ADMIN_CHANGE_TYPES = ['day_admin_change'];
+const ADMIN_CHANGE_DAY_KINDS = ['single'];
+const ADMIN_CHANGE_TRAIL_KINDS = ['batch'];
+// U-65: a settle-up to confirm, a reminder of one, or an expense the reader
+// takes part in opens Despesas (`/expenses`), where the answer is.
+const EXPENSE_TYPES = ['expense_changed', 'settlement_requested', 'settlement_reminder'];
+// U-65: the agenda's notice and reminder open the calendar on the item's day
+// (`/?day=YYYY-MM-DD`); without a real day they fall to "Todas".
+const AGENDA_TYPES = ['agenda_notice', 'agenda_reminder'];
 
 /// Where a tapped notification lands — the same URL `main.dart` builds for the
 /// Android tap, which is what makes the two channels agree: the Notificações
 /// screen reads `tab` and `n` from the query string either way.
 function landingUrl(data) {
+  if (PLAN_TYPES.includes(data.type)) {
+    return new URL('/family/plan', self.location.origin).href;
+  }
+  if (FAMILY_TYPES.includes(data.type)) {
+    return new URL('/family', self.location.origin).href;
+  }
+  if (EXPENSE_TYPES.includes(data.type)) {
+    return new URL('/expenses', self.location.origin).href;
+  }
+  if (AGENDA_TYPES.includes(data.type) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(data.date || '')) {
+    return new URL(`/?day=${data.date}`, self.location.origin).href;
+  }
+  if (data.type === 'plan_ending' && PLAN_FIRST_KINDS.includes(data.kind)) {
+    return new URL('/?plan=first', self.location.origin).href;
+  }
+  const id = data.notificationId || '';
+  if (ADMIN_CHANGE_TYPES.includes(data.type)) {
+    // A day that is not a real `YYYY-MM-DD` falls to "Todas", as on Android.
+    if (ADMIN_CHANGE_DAY_KINDS.includes(data.kind) &&
+        /^\d{4}-\d{2}-\d{2}$/.test(data.date || '')) {
+      return new URL(`/?day=${data.date}`, self.location.origin).href;
+    }
+    if (ADMIN_CHANGE_TRAIL_KINDS.includes(data.kind)) {
+      const n = id ? `&n=${encodeURIComponent(id)}` : '';
+      return new URL(`/reports?tab=history${n}`, self.location.origin).href;
+    }
+  }
   const actionable = ACTIONABLE_TYPES.includes(data.type) ||
     (data.type === 'day_notice' && ACTIONABLE_KINDS.includes(data.kind));
   const tab = CHAT_TYPES.includes(data.type)
     ? 'chat'
     : actionable ? 'incoming' : 'history';
-  const id = data.notificationId || '';
   const query = id ? `?tab=${tab}&n=${encodeURIComponent(id)}` : `?tab=${tab}`;
   return new URL(`/notifications${query}`, self.location.origin).href;
 }

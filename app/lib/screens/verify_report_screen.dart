@@ -112,10 +112,21 @@ class _VerifyReportScreenState extends State<VerifyReportScreen> {
               padding: const EdgeInsets.all(Spacing.md),
               children: [
                 if (_failed)
+                  // F-96: a load failure is not the end of the page.
                   AppBanner(
+                    key: const ValueKey('verify-failed'),
                     tone: tokens.warning,
                     icon: Icons.cloud_off_outlined,
                     message: l[KApp.attestError],
+                    actionLabel: l[KApp.attestRetry],
+                    actionIcon: Icons.refresh,
+                    onAction: () {
+                      setState(() {
+                        _failed = false;
+                        _answer = null;
+                      });
+                      _load();
+                    },
                   )
                 else if (_answer == null)
                   const LinearProgressIndicator()

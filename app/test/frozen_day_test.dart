@@ -103,7 +103,7 @@ void main() {
     final deadline = DateTime(date.year, date.month, date.day, 18)
         .add(const Duration(hours: 48));
     expect(find.text(l[K.frozenAutoApproval]), findsOneWidget);
-    expect(find.text(l.formatDateTime(deadline)), findsOneWidget);
+    expect(find.text(l.formatDeadline(deadline)), findsOneWidget);
   });
 
   testWidgets('F-60: no handoff time means midnight, two days on',
@@ -118,7 +118,7 @@ void main() {
     await openDay(tester, day);
 
     expect(
-        find.text(l.formatDateTime(
+        find.text(l.formatDeadline(
             DateTime(date.year, date.month, date.day)
                 .add(const Duration(hours: 48)))),
         findsOneWidget);

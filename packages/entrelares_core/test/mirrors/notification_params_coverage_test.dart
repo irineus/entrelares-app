@@ -113,6 +113,14 @@ void main() {
       'expense_notify',
       'settlement_notify',
       'send_chat_message',
+      // F-81: an admin's direct change, one per action and recipient.
+      'flush_admin_change_notices',
+      // F-101: the inviting admin is told once when an invitation expires.
+      'invitation_expiry_notices_due',
+      // F-102: a member's ask for Premium, to the admins.
+      'request_premium_from_admin',
+      // F-103: the member whose admin bit changed.
+      'set_member_admin',
     ]) {
       expect(writers, contains(expected));
     }

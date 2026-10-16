@@ -49,6 +49,18 @@ void main() {
       keys: [KApp.viewerMaxCap],
       words: ['quatro', 'four'],
     ),
+    // F-07: the free family's children (the Crianças page's free-plan line)
+    // and the ceiling for every plan.
+    'children.free_max': (
+      seed: seeds.childrenFreeMax,
+      keys: [KApp.childFreeCapOne, KApp.childFreeCapMany],
+      words: ['uma', 'one'],
+    ),
+    'children.max_per_family': (
+      seed: seeds.childrenMaxPerFamily,
+      keys: [KApp.childMaxCap],
+      words: ['seis', 'six'],
+    ),
     // T-82: server-only key, stated through the notification's `params.percent`
     // (seed 80 — the app has no PublicSettings getter for it on purpose).
     'email_quota.warn_percent': (

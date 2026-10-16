@@ -305,4 +305,107 @@ void main() {
     expect(find.text('CHAT'), findsOne);
     expect(badge.total, 5);
   });
+  // T-104: the whole table in one request was cut by PostgREST's max_rows at
+  // the NEWEST end — new texts stopped showing and every new one read "Ainda
+  // não lida". The Conversa now opens on the newest page and fetches older
+  // pages as the reader scrolls up, with the marks of the loaded texts only.
+  testWidgets('T-104: a long Conversa opens on the newest page; older pages '
+      'come on scroll-up', (tester) async {
+    const total = 450;
+    final ds = source()
+      ..chatMessages = [
+        for (var i = 1; i <= total; i++) text(i, 2, 'texto $i')
+      ];
+    await pumpChat(tester, ds);
+
+    expect(find.byKey(const ValueKey('chat-message-$total')), findsOne);
+    expect(find.byKey(const ValueKey('chat-message-1')), findsNothing);
+    // Everything up to the newest is marked, and nothing is unread after:
+    // reopening writes no second mark.
+    expect(ds.chatWrites, ['read:$total']);
+    await pumpChat(tester, ds);
+    expect(ds.chatWrites, ['read:$total']);
+
+    // Scrolling up fetches the older pages until the first text.
+    for (var i = 0;
+        i < 30 && find.byKey(const ValueKey('chat-message-1')).evaluate().isEmpty;
+        i++) {
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 2000));
+      await tester.pumpAndSettle();
+    }
+    expect(find.byKey(const ValueKey('chat-message-1')), findsOne);
+    expect(find.byKey(const ValueKey('chat-notice')), findsOne);
+    // The beginning is reached: no "older" row any more.
+    expect(find.byKey(const ValueKey('chat-load-older')), findsNothing);
+  });
+
+  testWidgets('T-104: a reply to a text older than the loaded page still '
+      'shows what it answers', (tester) async {
+    final ds = source()
+      ..chatMessages = [
+        text(1, 1, 'O primeiro de todos.'),
+        for (var i = 2; i <= 260; i++) text(i, 2, 'texto $i'),
+        text(261, 2, 'Respondendo lá atrás.', quote: 1),
+      ];
+    await pumpChat(tester, ds);
+    expect(find.byKey(const ValueKey('chat-message-261')), findsOne);
+    expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('chat-message-261')),
+            matching: find.textContaining('O primeiro de todos.')),
+        findsOne);
+  });
+
+  // F-90: "Lida por" is evidence and goes to the PDF — a text counts as read
+  // only when the reader can see it.
+  testWidgets('F-90: while searching, a new text is not read until the chip '
+      'takes the reader to it', (tester) async {
+    final ds = source()..chatMessages = [text(1, 2, 'Busco às 18h.')];
+    await pumpChat(tester, ds);
+    expect(ds.chatWrites, ['read:1']);
+
+    await tester.tap(find.byKey(const ValueKey('chat-search')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('chat-search-field')), 'busco');
+    await tester.pumpAndSettle();
+
+    ds.chatMessages = [...ds.chatMessages, text(2, 2, 'Chegamos.')];
+    await deliver(tester, ds);
+    expect(ds.chatWrites, ['read:1'], reason: 'searching hides it — unread');
+    expect(find.byKey(const ValueKey('chat-new-below')), findsOne);
+
+    await tester.tap(find.byKey(const ValueKey('chat-new-below')));
+    await tester.pumpAndSettle();
+    expect(ds.chatWrites, ['read:1', 'read:2']);
+    expect(find.text('Chegamos.'), findsOne);
+  });
+
+  testWidgets('F-90: scrolled far up, a new text waits for the reader',
+      (tester) async {
+    final ds = source()
+      ..chatMessages = [
+        for (var i = 1; i <= 60; i++) text(i, 2, 'texto $i'),
+      ];
+    await pumpChat(tester, ds, size: const Size(420, 700));
+    expect(ds.chatWrites, ['read:60']);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 2000));
+    await tester.pumpAndSettle();
+    ds.chatMessages = [...ds.chatMessages, text(61, 2, 'Chegamos.')];
+    await deliver(tester, ds);
+    expect(ds.chatWrites, ['read:60']);
+    expect(find.byKey(const ValueKey('chat-new-below')), findsOne);
+  });
+
+  testWidgets('F-90: the mute button says what a tap DOES in both states',
+      (tester) async {
+    final ds = source()..chatMessages = [text(1, 2, 'Oi.')];
+    await pumpChat(tester, ds);
+    final button = find.byKey(const ValueKey('chat-mute'));
+    expect(tester.widget<IconButton>(button).tooltip, l[KApp.chatMute]);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(tester.widget<IconButton>(button).tooltip, l[KApp.chatUnmute]);
+  });
 }

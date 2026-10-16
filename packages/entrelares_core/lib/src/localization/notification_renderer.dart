@@ -32,6 +32,7 @@ import '../expense_rules.dart';
 import '../notice_rules.dart';
 import 'date_formats.dart';
 import 'k.dart';
+import '../premium_ask_rules.dart';
 import 'localization.dart';
 
 abstract final class NotificationRenderer {
@@ -77,11 +78,19 @@ abstract final class NotificationRenderer {
       // language joins a day to an hour. A row written before this item has
       // no `deadline` and renders the window-free sentence — still in the
       // READER's language, which a fallback to the stored PT-BR would not be.
+      // F-94: the eve reminder (19:00 the day before) — who asked, and the
+      // day; it states no deadline, the request's row does.
+      case 'auto_reminder' when date != null && kind == 'eve':
+        return l.format(
+            K.notifRenderAutoReminderEve, [name ?? l[K.notifRenderFbOtherCap], date]);
+
       case 'auto_reminder' when date != null:
         final deadline = _parseDeadline(p['deadline']);
         if (deadline == null) return l.format(K.notifRenderAutoReminder, [date]);
+        // U-63: "até sábado, 10/10, à 0h" — the deadline said as a person
+        // says it, in the reader's language (`formatDeadline`).
         return l.format(K.notifRenderAutoReminderDeadline,
-            [date, l.formatDate(deadline), l.formatTime(deadline)]);
+            [date, l.formatDeadline(deadline)]);
 
       case 'auto_approved' when date != null:
         return l.format(
@@ -175,6 +184,16 @@ abstract final class NotificationRenderer {
       // ── Membership ──
       case 'member_joined' when name != null:
         return l.format(K.notifRenderMemberJoined, [name]);
+
+      // F-101: the invitation the reader sent expired unanswered.
+      case 'invitation_expired' when name != null:
+        return l.format(K.notifRenderInvitationExpired, [name]);
+
+      // F-103: an admin granted or removed the reader's admin bit.
+      case 'admin_changed' when name != null && kind == 'granted':
+        return l.format(K.notifRenderAdminGranted, [name]);
+      case 'admin_changed' when name != null && kind == 'revoked':
+        return l.format(K.notifRenderAdminRevoked, [name]);
 
       case 'member_returned' when name != null:
         return l.format(K.notifRenderMemberReturned, [name]);
@@ -285,6 +304,44 @@ abstract final class NotificationRenderer {
         return l.format(K.notifRenderPlanEnding, [date]);
       case 'plan_ending' when kind == 'ended' && date != null:
         return l.format(K.notifRenderPlanEnded, [date]);
+      // F-78: the plan never started.
+      case 'plan_ending' when kind == 'unplanned' && date != null:
+        return l[K.notifRenderPlanUnplanned];
+
+      // ── The Premium trial runs out (F-77) ──
+      case 'premium_trial' when kind == 'ending' && date != null:
+        return l.format(K.notifRenderTrialEnding, [date]);
+      case 'premium_trial' when kind == 'ended' && date != null:
+        return l.format(K.notifRenderTrialEnded, [date]);
+
+      // ── A referral earned the family a free month (F-80 PR 3) ──
+      // No day and no name: the referred family is never identified.
+      case 'referral_reward' when kind == 'granted':
+        return l[K.notifRenderReferralReward];
+
+      // F-102: a member asked the admins for Premium; the gate names what
+      // for, through a closed map (an unknown token reads as "a família").
+      case 'premium_request' when kind == 'ask' && name != null:
+        return l.format(K.notifRenderPremiumRequest, [
+          name,
+          l[PremiumAskRules.gateLabelKey(p['gate'])],
+        ]);
+
+      // ── An admin changed the reader's days directly (F-81) ──
+      // One day names it; several name the first, the last and how many. The
+      // name is the admin's own (user data, never translated).
+      case 'day_admin_change' when date != null && kind == 'single':
+        return l.format(K.notifRenderDayAdminChangeSingle,
+            [name ?? l[K.notifRenderFbOtherCap], date]);
+      case 'day_admin_change'
+          when date != null && kind == 'batch' && _adminBatch(p) != null:
+        final (count, to) = _adminBatch(p)!;
+        return l.format(K.notifRenderDayAdminChangeBatch, [
+          name ?? l[K.notifRenderFbOtherCap],
+          count,
+          date,
+          l.formatIsoDate(to),
+        ]);
 
       // ── Shared expenses (F-34) ──
       // The amount travels in cents and is printed in the reader's money
@@ -374,6 +431,17 @@ abstract final class NotificationRenderer {
     return text == null || text.trim().isEmpty
         ? ''
         : l.format(K.notifRenderAgendaTextSuffix, [text]);
+  }
+
+  /// F-81: a batch's count and last day, or null when either is missing or
+  /// off-shape — the row then keeps its stored sentence and heading.
+  static (String, String)? _adminBatch(Map<String, String> p) {
+    final count = p['count'];
+    final to = p['to'];
+    if (count == null || int.tryParse(count) == null || to == null) {
+      return null;
+    }
+    return (count, to);
   }
 
   /// F-34: `params.amount` (cents) in the reader's money format, or null.
@@ -467,7 +535,9 @@ abstract final class NotificationRenderer {
     final kind = p['kind'];
 
     final key = switch (type) {
-      'auto_reminder' => K.notifRenderTitleAutoReminder,
+      'auto_reminder' => kind == 'eve'
+          ? K.notifRenderTitleAutoReminderEve
+          : K.notifRenderTitleAutoReminder,
       'auto_approved' => K.notifRenderTitleAutoApproved,
       'swap_family_info' => K.notifRenderTitleCalendarUpdated,
       'swap_sent' => K.notifRenderTitleSwapSent,
@@ -482,6 +552,13 @@ abstract final class NotificationRenderer {
       'revert_rejected' => K.notifRenderTitleRevertRejected,
       'revert_cancelled' => K.notifRenderTitleRevertCancelled,
       'member_joined' => K.notifRenderTitleMemberJoined,
+      'invitation_expired' =>
+        p['name'] == null ? null : K.notifRenderTitleInvitationExpired,
+      'admin_changed' => switch (kind) {
+          'granted' => K.notifRenderTitleAdminGranted,
+          'revoked' => K.notifRenderTitleAdminRevoked,
+          _ => null,
+        },
       'member_returned' => K.notifRenderTitleMemberReturned,
       'email_cap_last' => K.notifRenderTitleEmailCapLast,
       'email_cap_80' => K.notifRenderTitleEmailCap80,
@@ -532,8 +609,31 @@ abstract final class NotificationRenderer {
           : switch (kind) {
               'ending' => K.notifRenderTitlePlanEnding,
               'ended' => K.notifRenderTitlePlanEnded,
+              'unplanned' => K.notifRenderTitlePlanUnplanned,
               _ => null,
             },
+      // F-77: same shape as F-70's.
+      'premium_trial' => p['date'] == null
+          ? null
+          : switch (kind) {
+              'ending' => K.notifRenderTitleTrialEnding,
+              'ended' => K.notifRenderTitleTrialEnded,
+              _ => null,
+            },
+      // F-80 PR 3: the heading only for the kind the body rebuilds.
+      'referral_reward' =>
+        kind == 'granted' ? K.notifRenderTitleReferralReward : null,
+      'premium_request' => kind == 'ask' && p['name'] != null
+          ? K.notifRenderTitlePremiumRequest
+          : null,
+      // F-81: the heading only where the body is rebuilt too.
+      'day_admin_change' => p['date'] == null
+          ? null
+          : kind == 'single'
+              ? K.notifRenderTitleDayAdminChangeSingle
+              : kind == 'batch' && _adminBatch(p) != null
+                  ? K.notifRenderTitleDayAdminChangeBatch
+                  : null,
       // F-55: the heading only where the body is rebuilt too.
       'agenda_notice' => p['date'] != null && _agendaKind(kind) != null
           ? K.notifRenderTitleAgendaNotice
@@ -591,11 +691,22 @@ abstract final class NotificationRenderer {
       return l.format(key, [p['percent'] ?? '80']);
     }
 
-    return switch (p['tag']) {
+    final heading = switch (p['tag']) {
       'urgent' => l[K.notifRenderTagUrgent] + l[key],
       'overdue' => l[K.notifRenderTagOverdue] + l[key],
       _ => l[key],
     };
+    return withChild(heading, p['child']);
+  }
+
+  /// F-07 — in a per-child plan a swap's notification names its child after
+  /// the heading ("Nova solicitação de troca · Lia"). The name is family
+  /// data (never translated) and `params.child` is stamped by the database
+  /// (`stamp_notification_child`), so every writer — app, cron, aviso — gets
+  /// it; `_shared/push.ts` appends it the same way.
+  static String withChild(String heading, String? child) {
+    final name = child?.trim() ?? '';
+    return name.isEmpty ? heading : '$heading · $name';
   }
 
   /// Flat string map from the JSONB payload. Returns null for absent, blank

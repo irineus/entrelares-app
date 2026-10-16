@@ -1,5 +1,6 @@
 import 'package:entrelares_core/entrelares_core.dart'
     show
+        Acquisition,
         AgendaNotify,
         AppLanguage,
         HandoffRangeResult,
@@ -136,10 +137,18 @@ abstract class CustodyDataSource {
   /// they travel verbatim in [BillingRefused].
   Future<void> reactivateSubscription();
 
+  /// F-84: the URL of the Asaas invoice still open for an `overdue`
+  /// subscription (from the ledger, or the gateway when the ledger has none).
+  /// Refuses with the function's own text — a Play subscription, nothing
+  /// overdue, or no invoice found.
+  Future<String> overdueInvoiceUrl();
+
   /// One day's row, or null when unassigned — mirror of the web's
   /// `GetScheduleForDateAsync` (the T-27 transition check on the 1st of the
   /// month needs the previous month's last day).
-  Future<CareSchedule?> fetchDay(DateTime date);
+  /// F-07: the day in ONE lane — [childId] null is the family's lane (a
+  /// single-plan family), a child is that child's lane.
+  Future<CareSchedule?> fetchDay(DateTime date, {int? childId});
 
   Future<void> insertDay(CareSchedule day);
 
@@ -162,23 +171,35 @@ abstract class CustodyDataSource {
   /// SECURITY INVOKER). The server floors [from] to today and keeps frozen
   /// and approved-swap days; the counts it answers are the toast. Admin-only
   /// by DB rule — the UI offers it only under the admin bypass.
-  Future<ScheduleRangeResult> clearScheduleRange(DateTime from, DateTime to);
+  /// F-07: [childId] null clears every lane; a child, that child's only.
+  Future<ScheduleRangeResult> clearScheduleRange(DateTime from, DateTime to,
+      {int? childId});
 
   /// F-51 — the wizard's "substituir os dias já planejados": clears
   /// [from, to] and inserts [days] in the SAME transaction
   /// (`replace_schedule_range`). Every day must fall inside the range — the
   /// server refuses otherwise. An insert that fails leaves the old plan
   /// untouched: the whole call rolls back.
+  /// F-07: with [childId], only that child's lane is cleared, and every day
+  /// must carry the same `childId`.
   Future<ScheduleRangeResult> replaceScheduleRange(
-      DateTime from, DateTime to, List<CareSchedule> days);
+      DateTime from, DateTime to, List<CareSchedule> days,
+      {int? childId});
 
   /// U-55 — one handoff time for every TRANSITION day in [from, to] (null =
   /// no upper bound) that has none, in ONE statement as the caller
   /// (`set_handoff_time_range`, SECURITY INVOKER). The server floors [from]
   /// to today, keeps frozen days and never overwrites a time already set;
   /// the counts it answers are the closing line. Admin-only by DB rule.
+  /// F-07: [childId] null times every lane; a child, that child's only.
   Future<HandoffRangeResult> setHandoffTimeRange(
-      DateTime from, DateTime? to, HandoffTime time);
+      DateTime from, DateTime? to, HandoffTime time,
+      {int? childId});
+
+  /// F-07 — `set_schedule_mode`: 'single' or 'per_child', from today on.
+  /// Back to 'single' names the child whose plan becomes the family's
+  /// ([baseChildId]). Returns how many days the switch moved.
+  Future<int> setScheduleMode(String mode, {int? baseChildId});
 
   /// Starts listening for care_schedules changes; [onChange] fires on any
   /// insert/update/delete visible to this session. [onStatus] reports socket
@@ -241,6 +262,11 @@ abstract class CustodyDataSource {
     bool restoreNotes = false,
     required Member myProfile,
     required List<Member> allProfiles,
+    // F-07: the day's lane and row. A swap approved before a plan-mode switch
+    // lost its `schedule_id` with the row it named, so the revert takes the
+    // lane's own row.
+    int? childId,
+    int? scheduleId,
   });
 
   /// Restores the day to its pre-edit snapshot (F-26 plan computed in core),
@@ -257,7 +283,8 @@ abstract class CustodyDataSource {
   /// F-47: the day's observation as the pre-edit snapshot holds it, or null
   /// when there is nothing to restore FROM (no approved swap on the date, no
   /// snapshot reference, or an old_data-less snapshot).
-  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate);
+  Future<PreEditNotes?> fetchPreEditNotes(DateTime scheduleDate,
+      {int? childId});
 
   // ── F-67 relato do dia ──
 
@@ -387,6 +414,13 @@ abstract class CustodyDataSource {
     required String token,
   });
 
+  /// F-59 — what the Hoje strip needs to tell that a notice reached nobody:
+  /// whether ANY device of [myProfileId] receives push (here the profile-wide
+  /// question is the right one — a reader whose other phone rings was told),
+  /// and when the newest unread notification addressed to them was written.
+  Future<({bool accountHasPush, DateTime? newestUnreadAt})> fetchPushReach(
+      int myProfileId);
+
   /// Listens for swap_requests + notifications changes — the lote-3 twin of
   /// [watchChanges] (frozen paint, badge, page refresh). Safe to call from
   /// more than one subscriber. Returns a dispose callback.
@@ -429,7 +463,25 @@ abstract class CustodyDataSource {
   /// Resolves an invitation token for an anonymous visitor, or null when the
   /// invitation is not usable. Unknown, accepted, revoked and expired tokens
   /// are all null — the RPC does not distinguish them, and neither may the UI.
+  ///
+  /// F-88: a server that could not be REACHED is not an invalid invitation —
+  /// it throws [InviteUnreachable], and the screen offers "Tentar de novo".
+  /// 4G at the school gate used to read "Convite inválido ou expirado — peça
+  /// um novo", and its only button dropped the token.
   Future<InviteInfo?> fetchInviteInfo(String token);
+
+  /// F-88: `pending` / `accepted` / `unusable` — so an invitation already
+  /// accepted reads "é só entrar" instead of "peça um novo".
+  Future<String> fetchInviteTokenStatus(String token);
+
+  /// F-88: the open invitation to the caller's VERIFIED e-mail from another
+  /// family, offered only while the caller's own family is empty (nobody
+  /// else, nothing planned). Null otherwise.
+  Future<PendingInvitationOffer?> fetchMyPendingInvitation();
+
+  /// F-88: accepts [token] and discards the caller's empty family — the
+  /// server re-checks both and refuses with a PT-BR sentence.
+  Future<void> joinInvitationFromEmptyFamily(String token);
 
   /// The FOUNDER branch. GoTrue creates the auth user carrying the metadata
   /// `handle_new_user` reads; the trigger is what creates family + profile
@@ -437,6 +489,21 @@ abstract class CustodyDataSource {
   ///
   /// Throws [SignUpFailure] with the catalog key to show — including for the
   /// anti-enumeration "silent duplicate" shape.
+  ///
+  /// F-80: [referralCode] — the code of the family that referred this one,
+  /// sent ONLY while `feature.referral` is on (the caller asks
+  /// [fetchReferralEnabled] first). It rides in the sign-up metadata because
+  /// the founder has no session until the e-mail is confirmed; the server
+  /// strips it from the auth row and attributes it in the same transaction
+  /// that creates the family.
+  ///
+  /// F-80 PR 2: [referralChannel] — where the code came from (`web` for a
+  /// `?ref=` link, `android` for the Install Referrer), the server's CHECK
+  /// vocabulary. Null derives it from the platform.
+  ///
+  /// T-101: [acquisition] — where the new family came from, decided by
+  /// `AcquisitionRules`; it rides the sign-up metadata (stripped by the server
+  /// before the auth row is stored) and is recorded once on the family.
   Future<void> signUpFounder({
     required String email,
     required String password,
@@ -444,7 +511,33 @@ abstract class CustodyDataSource {
     required String role,
     required String familyName,
     required String languageCode,
+    String? referralCode,
+    String? referralChannel,
+    Acquisition? acquisition,
+    // U-61: the child's optional first name — rides the metadata, written by
+    // the server as the family's first child and stripped from the auth row.
+    String? childFirstName,
   });
+
+  // ── F-80: family referral (built dark) ────────────────────────────────────
+
+  /// Whether `feature.referral` is on — answerable WITHOUT a session (the
+  /// `referral_enabled` RPC), because the register screen runs before one.
+  /// Any failure is `false`: a module that cannot prove it is on is off.
+  Future<bool> fetchReferralEnabled();
+
+  /// `attribute_referral` — the founder of a family created in the last 24 h
+  /// names the code that brought it. Returns the server's closed answer
+  /// (`attributed` / `ignored`), or null when the call failed or was refused.
+  /// Never throws: attribution is fire-and-forget.
+  Future<String?> attributeReferral(
+      {required String code, required String channel});
+
+  /// F-80 PR 2 — `my_referral_code()`: the family's opaque code (created on
+  /// the first ask), for the Família card's link. Null when the module is off,
+  /// the caller is not an active full member, or the call failed — the card
+  /// then simply does not show. Never throws.
+  Future<String?> fetchMyReferralCode();
 
   /// The INVITEE branch (U-17), which is auto-confirmed and therefore cannot
   /// go through GoTrue sign-up: the `register-invitee` Edge Function creates
@@ -463,10 +556,16 @@ abstract class CustodyDataSource {
   /// `handle_new_user` deferred, stamping the S-13 consent after validating
   /// the policy version server-side (S-15 posture). Throws with the server's
   /// PT-BR message on refusal.
+  ///
+  /// T-101: [acquisition] — where the new family came from
+  /// (`AcquisitionRules`), recorded once by the server at creation; null is
+  /// an older caller and reads `organic`.
   Future<void> completeOauthOnboarding({
     required String fullName,
     required String role,
     required String familyName,
+    Acquisition? acquisition,
+    String? childFirstName,
   });
 
   /// The INVITEE half: the `claim-invitation` Edge Function attaches the
@@ -681,10 +780,28 @@ abstract class CustodyDataSource {
 
   /// Every text of the family's conversation, oldest first. A viewer reads
   /// them too (RLS).
-  Future<List<ChatMessage>> fetchChatMessages();
+  ///
+  /// T-104: one PAGE — the newest [chatPageSize] texts, or the newest older
+  /// than [beforeId] — oldest first. An unpaged read was cut by PostgREST's
+  /// `max_rows` at the OLD end of an ascending list: past ~1,000 texts the
+  /// newest stopped showing.
+  Future<List<ChatMessage>> fetchChatPage({int? beforeId});
 
-  /// "Lida por" — every read mark of the family's texts.
-  Future<List<ChatRead>> fetchChatReads();
+  /// T-104: every text newer than [afterId], oldest first — what a poll or a
+  /// change on the channel adds to a Conversa already on screen.
+  Future<List<ChatMessage>> fetchChatMessagesAfter(int afterId);
+
+  /// T-104: every text written in [fromUtc, toUtcExclusive) — the PDF's
+  /// section — plus the texts those replies quote from before the period.
+  Future<List<ChatMessage>> fetchChatMessagesForPeriod(
+      DateTime fromUtc, DateTime toUtcExclusive);
+
+  /// The texts with these ids (a quote older than the loaded pages).
+  Future<List<ChatMessage>> fetchChatMessagesByIds(List<int> ids);
+
+  /// "Lida por" — the read marks of THESE texts (T-104: of the loaded ones,
+  /// never the family's whole table, which a cap would cut).
+  Future<List<ChatRead>> fetchChatReads(List<int> messageIds);
 
   /// Server-enforced: flag on, a full seat, Premium, the length key and the
   /// hourly brake — the RPC's PT-BR sentence reaches the user verbatim.
@@ -698,6 +815,12 @@ abstract class CustodyDataSource {
   Future<bool> fetchChatPushMuted();
 
   Future<void> setChatPushMuted(bool muted);
+
+  /// S-27: whether this member's Conversa pushes carry the text (default
+  /// false: "Nova mensagem de Nome na Conversa").
+  Future<bool> fetchChatPushPreview();
+
+  Future<void> setChatPushPreview(bool on);
 
   /// How many texts of others arrived after the newest one [profileId] read
   /// (capped at 100 — the badge prints "99+" past that).
@@ -751,11 +874,16 @@ abstract class CustodyDataSource {
   Future<void> deleteExpense(int id);
 
   /// "I paid [amountCents] to [toProfileId]" — waits for the receiver.
+  /// [reference] (F-93): optional, e.g. the Pix id.
   Future<int> requestSettlement(
-      {int? childId, required int toProfileId, required int amountCents});
+      {int? childId,
+      required int toProfileId,
+      required int amountCents,
+      String? reference});
 
-  /// The receiver's answer.
-  Future<void> answerSettlement(int id, {required bool received});
+  /// The receiver's answer — final. [note] (F-93): optional.
+  Future<void> answerSettlement(int id,
+      {required bool received, String? note});
 
   /// The one who recorded it takes it back while it waits.
   Future<void> cancelSettlement(int id);
@@ -763,6 +891,13 @@ abstract class CustodyDataSource {
   /// "Lembrar": the one who is owed reminds [toProfileId] — refused while the
   /// debt is not open or inside `expenses.reminder_cooldown_hours`.
   Future<void> remindSettlement({int? childId, required int toProfileId});
+
+  /// F-102: a member who is not an admin tells the family's admins they
+  /// want Premium (`request_premium_from_admin`): push + in-app to each
+  /// live admin, once per requester per day — the server judges. [gate] is
+  /// the F-79 token of the gate met, or `premium`. Returns how many admins
+  /// were told; a refusal is the RPC's own PT-BR sentence.
+  Future<int> requestPremiumFromAdmin({required String gate});
 
   /// Listens for expense, share and settle-up changes, so both phones see a
   /// payment and its confirmation as they happen (owner's validation,
@@ -934,6 +1069,19 @@ abstract class CustodyDataSource {
   /// resolution paths). Enrichment only: a failure costs the origin line, never
   /// the timeline.
   Future<Map<int, SwapOrigin>> fetchResolutionOrigins(List<int> logIds);
+
+  /// F-95: the approved swap that put [date] (in [childId]'s lane) in its
+  /// current state — who asked, who approved, when, and the messages. Null
+  /// when the day was never swapped through a request.
+  Future<SwapRequest?> fetchDaySwapOrigin(DateTime date, {int? childId});
+
+  /// F-95: one request, read fresh — a sheet opened from an old push must not
+  /// act on a request that was answered, cancelled or auto-approved since.
+  Future<SwapRequest?> fetchSwapRequest(int id);
+
+  /// F-96: which of [logIds] are a swap request's base write — the no-op
+  /// update made just before the request (`swap_requests.pre_edit_log_id`).
+  Future<Set<int>> fetchSwapBaseLogIds(List<int> logIds);
 }
 
 /// The three U-23 stamps, named rather than passed as column strings.
@@ -1078,6 +1226,37 @@ class ElevationRefused implements Exception {
 /// client-side guess (pilot lesson 4: never collapse the server's error into a
 /// generic one) — its refusals are written to be read by the payer, e.g. why
 /// a card subscription cannot be resumed without paying today.
+/// T-104: how many texts one Conversa page carries.
+const int chatPageSize = 200;
+
+/// S-25: the request was already answered another way (cancelled, rejected,
+/// auto-approved) — nothing changed. A batch counts it and goes on.
+class SwapAlreadyAnswered implements Exception {
+  final String message;
+  const SwapAlreadyAnswered(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// F-88: an invitation to a founder whose own family is still empty.
+class PendingInvitationOffer {
+  final String token;
+  final String familyName;
+  final String inviterName;
+
+  const PendingInvitationOffer({
+    required this.token,
+    required this.familyName,
+    required this.inviterName,
+  });
+}
+
+/// F-88: the invitation could not be checked — no answer from the server.
+class InviteUnreachable implements Exception {
+  const InviteUnreachable();
+}
+
 class BillingRefused implements Exception {
   final String? serverMessage;
 

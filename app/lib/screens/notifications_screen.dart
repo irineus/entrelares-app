@@ -75,6 +75,39 @@ class NotificationsScreen extends StatefulWidget {
   /// F-34: an expense or settle-up row's "Abrir Despesas". Null hides it.
   final VoidCallback? onOpenExpenses;
 
+  /// F-77: a Premium-trial row's "Ver o plano" — the host opens
+  /// `/family/plan`. Null hides it.
+  final VoidCallback? onOpenPlan;
+
+  static Key trialActionKey(int id) => Key('notif-trial-$id');
+
+  /// F-101: an expired invitation's "Compartilhar de novo" — the host opens
+  /// the Família page, where the card makes a new link. Null hides it.
+  final VoidCallback? onOpenFamily;
+
+  static Key familyActionKey(int id) => Key('notif-family-$id');
+
+  /// F-81: an admin's direct change of one of my days — "Ver o dia" opens
+  /// the calendar on that day's sheet. Null hides it.
+  final ValueChanged<DateTime>? onOpenDay;
+
+  /// F-81: the same about several days — "Ver o Histórico" opens Relatórios
+  /// → Histórico; the row's id makes a second tap re-apply the tab. Null
+  /// hides it.
+  final ValueChanged<int>? onOpenAuditTrail;
+
+  static Key adminChangeActionKey(int id) => Key('notif-admin-change-$id');
+
+  /// U-65: an agenda row's "Ver o dia" — through [onOpenDay].
+  static Key agendaActionKey(int id) => Key('notif-agenda-$id');
+
+  /// U-65: the Conversa's rows left "Todas"; while it has unread texts, one
+  /// line at the top says how many and opens it. Null (no Conversa here)
+  /// hides the line.
+  final VoidCallback? onOpenChat;
+
+  static const Key chatPointerKey = Key('notif-chat-pointer');
+
   /// The notification types whose row opens Despesas.
   static const Set<String> expenseTypes = {
     'expense_changed',
@@ -105,6 +138,11 @@ class NotificationsScreen extends StatefulWidget {
       this.analytics,
       this.onPlanFrom,
       this.onOpenExpenses,
+      this.onOpenPlan,
+      this.onOpenFamily,
+      this.onOpenDay,
+      this.onOpenAuditTrail,
+      this.onOpenChat,
       this.embedded = false,
       this.onApprovalSeen,
       this.landing,
@@ -150,6 +188,9 @@ IconData notifIcon(String type) => switch (type) {
       'email_cap_last' || 'email_cap_reached' => Icons.mail_outline,
       'billing' => Icons.credit_card,
       'plan_ending' => Icons.event_note_outlined,
+      'premium_trial' => Icons.workspace_premium_outlined,
+      'referral_reward' => Icons.card_giftcard_outlined,
+      'day_admin_change' => Icons.edit_calendar_outlined,
       _ => Icons.notifications_none,
     };
 
@@ -254,6 +295,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       NotificationLanding.incoming => _Tab.incoming,
       NotificationLanding.history => _Tab.history,
       NotificationLanding.chat => _Tab.history,
+      NotificationLanding.plan => _Tab.history,
+      NotificationLanding.planFirst => _Tab.history,
+      NotificationLanding.day => _Tab.history,
+      NotificationLanding.auditTrail => _Tab.history,
+      NotificationLanding.family => _Tab.history,
+      NotificationLanding.expenses => _Tab.history,
     };
   }
 
@@ -296,7 +343,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         try {
           notices = [
             for (final n in await widget.dataSource
-                .fetchDayNotices(DateTime.now()))
+                .fetchDayNotices(FamilyTime.now()))
               if (n.isOpen &&
                   n.senderProfileId != me.id &&
                   NoticeRequest.fromWire(n.request) != null &&
@@ -315,7 +362,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _incoming = incoming;
         _openNotices = notices;
         _sent = sent;
-        _history = history;
+        // U-65: the Conversa's rows are not "Todas"'s (the read already
+        // leaves them out; this holds for any source).
+        _history = [
+          for (final n in history)
+            if (!PushRouting.chatTypes.contains(n.type)) n
+        ];
         _loading = false;
         _loadError = null;
       });
@@ -326,7 +378,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _loading = false;
         _loadError = isSessionExpired(e.toString())
             ? sessionExpiredMessage(l)
-            : l[KApp.errCalendarLoad];
+            : l[KApp.errNotificationsLoad];
       });
     }
   }
@@ -715,9 +767,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// F-20 urgency as a pill. The banner it replaces took a full line per card;
   /// on a row the state is a badge beside the date, and the sheet still says
   /// the whole sentence.
-  Widget _tagBadge(SwapPriorityTag tag, Localization l) => _statusBadge(
+  Widget _tagBadge(SwapPriorityTag tag, Localization l,
+          {bool dayStarted = false}) =>
+      _statusBadge(
+        // U-63: a day with no handoff time "started" — it is not late.
         l[tag == SwapPriorityTag.overdue
-            ? K.notifTagOverdueShort
+            ? (dayStarted
+                ? KApp.notifTagDayStartedShort
+                : K.notifTagOverdueShort)
             : K.notifTagUrgentShort],
         tone: tag == SwapPriorityTag.overdue
             ? context.tokens.danger
@@ -738,6 +795,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     required List<Widget> badges,
     required List<String> lines,
     required VoidCallback? onTap,
+    List<Widget> actions = const [],
   }) {
     final theme = Theme.of(context).textTheme;
     return Padding(
@@ -759,6 +817,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   const SizedBox(height: Spacing.xs),
                   for (final line in lines)
                     Text(line, style: theme.bodySmall),
+                  // U-60: the answer on the row itself. The card then has no
+                  // tap of its own (U-47: no button inside a tappable tile).
+                  if (actions.isNotEmpty) ...[
+                    const SizedBox(height: Spacing.sm),
+                    Wrap(
+                      spacing: Spacing.sm,
+                      runSpacing: Spacing.xs,
+                      children: actions,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -779,7 +847,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (_incoming.isEmpty && _openNotices.isEmpty) {
       return _empty(Icons.task_alt, K.notifEmptyIncoming, l);
     }
-    final now = DateTime.now();
+    final now = FamilyTime.now();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
@@ -872,9 +940,60 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             : KApp.noticeAnsweredHelping]);
   }
 
+  String _firstNameOf(int? id) =>
+      (_nameOf(id) ?? '').trim().split(' ').first;
+
+  /// U-60: the answer straight from the row, through the S-25 RPCs the
+  /// frozen-day sheet calls. The sheet stays one tap away ("Detalhes") for a
+  /// note or a reason.
+  Future<void> _answerInline(SwapRequest req, {required bool approve}) async {
+    if (_answering != null) return;
+    final l = AppL10n.of(context).l;
+    setState(() => _answering = req.id);
+    final revert = req.isRevertPending;
+    try {
+      if (approve) {
+        await (revert
+            ? widget.dataSource
+                .approveRevert(req.id, allProfiles: _allProfiles)
+            : widget.dataSource
+                .approveSwap(req.id, allProfiles: _allProfiles));
+      } else {
+        await (revert
+            ? widget.dataSource.rejectRevert(req.id, allProfiles: _allProfiles)
+            : widget.dataSource.rejectSwap(req.id, allProfiles: _allProfiles));
+      }
+      if (!mounted) return;
+      showAppSnack(
+          context,
+          l[frozenOutcomeToastKey(approve
+              ? (revert
+                  ? FrozenDayOutcome.revertConfirmed
+                  : FrozenDayOutcome.approved)
+              : (revert
+                  ? FrozenDayOutcome.revertRejected
+                  : FrozenDayOutcome.rejected))]);
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnack(
+          context, translateSaveError(e.toString(), l[K.errSaveFailed], l));
+    }
+    if (mounted) setState(() => _answering = null);
+    await _loadAll();
+    await widget.badge.refresh();
+  }
+
+  /// U-60: the request being answered from its row — both buttons wait.
+  int? _answering;
+
   Widget _incomingRow(SwapRequest req, DateTime now, Localization l) {
     final isRevert = req.isRevertPending;
     final tag = req.toView().priorityTag(now); // F-20: pending → clock
+    final requester = _firstNameOf(req.requestingProfileId);
+    final message = (req.requestMessage ?? '').trim();
+    final canAnswer = _ownProfile?.isViewer != true &&
+        !(widget.connectivity?.offline ?? false);
+    final busy = _answering == req.id;
     return _requestRow(
       req: req,
       title: l.formatDate(req.scheduleDate),
@@ -883,18 +1002,51 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           l[isRevert ? K.notifRevertPendingBadge : K.notifPendingBadge],
           tone: isRevert ? context.tokens.accent : context.tokens.warning,
         ),
-        if (tag != SwapPriorityTag.none) _tagBadge(tag, l),
+        if (tag != SwapPriorityTag.none)
+          _tagBadge(tag, l,
+              dayStarted: req.toView().dayStartedWithoutTime(now)),
       ],
+      // U-60: a sentence, not "Solicitante: · Proposto:" to decode — who
+      // asks, what for, and the weekday; then the message and the deadline.
       lines: [
-        '${l[K.notifLabelRequester]}: '
-            '${_nameOf(req.requestingProfileId) ?? '—'} · '
-            '${l[isRevert ? K.notifLabelRevertTo : K.notifLabelProposed]}: '
-            '${_nameOf(req.proposedActualParentId) ?? '—'}',
+        swapRequestSentence(
+          l: l,
+          requesterName: requester.isEmpty ? '—' : requester,
+          date: req.scheduleDate,
+          isRevert: isRevert,
+          requesterIsProposed:
+              req.proposedActualParentId == req.requestingProfileId,
+        ),
+        if (message.isNotEmpty)
+          l.format(KApp.swapRowMessage, [requester, message]),
         // F-60: a request waiting on YOU says when it stops waiting.
         '${l[K.frozenAutoApproval]}: '
-            '${l.formatDateTime(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
+            '${l.formatFamilyDeadline(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
       ],
-      onTap: () => _openRequest(req),
+      onTap: canAnswer ? null : () => _openRequest(req),
+      actions: !canAnswer
+          ? const []
+          : [
+              FilledButton(
+                key: ValueKey('swap-request-approve-${req.id}'),
+                onPressed: busy || _answering != null
+                    ? null
+                    : () => _answerInline(req, approve: true),
+                child: Text(l[K.frozenApprove]),
+              ),
+              OutlinedButton(
+                key: ValueKey('swap-request-reject-${req.id}'),
+                onPressed: busy || _answering != null
+                    ? null
+                    : () => _answerInline(req, approve: false),
+                child: Text(l[K.frozenRejectAction]),
+              ),
+              TextButton(
+                key: ValueKey('swap-request-details-${req.id}'),
+                onPressed: busy ? null : () => _openRequest(req),
+                child: Text(l[KApp.swapRowDetails]),
+              ),
+            ],
     );
   }
 
@@ -902,7 +1054,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Widget _sentTab(Localization l) {
     if (_sent.isEmpty) return _empty(Icons.outbox_outlined, K.notifEmptySent, l);
-    final now = DateTime.now();
+    final now = FamilyTime.now();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
@@ -935,7 +1087,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             semantics: l[K.notifResolvedStateTitle],
           ),
         _statusBadge(statusKey == null ? req.status : l[statusKey]),
-        if (isPending && tag != SwapPriorityTag.none) _tagBadge(tag, l),
+        if (isPending && tag != SwapPriorityTag.none)
+          _tagBadge(tag, l,
+              dayStarted: req.toView().dayStartedWithoutTime(now)),
         // F-24: resolved by the 48h server cron.
         if (req.isAutoResolved)
           _statusBadge(l[K.notifAutoBadge],
@@ -950,7 +1104,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         // do arithmetic on a window that was never measured from here.
         if (isPending)
           '${l[K.frozenAutoApproval]}: '
-              '${l.formatDateTime(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
+              '${l.formatFamilyDeadline(autoApprovalDeadline(req.scheduleDate, req.proposedHandoffTime))}',
         // F-44 on a RESOLVED request: the sheet never opens for it again, so
         // the two messages live on the row — the sender's own and the
         // approver's note or rejection reason. A pending one shows them in
@@ -971,15 +1125,64 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // ── "Todas" ────────────────────────────────────────────────────────────
 
   Widget _historyTab(Localization l) {
-    if (_history.isEmpty) return _empty(Icons.notifications_none, K.notifEmptyHistory, l);
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        for (final notif in _history) _historyItem(notif, l),
-        const SizedBox(height: 12),
-        ..._pushFooter(l),
-      ],
+    return ListenableBuilder(
+      listenable: widget.badge,
+      builder: (context, _) {
+        final pointer = _chatPointer(l);
+        if (_history.isEmpty && pointer == null) {
+          return _empty(Icons.notifications_none, K.notifEmptyHistory, l);
+        }
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            ?pointer,
+            ..._historyRows(l),
+          ],
+        );
+      },
     );
+  }
+
+  /// U-65 — "N mensagens novas na Conversa · Abrir a Conversa", the one line
+  /// that replaced a row per text.
+  Widget? _chatPointer(Localization l) {
+    final open = widget.onOpenChat;
+    final unread = widget.badge.chatUnread;
+    if (open == null || !widget.badge.chatOn || unread <= 0) return null;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          Spacing.md, Spacing.sm, Spacing.md, Spacing.xs),
+      child: AppCard(
+        child: Row(
+          children: [
+            Icon(Icons.forum_outlined, color: context.tokens.accent.solid),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                unread == 1
+                    ? l[KApp.notifChatUnreadOne]
+                    : l.format(KApp.notifChatUnreadMany, [unread]),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            TextButton(
+              key: NotificationsScreen.chatPointerKey,
+              onPressed: open,
+              child: Text(l[KApp.notifOpenChat]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _historyRows(Localization l) {
+    if (_history.isEmpty) return const [];
+    return [
+      for (final notif in _history) _historyItem(notif, l),
+      const SizedBox(height: 12),
+      ..._pushFooter(l),
+    ];
   }
 
   Widget _historyItem(AppNotification notif, Localization l) {
@@ -1016,7 +1219,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         timestamp:
             createdLocal == null ? '' : l.formatDateTime(createdLocal),
-        detail: _planAction(notif, l) ?? _expenseAction(notif, l),
+        detail: _planAction(notif, l) ??
+            _expenseAction(notif, l) ??
+            _trialAction(notif, l) ??
+            _familyAction(notif, l) ??
+            _adminChangeAction(notif, l) ??
+            _agendaAction(notif, l),
       ),
     );
   }
@@ -1041,20 +1249,118 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
+  /// F-101: an expired invitation's row opens the Família page, where the
+  /// card's "Compartilhar de novo" makes a new link. The row only reaches the
+  /// inviter.
+  Widget? _familyAction(AppNotification notif, Localization l) {
+    final open = widget.onOpenFamily;
+    if (open == null || !PushRouting.familyTypes.contains(notif.type)) {
+      return null;
+    }
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: NotificationsScreen.familyActionKey(notif.id),
+        icon: const Icon(Icons.share_outlined),
+        label: Text(l[KApp.famShareAgain]),
+        onPressed: () {
+          _trackListOpen(notif.type);
+          open();
+        },
+      ),
+    );
+  }
+
+  /// F-77: a Premium-trial row opens the plan page, where the subscribe
+  /// button is. Any member may see the page; the row only reaches admins.
+  /// F-80 PR 3: a referral-reward row opens it too, where the new end shows.
+  Widget? _trialAction(AppNotification notif, Localization l) {
+    final open = widget.onOpenPlan;
+    if (open == null ||
+        !PushRouting.planTypes.contains(notif.type)) {
+      return null;
+    }
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: NotificationsScreen.trialActionKey(notif.id),
+        icon: const Icon(Icons.workspace_premium_outlined),
+        label: Text(l[K.notifTrialAction]),
+        onPressed: () {
+          _trackListOpen(notif.type);
+          open();
+        },
+      ),
+    );
+  }
+
+  /// F-81: an admin changed one of my days directly. One day opens it; several
+  /// open the Histórico, where the action reads as one entry. A row whose
+  /// params the rule cannot read offers nothing and still renders.
+  Widget? _adminChangeAction(AppNotification notif, Localization l) {
+    final target = AdminChangeRules.targetOf(notif.type, notif.paramsJson);
+    final day = AdminChangeRules.dayOf(notif.type, notif.paramsJson);
+    final VoidCallback? onPressed = switch (target) {
+      AdminChangeTarget.day when day != null && widget.onOpenDay != null =>
+        () => widget.onOpenDay!(day),
+      AdminChangeTarget.auditTrail when widget.onOpenAuditTrail != null =>
+        () => widget.onOpenAuditTrail!(notif.id),
+      _ => null,
+    };
+    if (onPressed == null) return null;
+    final isDay = target == AdminChangeTarget.day;
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: NotificationsScreen.adminChangeActionKey(notif.id),
+        icon: Icon(isDay ? Icons.event_outlined : Icons.history),
+        label: Text(l[isDay
+            ? K.notifDayAdminChangeDayAction
+            : K.notifDayAdminChangeTrailAction]),
+        onPressed: () {
+          _trackListOpen(notif.type);
+          onPressed();
+        },
+      ),
+    );
+  }
+
+  /// U-65: an agenda notice or reminder opens its day — the payload already
+  /// carried the date; the row did not use it (T-103 audit).
+  Widget? _agendaAction(AppNotification notif, Localization l) {
+    final open = widget.onOpenDay;
+    final day = PushRouting.agendaDayOf(notif.type, notif.paramsJson);
+    if (open == null || day == null) return null;
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(
+        key: NotificationsScreen.agendaActionKey(notif.id),
+        icon: const Icon(Icons.event_outlined),
+        label: Text(l[KApp.notifAgendaSeeDay]),
+        onPressed: () {
+          _trackListOpen(notif.type);
+          open(day);
+        },
+      ),
+    );
+  }
+
   /// F-70: the one thing a plan-end row asks for, on the row itself. A row
   /// whose params the rule cannot read offers nothing and still renders.
   Widget? _planAction(AppNotification notif, Localization l) {
     final onPlanFrom = widget.onPlanFrom;
     if (onPlanFrom == null || _ownProfile?.isViewer == true) return null;
     final start =
-        PlanEndRules.actionStart(notif.type, notif.paramsJson, DateTime.now());
+        PlanEndRules.actionStart(notif.type, notif.paramsJson, FamilyTime.now());
     if (start == null) return null;
     return Align(
       alignment: AlignmentDirectional.centerStart,
       child: TextButton.icon(
         key: NotificationsScreen.planActionKey(notif.id),
         icon: const Icon(Icons.edit_calendar_outlined),
-        label: Text(l[K.notifPlanAction]),
+        label: Text(l[PlanEndRules.isUnplanned(notif.paramsJson)
+            ? K.notifPlanFirstAction
+            : K.notifPlanAction]),
         onPressed: () {
           _trackListOpen(PlanEndRules.type);
           onPlanFrom(start);
