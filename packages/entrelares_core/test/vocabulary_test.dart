@@ -303,6 +303,10 @@ void main() {
       'notifRender.settlement',
       'notifRender.title.settlement',
       'app.expense.',
+      // The module named from outside it: the Premium gate and the hint that
+      // says where a child's name shows up.
+      'notifRender.premiumGate.expenses',
+      'app.child.lead',
     ];
     final pt = catalogs['pt-BR']!;
     final word = RegExp(r'\bdespesas?\b', caseSensitive: false);
@@ -327,6 +331,11 @@ void main() {
       'notifRender.chat',
       'notifRender.title.chat',
       'app.chat.',
+      // The module named from outside it: the Premium gate (writing, export)
+      // and the bell's unread line that opens the chat.
+      'notifRender.premiumGate.chat',
+      'app.notif.chatUnread.',
+      'app.notif.openChat',
     ];
     final pt = catalogs['pt-BR']!;
     final word = RegExp(r'\bconversas?\b', caseSensitive: false);
