@@ -277,10 +277,12 @@ void main() {
     final gesture = await pressOn(tester, today.day + 1);
     await gesture.moveTo(tester.getCenter(find.text('${today.day + 4}').last));
     await tester.pump();
-    expect(find.text(pt.format(K.selectionEdit, [4])), findsOneWidget);
+    // While the finger is down the count is the contextual title's — the
+    // action bar waits for the lift (see the test below).
+    expect(find.text(pt.format(K.navGuardSelectedMany, [4])), findsOneWidget);
     await gesture.moveTo(tester.getCenter(find.text('${today.day + 2}').last));
     await tester.pump();
-    expect(find.text(pt.format(K.selectionEdit, [2])), findsOneWidget,
+    expect(find.text(pt.format(K.navGuardSelectedMany, [2])), findsOneWidget,
         reason: 'the run follows the finger back');
     await gesture.up();
     await tester.pumpAndSettle();
@@ -367,5 +369,67 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(pt.format(K.selectionEdit, [2])), findsOneWidget,
         reason: 'the run from the 2nd to the 4th day came out');
+  });
+
+  // Owner's report (21/10/2026): a press held STILL on the 22nd selected the
+  // 22nd to the 29th. The action bar mounted on the press and took its height
+  // from the grid, every row shrank under the finger, and the next move event
+  // — a tremor — read a day lower down. On a 360 × 700 phone the grid is
+  // height-bound, so the bar does shrink the cells here.
+  testWidgets('a press held still selects ONE day: the action bar waits for '
+      'the lift, so the grid does not move under the finger', (tester) async {
+    const size = Size(360, 700);
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    // A day in one of the lower rows, as in the report: the lower the row,
+    // the further the shrink moves it (50 dp here before the fix — the cell
+    // left the finger, and the 2 dp tremor below painted a run).
+    final lastDay = DateTime(today.year, today.month + 1, 0).day;
+    final day = lastDay - 5;
+    final cell = find.text('$day').last;
+    await tester.ensureVisible(cell);
+    await tester.pumpAndSettle();
+    final before = tester.getRect(cell);
+    final gesture = await pressOn(tester, day);
+    await tester.pump();
+    expect(find.byIcon(Icons.edit_outlined), findsNothing,
+        reason: 'no bar while the finger is down');
+    expect(tester.getRect(cell), before, reason: 'the cell stays put');
+    await gesture.moveBy(const Offset(0, 2));
+    await tester.pump();
+    expect(find.text(pt.format(K.navGuardSelectedOne, [1])), findsOneWidget,
+        reason: 'a tremor is not a drag into the next row');
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text(pt.format(K.selectionEdit, [1])), findsOneWidget,
+        reason: 'the bar arrives once the finger is up');
+  });
+
+  testWidgets('with the bar already up, a press that empties the selection '
+      'keeps it until the lift', (tester) async {
+    final days = twoFutureDays;
+    if (days == null) return;
+    final ds = FakeCustodyDataSource(members: [ana, bruno], days: []);
+    await tester.pumpWidget(app(ds));
+    await tester.pumpAndSettle();
+
+    await longPressDay(tester, days.$1);
+    expect(find.text(pt.format(K.selectionEdit, [1])), findsOneWidget);
+    final gesture = await pressOn(tester, days.$1);
+    await tester.pump();
+    expect(find.byIcon(Icons.edit_outlined), findsOneWidget,
+        reason: 'the bar the press found stays while the finger is down');
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
+    expect(find.text(pt[K.navCalendar]), findsOneWidget);
   });
 }
