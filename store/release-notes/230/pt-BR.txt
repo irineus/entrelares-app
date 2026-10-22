@@ -1,0 +1,1 @@
+Calendário: segurar o dedo num dia para começar a selecionar não marca mais, sem querer, os dias da linha de baixo. A barra "Editar" agora aparece quando você solta o dedo, e o calendário não se mexe enquanto você seleciona.
