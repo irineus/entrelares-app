@@ -1619,6 +1619,9 @@ class _CalendarScreenState extends State<CalendarScreen>
     final from = _lastPicked;
     final shift = HardwareKeyboard.instance.isShiftPressed;
     setState(() {
+      // A tap means no press is under way — even one whose grid was rebuilt
+      // before the finger lifted, so its end never arrived.
+      _barAtPress = null;
       _lastPicked = d;
       if (shift && from != null && from != d) {
         _selectedDays.addAll(selectionRange(from, d, horizon: _horizonDate));
@@ -1644,6 +1647,17 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// starts.
   DateTime? _lastPicked;
 
+  /// Owner's report (21/10/2026): whether the action bar was up when the
+  /// press began, held until the finger lifts. The bar takes height from the
+  /// grid, which sizes its cells to what is left (U-28) — so a bar that
+  /// mounted on the press shrank every row under a finger that had not
+  /// moved, and the next move event read a day further down: a press on the
+  /// 22nd, held still, selected the 22nd to the 29th. Null when no press is
+  /// under way, and then the bar follows the selection.
+  bool? _barAtPress;
+
+  bool get _showSelectionBar => _barAtPress ?? _isSelectionMode;
+
   /// The finger is over [date] while pressing: the selection is what it was
   /// before the press plus every day from the press to here. It stops at the
   /// month's edge (the grid maps no further) and at the planning horizon.
@@ -1666,10 +1680,14 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   void _onDragEnd() {
+    // The finger is up: the bar may now take its height from the grid.
+    final barHeld = _barAtPress != null;
+    _barAtPress = null;
     _dragAnchor = null;
     _dragBase = null;
     _dragRemoves = false;
     if (_selectedDays.isEmpty) _forgetSelectionMonths();
+    if (barHeld && mounted) setState(() {});
   }
 
   /// F-100: the days and open requests of the months the selection already
@@ -1686,6 +1704,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   void _forgetSelectionMonths() {
     _dragAnchor = null;
     _dragBase = null;
+    _barAtPress = null;
     _lastPicked = null;
     _selectionDays.clear();
     _selectionFrozen.clear();
@@ -1718,6 +1737,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (_refuseWriteInTodas()) return;
     HapticFeedback.mediumImpact();
     setState(() {
+      _barAtPress = _showSelectionBar;
       // Owner's QA of 3.1.10: the press may become a drag — remember where
       // it started and what was selected before it.
       final d = dateOnly(date);
@@ -3631,7 +3651,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               },
             ),
           ),
-          if (_isSelectionMode)
+          if (_showSelectionBar)
             Material(
               elevation: 8,
               child: SafeArea(
@@ -4202,7 +4222,12 @@ class _MonthGrid extends StatelessWidget {
                       DateTime(month.year, month.month, day))),
                   type: type,
                   onTap: onDayTap,
-                  onLongPress: onDayLongPress,
+                  // The screen reader's press has no finger to lift, so it
+                  // ends where it starts.
+                  onLongPress: (d) {
+                    onDayLongPress(d);
+                    onDragEnd();
+                  },
                 ),
             ],
           ),

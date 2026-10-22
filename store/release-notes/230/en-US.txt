@@ -1,0 +1,1 @@
+Calendar: pressing and holding a day to start selecting no longer marks the days in the row below by accident. The "Edit" bar now appears when you lift your finger, and the calendar stays still while you select.
