@@ -11,6 +11,12 @@
 # (The old reason — "the account's 2000 min/mo" — was stale: the repo is
 # PUBLIC, and standard GitHub-hosted runners carry no minute quota there;
 # corrected by T-79.)
+# 04/11/2026: minutes became a constraint again — the owner wants the option
+# of a PRIVATE repo, where the account has 2,000 a month and this workflow
+# alone used ~7,950. Two cuts, each bounded by what it may NOT lose: the full
+# gate runs on the schedule only on Mondays (`on:`), and a push to `main`
+# skips the gates its PR run already passed over the very same tree
+# (`gate-proof`). `app/test/gate_proof_test.dart` pins both.
 # T-79 added the Android channel at the bottom: `play-internal` uploads the
 # prod AAB to the Play Internal testing track on every merge that bumps the
 # versionCode. Production is a separate, owner-approved dispatch.
@@ -57,8 +63,19 @@ on:
     paths-ignore: ['**/*.md']
   # T-53 lote 3: the E2E lane runs on a schedule, not on every push — an
   # emulator run costs ~10-15 min per run. 06:10 UTC daily.
+  #
+  # TWO entries since 04/11/2026, and the difference is what else runs. On
+  # MONDAY the whole gate runs over `main` (`db-gate` + `web-e2e`) — the run
+  # that catches what breaks with no commit at all: a test that depends on
+  # today's date (the four #413 fixed), a runner image or Chrome update, a
+  # console change on the dev project. Every OTHER day only `verify` and the
+  # emulator lane run. That daily repeat cost ~37 min a day to re-prove a tree
+  # no PR had touched; a weekly one finds the same drift within seven days.
+  # The two gate jobs compare `github.event.schedule` against the MONDAY string
+  # below, so the strings must match byte for byte (`web_channel_test` pins it).
   schedule:
-    - cron: "10 6 * * *"
+    - cron: "10 6 * * 1"
+    - cron: "10 6 * * 0,2-6"
   workflow_dispatch:
     inputs:
       build-apk:
@@ -108,6 +125,24 @@ jobs:
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
+
+      # 04/11/2026: the receipt `gate-proof` reads after the merge. On a PR,
+      # the checkout is `refs/pull/N/merge` — the PR merged into `main` AS IT
+      # STOOD when this run started — and its TREE hash names those exact
+      # bytes. If the squash that lands on `main` has the same tree, this run's
+      # `db-gate` and `web-e2e` already proved what is about to be published.
+      - name: Record the tree this PR run tests
+        if: github.event_name == 'pull_request'
+        run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
+      - name: Keep the tree for the merge
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tested-tree
+          path: tested-tree.txt
+          retention-days: 30
+          overwrite: true
+          if-no-files-found: error
 
       # .fvmrc is the single source of truth for the Flutter version (locked
       # decision: version changes only by explicit owner decision on the board).
@@ -169,6 +204,46 @@ jobs:
           # push, so a regression is noticed the day it lands rather than the
           # day someone complains.
 
+  # ── 04/11/2026 — a merge does not re-prove what its PR already proved ────
+  # A push to `main` used to run `db-gate` and the three `web-e2e` legs again
+  # (~32 of its ~49 billed minutes) over a commit the PR had usually tested
+  # minutes earlier. Usually is the problem: the PR tests itself merged into
+  # `main` as `main` stood when its run STARTED, and nothing re-runs it when
+  # `main` moves. Two PRs green one by one, merged one after the other, were
+  # never tested together — and this repo has no "branch must be up to date"
+  # rule to force it.
+  #
+  # So the skip is not "the PR was green". It is "the bytes `main` now holds
+  # are the bytes a green PR run tested": this job compares the merged commit's
+  # TREE with the tree that run recorded (`tested-tree`, uploaded by `verify`
+  # on every PR run). Equal trees ⇒ the same files, the same migrations, this
+  # same workflow — `db-gate` and `web-e2e` skip and the publish chain accepts
+  # the PR run as their verdict. Any difference (`main` moved between that run
+  # and the merge, a second PR landed first, no PR found, an API error, an
+  # expired artifact) ⇒ `proven` is not `true` and both gates run here as
+  # before. Every way this job can fail lands on "run the gates": it can only
+  # ever make the push run do MORE.
+  #
+  # Push only. A `workflow_dispatch` on `main` — the documented way to
+  # republish HEAD (F-63) — always runs the whole gate.
+  gate-proof:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      proven: ${{ steps.proof.outputs.proven }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Was this exact tree proven by its PR run?
+        id: proof
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/gate_proof.sh
+
   # ── The DB gate ──────────────────────────────────────────────────────────
   # The tests over RLS, the SECURITY DEFINER RPCs, the triggers, the Edge
   # Functions' refusals and the billing ledger (479 on 27/09/2026 — `dart
@@ -194,7 +269,16 @@ jobs:
   #
   # Runs on the same events as `verify` (and blocks `deploy-web` alongside it),
   # but in its own job, so it costs nothing to run beside the Flutter lane.
+  # Two exceptions since 04/11/2026: a push whose tree `gate-proof` found
+  # already proven, and the schedule on any day but Monday (see `on:`).
+  # `!cancelled()` because `gate-proof` SKIPS on every event but push, and a
+  # skipped `needs` would otherwise skip this job too.
   db-gate:
+    needs: gate-proof
+    if: >-
+      !cancelled()
+      && needs.gate-proof.outputs.proven != 'true'
+      && (github.event_name != 'schedule' || github.event.schedule == '10 6 * * 1')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Serialized across the whole repo, unlike the per-ref group of the workflow.
@@ -493,8 +577,17 @@ jobs:
   # each suite has its own runner, clock and verdict, and the job ends when the
   # longest leg does (~10 min, not ~19). `needs: web-e2e` still waits for ALL
   # legs, and a failing leg makes the whole job `failure`.
+  #
+  # The same two exceptions as `db-gate` since 04/11/2026, written the same
+  # way: a push whose tree its PR run already proved, and the schedule on any
+  # day but Monday.
   web-e2e:
     name: web-e2e (${{ matrix.target }})
+    needs: gate-proof
+    if: >-
+      !cancelled()
+      && needs.gate-proof.outputs.proven != 'true'
+      && (github.event_name != 'schedule' || github.event.schedule == '10 6 * * 1')
     runs-on: ubuntu-latest
     # Per LEG. Measured over those 20 green runs: setup before the drive p95
     # 0.6 min; compile + run p95 5.9 (swap_workflow), 4.3 (account_flows) and
@@ -617,9 +710,20 @@ jobs:
   # file, and a same-repo branch can edit this file — so the `if` keeps the job
   # from RUNNING elsewhere, and only the Environment's rule keeps a branch from
   # READING the secrets. The shape T-79 gave the Play upload key.
+  #
+  # 04/11/2026 — the condition every publishing job shares. A gate counts as
+  # passed when it is `success` HERE, or `skipped` because `gate-proof` proved
+  # the tree in the PR run. `!cancelled()` is what lets a skipped gate through
+  # at all (without a status function, a skipped `needs` skips the dependent);
+  # the explicit results are what keep a FAILED or CANCELLED gate from doing
+  # the same. `verify` is never skipped and is checked for `success` outright.
   db-prod:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
-    needs: [verify, db-gate]
+    if: >-
+      !cancelled()
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
+      && needs.verify.result == 'success'
+      && (needs.db-gate.result == 'success' || (needs.db-gate.result == 'skipped' && needs.gate-proof.outputs.proven == 'true'))
+    needs: [verify, gate-proof, db-gate]
     runs-on: ubuntu-latest
     environment: production
     # Queue, never cancel: a `db push` interrupted between two migrations leaves
@@ -683,7 +787,15 @@ jobs:
   #                               third-party host.
   #   --release                   the only build a user may ever receive.
   deploy-web:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
+    # The shared publish condition (see `db-prod`), with both gates and the
+    # production schema.
+    if: >-
+      !cancelled()
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
+      && needs.verify.result == 'success'
+      && (needs.db-gate.result == 'success' || (needs.db-gate.result == 'skipped' && needs.gate-proof.outputs.proven == 'true'))
+      && (needs.web-e2e.result == 'success' || (needs.web-e2e.result == 'skipped' && needs.gate-proof.outputs.proven == 'true'))
+      && needs.db-prod.result == 'success'
     # THREE gates and one deploy, in this order, and each edge was added the day
     # its absence would have cost something:
     #   · `verify`   — the Flutter suites (unit, widget, web compile);
@@ -693,7 +805,7 @@ jobs:
     #     the old repo's promotion: a broken two-user flow stops the channel;
     #   · `db-prod`  — T-29's order, migrations → functions → app, so the channel
     #     never serves an app whose schema failed to apply.
-    needs: [verify, db-gate, web-e2e, db-prod]
+    needs: [verify, gate-proof, db-gate, web-e2e, db-prod]
     runs-on: ubuntu-latest
     # S-23: the Cloudflare and Sentry tokens live in the `production`
     # Environment (`main` only), for the reason `db-prod` states. The QA lanes
@@ -868,8 +980,15 @@ jobs:
   # branch rule is `main` alone — the repo is PUBLIC, and that rule, not the
   # job's `if`, is what keeps a same-repo PR branch from reading the key.
   play-internal:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
-    needs: [verify, db-gate, web-e2e, db-prod]
+    # The shared publish condition (see `db-prod`), the same gates as the web.
+    if: >-
+      !cancelled()
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
+      && needs.verify.result == 'success'
+      && (needs.db-gate.result == 'success' || (needs.db-gate.result == 'skipped' && needs.gate-proof.outputs.proven == 'true'))
+      && (needs.web-e2e.result == 'success' || (needs.web-e2e.result == 'skipped' && needs.gate-proof.outputs.proven == 'true'))
+      && needs.db-prod.result == 'success'
+    needs: [verify, gate-proof, db-gate, web-e2e, db-prod]
     runs-on: ubuntu-latest
     environment: play-internal
     timeout-minutes: 30
@@ -1131,8 +1250,13 @@ jobs:
   # the owner, and only WARNED about here — a missing DNS record must not turn
   # `main` red.
   qa-web:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
-    needs: [verify, db-gate]
+    # The shared publish condition (see `db-prod`), behind `db-gate` alone.
+    if: >-
+      !cancelled()
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
+      && needs.verify.result == 'success'
+      && (needs.db-gate.result == 'success' || (needs.db-gate.result == 'skipped' && needs.gate-proof.outputs.proven == 'true'))
+    needs: [verify, gate-proof, db-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
