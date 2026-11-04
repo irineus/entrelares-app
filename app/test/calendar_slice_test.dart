@@ -2094,7 +2094,9 @@ class FakeCustodyDataSource implements CustodyDataSource {
 const ana = Member(id: 1, fullName: 'Ana Souza', colorSlot: 1, userId: 'u1');
 const bruno = Member(id: 2, fullName: 'Bruno Lima', colorSlot: 2, userId: 'u2');
 
-DateTime get today => DateTime.now();
+/// The fixtures' today is the screen's: the family clock, which a test run can pin
+/// (`TEST_TODAY`, flutter_test_config.dart). On the host clock the two agree.
+DateTime get today => FamilyTime.now();
 DateTime dayOfMonth(int day) => DateTime(today.year, today.month, day);
 
 CareSchedule row(int id, DateTime date, int scheduled,

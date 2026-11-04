@@ -28,9 +28,15 @@ abstract final class FamilyTime {
 
   static Duration get _offset => debugOffset ?? offset;
 
+  /// Tests only: the instant [now] and [today] read instead of the host's
+  /// clock. The app's widget tests pin it, so a fixture's "today" and the
+  /// screen's agree on every calendar day, not only the one CI runs on. Null
+  /// in the app.
+  static DateTime? debugNow;
+
   /// The family's wall clock at [instant] (default: now).
   static DateTime now([DateTime? instant]) {
-    final u = (instant ?? DateTime.now()).toUtc().add(_offset);
+    final u = (instant ?? debugNow ?? DateTime.now()).toUtc().add(_offset);
     return DateTime(u.year, u.month, u.day, u.hour, u.minute, u.second,
         u.millisecond);
   }

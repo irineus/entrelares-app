@@ -77,7 +77,11 @@ int _wholeWeeksVisible(WidgetTester tester) {
   final gridFinder = find.byType(GridView).first;
   final grid = tester.widget<GridView>(gridFinder);
   final cells = grid.childrenDelegate.estimatedChildCount!;
-  final rows = cells ~/ 7;
+  // The grid pads the first week only: a month that starts on the week's
+  // first day ends on a short row (November 2026: 30 cells, five rows), and
+  // `~/ 7` counted four — every cell 13 dp too tall, two weeks read as fit,
+  // red for the whole month.
+  final rows = (cells + 6) ~/ 7;
   final gridRect = tester.getRect(gridFinder);
   final viewport = tester.getRect(
       find.ancestor(of: gridFinder, matching: find.byType(Viewport)).first);

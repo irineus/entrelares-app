@@ -9,6 +9,7 @@
 //    clocks.
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/child.dart';
@@ -17,6 +18,7 @@ import 'package:entrelares_db_contracts/models/family.dart';
 import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_app/screens/calendar_screen.dart';
 import 'package:entrelares_app/services/admin_mode.dart';
+import 'package:entrelares_app/theme/app_theme.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_app/widgets/day_agenda.dart';
 
@@ -69,10 +71,13 @@ FakeCustodyDataSource worstCaseAgendaSource() {
     ];
 }
 
-Widget calendarIn(FakeCustodyDataSource ds, AppLanguage language) => AppL10n(
+Widget calendarIn(FakeCustodyDataSource ds, AppLanguage language,
+        {ThemeData? theme}) =>
+    AppL10n(
       l: Localization(language),
       setLanguage: (_) async {},
       child: MaterialApp(
+        theme: theme,
         home: CalendarScreen(dataSource: ds, adminMode: AdminMode()),
       ),
     );
@@ -245,6 +250,18 @@ void main() {
 
     // The worst cells at 360 dp, 1.3×, in the 12-hour clock too ("12:00 PM"
     // is the widest time line, U-39). An overflow is an exception here.
+    // In the app's theme and the real Inter, as the U-32/U-48 gate measures:
+    // the test font draws every glyph a full em wide, and on the 10th — the
+    // fixture's handoff day, when the Hoje card adds "Próxima entrega" — it
+    // pushed that card 70 dp past a 360 dp phone the real font fits in
+    // (10/10/2026). The cells were never the ones that overflowed.
+    setUpAll(() async {
+      final inter = FontLoader('Inter');
+      for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+        inter.addFont(rootBundle.load('assets/fonts/Inter-$w.ttf'));
+      }
+      await inter.load();
+    });
     for (final language in [AppLanguage.ptBr, AppLanguage.en]) {
       for (final height in [640.0, 900.0]) {
         testWidgets(
@@ -256,7 +273,8 @@ void main() {
           tester.platformDispatcher.textScaleFactorTestValue = 1.3;
           addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
           await tester.pumpWidget(
-              calendarIn(worstCaseAgendaSource(), language));
+              calendarIn(worstCaseAgendaSource(), language,
+                  theme: AppTheme.light));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
           for (final d in [10, 21, 28]) {

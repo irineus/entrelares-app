@@ -10,7 +10,10 @@ DateTime manaus(int y, int mo, int d, int h, [int mi = 0]) =>
 
 void main() {
   setUp(() => FamilyTime.debugOffset = null);
-  tearDown(() => FamilyTime.debugOffset = null);
+  tearDown(() {
+    FamilyTime.debugOffset = null;
+    FamilyTime.debugNow = null;
+  });
 
   group('a device in Manaus (UTC−4)', () {
     test('at 23:30 local the family is already on the next day', () {
@@ -65,5 +68,14 @@ void main() {
     expect(FamilyTime.now(DateTime.utc(2026, 10, 9, 1)),
         DateTime(2026, 10, 9, 1));
     expect(FamilyTime.deviceDiffers(deviceOffset: Duration.zero), isFalse);
+  });
+
+  test('debugNow pins the instant now and today read (tests only)', () {
+    FamilyTime.debugNow = DateTime.utc(2026, 11, 1, 2, 30);
+    expect(FamilyTime.now(), DateTime(2026, 10, 31, 23, 30));
+    expect(FamilyTime.today(), DateTime(2026, 10, 31));
+    // An explicit instant still wins.
+    expect(FamilyTime.today(DateTime.utc(2026, 11, 1, 12)),
+        DateTime(2026, 11, 1));
   });
 }
