@@ -105,7 +105,9 @@ void main() {
     });
 
     test('a manual dispatch on main republishes it too (F-63)', () {
-      final condition = RegExp(r'if: (.+)').firstMatch(job)!.group(1)!;
+      // The job's own `if:` up to `needs:` — a `>-` block since 04/11/2026,
+      // when the condition grew the proven-skip clauses (gate_proof_test).
+      final condition = job.substring(job.indexOf('    if:'), job.indexOf('    needs:'));
       expect(condition, contains("github.event_name == 'push'"));
       expect(condition, contains("github.event_name == 'workflow_dispatch'"));
     });

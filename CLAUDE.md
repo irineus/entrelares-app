@@ -333,6 +333,16 @@ emulador contra o projeto dev, família descartável (`E2E-<runId>`, `@resend.de
 `purge_e2e_family` no teardown). Fora do gate por custo de minutos: agendada
 (06:10 UTC) + `workflow_dispatch` (`run-e2e`, `e2e-pack` p0/full). A service_role do
 dev chega só por `--dart-define` a partir do secret `SUPABASE_SERVICE_ROLE_DEV`.
+
+⚠️ **Dois cortes de minutos no `verify.yml` (04/11/2026), presos em `app/test/gate_proof_test.dart`.**
+(1) O agendado roda o gate INTEIRO (`db-gate` + `web-e2e`) só na **segunda-feira**; nos outros
+dias, só `verify` + o lane do emulador — quebra que chega sem commit (teste que depende da data,
+imagem do runner, console do dev) aparece em até 7 dias. (2) No push em `main`, o job
+`gate-proof` compara a ÁRVORE do commit mergeado com a que o run verde do PR gravou
+(`tested-tree`); árvores iguais ⇒ `db-gate` e `web-e2e` pulam e a publicação aceita o veredito
+do PR. Se `main` andou entre o run do PR e o merge, ou qualquer passo falha, os dois rodam como
+antes — o sumário do `gate-proof` diz qual dos dois aconteceu. Um `workflow_dispatch` em `main`
+sempre roda tudo. Os jobs que publicam aceitam gate só como `success` ou `skipped` com prova.
 Cloud sessions: `bash tool/setup_env.sh && source tool/env` (hosts needed:
 `storage.googleapis.com`, `dl.google.com`, `pub.dev` — all reachable in this product's
 cloud policy; if one is blocked, STOP and report the domain, no unofficial mirrors).
