@@ -234,8 +234,11 @@ void main() {
   testWidgets('wizard: ticking "substituir" asks, and "Ativar" ticks it',
       (tester) async {
     final mode = AdminMode();
-    // F-97: the box exists only when the range holds planned days.
-    final ahead = DateTime(today.year, today.month, today.day + 5);
+    // F-97: the box exists only when the range holds planned days. The
+    // default model (3-11) starts on the next Friday — up to six days out, so
+    // on a Saturday a day five ahead was BEFORE the range and the box hid
+    // (17/10 and 10/10/2026). Ten days ahead is inside it on every weekday.
+    final ahead = DateTime(today.year, today.month, today.day + 10);
     final ds = FakeCustodyDataSource(
         members: [anaAdmin, bruno], days: [row(9, ahead, anaAdmin.id)]);
     await tester.pumpWidget(app(ds, adminMode: mode));
