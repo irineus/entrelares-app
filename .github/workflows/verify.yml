@@ -1106,9 +1106,18 @@ jobs:
   # split buys is that the production token, Supabase and Sentry left PR reach,
   # and each lane is revoked and audited on its own. Real isolation is a
   # second Cloudflare account for the QA project — an open decision on S-23.
+  #
+  # 04/11/2026: `!cancelled()` and the two explicit results are NOT optional.
+  # `db-gate` needs `gate-proof`, which skips on every PR, and GitHub's default
+  # `success()` reads EVERY ancestor, not just the jobs named here — so with the
+  # default this job skipped on every PR while both of its needs were green
+  # (the first run of PR #414). `gate_proof_test` refuses any job downstream of
+  # a gate without a status function in its `if`.
   qa-preview:
     if: >-
-      github.event_name == 'pull_request'
+      !cancelled()
+      && needs.verify.result == 'success' && needs.db-gate.result == 'success'
+      && github.event_name == 'pull_request'
       && !github.event.pull_request.draft
       && github.event.pull_request.head.repo.full_name == github.repository
     needs: [verify, db-gate]

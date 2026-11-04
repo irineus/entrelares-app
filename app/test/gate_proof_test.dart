@@ -149,6 +149,32 @@ void main() {
       }
     });
 
+    test('every job downstream of a gate carries a status function', () {
+      // GitHub's default `success()` reads EVERY ancestor job, not only the
+      // ones in `needs:`. `gate-proof` skips on PRs, schedules and dispatches,
+      // so a job that needs `db-gate` or `web-e2e` without a status function
+      // skips with both of its needs green — PR #414's first run lost
+      // `qa-preview` exactly that way, with no red anywhere.
+      final jobs = RegExp(r'^  ([a-z0-9-]+):$', multiLine: true)
+          .allMatches(_code)
+          .map((m) => m.group(1)!)
+          .where((name) => _lines.indexOf('  $name:') > _lines.indexOf('jobs:'));
+      final downstream = [
+        for (final name in jobs)
+          if (RegExp(r'needs:\s*(\[[^\]]*\]|\S+)').firstMatch(_job(name))
+                  case final m?
+              when RegExp(r'\b(db-gate|web-e2e|gate-proof)\b')
+                  .hasMatch(m.group(1)!))
+            name,
+      ];
+      expect(downstream, containsAll(['db-gate', 'web-e2e', 'qa-preview',
+          'db-prod', 'deploy-web', 'play-internal', 'qa-web', 'ops-alert']));
+      for (final name in downstream) {
+        expect(_if(name), anyOf(startsWith('!cancelled()'), startsWith('always()')),
+            reason: '$name would skip whenever gate-proof skips');
+      }
+    });
+
     test('the PR run records the tree it tested', () {
       final verify = _job('verify');
       expect(verify, contains("run: git rev-parse 'HEAD^{tree}' > tested-tree.txt"));
