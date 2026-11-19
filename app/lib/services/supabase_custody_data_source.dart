@@ -1364,6 +1364,21 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
   }
 
   @override
+  Future<PendingInvitationOffer?> fetchInvitationOfferForToken(
+      String token) async {
+    if (!InviteFormRules.isTokenShaped(token)) return null;
+    final data = await _client.rpc<dynamic>('invitation_offer_for_token',
+        params: {'p_token': token});
+    final row = data is List ? (data.isEmpty ? null : data.first) : data;
+    if (row is! Map || row['token'] == null) return null;
+    return PendingInvitationOffer(
+      token: '${row['token']}',
+      familyName: '${row['family_name'] ?? ''}',
+      inviterName: '${row['inviter_name'] ?? ''}',
+    );
+  }
+
+  @override
   Future<void> joinInvitationFromEmptyFamily(String token) async {
     await _client.rpc<dynamic>('join_invitation_from_empty_family', params: {
       'p_token': token,
@@ -1426,6 +1441,41 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       throw const SignUpFailure(K.authErrConnection);
     }
 
+    if (RegisterRules.isSilentDuplicate(
+        hasUser: response.user != null,
+        identityCount: response.user?.identities?.length ?? 0)) {
+      throw const SignUpFailure(K.authErrAlreadyRegistered);
+    }
+  }
+
+  @override
+  Future<void> signUpInvitee({
+    required String email,
+    required String password,
+    required String fullName,
+    required String inviteToken,
+    required String languageCode,
+  }) async {
+    final AuthResponse response;
+    try {
+      response = await _client.auth.signUp(
+        email: email,
+        password: password,
+        emailRedirectTo: DeepLinkUrls.login,
+        // F-108: the same keys `claim_invitation_on_confirm` reads once the
+        // address is confirmed — the name, the token, the S-13 evidence.
+        data: {
+          'full_name': fullName,
+          'invite_token': inviteToken,
+          'policy_version': PolicyVersions.current,
+          'language': languageCode,
+        },
+      );
+    } on AuthException catch (e) {
+      throw SignUpFailure(RegisterRules.signUpErrorKey(e.message));
+    } catch (_) {
+      throw const SignUpFailure(K.authErrConnection);
+    }
     if (RegisterRules.isSilentDuplicate(
         hasUser: response.user != null,
         identityCount: response.user?.identities?.length ?? 0)) {
@@ -1638,12 +1688,14 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
 
   @override
   Future<int> createInvitation({
-    required String email,
+    required String? email,
     required int roleId,
     int? profileId,
   }) async {
+    final clean = email?.trim() ?? '';
     final data = await _client.rpc('create_invitation', params: {
-      'p_email': email.trim(),
+      // F-108: no address is a LINK — sent as SQL NULL, never ''.
+      'p_email': clean.isEmpty ? null : clean,
       'p_role_id': roleId,
       'p_profile_id': ?profileId,
     });

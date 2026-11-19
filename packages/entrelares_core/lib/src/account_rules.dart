@@ -54,6 +54,19 @@ abstract final class RegisterRules {
     return null;
   }
 
+  /// F-108 — which door an invitee's e-mail sign-up takes. The invitation's
+  /// OWN address keeps U-17's pre-confirmed `register-invitee`: the message
+  /// reached that mailbox, so it is already proven. Any other address — and
+  /// every link invitation, which has none — signs up with GoTrue's
+  /// confirmation, and the seat is taken only once the address is confirmed.
+  static bool inviteeNeedsConfirmation({
+    required String typedEmail,
+    required String invitedEmail,
+  }) {
+    final invited = invitedEmail.trim().toLowerCase();
+    return invited.isEmpty || typedEmail.trim().toLowerCase() != invited;
+  }
+
   /// U-44 — the founder's first step (the account) alone: the same checks,
   /// in the same order, that [validationErrorKey] runs on these four fields.
   /// No new rule — with a valid second step the two answer identically, and a

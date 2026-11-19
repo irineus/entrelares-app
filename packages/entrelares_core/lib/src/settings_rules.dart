@@ -117,6 +117,14 @@ class PublicSettings {
   bool get referralEnabled =>
       parseBoolSetting(values, 'feature.referral', false);
 
+  /// F-108 — the caregiver invitation by LINK, no e-mail needed. Dark until
+  /// the Android build that unlocks the invitee's e-mail is in Production:
+  /// an older build locks the sign-up to the invitation's address, which a
+  /// link does not have. The server refuses an address-less invitation while
+  /// it is off; the client then keeps the e-mail-only flow.
+  bool get inviteLinkEnabled =>
+      parseBoolSetting(values, 'feature.invite_link', false);
+
   // F-55 PR 2 — the agenda's operator keys (the RPCs read the same ones).
   bool get agendaPremiumOnly =>
       parseBoolSetting(values, 'agenda.premium_only', true);

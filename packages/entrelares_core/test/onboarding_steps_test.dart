@@ -80,28 +80,36 @@ void main() {
           isFalse);
     });
 
-    test('F-56: done when a pending member is on the calendar, and the done '
-        'line says the invitation is still to come', () {
+    test('F-108: a pending member with no invitation is NOT done, and the '
+        'line says to share the invitation', () {
       const solo = OnboardingSignals(hasPendingMember: true);
       expect(
           OnboardingSteps.isDone(OnboardingStep.inviteCoCaregiver, solo),
-          isTrue);
+          isFalse,
+          reason: 'six of eight families stopped here with the step ticked');
       expect(
-          OnboardingSteps.doneHintKeyFor(
-              OnboardingStep.inviteCoCaregiver, solo),
-          KApp.onbStepInviteDoneHintPending);
+          OnboardingSteps.hintKeyFor(OnboardingStep.inviteCoCaregiver, solo),
+          KApp.onbStepInviteHintPending);
 
-      // Once an invitation exists the ordinary line is the true one again.
+      // Once an invitation exists the step is done and says so.
       const invited = OnboardingSignals(
           hasPendingMember: true, hasOpenInvitation: true);
       expect(
-          OnboardingSteps.doneHintKeyFor(
+          OnboardingSteps.isDone(OnboardingStep.inviteCoCaregiver, invited),
+          isTrue);
+      expect(
+          OnboardingSteps.hintKeyFor(
               OnboardingStep.inviteCoCaregiver, invited),
           K.onbStepInviteDoneHint);
-      // Other steps never branch.
+
+      // Nobody on the calendar yet: the generic pitch.
       expect(
-          OnboardingSteps.doneHintKeyFor(OnboardingStep.planTheDays, solo),
-          OnboardingStep.planTheDays.doneHintKey);
+          OnboardingSteps.hintKeyFor(
+              OnboardingStep.inviteCoCaregiver, const OnboardingSignals()),
+          K.onbStepInviteHint);
+      // Other steps never branch.
+      expect(OnboardingSteps.hintKeyFor(OnboardingStep.planTheDays, solo),
+          OnboardingStep.planTheDays.hintKey);
     });
   });
 

@@ -858,6 +858,14 @@ class FakeCustodyDataSource implements CustodyDataSource {
   Future<PendingInvitationOffer?> fetchMyPendingInvitation() async =>
       pendingInvitation;
 
+  /// F-108: what `invitation_offer_for_token` answers, keyed by token.
+  Map<String, PendingInvitationOffer> tokenOffers = {};
+
+  @override
+  Future<PendingInvitationOffer?> fetchInvitationOfferForToken(
+          String token) async =>
+      tokenOffers[token];
+
   @override
   Future<void> joinInvitationFromEmptyFamily(String token) async {
     if (throwOnWrite != null) throw throwOnWrite!;
@@ -904,6 +912,26 @@ class FakeCustodyDataSource implements CustodyDataSource {
       'confirmMigration': confirmMigration,
     });
     return inviteeResult;
+  }
+
+  /// F-108: the confirmation-path sign-ups of an invitee, in order.
+  final List<Map<String, Object?>> inviteeSignUps = [];
+
+  @override
+  Future<void> signUpInvitee({
+    required String email,
+    required String password,
+    required String fullName,
+    required String inviteToken,
+    required String languageCode,
+  }) async {
+    inviteeSignUps.add({
+      'email': email,
+      'fullName': fullName,
+      'inviteToken': inviteToken,
+      'language': languageCode,
+    });
+    if (signUpFailureKey != null) throw SignUpFailure(signUpFailureKey!);
   }
 
   // ── F-57: social-login onboarding ──
@@ -1017,23 +1045,54 @@ class FakeCustodyDataSource implements CustodyDataSource {
 
   @override
   Future<int> createInvitation({
-    required String email,
+    required String? email,
     required int roleId,
     int? profileId,
   }) async {
     if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
+    final clean = email?.trim().toLowerCase() ?? '';
     createdInvitations
         .add({'email': email, 'roleId': roleId, 'profileId': profileId});
+    final now = DateTime.now().toUtc();
+    // F-108: the placeholder's open, unexpired invitation is the one link —
+    // sharing again returns it, and an address typed later lands on it.
+    final open = profileId == null
+        ? null
+        : invitations
+            .where((i) => i.profileId == profileId && i.isPending(now))
+            .firstOrNull;
+    if (open != null && (clean.isEmpty || open.isLink)) {
+      if (clean.isNotEmpty) {
+        invitations = [
+          for (final i in invitations)
+            if (i.id == open.id)
+              FamilyInvitation(
+                id: i.id,
+                email: clean,
+                roleId: i.roleId,
+                token: i.token,
+                expiresAt: i.expiresAt,
+                profileId: i.profileId,
+              )
+            else
+              i,
+        ];
+      }
+      return open.id;
+    }
     // F-101: the renewed row is what the page re-reads and shares; the fake
     // keeps the resend semantics (the old open one is gone).
     invitations = [
-      for (final i in invitations) if (i.email != email) i,
+      for (final i in invitations)
+        if (!(clean.isNotEmpty && i.email == clean) &&
+            !(profileId != null && i.profileId == profileId))
+          i,
       FamilyInvitation(
         id: 42,
-        email: email,
+        email: clean,
         roleId: roleId,
         token: 'renewed-0000-0000-0000-000000000042',
-        expiresAt: DateTime.now().toUtc().add(const Duration(days: 7)),
+        expiresAt: now.add(const Duration(days: 7)),
         profileId: profileId,
       ),
     ];
@@ -1053,7 +1112,22 @@ class FakeCustodyDataSource implements CustodyDataSource {
     if (throwOnFamilyWrite != null) throw throwOnFamilyWrite!;
     addedPending.add({'fullName': fullName, 'roleId': roleId, 'email': email});
     final clean = email?.trim() ?? '';
-    return (profileId: 500 + addedPending.length, invitationId: clean.isEmpty ? null : 42);
+    final profileId = 500 + addedPending.length;
+    if (clean.isEmpty) return (profileId: profileId, invitationId: null);
+    // The RPC issues the invitation in the same transaction — the page
+    // re-reads it (F-108 shares it right away).
+    invitations = [
+      ...invitations,
+      FamilyInvitation(
+        id: 42,
+        email: clean.toLowerCase(),
+        roleId: roleId,
+        token: 'born-0000-0000-0000-000000000042',
+        expiresAt: DateTime.now().toUtc().add(const Duration(days: 7)),
+        profileId: profileId,
+      ),
+    ];
+    return (profileId: profileId, invitationId: 42);
   }
 
   @override

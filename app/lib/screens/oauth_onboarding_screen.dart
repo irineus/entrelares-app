@@ -434,8 +434,11 @@ class _OauthOnboardingScreenState extends State<OauthOnboardingScreen> {
           ),
           // F-88: the invitation names an address, and the claim refuses any
           // other — say so BEFORE the form, while switching accounts still
-          // costs nothing (the invitation stays kept).
+          // costs nothing (the invitation stays kept). F-108: only a viewer's
+          // or a legacy invitation is bound; a caregiver invitation for a
+          // pending member takes the Google address the person signed in with.
           if (_sessionEmail != null &&
+              invite.bindsAddress &&
               invite.invitedEmail.trim().toLowerCase() !=
                   _sessionEmail!.trim().toLowerCase()) ...[
             const SizedBox(height: 12),

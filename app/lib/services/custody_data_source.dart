@@ -479,6 +479,11 @@ abstract class CustodyDataSource {
   /// else, nothing planned). Null otherwise.
   Future<PendingInvitationOffer?> fetchMyPendingInvitation();
 
+  /// F-108: `invitation_offer_for_token` — F-88's offer keyed on a link's
+  /// token: answers only for a founder alone in an EMPTY family, about a
+  /// pending invitation the token makes claimable. Null otherwise.
+  Future<PendingInvitationOffer?> fetchInvitationOfferForToken(String token);
+
   /// F-88: accepts [token] and discards the caller's empty family — the
   /// server re-checks both and refuses with a PT-BR sentence.
   Future<void> joinInvitationFromEmptyFamily(String token);
@@ -517,6 +522,21 @@ abstract class CustodyDataSource {
     // U-61: the child's optional first name — rides the metadata, written by
     // the server as the family's first child and stripped from the auth row.
     String? childFirstName,
+  });
+
+  /// F-108: the invitee whose address is NOT the invitation's — or whose
+  /// invitation is a link, with none — signs up like a founder does: GoTrue's
+  /// normal confirmation, the token in the metadata. `handle_new_user` makes
+  /// no profile yet; confirming the address takes the seat
+  /// (`claim_invitation_on_confirm`), so a mistyped address never holds it.
+  /// The invitation's own address keeps the pre-confirmed [registerInvitee].
+  /// Throws [SignUpFailure] with a catalog key, like [signUpFounder].
+  Future<void> signUpInvitee({
+    required String email,
+    required String password,
+    required String fullName,
+    required String inviteToken,
+    required String languageCode,
   });
 
   // ── F-80: family referral (built dark) ────────────────────────────────────
@@ -634,8 +654,14 @@ abstract class CustodyDataSource {
   /// role, its previous open invitation revoked, no seat gate (the placeholder
   /// already holds the seat). A resend of a placeholder's invitation MUST pass
   /// it, or the RPC would issue a placeholder-less invitation for the address.
+  ///
+  /// F-108: a null or blank [email] with [profileId] is a LINK invitation
+  /// (`feature.invite_link` on): the RPC returns the placeholder's open one
+  /// when there is one, so sharing again never kills a link already sent. An
+  /// [email] typed for a placeholder whose open invitation is a link is
+  /// written onto THAT row — same token.
   Future<int> createInvitation({
-    required String email,
+    required String? email,
     required int roleId,
     int? profileId,
   });

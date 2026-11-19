@@ -424,8 +424,14 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         roleId: _inviteRoleId,
         email: email.isEmpty ? null : email,
       );
-      final invitationId = born.invitationId;
-      final mailed = invitationId == null
+      // F-108: with the link on, every caregiver added leaves with an
+      // invitation — 6 of 8 families stopped at a placeholder with no e-mail,
+      // so no link existed to send. The e-mail, when typed, is delivery only.
+      var invitationId = born.invitationId;
+      if (invitationId == null && _settings.inviteLinkEnabled) {
+        invitationId = await _linkFor(born.profileId, _inviteRoleId);
+      }
+      final mailed = invitationId == null || email.isEmpty
           ? false
           : await widget.dataSource.sendInvitationEmail(invitationId);
       if (!mounted) return;
@@ -435,6 +441,28 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
         _inviteRoleId = 0;
         _sendingInvite = false;
       });
+      if (_settings.inviteLinkEnabled && invitationId != null) {
+        widget.analytics?.trackEvent(AnalyticsEvents.inviteSent, props: {
+          'email': email.isEmpty ? 'link' : (mailed ? 'sent' : 'link_only'),
+        });
+        await _load();
+        if (!mounted) return;
+        // The share sheet opens right away (owner, 19/11/2026): the moment the
+        // admin names the other caregiver is the moment they are in the chat.
+        final created =
+            _invitations.where((i) => i.id == invitationId).firstOrNull;
+        if (created != null) await _shareLink(created, l);
+        if (!mounted) return;
+        showAppSnack(
+            context,
+            email.isEmpty
+                ? l.format(KApp.famPendingAdded, [name])
+                : l[mailed ? K.famInviteEmailSent : K.famInviteEmailFailed],
+            type: email.isEmpty || mailed
+                ? AppSnackType.success
+                : AppSnackType.info);
+        return;
+      }
       if (invitationId == null) {
         widget.analytics?.trackEvent(AnalyticsEvents.inviteSent, props: {'email': 'none'});
         showAppSnack(context, l.format(KApp.famPendingAdded, [name]),
@@ -466,6 +494,39 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
           ? l[KApp.famInviteEmailTaken]
           : translateSaveError(e.toString(), l[K.errSaveFailed], l);
 
+  /// F-108: the placeholder's LINK invitation — the open one when it exists
+  /// (the RPC hands it back, so a link already in a chat stays alive), a new
+  /// one otherwise. Null when the server refused (the flag went off between
+  /// the page load and the tap): the placeholder exists either way.
+  Future<int?> _linkFor(int profileId, int roleId) async {
+    try {
+      return await widget.dataSource.createInvitation(
+          email: null, roleId: roleId, profileId: profileId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// F-108: "Compartilhar convite" on a pending member — create (or reuse)
+  /// the link and hand it to the share sheet in one tap.
+  Future<void> _sharePending(Member member, Localization l) async {
+    final hadInvitation = _invitationFor(member) != null;
+    final id = await _linkFor(member.id, member.roleId ?? 0);
+    if (!mounted) return;
+    if (id == null) {
+      showAppSnack(context, l[K.famErrResendInvite], type: AppSnackType.error);
+      return;
+    }
+    if (!hadInvitation) {
+      widget.analytics
+          ?.trackEvent(AnalyticsEvents.inviteSent, props: {'email': 'link'});
+    }
+    await _load();
+    if (!mounted) return;
+    final link = _invitations.where((i) => i.id == id).firstOrNull;
+    if (link != null) await _shareLink(link, l);
+  }
+
   /// F-101: the expired card's one action — a new link (the RPC revokes the
   /// dead one, F-56 carries the placeholder) handed straight to the share
   /// sheet. The e-mail goes out too, best-effort; the link is the point, and
@@ -477,7 +538,9 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
           email: invitation.email,
           roleId: invitation.roleId,
           profileId: invitation.profileId);
-      final mailed = await widget.dataSource.sendInvitationEmail(id);
+      // F-108: a link has no address — nothing to mail, nothing failed.
+      final mailed = invitation.isLink ||
+          await widget.dataSource.sendInvitationEmail(id);
       if (!mounted) return;
       await _load();
       if (!mounted) return;
@@ -564,10 +627,19 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     final message =
         InviteFormRules.inviteShareMessage(l[K.famInviteShareText], link);
     final share = widget.onShareInvite;
-    if (share != null) {
-      await share(message);
-    } else {
-      await Share.share(message);
+    try {
+      if (share != null) {
+        await share(message);
+      } else {
+        await Share.share(message);
+      }
+    } catch (_) {
+      // F-108: a browser without Web Share (desktop) throws here, and the
+      // share now runs right after the caregiver is added — an error at that
+      // point would read as if the add had failed. The link goes to the
+      // clipboard instead, which is what that reader can use.
+      if (!mounted) return;
+      await _copyLink(invitation, l);
     }
   }
 
@@ -647,7 +719,9 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
 
   /// F-56: invite a placeholder that has no open invitation — the one moment
   /// the invitee's e-mail enters the system, and only for as long as the
-  /// invitation lives.
+  /// invitation lives. F-108: on a placeholder whose open invitation is a
+  /// LINK the RPC writes the address onto that same row (same token): the
+  /// link already shared keeps working, and the e-mail is delivery only.
   Future<void> _invitePending(Member member, Localization l) async {
     final email = await showAppSheet<String>(
       context: context,
@@ -672,6 +746,16 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       if (!mounted) return;
       showAppSnack(context, translateSaveError(e.toString(), l[K.errSaveFailed], l),
           type: AppSnackType.error);
+    }
+  }
+
+  /// F-108: the address for a live LINK, written onto the same row by the
+  /// RPC — the person already holding the link loses nothing.
+  Future<void> _emailLink(FamilyInvitation invitation, Localization l) async {
+    final id = invitation.profileId;
+    if (id == null) return;
+    for (final m in _members) {
+      if (m.id == id) return _invitePending(m, l);
     }
   }
 
@@ -1042,15 +1126,26 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       tooltip: l[KApp.commonMoreActions],
       icon: const Icon(Icons.more_vert),
       onSelected: (action) => switch (action) {
+        _MemberAction.share => _sharePending(member, l),
         _MemberAction.invite => _invitePending(member, l),
         _MemberAction.remove => _removePending(member, l),
         _ => null,
       },
       itemBuilder: (context) => [
+        // F-108: the link first — no address needed — and the e-mail after.
+        if (_invitationFor(member) == null && _settings.inviteLinkEnabled)
+          PopupMenuItem(
+            value: _MemberAction.share,
+            child: _menuRow(Icons.share_outlined, l[KApp.famShareInvite]),
+          ),
         if (_invitationFor(member) == null)
           PopupMenuItem(
             value: _MemberAction.invite,
-            child: _menuRow(Icons.mail_outline, l[KApp.famPendingInvite]),
+            child: _menuRow(
+                Icons.mail_outline,
+                l[_settings.inviteLinkEnabled
+                    ? KApp.famInviteByEmail
+                    : KApp.famPendingInvite]),
           ),
         PopupMenuItem(
           value: _MemberAction.remove,
@@ -1075,6 +1170,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       onSelected: (action) => switch (action) {
         _InvitationAction.copyLink => _copyLink(invitation, l),
         _InvitationAction.resend => _resendInvite(invitation, l),
+        _InvitationAction.addEmail => _emailLink(invitation, l),
         _InvitationAction.revoke => _revokeInvite(invitation, l),
       },
       itemBuilder: (context) => [
@@ -1083,12 +1179,20 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             value: _InvitationAction.copyLink,
             child: _menuRow(Icons.copy, l[K.famCopyLink]),
           ),
-        // F-101: on an expired card the primary is "Compartilhar de novo";
-        // the plain resend (a new link, e-mail only) moves behind the ⋮.
-        PopupMenuItem(
-          value: _InvitationAction.resend,
-          child: _menuRow(Icons.refresh, l[K.famResendInvite]),
-        ),
+        // F-108: a live LINK has nothing to resend (sharing again returns the
+        // same row); its e-mail move is "Convidar por e-mail", same token.
+        if (invitation.isLink && !expired)
+          PopupMenuItem(
+            value: _InvitationAction.addEmail,
+            child: _menuRow(Icons.mail_outline, l[KApp.famInviteByEmail]),
+          )
+        else if (!invitation.isLink)
+          // F-101: on an expired card the primary is "Compartilhar de novo";
+          // the plain resend (a new link, e-mail only) moves behind the ⋮.
+          PopupMenuItem(
+            value: _InvitationAction.resend,
+            child: _menuRow(Icons.refresh, l[K.famResendInvite]),
+          ),
         PopupMenuItem(
           value: _InvitationAction.revoke,
           child: _menuRow(Icons.link_off, l[K.famRevoke], danger: true),
@@ -1135,6 +1239,13 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
               child: Text(l[K.famOnlyAdminsInvite],
                   style: Theme.of(context).textTheme.bodySmall))
         else ...[
+          // F-108: a pending member with no invitation is where 6 of 8
+          // families stopped — its card carries the one move left.
+          if (_settings.inviteLinkEnabled)
+            ..._members
+                .where((m) =>
+                    m.isPendingMember && _invitationFor(m) == null)
+                .map((m) => _uninvitedCard(m, l)),
           ...pending.map((i) => _invitationCard(i, l, expired: false)),
           ...expired.map((i) => _invitationCard(i, l, expired: true)),
           if (_atFreeCap)
@@ -1309,6 +1420,68 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     }
   }
 
+  /// F-108: a pending member nobody invited yet — the U-47 shape (one
+  /// primary, the rest behind ⋮), with "Compartilhar convite" as the primary.
+  Widget _uninvitedCard(Member member, Localization l) {
+    final theme = Theme.of(context);
+    return Card(
+      key: ValueKey('uninvited-${member.id}'),
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                    child: Text(member.fullName,
+                        style: theme.textTheme.titleSmall)),
+                AppBadge(
+                    text: l[KApp.famNoInviteBadge],
+                    tone: context.tokens.warning),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(_roleLabel(member.roleId, l.current),
+                style: theme.textTheme.bodySmall),
+            const SizedBox(height: 8),
+            Text(l[KApp.famNoInviteHint], style: theme.textTheme.bodySmall),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: FilledButton.icon(
+                      key: ValueKey('share-invite-${member.id}'),
+                      icon: const Icon(Icons.share_outlined, size: 18),
+                      label: Text(l[KApp.famShareInvite]),
+                      onPressed: () => _sharePending(member, l),
+                    ),
+                  ),
+                ),
+                PopupMenuButton<_MemberAction>(
+                  key: ValueKey('uninvited-menu-${member.id}'),
+                  tooltip: l[KApp.commonMoreActions],
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (_) => _invitePending(member, l),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: _MemberAction.invite,
+                      child: _menuRow(
+                          Icons.mail_outline, l[KApp.famInviteByEmail]),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _invitationCard(FamilyInvitation invitation, Localization l,
       {required bool expired}) {
     final theme = Theme.of(context);
@@ -1327,7 +1500,11 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
               ),
             Row(
               children: [
-                Expanded(child: Text(invitation.email)),
+                // F-108: a link has no address to show.
+                Expanded(
+                    child: Text(invitation.isLink
+                        ? l[KApp.famInviteLinkLabel]
+                        : invitation.email)),
                 // U-29: a row's state is an AppBadge everywhere else in the
                 // app — this was the one place it was still a grey text run.
                 // F-101: the card used to read "Convite enviado" from the
@@ -1336,9 +1513,11 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
                 AppBadge(
                   text: expired
                       ? l[K.famInviteExpiredBadge]
-                      : invitation.emailUnsent
-                          ? l[KApp.famInviteEmailUnsentBadge]
-                          : l[K.famInviteSentBadge],
+                      : invitation.isLink
+                          ? l[KApp.famInviteLinkBadge]
+                          : invitation.emailUnsent
+                              ? l[KApp.famInviteEmailUnsentBadge]
+                              : l[K.famInviteSentBadge],
                   tone: expired || invitation.emailUnsent
                       ? context.tokens.warning
                       : context.tokens.info,
@@ -1351,6 +1530,12 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             const SizedBox(height: 8),
             if (expired)
               Text(l[K.famInviteExpiredHint], style: theme.textTheme.bodySmall)
+            else if (invitation.isLink)
+              // F-108: the risk the owner accepted, said where the link lives.
+              Text(
+                  l.format(KApp.famInviteLinkHint,
+                      [l.formatDate(invitation.expiresAt.toLocal())]),
+                  style: theme.textTheme.bodySmall)
             else if (invitation.emailUnsent)
               Text(l[KApp.famInviteEmailUnsentHint],
                   style: theme.textTheme.bodySmall)
@@ -1467,7 +1652,13 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 4),
-        Text(l[KApp.famInviteEmailOptional], style: theme.textTheme.bodySmall),
+        // F-108: with the link on, a blank address still invites — the link
+        // goes to the share sheet the moment the person is added.
+        Text(
+            l[_settings.inviteLinkEnabled
+                ? KApp.famInviteEmailOptionalLink
+                : KApp.famInviteEmailOptional],
+            style: theme.textTheme.bodySmall),
         const SizedBox(height: 12),
         // F-101: the sign-up's own picker (U-44) — the six common roles as
         // chips, the other built-ins and the family's custom roles behind
@@ -1510,12 +1701,16 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
             child: Text(_sendingInvite
                 ? l[K.famSending]
                 : value.text.trim().isEmpty
-                    ? l[KApp.famAddWithoutInvite]
+                    ? l[_settings.inviteLinkEnabled
+                        ? KApp.famAddAndShare
+                        : KApp.famAddWithoutInvite]
                     : l[K.famSendInvite]),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(l[K.famInviteWhatsapp], style: theme.textTheme.bodySmall),
+        if (!_settings.inviteLinkEnabled) ...[
+          const SizedBox(height: 8),
+          Text(l[K.famInviteWhatsapp], style: theme.textTheme.bodySmall),
+        ],
       ],
     );
   }
@@ -1880,10 +2075,10 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
 }
 
 /// U-47: what a pending member's ⋮ offers.
-enum _MemberAction { invite, remove, promote, removeViewer }
+enum _MemberAction { share, invite, remove, promote, removeViewer }
 
 /// U-47: what an invitation card's ⋮ offers.
-enum _InvitationAction { copyLink, resend, revoke }
+enum _InvitationAction { copyLink, resend, addEmail, revoke }
 
 /// F-62: the one question an admin answers to give a legacy invitation its
 /// placeholder — the name. E-mail and role are already the invitation's; the

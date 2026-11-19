@@ -231,6 +231,15 @@ abstract final class KApp {
   static const String famInviteEmailUnsentBadge = 'app.fam.inviteEmailUnsentBadge';
   static const String famInviteEmailUnsentHint = 'app.fam.inviteEmailUnsentHint';
   static const String famShareAgain = 'app.fam.shareAgain';
+  static const String famShareInvite = 'app.fam.shareInvite';
+  static const String famInviteByEmail = 'app.fam.inviteByEmail';
+  static const String famInviteLinkLabel = 'app.fam.inviteLinkLabel';
+  static const String famInviteLinkBadge = 'app.fam.inviteLinkBadge';
+  static const String famInviteLinkHint = 'app.fam.inviteLinkHint';
+  static const String famNoInviteBadge = 'app.fam.noInviteBadge';
+  static const String famNoInviteHint = 'app.fam.noInviteHint';
+  static const String famAddAndShare = 'app.fam.addAndShare';
+  static const String famInviteEmailOptionalLink = 'app.fam.inviteEmailOptionalLink';
   static const String famInviteEmailTaken = 'app.fam.inviteEmailTaken';
   static const String registerMigrationOtherEmail = 'app.register.migrationOtherEmail';
   /// F-102: the plan page for a member who is not an admin — who can
@@ -273,8 +282,8 @@ abstract final class KApp {
   static const String sheetSwapUnavailablePending =
       'app.sheet.swapUnavailablePending';
   static const String calMemberPending = 'app.cal.memberPending';
-  static const String onbStepInviteDoneHintPending =
-      'app.onbStep.invite.doneHintPending';
+  static const String onbStepInviteHintPending =
+      'app.onbStep.invite.hintPending';
   static const String auditActionPendingAdded = 'app.audit.pendingAdded';
   static const String auditActionPendingRemoved = 'app.audit.pendingRemoved';
   static const String auditActionPendingClaimed = 'app.audit.pendingClaimed';
@@ -1004,6 +1013,8 @@ abstract final class KApp {
   static const String authLinkExpired = 'app.auth.linkExpired';
   static const String registerCheckSpam = 'app.register.checkSpam';
   static const String registerFixEmail = 'app.register.fixEmail';
+  static const String registerInviteEmailHelper = 'app.register.inviteEmailHelper';
+  static const String registerInviteConfirmJoins = 'app.register.inviteConfirmJoins';
   static const String updatePwdRequestNew = 'app.updatePwd.requestNew';
   static const String authErrSamePassword = 'app.auth.errSamePassword';
   static const String inviteUnreachableTitle = 'app.invite.unreachableTitle';
@@ -1012,6 +1023,8 @@ abstract final class KApp {
   static const String inviteEmailMismatch = 'app.invite.emailMismatch';
   static const String inviteSignedInTitle = 'app.invite.signedInTitle';
   static const String inviteSignedInBody = 'app.invite.signedInBody';
+  static const String inviteSignedInTitleLink = 'app.invite.signedInTitleLink';
+  static const String inviteSignedInBodyLink = 'app.invite.signedInBodyLink';
   static const String inviteSignOutContinue = 'app.invite.signOutContinue';
   static const String inviteNotNow = 'app.invite.notNow';
   static const String inviteAcceptedTitle = 'app.invite.acceptedTitle';
@@ -1170,6 +1183,15 @@ abstract final class KApp {
     famInviteEmailUnsentBadge,
     famInviteEmailUnsentHint,
     famShareAgain,
+    famShareInvite,
+    famInviteByEmail,
+    famInviteLinkLabel,
+    famInviteLinkBadge,
+    famInviteLinkHint,
+    famNoInviteBadge,
+    famNoInviteHint,
+    famAddAndShare,
+    famInviteEmailOptionalLink,
     famInviteEmailTaken,
     registerMigrationOtherEmail,
     premAdminNamedOne,
@@ -1202,7 +1224,7 @@ abstract final class KApp {
     inviteErrNameRequired,
     sheetSwapUnavailablePending,
     calMemberPending,
-    onbStepInviteDoneHintPending,
+    onbStepInviteHintPending,
     auditActionPendingAdded,
     auditActionPendingRemoved,
     auditActionPendingClaimed,
@@ -1793,6 +1815,8 @@ abstract final class KApp {
     authLinkExpired,
     registerCheckSpam,
     registerFixEmail,
+    registerInviteEmailHelper,
+    registerInviteConfirmJoins,
     updatePwdRequestNew,
     authErrSamePassword,
     inviteUnreachableTitle,
@@ -1801,6 +1825,8 @@ abstract final class KApp {
     inviteEmailMismatch,
     inviteSignedInTitle,
     inviteSignedInBody,
+    inviteSignedInTitleLink,
+    inviteSignedInBodyLink,
     inviteSignOutContinue,
     inviteNotNow,
     inviteAcceptedTitle,
@@ -2019,6 +2045,15 @@ abstract final class StringsAppPtBr {
         'O e-mail não saiu. Compartilhe o link — pelo WhatsApp costuma '
             'funcionar melhor.',
     KApp.famShareAgain: 'Compartilhar de novo',
+    KApp.famShareInvite: 'Compartilhar convite',
+    KApp.famInviteByEmail: 'Convidar por e-mail',
+    KApp.famInviteLinkLabel: 'Convite por link',
+    KApp.famInviteLinkBadge: 'Link ativo',
+    KApp.famInviteLinkHint: 'Qualquer pessoa com o link pode entrar, uma vez, até {0}.',
+    KApp.famNoInviteBadge: 'Sem convite',
+    KApp.famNoInviteHint: 'Compartilhe o convite para esta pessoa entrar no aplicativo.',
+    KApp.famAddAndShare: 'Adicionar e compartilhar convite',
+    KApp.famInviteEmailOptionalLink: 'Opcional: o convite sai como link, para você mandar no WhatsApp. Com o e-mail, ele também vai por e-mail.',
     KApp.famInviteEmailTaken:
         'Este e-mail já tem conta em outra família do Entrelares. Cada e-mail '
             'entra em uma família só: para participar das duas, essa pessoa '
@@ -2072,9 +2107,9 @@ abstract final class StringsAppPtBr {
         '{0} ainda não entrou no aplicativo. Você pode mudar o responsável '
             'planejado; a troca fica disponível quando a conta for criada.',
     KApp.calMemberPending: '(pendente)',
-    KApp.onbStepInviteDoneHintPending:
-        'O outro responsável já está no calendário. Convide quando fizer '
-            'sentido.',
+    KApp.onbStepInviteHintPending:
+        'O outro responsável já está no calendário. Compartilhe o convite '
+            'para a outra pessoa entrar no aplicativo.',
     KApp.auditActionPendingAdded: 'Responsável adicionado ao calendário',
     KApp.auditActionPendingRemoved: 'Responsável removido do calendário',
     KApp.auditActionPendingClaimed: 'Responsável entrou pelo convite',
@@ -2741,6 +2776,8 @@ abstract final class StringsAppPtBr {
     KApp.authLinkExpired: 'Este link expirou ou já foi usado. Entre com seu e-mail e senha — se o e-mail ainda não foi confirmado, você poderá pedir um novo link aqui.',
     KApp.registerCheckSpam: 'Não chegou? Confira a caixa de spam e a de promoções.',
     KApp.registerFixEmail: 'Corrigir o e-mail',
+    KApp.registerInviteEmailHelper: 'Pode ser outro e-mail. Se for diferente do convite, enviaremos um link de confirmação.',
+    KApp.registerInviteConfirmJoins: 'Ao confirmar, você entra na família {0}.',
     KApp.updatePwdRequestNew: 'Pedir novo link',
     KApp.authErrSamePassword: 'A nova senha precisa ser diferente da atual.',
     KApp.inviteUnreachableTitle: 'Não conseguimos conferir o convite',
@@ -2749,6 +2786,8 @@ abstract final class StringsAppPtBr {
     KApp.inviteEmailMismatch: 'Este convite foi enviado para {0}, e você entrou como {1}. Se o convite é seu, use "Entrar com outra conta" — ele fica guardado.',
     KApp.inviteSignedInTitle: 'Este convite é para outra conta',
     KApp.inviteSignedInBody: 'Este aparelho está conectado como {0}. O convite de {1} para a família {2} é para {3}. Para aceitá-lo, saia desta conta e continue.',
+    KApp.inviteSignedInTitleLink: 'Entrar com outra conta?',
+    KApp.inviteSignedInBodyLink: 'Este aparelho está conectado como {0}. Para aceitar o convite de {1} para a família {2} com outra conta, saia desta conta e continue.',
     KApp.inviteSignOutContinue: 'Sair e continuar',
     KApp.inviteNotNow: 'Agora não',
     KApp.inviteAcceptedTitle: 'Este convite já foi aceito',
@@ -2962,6 +3001,15 @@ abstract final class StringsAppEn {
         'The e-mail did not go out. Share the link — WhatsApp usually works '
             'best.',
     KApp.famShareAgain: 'Share again',
+    KApp.famShareInvite: 'Share invitation',
+    KApp.famInviteByEmail: 'Invite by e-mail',
+    KApp.famInviteLinkLabel: 'Invitation by link',
+    KApp.famInviteLinkBadge: 'Link active',
+    KApp.famInviteLinkHint: 'Anyone with the link can join, once, until {0}.',
+    KApp.famNoInviteBadge: 'Not invited yet',
+    KApp.famNoInviteHint: 'Share the invitation so this person can join the app.',
+    KApp.famAddAndShare: 'Add and share the invitation',
+    KApp.famInviteEmailOptionalLink: 'Optional: the invitation goes out as a link for you to send on WhatsApp. With an e-mail it also goes by e-mail.',
     KApp.famInviteEmailTaken:
         'This e-mail already has an account in another Entrelares family. '
             'One e-mail belongs to one family: to take part in both, that '
@@ -3013,9 +3061,9 @@ abstract final class StringsAppEn {
         '{0} has not joined the app yet. You can change the planned parent; '
             'swaps become available once the account is created.',
     KApp.calMemberPending: '(pending)',
-    KApp.onbStepInviteDoneHintPending:
-        'The other caregiver is already on the calendar. Invite them '
-            'whenever it makes sense.',
+    KApp.onbStepInviteHintPending:
+        'The other caregiver is already on the calendar. Share the '
+            'invitation so they can join the app.',
     KApp.auditActionPendingAdded: 'Caregiver added to the calendar',
     KApp.auditActionPendingRemoved: 'Caregiver removed from the calendar',
     KApp.auditActionPendingClaimed: 'Caregiver joined through the invitation',
@@ -3682,6 +3730,8 @@ abstract final class StringsAppEn {
     KApp.authLinkExpired: 'This link has expired or was already used. Sign in with your e-mail and password — if the e-mail is not confirmed yet, you can ask for a new link here.',
     KApp.registerCheckSpam: 'Nothing yet? Check your spam and promotions folders.',
     KApp.registerFixEmail: 'Fix the e-mail address',
+    KApp.registerInviteEmailHelper: "It can be another address. If it differs from the invitation's, we'll send a confirmation link.",
+    KApp.registerInviteConfirmJoins: 'Once you confirm, you join the {0} family.',
     KApp.updatePwdRequestNew: 'Ask for a new link',
     KApp.authErrSamePassword: 'The new password must be different from the current one.',
     KApp.inviteUnreachableTitle: 'We could not check the invitation',
@@ -3690,6 +3740,8 @@ abstract final class StringsAppEn {
     KApp.inviteEmailMismatch: 'This invitation was sent to {0}, and you signed in as {1}. If the invitation is yours, use "Sign in with another account" — it stays kept.',
     KApp.inviteSignedInTitle: 'This invitation is for another account',
     KApp.inviteSignedInBody: 'This device is signed in as {0}. The invitation from {1} to the {2} family is for {3}. To accept it, sign out of this account and continue.',
+    KApp.inviteSignedInTitleLink: 'Join with another account?',
+    KApp.inviteSignedInBodyLink: 'This device is signed in as {0}. To accept the invitation from {1} to the {2} family with another account, sign out of this one and continue.',
     KApp.inviteSignOutContinue: 'Sign out and continue',
     KApp.inviteNotNow: 'Not now',
     KApp.inviteAcceptedTitle: 'This invitation was already accepted',

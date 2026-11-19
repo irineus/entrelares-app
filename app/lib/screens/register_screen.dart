@@ -282,7 +282,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
       _invite = info;
-      // The invitation names the address; the trigger refuses any other.
+      // The invitation's address, when it has one. F-108: a caregiver
+      // invitation for a pending member takes another address too (it then
+      // confirms first); a viewer's or a legacy one still refuses any other.
       _email.text = info.invitedEmail;
       // F-56: the name the admin gave the placeholder is a suggestion — the
       // person's own typing wins, at sign-up and forever after.
@@ -469,6 +471,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submitInvite(
       {required bool confirmMigration, required Localization l}) async {
+    final invite = _invite;
+    if (invite != null &&
+        !invite.bindsAddress &&
+        RegisterRules.inviteeNeedsConfirmation(
+            typedEmail: _email.text, invitedEmail: invite.invitedEmail)) {
+      await _signUpInviteeWithConfirmation(l);
+      return;
+    }
     final result = await widget.dataSource.registerInvitee(
       token: widget.inviteToken!.trim(),
       fullName: _fullName.text.trim(),
@@ -505,6 +515,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _errorText = message;
           _errorKey = message == null ? K.authErrSignUpFailed : null;
         });
+    }
+  }
+
+  /// F-108: an address the invitation was not mailed to signs up like a
+  /// founder — the confirmation e-mail, then the seat. Ends on the same
+  /// "confirme seu e-mail" page, which says which family it leads to.
+  Future<void> _signUpInviteeWithConfirmation(Localization l) async {
+    try {
+      await widget.dataSource.signUpInvitee(
+        email: _email.text.trim(),
+        password: _password.text,
+        fullName: _fullName.text.trim(),
+        inviteToken: widget.inviteToken!.trim(),
+        languageCode: l.current.code,
+      );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _signUpDone = true;
+      });
+    } on SignUpFailure catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorKey = e.errorKey;
+        _errorText = null;
+        _returnToAccountStepFor(e.errorKey);
+      });
     }
   }
 
@@ -642,6 +680,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
               style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           Text(l[K.registerConfirmEmailBody], textAlign: TextAlign.center),
+          // F-108: the invitee on the confirmation path learns the family is
+          // on the other side of the link — not a second sign-up to do.
+          if (_invite case final invite?) ...[
+            const SizedBox(height: 8),
+            Text(
+                l.format(KApp.registerInviteConfirmJoins, [invite.familyName]),
+                key: const ValueKey('register-invite-confirm-joins'),
+                textAlign: TextAlign.center),
+          ],
           const SizedBox(height: 8),
           // F-87: the e-mail that never arrives is usually in spam.
           Text(l[KApp.registerCheckSpam],
@@ -751,7 +798,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SizedBox(height: 24),
         _nameField(l),
         const SizedBox(height: 12),
-        _emailField(l, readOnly: true),
+        _emailField(l,
+            readOnly: invite.bindsAddress,
+            helper: invite.bindsAddress
+                ? null
+                : l[KApp.registerInviteEmailHelper]),
         // F-57: ABOVE the password fields, deliberately. This button exists so
         // the person never has to invent a password, so offering it after the
         // form has already been filled defeats it — by then the cost it saves
@@ -891,14 +942,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         autofillHints: const [AutofillHints.name],
       );
 
-  Widget _emailField(Localization l, {required bool readOnly}) =>
+  Widget _emailField(Localization l,
+          {required bool readOnly, String? helper}) =>
       AppTextField(
         label: l[K.commonEmail],
         hint: l[K.commonEmailPlaceholder],
+        helper: helper,
         controller: _email,
         errorText: _fieldError(l, AccountField.email),
         onChanged: (_) => _clearFieldError(AccountField.email),
-        // The invitation names the address — the trigger refuses any other.
+        // A viewer's or a legacy invitation names the address and the
+        // trigger refuses any other; F-108 unlocks the rest.
         readOnly: readOnly,
         keyboardType: TextInputType.emailAddress,
         autofillHints: const [AutofillHints.email],

@@ -247,6 +247,28 @@ void main() {
     expect(RegisterRules.defaultFamilyName('  Ana Souza '), 'Família Ana Souza');
   });
 
+  group('F-108 — which door an invitee e-mail sign-up takes', () {
+    test("the invitation's own address keeps the pre-confirmed path", () {
+      expect(
+          RegisterRules.inviteeNeedsConfirmation(
+              typedEmail: ' Ana@Example.com ', invitedEmail: 'ana@example.com'),
+          isFalse);
+    });
+    test('another address confirms first', () {
+      expect(
+          RegisterRules.inviteeNeedsConfirmation(
+              typedEmail: 'ana.outra@example.com',
+              invitedEmail: 'ana@example.com'),
+          isTrue);
+    });
+    test('a link has no address, so it always confirms', () {
+      expect(
+          RegisterRules.inviteeNeedsConfirmation(
+              typedEmail: 'ana@example.com', invitedEmail: ''),
+          isTrue);
+    });
+  });
+
   group('signUpErrorKey — GoTrue answers in English, the reader does not', () {
     test('an address already in use', () {
       expect(RegisterRules.signUpErrorKey('User already registered'),
