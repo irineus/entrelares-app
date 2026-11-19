@@ -274,15 +274,95 @@ final scenes = <Scene>[
   ),
 ];
 
+/// T-108 — the variant of a Google Play store-listing experiment, rendered by
+/// the same path as the listing so it differs from the control in ONE thing.
+///
+/// The experiment is a *default graphics* experiment on the pt-BR listing (the
+/// default language; en-US carries its own graphics, so its readers are not
+/// in it). Its one variable is the FIRST screenshot's headline: the control is
+/// scene 1 as published ("Quem fica com as crianças, dia a dia", which names
+/// the feature); the variant keeps the same screen and the same detail line
+/// and names the reader's situation instead. Screenshots 2–8 of the variant
+/// are the control's own files, uploaded in the same order — so control and
+/// variant must come from the SAME run, or the dates and the UI on screen
+/// differ too (store/experiments/README.md).
+///
+/// Written to `store/experiments/<id>/pt-BR/phone-1.png`, a folder the
+/// `play-listing` lane never reads: the variant reaches Play only through the
+/// Console's experiment form, by the owner's hand.
+final experimentVariants = <String, Scene>{
+  'T-108': Scene(
+    'calendar-two-homes',
+    pt: const Caption(
+      'Duas casas, um só calendário',
+      'O mês num olhar, e com quem elas estão hoje',
+    ),
+    en: scenes.first.en,
+    source: scenes.first.source,
+    tab: scenes.first.tab,
+  ),
+};
+
 const _out = '../store/screenshots';
+const _experiments = '../store/experiments';
+
+/// Pumps [scene] in [language] inside the store frame and writes the PNG.
+Future<void> _render(
+  WidgetTester tester,
+  Scene scene,
+  AppLanguage language,
+  String path,
+) async {
+  final en = language == AppLanguage.en;
+  final l = Localization(language);
+  await useCanvas(tester);
+  final ds = scene.source(DemoTexts(en));
+  final boundary = GlobalKey();
+  await tester.pumpWidget(
+    RepaintBoundary(
+      key: boundary,
+      child: StoreFrame(
+        caption: en ? scene.en : scene.pt,
+        premiumLabel: 'Premium',
+        app: shellApp(
+          ds,
+          language: language,
+          tab: scene.tab,
+          openOnChat: scene.openOnChat,
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  await scene.interact?.call(tester, l, DemoTexts(en));
+  await tester.pumpAndSettle();
+  // A caption line cut by the band is a failure, not a silent "…".
+  for (final p in tester.renderObjectList<RenderParagraph>(
+    find.descendant(
+      of: find.byKey(StoreFrame.captionKey),
+      matching: find.byType(RichText),
+    ),
+  )) {
+    expect(
+      p.didExceedMaxLines,
+      isFalse,
+      reason: 'caption too long: "${p.text.toPlainText()}"',
+    );
+  }
+  await capture(tester, boundary, path);
+}
 
 void main() {
   setUpAll(() async {
     await loadBundleFonts();
     // A scene taken out of the list must not leave its old PNG behind to be
     // uploaded by mistake: the folders hold exactly what this run wrote.
-    for (final folder in ['pt-BR', 'en-US']) {
-      final dir = Directory('$_out/$folder');
+    final folders = [
+      for (final f in ['pt-BR', 'en-US']) '$_out/$f',
+      for (final id in experimentVariants.keys) '$_experiments/$id/pt-BR',
+    ];
+    for (final folder in folders) {
+      final dir = Directory(folder);
       if (!dir.existsSync()) continue;
       for (final f in dir.listSync().whereType<File>()) {
         if (RegExp(r'phone-\d+\.png$').hasMatch(f.path)) f.deleteSync();
@@ -291,48 +371,27 @@ void main() {
   });
 
   for (final language in AppLanguage.values) {
-    final en = language == AppLanguage.en;
-    final folder = en ? 'en-US' : 'pt-BR';
-    final l = Localization(language);
+    final folder = language == AppLanguage.en ? 'en-US' : 'pt-BR';
     for (var i = 0; i < scenes.length; i++) {
       final scene = scenes[i];
-      testWidgets('$folder ${i + 1} ${scene.name}', (tester) async {
-        await useCanvas(tester);
-        final ds = scene.source(DemoTexts(en));
-        final boundary = GlobalKey();
-        await tester.pumpWidget(
-          RepaintBoundary(
-            key: boundary,
-            child: StoreFrame(
-              caption: en ? scene.en : scene.pt,
-              premiumLabel: 'Premium',
-              app: shellApp(
-                ds,
-                language: language,
-                tab: scene.tab,
-                openOnChat: scene.openOnChat,
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-        await scene.interact?.call(tester, l, DemoTexts(en));
-        await tester.pumpAndSettle();
-        // A caption line cut by the band is a failure, not a silent "…".
-        for (final p in tester.renderObjectList<RenderParagraph>(
-          find.descendant(
-            of: find.byKey(StoreFrame.captionKey),
-            matching: find.byType(RichText),
-          ),
-        )) {
-          expect(
-            p.didExceedMaxLines,
-            isFalse,
-            reason: 'caption too long: "${p.text.toPlainText()}"',
-          );
-        }
-        await capture(tester, boundary, '$_out/$folder/phone-${i + 1}.png');
-      });
+      testWidgets(
+        '$folder ${i + 1} ${scene.name}',
+        (tester) =>
+            _render(tester, scene, language, '$_out/$folder/phone-${i + 1}.png'),
+      );
     }
   }
+
+  // The experiment variants: pt-BR only, the first screenshot only.
+  experimentVariants.forEach((id, scene) {
+    testWidgets(
+      'experiment $id pt-BR 1 ${scene.name}',
+      (tester) => _render(
+        tester,
+        scene,
+        AppLanguage.ptBr,
+        '$_experiments/$id/pt-BR/phone-1.png',
+      ),
+    );
+  });
 }

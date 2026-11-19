@@ -2,46 +2,47 @@
 Entrelares: Co-Parenting
 
 === SHORT DESCRIPTION (<= 80 chars) ===
-Shared custody calendar: who has the child today, and every swap.
+Co-parenting calendar: who has the kids today, the next handover, every swap.
 
 === FULL DESCRIPTION (<= 4000 chars) ===
-Two homes, one childhood. Entrelares organizes life for separated parents: one shared calendar shows who has the child today, who takes over next, and the handoff time for each day.
+Two homes, one childhood. Entrelares organizes everyday life for separated parents who share custody: one shared calendar shows who has the kids today, who takes over next, and the handover time for each day.
 
-WHO HAS THE CHILD TODAY
-Open the app and the answer is on the first screen. The month calendar colors each caregiver's days, and shows the handoff time whenever the child changes homes.
+WHO HAS THE KIDS TODAY
+Open the app and the answer is on the first screen. The month calendar colors each caregiver's days, and shows the handover time whenever the kids change homes.
 
-SWAPS BOTH SIDES APPROVE
-Need to trade a day? Propose the swap with a short message ("doctor's appointment at 2pm") — nothing moves on the calendar until the other caregiver agrees. Whoever answers can reply with a note, and all of it is recorded. If nobody answers in time, the request is approved automatically — and a reminder comes first, with the exact day and time.
+DAY SWAPS, ASKED AND ANSWERED IN THE APP
+Need to trade a day? Propose the swap with a short message ("doctor's appointment at 2pm") — nothing moves on the calendar until the other caregiver answers. Whoever answers can reply with a note, and all of it is recorded. If nobody answers in time, the request is approved automatically — and a reminder comes first, with the exact day and time.
 
 NOTICES AND DAY ACCOUNTS
-Something came up today? Send the other caregiver a notice ("running 15 minutes late"). Once the day has passed, add a day account: what happened stays attached to that day and is never edited — a correction becomes a new account, and both are kept.
+Something came up today? Send the other caregiver a notice ("running 15 minutes late"). Once the day has passed, write a day account — a short record of what happened that day. It stays attached to that day and is never edited: a correction becomes a new account, and both are kept.
 
 A HISTORY NO FAMILY MEMBER CAN REWRITE
 Every calendar change is recorded: who asked, who approved, and the messages they exchanged. No family member can edit or delete the history. On the Premium plan, export a PDF report of any period with the full timeline, verifiable by QR code.
 
 PERIOD SUMMARY
-See how many days each caregiver had — planned and actual —, how many swaps each one gave up and received, and the projected balance including the future swaps already agreed on.
+See how many days each caregiver had, planned and actual; how many swaps each one gave up and received; and the projected balance, including the future swaps already agreed on.
 
-THE CHILD'S AGENDA
-Leave notes on a day for the other home. On Premium, the child's full agenda: school, health, medicine and activities, with routines and reminders.
+EACH CHILD'S AGENDA
+Leave notes on a day for the other home. On Premium, each child's full agenda: school, health, medicine and activities, with routines and reminders.
 
 EXPENSES AND CHAT
-On Premium, shared expenses, with each settlement confirmed by whoever receives it, and the family Chat: permanent, with read receipts.
+On Premium, shared expenses, with each payment confirmed by whoever receives it, and the family chat: permanent, with read receipts.
 
-MORE PEOPLE IN THE ROUTINE
-Grandparents, a nanny or another caregiver can join the family with their own role, invited by e-mail by the administrators; caregivers beyond the free plan's limit join with Premium. And a Viewer follows along without taking part: sees the calendar, the agenda and the reports, and changes nothing.
+GRANDPARENTS AND OTHER CAREGIVERS
+Grandparents, a nanny or another caregiver can join the family with their own role, invited by email by the family's admins; caregivers beyond the free plan's limit join with Premium. And a Viewer follows along without taking part: sees the calendar, the agenda and the reports, and changes nothing.
 
 ALWAYS UP TO DATE
 With the app open, the calendar updates in real time: requests, approvals and changes appear without a reload. With the app closed, requests, approvals, notices and reminders arrive as phone notifications.
 
 BUILT FOR EVERYDAY USE
-• In English and Portuguese — each person in the family reads in their own language, notifications and e-mails included
-• Sign in with e-mail and password or with your Google account
+• In English and Portuguese — each person in the family reads in their own language, notifications and emails included
+• Sign in with email and password or with your Google account
 • Light or dark theme
 • On Android, the current month stays visible even without a connection
 • The same calendar in the browser, at https://web.entrelares.app
 • The essentials are free: calendar, swaps with approval, notifications and history
 • New families start with a Premium trial
+• Made in Brazil: days and deadlines run on Brasília time (UTC−3), and a phone in another time zone shows deadlines marked "(Brasília time)"
 
 PRIVACY
-Your data belongs to your family: per-profile access control, no ads, and no data selling. Privacy policy: https://entrelares.app/privacidade
+Your data belongs to your family: per-profile access control, no ads, and no data selling. Privacy policy (in Portuguese): https://entrelares.app/privacidade

@@ -63,6 +63,16 @@ points at them; this directory is about the *presence*, not the pipeline.
     price (the store price is Play's), and the vocabulary is `vocabulary_test`'s.
   - en-US also stopped saying "after a divorce" (pt says *pais separados*) and "approved
     swaps" (read as if only approved swaps were free).
+- **en-US re-read for a reader outside Brazil on 19/11/2026 (T-108)** — the only paying family
+  so far uses the app in English, from Australia. *Handoff* became **handover**, the word the
+  app's own screens print (*Next handover*); the short description leads with **co-parenting**
+  (the search term outside the US; Australian family law has not said "custody" since 1995) and
+  keeps "custody" once in the opening; *the child* became *the kids*, as the screenshots say; a
+  *day account* is explained where it first appears; "MORE PEOPLE IN THE ROUTINE" (a calque of
+  *rotina*) and the stray "—," went; a new bullet says that days and deadlines run on Brasília
+  time and that another time zone sees deadlines marked *(Brasília time)* (T-105's
+  `formatFamilyDeadline`); and the privacy link says the policy is in Portuguese, because there is
+  no English version on the landing.
 - **English translation** (the app is bilingual since U-13): the listing carries an **English
   (United States) – en-US** translation beside the default pt-BR, and `play-listing` writes
   both languages on every run — the file suffix is the Play locale code. The default language
@@ -153,6 +163,14 @@ suites.
 pt-BR set goes to the Main store listing's *Phone screenshots*, the en-US set to *Manage
 translations → English (United States)*. A change to a screen, a caption or the scene list
 means a new run, a new look, and a new approval.
+
+**Regenerated 19/11/2026 (T-108).** The set Play carried since 02/10/2026 predated U-60 and U-63
+— its Hoje card said *"Próxima troca"*, a word the app gave back to the swap on 07/10/2026
+(*"Próxima entrega"* since). Same scenes, same captions, today's UI and a November month.
+
+**Store-listing experiments** keep their variants in [`experiments/`](experiments/README.md),
+outside what `play-listing` reads; the harness renders them in the SAME run as the listing
+(`experimentVariants`), because a variant from another day differs in more than its one variable.
 
 ## 2 · Brand assets
 
