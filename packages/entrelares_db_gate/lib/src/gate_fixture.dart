@@ -310,6 +310,26 @@ class GateFixture {
     return uid;
   }
 
+  /// F-108: the normal (unconfirmed) sign-up of an invitee whose address is
+  /// NOT the invitation's — the link path. Returns the auth uid; tracked so
+  /// teardown removes it. [confirmUser] plays the confirmation link.
+  Future<String> createUnconfirmedInvitedUser(
+    String email,
+    String token, {
+    required String fullName,
+  }) async {
+    final uid = await _admin.createUnconfirmedUser(email, password, {
+      'full_name': fullName,
+      'invite_token': token,
+      'policy_version': PolicyVersions.current,
+    });
+    _userIds.add(uid);
+    return uid;
+  }
+
+  /// F-108: GoTrue's confirmation of [userId]'s address.
+  Future<void> confirmUser(String userId) => _admin.confirmUser(userId);
+
   /// F-57: a user with NO metadata at all — the shape a password sign-up
   /// straight at the GoTrue API (never our forms) produces. Since the
   /// deferred branch keys on the metadata's absence, this defers exactly like

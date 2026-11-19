@@ -17,6 +17,8 @@ class FamilyInvitation {
   /// an invitation instead of waiting a month.
   final DateTime? createdAt;
 
+  /// Where the invitation message was mailed. EMPTY for a link invitation
+  /// (F-108: the column is NULL and the admin shares the link by hand).
   final String email;
   final int roleId;
 
@@ -44,8 +46,12 @@ class FamilyInvitation {
 
   bool get isViewer => memberType == 'viewer';
 
-  /// The e-mail did not go out (F-101). Only meaningful while [isPending].
-  bool get emailUnsent => emailSentAt == null;
+  /// F-108: a link invitation — no address, nothing was ever mailed.
+  bool get isLink => email.isEmpty;
+
+  /// The e-mail did not go out (F-101). Only meaningful while [isPending];
+  /// never true for a link, which had no message to send (F-108).
+  bool get emailUnsent => !isLink && emailSentAt == null;
 
   const FamilyInvitation({
     required this.id,

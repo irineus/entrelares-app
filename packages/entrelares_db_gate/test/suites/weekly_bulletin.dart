@@ -33,6 +33,8 @@ const _bulletinKeys = {
   'real_cohort', 'start', 'by_source', 'google_app', 'google_search', 'meta',
   'referral', 'organic', 'families', 'created_week', 'planned_7d', 'invited',
   'invitee_joined', 'paid', 'referred_others', 'test_cohort',
+  // F-108: the invite step in the family's first 7 days
+  'pending_no_invite_7d', 'invited_7d', 'invitee_joined_7d',
 };
 
 Set<String> _keysOf(Object? node) => switch (node) {
