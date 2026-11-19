@@ -16,6 +16,12 @@
 // invitation's address (never caller-chosen). The secret key never leaves the
 // server.
 //
+// F-108 (19/11/2026): this is now ONLY the path for the address the
+// invitation was mailed to. Any other address (and every link invitation,
+// which has none) takes the normal sign-up with `invite_token` in the
+// metadata and confirms first — pre-confirming an address nobody proved would
+// let a typo hold the seat.
+//
 // S-16: this one runs with verify_jwt = false and gains NO in-code key check,
 // unlike the other gate-less functions. Its caller is a person who has not
 // signed up yet and therefore holds no session — only the publishable key,
@@ -93,6 +99,16 @@ serve(async (req: Request) => {
     if (!invitation) {
       return jsonResponse(
         { error: "Convite inválido, expirado ou emitido para outro e-mail." }, 400);
+    }
+
+    // F-108: a LINK invitation carries no address, so there is nothing to
+    // pre-confirm — the person signs up with their own e-mail through GoTrue's
+    // normal confirmation, and the seat is taken at confirmation
+    // (claim_invitation_on_confirm). Only a build that predates F-108 locks
+    // the form to the invitation's address and ends up here.
+    if (!invitation.email) {
+      return jsonResponse(
+        { error: "Atualize o aplicativo para entrar por este convite." }, 400);
     }
 
     // Pre-confirmed creation; handle_new_user re-validates the token, creates

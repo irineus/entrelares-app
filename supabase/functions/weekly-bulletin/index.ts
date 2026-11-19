@@ -114,6 +114,11 @@ interface CohortStats {
   planned_7d: number;
   invited: number;
   invitee_joined: number;
+  // F-108: the invite step in the family's first 7 days. Absent on a stack
+  // older than F-108 — the line then omits them.
+  pending_no_invite_7d?: number;
+  invited_7d?: number;
+  invitee_joined_7d?: number;
   paid: number;
   referred_others: number;
 }
@@ -138,6 +143,9 @@ const SOURCES: Array<{ key: string; label: string }> = [
 function cohortLine(c: CohortStats): string {
   return `<strong>${c.families}</strong> famílias · planejaram em 7 dias ${c.planned_7d}` +
     ` · convidaram ${c.invited} · convidado entrou ${c.invitee_joined}` +
+    (c.invited_7d === undefined ? "" :
+      ` · em 7 dias: pendente sem convite ${c.pending_no_invite_7d ?? 0}` +
+      `, convite criado ${c.invited_7d}, convidado entrou ${c.invitee_joined_7d ?? 0}`) +
     ` · pagaram ${c.paid} · indicaram ${c.referred_others}`;
 }
 

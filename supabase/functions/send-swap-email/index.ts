@@ -137,6 +137,15 @@ async function handleInvitationEmail(
     return jsonResponse({ error: "Invitation is not pending." }, 409);
   }
 
+  // F-108: a LINK invitation carries no address — the admin shares the link
+  // by hand. Nothing is sent and nothing is stamped: `email_sent_at` stays NULL
+  // by design, and the client never reads it as "E-mail não enviado" for a row
+  // with no e-mail (F-101's sentence is about a message that failed to leave).
+  if (!data.email) {
+    console.log(`[send-swap-email] invitation ${invitationId} is a link — nothing to send`);
+    return jsonResponse({ sent: 0, suppressed: 0, failed: 0, skipped: "link" });
+  }
+
   // U-13: an invitee has NO profile yet, so there is no language of their own to
   // read. The INVITER's language is the best signal available — a family
   // operating the app in English is most likely inviting someone who reads it —

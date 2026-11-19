@@ -54,6 +54,7 @@ import 'suites/handoff_range.dart';
 import 'suites/handoff_transition.dart';
 import 'suites/invitation_lifecycle.dart';
 import 'suites/invitation_purge.dart';
+import 'suites/invite_link.dart';
 import 'suites/joined_via_invite.dart';
 import 'suites/member_activity.dart';
 import 'suites/multi_caregiver.dart';
@@ -210,6 +211,7 @@ void main() {
   chatTests(fx);
   pagedReadsTests(fx);
   pendingInvitationOfferTests(fx);
+  inviteLinkTests(fx); // F-108
   appSettingsTests(fx);
   publicSettingsTests(fx);
   serverParametersTests(fx);

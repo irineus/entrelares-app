@@ -57,6 +57,47 @@ class AdminApi {
     return (jsonDecode(response.body) as Map<String, dynamic>)['id'] as String;
   }
 
+  /// F-108: a user created the way GoTrue's NORMAL sign-up creates one — the
+  /// address not yet confirmed. With `invite_token` in [metadata] and an
+  /// address other than the invitation's, `handle_new_user` leaves the account
+  /// profile-less until [confirmUser] stamps `email_confirmed_at`.
+  Future<String> createUnconfirmedUser(
+    String email,
+    String password,
+    Map<String, dynamic> metadata,
+  ) async {
+    final response = await _http.post(
+      _uri('/auth/v1/admin/users'),
+      headers: _headers,
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+        'email_confirm': false,
+        'user_metadata': metadata,
+      }),
+    );
+    if (response.statusCode >= 300) {
+      throw StateError("Admin create unconfirmed user '$email' failed "
+          '(${response.statusCode}): ${response.body}');
+    }
+    return (jsonDecode(response.body) as Map<String, dynamic>)['id'] as String;
+  }
+
+  /// F-108: what the confirmation link does — GoTrue stamps
+  /// `email_confirmed_at`, which is the UPDATE `claim_invitation_on_confirm`
+  /// listens to.
+  Future<void> confirmUser(String userId) async {
+    final response = await _http.put(
+      _uri('/auth/v1/admin/users/$userId'),
+      headers: _headers,
+      body: jsonEncode({'email_confirm': true}),
+    );
+    if (response.statusCode >= 300) {
+      throw StateError('Admin confirm $userId failed '
+          '(${response.statusCode}): ${response.body}');
+    }
+  }
+
   /// S-21: a user with NO password at all — the shape a Google sign-in leaves
   /// behind, reproduced by the only means this gate has.
   ///
