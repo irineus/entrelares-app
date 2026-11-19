@@ -188,9 +188,7 @@ class _StepTile extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleSmall),
                 ),
                 Text(
-                    l[done
-                        ? OnboardingSteps.doneHintKeyFor(step, signals)
-                        : step.hintKey],
+                    l[OnboardingSteps.hintKeyFor(step, signals)],
                     style: Theme.of(context).textTheme.bodySmall),
                 // U-61: the action UNDER the text, not in a trailing column —
                 // at 360 dp the column squeezed every hint into six or seven

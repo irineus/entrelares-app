@@ -9,8 +9,9 @@ class InviteInfo {
   final String familyName;
   final String inviterName;
 
-  /// The address the invitation was issued to. The sign-up form shows it
-  /// read-only: `handle_new_user` refuses a mismatch anyway.
+  /// The address the invitation was issued to — empty for a LINK invitation
+  /// (F-108), which has none. Only [bindsAddress] invitations refuse another
+  /// address; for the rest it is where the message went, a prefill at most.
   final String invitedEmail;
 
   /// The role the inviter chose. Stored raw — [RoleCatalog] translates the
@@ -26,6 +27,15 @@ class InviteInfo {
   final String memberType;
 
   bool get isViewer => memberType == 'viewer';
+
+  /// F-108: a caregiver invitation for a pending member is claimable by
+  /// whoever holds the token (`invitation_claimable_by`); a viewer's and a
+  /// legacy one (no pending member — [inviteeName] null, the LEFT JOIN of
+  /// `profile_id`) still require the invitation's own address.
+  bool get bindsAddress => isViewer || inviteeName == null;
+
+  /// F-108: no address at all — the admin shared a link.
+  bool get isLink => invitedEmail.trim().isEmpty;
 
   const InviteInfo({
     required this.familyName,

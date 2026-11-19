@@ -33,6 +33,7 @@ import 'package:entrelares_app/main.dart' as app;
 
 import 'e2e_family.dart';
 import 'e2e_proof.dart';
+import 'e2e_wait.dart';
 
 const policyVersion =
     String.fromEnvironment('E2E_POLICY_VERSION', defaultValue: '2026-10-03');
@@ -166,5 +167,50 @@ void main() {
     expect(find.text(l[K.loginSubmit]), findsOneWidget,
         reason: 'restoring a guarded screen for a visitor without a session '
             'would hand over exactly what S-02 refuses');
+  }, timeout: e2eTestTimeout);
+
+  // F-108 — the invitation's e-mail is DELIVERY only. A pending member's
+  // invitation went to one address; the person opens the link and signs up
+  // with another (the co-parent's own Gmail, say). That address is not
+  // proven, so the app takes GoTrue's confirmation path and the seat waits:
+  // only confirming the address claims the placeholder
+  // (`claim_invitation_on_confirm`). A cold entry at `/register?invite=` is
+  // this file's subject, and the database is the assertion.
+  testWidgets('p0 — F-108: another address opens the invitation, confirms, '
+      'and takes the pending seat', (tester) async {
+    final pending = await family.addPendingWithInvite('Pai E2E',
+        email: family.disposableEmail('typed'));
+    final other = family.disposableEmail('other');
+
+    await bootAt(tester, '/register?invite=${pending.token}');
+    await pumpUntilFound(tester, find.text(l[K.registerInvitedTitle]),
+        reason: 'the invitation must resolve on a cold entry');
+
+    await tester.enterText(
+        find.widgetWithText(TextField, l[K.commonEmail]), other);
+    await tester.enterText(
+        find.widgetWithText(TextField, l[K.commonPassword]), family.password);
+    await tester.enterText(
+        find.widgetWithText(TextField, l[K.commonConfirmPassword]),
+        family.password);
+    await tester.pumpAndSettle();
+    final consent = find.byType(Checkbox);
+    await tester.ensureVisible(consent);
+    await tester.tap(consent);
+    await tester.pumpAndSettle();
+    final submit = find.text(l[K.registerSubmit]);
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await pumpUntilFound(tester, find.text(l[K.registerConfirmEmailTitle]),
+        reason: 'an address the invitation was not mailed to confirms first');
+
+    final uid = await family.adoptUserByEmail(other);
+    expect(uid, isNotNull, reason: 'the sign-up created the auth user');
+    expect(await family.userIdOfProfile(pending.profileId), isNull,
+        reason: 'an unconfirmed address never holds the seat');
+
+    await family.confirmUser(uid!);
+    expect(await family.userIdOfProfile(pending.profileId), uid,
+        reason: 'confirming the address claimed the placeholder');
   }, timeout: e2eTestTimeout);
 }

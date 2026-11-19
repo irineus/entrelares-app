@@ -608,7 +608,7 @@ jobs:
         include:
           - { target: swap_workflow_test, p0: 1, full: 2 }
           - { target: account_flows_test, p0: 1, full: 3 }
-          - { target: deep_link_test, p0: 4, full: 4 }
+          - { target: deep_link_test, p0: 5, full: 5 }
     concurrency:
       # Its OWN group, not `db-gate`'s: both drive the dev project, but they do
       # not collide — each invents its own `E2E-<runId>` family and both orphan

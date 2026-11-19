@@ -409,6 +409,73 @@ class E2eFamily {
             roleName.toLowerCase()) as Map)['id'] as int;
   }
 
+  /// F-108: a pending member with an e-mail invitation, made by the FOUNDER
+  /// (`add_pending_member` reads `auth.uid()`). The address is delivery only
+  /// since F-108, so another one may claim the token. Returns the placeholder
+  /// and the token.
+  Future<({int profileId, String token})> addPendingWithInvite(String name,
+      {required String email}) async {
+    final founderToken = await _accessToken(founder.email, password);
+    final born = await _rpcAs(founderToken, 'add_pending_member', {
+      'p_full_name': name,
+      'p_role_id': await roleIdOf('father'),
+      'p_email': email,
+    });
+    final row = (born is List ? born.first : born) as Map;
+    final profileId = row['profile_id'] as int;
+    final rows = await _get('/rest/v1/family_invitations'
+        '?profile_id=eq.$profileId&accepted_at=is.null&revoked_at=is.null'
+        '&select=token');
+    return (
+      profileId: profileId,
+      token: (rows.first as Map)['token'] as String,
+    );
+  }
+
+  /// F-108: the auth user an in-app sign-up created, found by its address —
+  /// and adopted, so [purge] deletes it even when it never joined a family.
+  Future<String?> adoptUserByEmail(String email) async {
+    final res = await _bounded(
+        'GET admin users (filter)',
+        () => http.get(
+            Uri.parse('$_adminUrl/auth/v1/admin/users'
+                '?filter=${Uri.encodeQueryComponent(email)}&per_page=10'),
+            headers: _headers),
+        idempotent: true);
+    if (res.statusCode >= 300) {
+      throw StateError('GET admin users → ${res.statusCode}: ${res.body}');
+    }
+    final users = (jsonDecode(res.body) as Map)['users'] as List? ?? const [];
+    for (final u in users) {
+      if ((u as Map)['email'].toString().toLowerCase() == email.toLowerCase()) {
+        final id = u['id'] as String;
+        _userIds.add(id);
+        return id;
+      }
+    }
+    return null;
+  }
+
+  /// F-108: what clicking the confirmation link does, through the Admin API —
+  /// it fires `claim_invitation_on_confirm` exactly as GoTrue's verify would.
+  Future<void> confirmUser(String userId) async {
+    final res = await _bounded(
+        'PUT admin user (confirm)',
+        () => http.put(Uri.parse('$_adminUrl/auth/v1/admin/users/$userId'),
+            headers: _headers, body: jsonEncode({'email_confirm': true})),
+        idempotent: true);
+    if (res.statusCode >= 300) {
+      throw StateError('PUT admin user → ${res.statusCode}: ${res.body}');
+    }
+  }
+
+  /// F-108: who holds a placeholder now — null while nobody claimed it.
+  Future<String?> userIdOfProfile(int profileId) async {
+    final rows =
+        await _get('/rest/v1/profiles?id=eq.$profileId&select=user_id');
+    return rows.isEmpty ? null : (rows.first as Map)['user_id'] as String?;
+  }
+
   /// Lifts the family past the F-37 free cap so the invite FORM renders. The
   /// cap itself is the DB's business and has its own server-side tests; this
   /// lane is here to exercise the screen behind it.

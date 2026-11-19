@@ -1723,6 +1723,12 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       return;
     }
     if (offer == null) return;
+    await _askToJoin(offer);
+  }
+
+  /// F-88's question — "Entrar na família X?" — and the join. F-108 asks it
+  /// from a link's token too, so it is one dialog with two doors.
+  Future<void> _askToJoin(PendingInvitationOffer offer) async {
     final context = _router.routerDelegate.navigatorKey.currentContext;
     if (context == null || !context.mounted) return;
     final l = _l;
@@ -1732,7 +1738,7 @@ class _EntrelaresAppState extends State<EntrelaresApp>
         key: const ValueKey('invite-offer'),
         title: Text(l[KApp.inviteOfferTitle]),
         content: Text(l.format(
-            KApp.inviteOfferBody, [offer!.inviterName, offer.familyName])),
+            KApp.inviteOfferBody, [offer.inviterName, offer.familyName])),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -1772,6 +1778,19 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     final token = _bootInviteToken;
     _bootInviteToken = null;
     if (token == null) return;
+    // F-108: a solo founder of an empty family opening ANY claimable link is
+    // offered it (F-88's rules, keyed on the token instead of the e-mail).
+    PendingInvitationOffer? offer;
+    try {
+      offer = await _dataSource.fetchInvitationOfferForToken(token);
+    } catch (_) {
+      offer = null;
+    }
+    if (offer != null) {
+      _pendingInvitationAsked = true;
+      await _askToJoin(offer);
+      return;
+    }
     InviteInfo? invite;
     try {
       invite = await _dataSource.fetchInviteInfo(token);
@@ -1780,23 +1799,33 @@ class _EntrelaresAppState extends State<EntrelaresApp>
     }
     final me = _client.auth.currentUser?.email ?? '';
     if (invite == null ||
-        invite.invitedEmail.trim().toLowerCase() == me.trim().toLowerCase()) {
+        (invite.bindsAddress &&
+            invite.invitedEmail.trim().toLowerCase() ==
+                me.trim().toLowerCase())) {
       return;
     }
     final context = _router.routerDelegate.navigatorKey.currentContext;
     if (context == null || !context.mounted) return;
     final l = _l;
+    // F-108: a claimable invitation is not "for another account" — this
+    // account already belongs to a family, so the way in is another one.
+    final bound = invite.bindsAddress;
     final leave = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         key: const ValueKey('invite-other-account'),
-        title: Text(l[KApp.inviteSignedInTitle]),
-        content: Text(l.format(KApp.inviteSignedInBody, [
-          me,
-          invite!.inviterName,
-          invite.familyName,
-          invite.invitedEmail,
-        ])),
+        title: Text(l[bound
+            ? KApp.inviteSignedInTitle
+            : KApp.inviteSignedInTitleLink]),
+        content: Text(bound
+            ? l.format(KApp.inviteSignedInBody, [
+                me,
+                invite!.inviterName,
+                invite.familyName,
+                invite.invitedEmail,
+              ])
+            : l.format(KApp.inviteSignedInBodyLink,
+                [me, invite!.inviterName, invite.familyName])),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),

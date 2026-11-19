@@ -25,7 +25,11 @@ abstract final class AnalyticsEvents {
   static const signupStep = 'signup_step'; // step — since U-44, 16/09/2026
   static const familyCreated = 'family_created';
   static const inviteeJoined = 'invitee_joined';
-  static const inviteSent = 'invite_sent'; // email = none/sent/link_only
+  // email = none/sent/link_only; `link` since F-108 (19/11/2026): an invitation
+  // with no address, shared by the admin. Before it, a pending member added
+  // without an e-mail was `none` and had no link at all — read the series
+  // across that date as `none` turning into `link` (U-35 cliff).
+  static const inviteSent = 'invite_sent';
   static const inviteNudgeShown = 'invite_nudge_shown'; // once — T-76, 18/09/2026
   static const inviteNudgeClick = 'invite_nudge_click'; // T-76, 18/09/2026
   // F-80, 02/10/2026 — built dark: no event until `feature.referral` is on.
