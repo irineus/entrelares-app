@@ -11,6 +11,7 @@ library;
 import 'auth_rules.dart';
 import 'localization/k.dart';
 import 'localization/k_app.dart';
+import 'route_rules.dart';
 
 /// U-64 — the four fields of the account step, in the screen's order.
 enum AccountField { name, email, password, confirmPassword }
@@ -279,6 +280,28 @@ abstract final class InviteFormRules {
   static String? inviteTokenFrom(Uri uri) {
     final token = uri.queryParameters['invite'];
     return (token == null || token.trim().isEmpty) ? null : token.trim();
+  }
+
+  /// F-108 — the invitation an App Link carried into a SIGNED-IN app, or null.
+  ///
+  /// On Android `https://web.entrelares.app/register?invite=…` opens the app
+  /// (App Links), the router receives `/register?invite=…`, and a session is
+  /// sent home — so the token vanished without a word: no "Entrar com outra
+  /// conta?", and no F-88 offer for a solo founder of an empty family, which
+  /// for a LINK invitation (no e-mail to match) is the only way in. The web
+  /// never needs this: every link opens a new tab, a cold boot that reads the
+  /// token from the boot address. Only a signed-in shell asks: signed out, the
+  /// register screen already takes the token; mid-onboarding there is no
+  /// family to leave yet.
+  static String? appLinkInviteToken(
+    Uri uri, {
+    required bool isWeb,
+    required bool signedIn,
+  }) {
+    if (isWeb || !signedIn) return null;
+    if (uri.path != RouteRules.register) return null;
+    final token = inviteTokenFrom(uri);
+    return token != null && isTokenShaped(token) ? token : null;
   }
 
   /// Whether a token even has the shape of the `uuid` the column holds. Mirror

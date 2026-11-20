@@ -14,6 +14,8 @@
 //   (the seat is taken when it is confirmed — PR 1's trigger);
 // * with the flag OFF nothing changes — the Android build in Production still
 //   locks the sign-up to the invitation's address.
+import 'dart:io';
+
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -352,5 +354,26 @@ void main() {
       expect(find.text(l[K.registerInvitedTitle]), findsOne);
       expect(find.byKey(const ValueKey('invite-email-mismatch')), findsNothing);
     });
+  });
+
+  // F-108 (3.4.1): on Android the invitation link reaches a SIGNED-IN app
+  // through the router, whose gate sends a session home — the owner's QA of
+  // 231 opened it and landed on the calendar with no question. No test pumps
+  // the whole app, so the wiring is pinned in the source; the rule itself
+  // (web / signed out / shape) is InviteFormRules.appLinkInviteToken's test.
+  test('the router keeps an App Link invitation for the signed-in offer', () {
+    final main = File('lib/main.dart').readAsStringSync();
+    final redirect = RegExp(
+            r'String\? _redirect\(BuildContext context, GoRouterState state\) \{([\s\S]*?)\n  \}')
+        .firstMatch(main);
+    expect(redirect, isNotNull, reason: '_redirect moved');
+    expect(redirect!.group(1), contains('_noteAppLinkInvite(state.uri)'),
+        reason: 'every route the platform hands the app passes through here');
+    final note = RegExp(r'void _noteAppLinkInvite\(Uri uri\) \{([\s\S]*?)\n  \}')
+        .firstMatch(main);
+    expect(note, isNotNull, reason: '_noteAppLinkInvite moved');
+    expect(note!.group(1), contains('InviteFormRules.appLinkInviteToken('));
+    expect(note.group(1), contains('_offerInviteForAnotherAccount()'),
+        reason: 'the same question the web asks from its boot address');
   });
 }
