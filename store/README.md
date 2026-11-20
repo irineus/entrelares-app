@@ -171,6 +171,9 @@ means a new run, a new look, and a new approval.
 **Store-listing experiments** keep their variants in [`experiments/`](experiments/README.md),
 outside what `play-listing` reads; the harness renders them in the SAME run as the listing
 (`experimentVariants`), because a variant from another day differs in more than its one variable.
+The first one (T-108) was cancelled before it started: at ~15 install clicks a month the listing
+cannot reach the 8,173 that Play asks for even at its loosest setting. Check that ratio before
+planning the next one (experiments/README.md).
 
 ## 2 · Brand assets
 

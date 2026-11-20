@@ -18,7 +18,33 @@ in the month, the data and every screen that changed in between.
 
 ---
 
-## T-108 — the first screenshot's headline (pt-BR)
+## T-108 — the first screenshot's headline (pt-BR) — CANCELLED before it started (20/11/2026)
+
+**Outcome.** The regenerated sets were published by `play-listing` on 19/11/2026, and on
+20/11/2026 the experiment form in the Console showed what this listing cannot reach. For this
+setup (1 variant, 50 % audience, 90 % confidence), Play needs this many unique user install clicks:
+
+| Minimum detectable effect | Unique user install clicks needed |
+|---|---|
+| 2.5 % (default) | 47,071 |
+| 6.0 % (the largest offered) | 8,173 |
+
+The listing had **15** install clicks from **29** visitors in the 28 days to 16/11/2026. Even at
+6 %, the experiment would need decades. Play stops every experiment at 6 months, so the verdict
+was certain to be *More data needed*, which the reading rule below turns into "keep the current
+listing". It would also have frozen screenshot uploads for six months. The owner cancelled it
+before it was created; nothing was saved in the Console.
+
+**The volume estimate below was wrong.** It took ~135 visitors a month from "17 acquisitions /
+12.6 %". The Console's own count is ~30 visitors in 28 days, at a ~31 % conversion. Read the
+listing's numbers in *Store listings → Your performance on Play* before planning an experiment,
+and compare the needed install clicks the setup form shows against the monthly install clicks.
+An experiment is only worth creating when that ratio fits inside 6 months.
+
+The variant (`T-108/pt-BR/phone-1.png`) and its `experimentVariants` entry stay as the worked
+example of the mechanism. Changing the first headline is now a judgement call, not a test result.
+
+The plan as written before the cancellation:
 
 | | |
 |---|---|
