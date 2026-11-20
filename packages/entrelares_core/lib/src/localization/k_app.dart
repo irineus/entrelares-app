@@ -1067,6 +1067,42 @@ abstract final class KApp {
   static const String famReferralRule = 'app.fam.referralRule';
   static const String famReferralShareText = 'app.fam.referralShareText';
 
+  // ── F-08: export to another calendar (.ics) ──
+  static const String calExportAction = 'app.calExport.action';
+  static const String calExportLead = 'app.calExport.lead';
+  static const String calExportPeriod = 'app.calExport.period';
+  static const String calExportPeriodMonth = 'app.calExport.periodMonth';
+  static const String calExportPeriodYear = 'app.calExport.periodYear';
+  static const String calExportPeriodCustom = 'app.calExport.periodCustom';
+  static const String calExportFrom = 'app.calExport.from';
+  static const String calExportTo = 'app.calExport.to';
+  static const String calExportPeriodInvalid = 'app.calExport.periodInvalid';
+  static const String calExportLayers = 'app.calExport.layers';
+  static const String calExportHandoffs = 'app.calExport.handoffs';
+  static const String calExportHandoffsHint = 'app.calExport.handoffsHint';
+  static const String calExportEvents = 'app.calExport.events';
+  static const String calExportDays = 'app.calExport.days';
+  static const String calExportKinds = 'app.calExport.kinds';
+  static const String calExportChildren = 'app.calExport.children';
+  static const String calExportScope = 'app.calExport.scope';
+  static const String calExportScopeFamily = 'app.calExport.scopeFamily';
+  static const String calExportScopeMine = 'app.calExport.scopeMine';
+  static const String calExportReminders = 'app.calExport.reminders';
+  static const String calExportRemindersHint = 'app.calExport.remindersHint';
+  static const String calExportCountOne = 'app.calExport.countOne';
+  static const String calExportCountMany = 'app.calExport.countMany';
+  static const String calExportEmpty = 'app.calExport.empty';
+  static const String calExportSubmit = 'app.calExport.submit';
+  static const String calExportTip = 'app.calExport.tip';
+  static const String calExportPremium = 'app.calExport.premium';
+  static const String calExportDone = 'app.calExport.done';
+  static const String calExportError = 'app.calExport.error';
+  static const String calExportHandoff = 'app.calExport.handoff';
+  static const String calExportHandoffNoTime = 'app.calExport.handoffNoTime';
+  static const String calExportWith = 'app.calExport.with';
+  static const String calExportCalendarName = 'app.calExport.calendarName';
+  static const String calExportPremiumBenefit = 'app.calExport.premiumBenefit';
+
   static const List<String> allKeys = [
     sessionRestoredExpired,
     sessionExpired,
@@ -1865,6 +1901,40 @@ abstract final class KApp {
     famReferralTitle,
     famReferralRule,
     famReferralShareText,
+    calExportAction,
+    calExportLead,
+    calExportPeriod,
+    calExportPeriodMonth,
+    calExportPeriodYear,
+    calExportPeriodCustom,
+    calExportFrom,
+    calExportTo,
+    calExportPeriodInvalid,
+    calExportLayers,
+    calExportHandoffs,
+    calExportHandoffsHint,
+    calExportEvents,
+    calExportDays,
+    calExportKinds,
+    calExportChildren,
+    calExportScope,
+    calExportScopeFamily,
+    calExportScopeMine,
+    calExportReminders,
+    calExportRemindersHint,
+    calExportCountOne,
+    calExportCountMany,
+    calExportEmpty,
+    calExportSubmit,
+    calExportTip,
+    calExportPremium,
+    calExportDone,
+    calExportError,
+    calExportHandoff,
+    calExportHandoffNoTime,
+    calExportWith,
+    calExportCalendarName,
+    calExportPremiumBenefit,
   ];
 }
 
@@ -2826,6 +2896,40 @@ abstract final class StringsAppPtBr {
     KApp.famReferralTitle: 'Indique uma família',
     KApp.famReferralRule: 'Quando uma família que vocês indicaram assinar o Premium e o primeiro pagamento dela passar um período sem estorno, a sua família ganha um mês de Premium, até um limite por ano.',
     KApp.famReferralShareText: 'Usamos o Entrelares para organizar o calendário da guarda compartilhada. Para criar o da sua família, comece por este link:',
+    KApp.calExportAction: 'Exportar para outro calendário',
+    KApp.calExportLead: 'Gera um arquivo .ics para o Google Agenda, o Outlook ou o Calendário do iPhone. É uma cópia de agora: depois de uma troca, exporte de novo.',
+    KApp.calExportPeriod: 'Período',
+    KApp.calExportPeriodMonth: 'Mês',
+    KApp.calExportPeriodYear: 'Ano',
+    KApp.calExportPeriodCustom: 'Personalizado',
+    KApp.calExportFrom: 'De',
+    KApp.calExportTo: 'Até',
+    KApp.calExportPeriodInvalid: 'A data final vem antes da inicial.',
+    KApp.calExportLayers: 'O que exportar',
+    KApp.calExportHandoffs: 'Entregas',
+    KApp.calExportHandoffsHint: 'Quem entrega para quem, no horário da entrega',
+    KApp.calExportEvents: 'Eventos das crianças',
+    KApp.calExportDays: 'Dias de cada responsável',
+    KApp.calExportKinds: 'Tipos de evento',
+    KApp.calExportChildren: 'Crianças',
+    KApp.calExportScope: 'Para quem',
+    KApp.calExportScopeFamily: 'Toda a família',
+    KApp.calExportScopeMine: 'Só o que envolve você',
+    KApp.calExportReminders: 'Incluir lembretes',
+    KApp.calExportRemindersHint: 'O lembrete de cada evento e 60 minutos antes de cada entrega. O app já manda notificação: ligue só se quiser as duas.',
+    KApp.calExportCountOne: '1 evento',
+    KApp.calExportCountMany: '{0} eventos',
+    KApp.calExportEmpty: 'Nada para exportar com essas escolhas.',
+    KApp.calExportSubmit: 'Exportar',
+    KApp.calExportTip: 'No Google Agenda, importe pelo computador: Configurações → Importar e exportar. Dica: importe num calendário só do Entrelares, que se apaga de uma vez.',
+    KApp.calExportPremium: 'Exportar para outro calendário é um recurso Premium.',
+    KApp.calExportDone: 'Arquivo do calendário pronto.',
+    KApp.calExportError: 'Não foi possível exportar o calendário. Tente de novo.',
+    KApp.calExportHandoff: 'Entrega: {0} → {1}',
+    KApp.calExportHandoffNoTime: 'Entrega: {0} → {1} (sem horário definido)',
+    KApp.calExportWith: 'Com {0}',
+    KApp.calExportCalendarName: 'Entrelares — {0}',
+    KApp.calExportPremiumBenefit: 'Entregas e eventos das crianças exportados para o Google Agenda, o Outlook ou o iPhone',
   };
 }
 
@@ -3780,5 +3884,39 @@ abstract final class StringsAppEn {
     KApp.famReferralTitle: 'Refer a family',
     KApp.famReferralRule: 'When a family you referred subscribes to Premium and its first payment stands for a period with no refund, your family gets a month of Premium, up to a yearly limit.',
     KApp.famReferralShareText: 'We use Entrelares to organize our shared custody calendar. To start one for your family, begin with this link:',
+    KApp.calExportAction: 'Export to another calendar',
+    KApp.calExportLead: 'Creates an .ics file for Google Calendar, Outlook or the iPhone Calendar. It is a copy of now: after a swap, export again.',
+    KApp.calExportPeriod: 'Period',
+    KApp.calExportPeriodMonth: 'Month',
+    KApp.calExportPeriodYear: 'Year',
+    KApp.calExportPeriodCustom: 'Custom',
+    KApp.calExportFrom: 'From',
+    KApp.calExportTo: 'To',
+    KApp.calExportPeriodInvalid: 'The end date is before the start date.',
+    KApp.calExportLayers: 'What to export',
+    KApp.calExportHandoffs: 'Handoffs',
+    KApp.calExportHandoffsHint: 'Who hands over to whom, at the handoff time',
+    KApp.calExportEvents: "Children's events",
+    KApp.calExportDays: "Each carer's days",
+    KApp.calExportKinds: 'Event types',
+    KApp.calExportChildren: 'Children',
+    KApp.calExportScope: 'For whom',
+    KApp.calExportScopeFamily: 'The whole family',
+    KApp.calExportScopeMine: 'Only what involves you',
+    KApp.calExportReminders: 'Include reminders',
+    KApp.calExportRemindersHint: "Each event's own reminder and 60 minutes before each handoff. The app already sends notifications: turn this on only if you want both.",
+    KApp.calExportCountOne: '1 event',
+    KApp.calExportCountMany: '{0} events',
+    KApp.calExportEmpty: 'Nothing to export with these choices.',
+    KApp.calExportSubmit: 'Export',
+    KApp.calExportTip: 'In Google Calendar, import from a computer: Settings → Import & export. Tip: import into a calendar of its own, which can be deleted all at once.',
+    KApp.calExportPremium: 'Exporting to another calendar is a Premium feature.',
+    KApp.calExportDone: 'Calendar file ready.',
+    KApp.calExportError: "Couldn't export the calendar. Try again.",
+    KApp.calExportHandoff: 'Handoff: {0} → {1}',
+    KApp.calExportHandoffNoTime: 'Handoff: {0} → {1} (no set time)',
+    KApp.calExportWith: 'With {0}',
+    KApp.calExportCalendarName: 'Entrelares — {0}',
+    KApp.calExportPremiumBenefit: "Handoffs and the children's events exported to Google Calendar, Outlook or the iPhone",
   };
 }

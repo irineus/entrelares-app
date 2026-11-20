@@ -736,6 +736,12 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
           ),
         if (_settings.chatEnabled && _settings.chatPremiumOnly)
           (text: l[KApp.chatPremiumBenefit], icon: Icons.forum_outlined),
+        // F-08: the export to another calendar.
+        if (_settings.calendarExportPremiumOnly)
+          (
+            text: l[KApp.calExportPremiumBenefit],
+            icon: Icons.event_available_outlined
+          ),
         if (_settings.viewersEnabled &&
             _settings.maxViewers > _settings.freeViewers)
           (

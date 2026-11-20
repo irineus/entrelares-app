@@ -58,6 +58,10 @@ abstract final class AnalyticsEvents {
   static const dayAccountSaved = 'day-account-saved'; // T-78 (F-67)
   static const dayAccountReplySaved = 'day-account-reply-saved'; // F-75, 28/09/2026
   static const historySearch = 'history-search'; // F-76, 28/09/2026 — a count, never the words
+  // F-08, 20/11/2026: a calendar file was handed to the share sheet / download.
+  // `layers` = the picked layers as letters (h handoffs, e events, d days),
+  // `period` month/year/custom, `scope` family/mine, `size` a count bucket.
+  static const calendarExport = 'calendar-export';
   static const adminModeOffer = 'admin-mode-offer'; // F-67, 21/09/2026
   static const adminModeToggle = 'admin-mode-toggle'; // T-78
   static const pdfExport = 'pdf-export'; // T-78
@@ -158,6 +162,7 @@ abstract final class AnalyticsCatalog {
     AnalyticsEvents.reviewPromptRequested: {},
     AnalyticsEvents.preferenceChanged: {'pref', 'value'},
     AnalyticsEvents.supportContactSent: {'category', 'signed_in'},
+    AnalyticsEvents.calendarExport: {'layers', 'period', 'scope', 'size'},
     AnalyticsEvents.premiumGateClick: {'gate'},
     // F-79 (02/10/2026): `admin` (may this reader pay at all) and `buyable`
     // (were a price card and "Assinar" built for them) — before that date

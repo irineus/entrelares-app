@@ -125,6 +125,11 @@ class PublicSettings {
   bool get inviteLinkEnabled =>
       parseBoolSetting(values, 'feature.invite_link', false);
 
+  // F-08 — the export to another calendar is Premium while this is on. The
+  // gate is the app's (like the PDF's): there is no server write to refuse.
+  bool get calendarExportPremiumOnly =>
+      parseBoolSetting(values, 'calendar_export.premium_only', true);
+
   // F-55 PR 2 — the agenda's operator keys (the RPCs read the same ones).
   bool get agendaPremiumOnly =>
       parseBoolSetting(values, 'agenda.premium_only', true);
