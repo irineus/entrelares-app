@@ -24,6 +24,7 @@ import '../theme/slot_pattern.dart';
 import '../theme/tokens.dart';
 import '../widgets/account_button.dart';
 import '../widgets/admin_mode_offer.dart';
+import '../widgets/calendar_export_sheet.dart';
 import '../widgets/app_l10n.dart';
 import '../widgets/app_snack.dart';
 import '../widgets/day_agenda.dart';
@@ -127,6 +128,9 @@ class CalendarScreen extends StatefulWidget {
   /// F-55: the agenda's "add the child" door (`/family/children`).
   final VoidCallback? onOpenChildren;
 
+  /// F-08: the export's Premium gate (`/family/plan?gate=calendar-export`).
+  final VoidCallback? onOpenPlanForExport;
+
   /// F-95: Relatórios → Histórico, from a swapped day's story line.
   final VoidCallback? onOpenHistory;
 
@@ -182,6 +186,7 @@ class CalendarScreen extends StatefulWidget {
   /// U-60: the ⋮ "Pedir troca de um dia" and the Hoje card's strip of the
   /// requests waiting for the reader's answer.
   static const askSwapMenuKey = Key('ask-swap-menu');
+  static const exportMenuKey = Key('calendar-export-menu');
   static const requestStripKey = Key('request-strip');
 
   /// F-94: today's request, still unanswered, on the Hoje card.
@@ -203,6 +208,7 @@ class CalendarScreen extends StatefulWidget {
       this.onOpenNotifications,
       this.onOpenPlan,
       this.onOpenChildren,
+      this.onOpenPlanForExport,
       this.onOpenHistory,
       this.onOpenChat,
       this.onOpenMember,
@@ -1781,6 +1787,26 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   /// U-60: "Pedir troca de um dia" — which day, then that day's sheet with
   /// the request armed: the SAME sheet and field a tap on the cell opens.
+  /// F-08: "Exportar para outro calendário" — the period the reader is
+  /// looking at, and the family the screen already holds.
+  Future<void> _openExport() async {
+    final family = _family;
+    if (family == null) return;
+    await showCalendarExportSheet(
+      context,
+      dataSource: widget.dataSource,
+      family: family,
+      members: _members,
+      children: _children,
+      me: _ownProfile,
+      allowed: !_settings.calendarExportPremiumOnly ||
+          Family.isPremiumFamily(family, DateTime.now().toUtc()),
+      agendaEnabled: _settings.childAgendaEnabled,
+      visibleMonth: _visibleMonth,
+      onOpenPlan: widget.onOpenPlanForExport,
+    );
+  }
+
   Future<void> _askSwapFromMenu() async {
     if (_refuseWriteOffline() || _refuseWriteInTodas()) return;
     final l = AppL10n.of(context).l;
@@ -3353,6 +3379,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               _CalendarAction.notice => _openNoticeFromMenu(),
               _CalendarAction.clearMonth => _clearMonth(),
               _CalendarAction.adminMode => widget.adminMode.toggle(),
+              _CalendarAction.exportCalendar => _openExport(),
             },
             itemBuilder: (context) => [
               // F-50: a viewer plans nothing and selects nothing.
@@ -3400,6 +3427,19 @@ class _CalendarScreenState extends State<CalendarScreen>
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.campaign_outlined),
                     title: Text(l[KApp.noticeAction]),
+                  ),
+                ),
+              // F-08: reading the plan out is open to everyone, the
+              // Visualizador included; the Premium gate is the sheet's.
+              if (_family != null)
+                PopupMenuItem(
+                  key: CalendarScreen.exportMenuKey,
+                  value: _CalendarAction.exportCalendar,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.event_available_outlined),
+                    title: Text(l[KApp.calExportAction]),
                   ),
                 ),
               // F-51 "Limpar mês": the third item, after a divider —
@@ -3721,6 +3761,7 @@ enum _CalendarAction {
   askSwap,
   notice,
   adminMode,
+  exportCalendar,
   clearMonth,
 }
 

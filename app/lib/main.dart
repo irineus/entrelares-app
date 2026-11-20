@@ -545,6 +545,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
                   onOpenNotifications: () => _router.go('/notifications'),
                   onOpenPlan: () => _router.go('/family/plan?gate=agenda'),
                   onOpenChildren: () => _router.go('/family/children'),
+                  onOpenPlanForExport: () =>
+                      _router.go('/family/plan?gate=calendar-export'),
                   onOpenHistory: () => _openAuditTrail(
                       '${DateTime.now().millisecondsSinceEpoch}'),
                   onOpenChat: () => _router.go(Uri(

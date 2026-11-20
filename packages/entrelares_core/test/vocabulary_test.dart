@@ -173,12 +173,23 @@ void main() {
     'app.viewer.',
   ];
 
+  const googleAgendaKeys = {
+    KApp.calExportLead,
+    KApp.calExportTip,
+    KApp.calExportPremiumBenefit,
+  };
+
   test('"agenda" and "nota" name the F-55 agenda, and nothing else', () {
     final pt = catalogs['pt-BR']!;
     final word = RegExp(r'\b(agendas?|notas?)\b', caseSensitive: false);
     for (final key in [...K.allKeys, ...KApp.allKeys]) {
       if (agendaPrefixes.any(key.startsWith)) continue;
-      expect(word.hasMatch(pt[key]), isFalse,
+      // F-08: "Google Agenda" is the product's Brazilian NAME, said where the
+      // export tells the reader how to import — never our word for anything.
+      final text = googleAgendaKeys.contains(key)
+          ? pt[key].replaceAll('Google Agenda', '')
+          : pt[key];
+      expect(word.hasMatch(text), isFalse,
           reason: '$key says "${pt[key]}"');
     }
   });
