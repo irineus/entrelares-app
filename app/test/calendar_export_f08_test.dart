@@ -112,6 +112,8 @@ void main() {
     // school event; D-1 (30/11) is read, never exported.
     expect(countText(tester), l.format(KApp.calExportCountMany, [3]));
     expect(ds.periodReads.single.$1, DateTime(2026, 11, 30));
+    expect(find.text(l[KApp.calExportTip]), findsOne,
+        reason: 'the import tip is said, not a tooltip');
 
     await tester.tap(find.byKey(const ValueKey('cal-export-events')));
     await tester.pumpAndSettle();

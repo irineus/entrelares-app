@@ -488,7 +488,14 @@ class _CalendarExportSheetState extends State<CalendarExportSheet> {
             style: textTheme.titleSmall,
           ),
         const SizedBox(height: Spacing.sm),
-        AppInfoTip(message: l[KApp.calExportTip]),
+        // Said, not hidden behind a tooltip nobody long-presses (U-36): the
+        // Google Calendar app may not import a file at all on Android.
+        AppBanner(
+          key: const ValueKey('cal-export-tip'),
+          tone: tokens.info,
+          icon: Icons.info_outline,
+          message: l[KApp.calExportTip],
+        ),
       ],
     );
   }
