@@ -385,7 +385,12 @@ dev project the numbers include the E2E families — switch it off there if the
 (São Paulo; L-31 moves it to the launch day by migration) counted under its
 `families.acquisition_source` — written once at creation, from the Play Install
 Referrer or `/register?src=` — and the internal test cohort apart. The campaign
-token stays out of the e-mail; read it here when needed. Check a run, or read the
+token stays out of the e-mail; read it here when needed. Since **F-108**
+(19/11/2026) each cohort also carries `pending_no_invite_7d`, `invited_7d` and
+`invitee_joined_7d` — the invite step in the family's first 7 days, read from
+`account_logs` and the ACCEPTED invitations because the 30-day purge deletes the
+never-accepted rows. F-108's metric (other caregiver joined within 7 days in
+≥ 30% of new families) is read from them. Check a run, or read the
 numbers without sending:
 ```sql
 select jobname, schedule from cron.job where jobname = 'weekly-bulletin';
