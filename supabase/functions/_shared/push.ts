@@ -242,6 +242,7 @@ const K = {
 	premiumGateAgenda: "notifRender.premiumGate.agenda",
 	premiumGateExpenses: "notifRender.premiumGate.expenses",
 	premiumGatePdf: "notifRender.premiumGate.pdf",
+	premiumGateCalendarExport: "notifRender.premiumGate.calendarExport",
 	premiumGateFamily: "notifRender.premiumGate.family",
 	titleDayAdminChangeSingle: "notifRender.title.dayAdminChange.single",
 	titleDayAdminChangeBatch: "notifRender.title.dayAdminChange.batch",
@@ -344,6 +345,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.premiumGate.agenda": "a agenda da criança",
 		"notifRender.premiumGate.expenses": "as despesas",
 		"notifRender.premiumGate.pdf": "o relatório em PDF",
+		"notifRender.premiumGate.calendarExport": "exportar para outro calendário",
 		"notifRender.premiumGate.family": "a família",
 		"notifRender.title.dayAdminChange.single": "Dia alterado no calendário",
 		"notifRender.title.dayAdminChange.batch": "Dias alterados no calendário",
@@ -476,6 +478,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
 		"notifRender.premiumGate.agenda": "the child's agenda",
 		"notifRender.premiumGate.expenses": "the expenses",
 		"notifRender.premiumGate.pdf": "the PDF report",
+		"notifRender.premiumGate.calendarExport": "exporting to another calendar",
 		"notifRender.premiumGate.family": "the family",
 		"notifRender.title.dayAdminChange.single": "Day changed on the calendar",
 		"notifRender.title.dayAdminChange.batch": "Days changed on the calendar",
@@ -722,6 +725,7 @@ export function renderPush(
 			: gate === "agenda" ? K.premiumGateAgenda
 			: gate === "expenses" ? K.premiumGateExpenses
 			: gate === "pdf" ? K.premiumGatePdf
+			: gate === "calendar-export" ? K.premiumGateCalendarExport
 			: K.premiumGateFamily;
 		return {
 			title: fmt(lang, K.titlePremiumRequest),

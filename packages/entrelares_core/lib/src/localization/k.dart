@@ -942,6 +942,7 @@ abstract final class K {
   static const String notifRenderPremiumRequest = 'notifRender.premiumRequest';
   static const String notifRenderPremiumGateChat = 'notifRender.premiumGate.chat';
   static const String notifRenderPremiumGateChatExport = 'notifRender.premiumGate.chatExport';
+  static const String notifRenderPremiumGateCalendarExport = 'notifRender.premiumGate.calendarExport';
   static const String notifRenderPremiumGateAgenda = 'notifRender.premiumGate.agenda';
   static const String notifRenderPremiumGateExpenses = 'notifRender.premiumGate.expenses';
   static const String notifRenderPremiumGatePdf = 'notifRender.premiumGate.pdf';
@@ -2125,6 +2126,7 @@ abstract final class K {
     notifRenderPremiumRequest,
     notifRenderPremiumGateChat,
     notifRenderPremiumGateChatExport,
+    notifRenderPremiumGateCalendarExport,
     notifRenderPremiumGateAgenda,
     notifRenderPremiumGateExpenses,
     notifRenderPremiumGatePdf,

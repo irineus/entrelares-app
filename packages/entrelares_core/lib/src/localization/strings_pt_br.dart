@@ -830,6 +830,7 @@ abstract final class StringsPtBr {
     K.notifRenderPremiumRequest: '{0} quer o Premium para {1}.',
     K.notifRenderPremiumGateChat: 'escrever na Conversa',
     K.notifRenderPremiumGateChatExport: 'exportar a Conversa em PDF',
+    K.notifRenderPremiumGateCalendarExport: 'exportar para outro calendário',
     K.notifRenderPremiumGateAgenda: "a agenda da criança",
     K.notifRenderPremiumGateExpenses: 'as despesas',
     K.notifRenderPremiumGatePdf: 'o relatório em PDF',

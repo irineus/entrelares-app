@@ -820,6 +820,7 @@ abstract final class StringsEn {
     K.notifRenderPremiumRequest: '{0} wants Premium for {1}.',
     K.notifRenderPremiumGateChat: 'writing in the chat',
     K.notifRenderPremiumGateChatExport: 'exporting the chat as PDF',
+    K.notifRenderPremiumGateCalendarExport: 'exporting to another calendar',
     K.notifRenderPremiumGateAgenda: "the child's agenda",
     K.notifRenderPremiumGateExpenses: 'the expenses',
     K.notifRenderPremiumGatePdf: 'the PDF report',

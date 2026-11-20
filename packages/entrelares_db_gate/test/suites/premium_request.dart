@@ -76,6 +76,30 @@ void premiumRequestTests(GateFixture fx) {
       expect(n.single['message'], endsWith('quer o Premium para a família.'));
     });
 
+    // F-08: the export to another calendar is a gate of its own — stored with
+    // its own words, never as the generic ask.
+    test('the calendar-export gate is stored and told in its own words',
+        () async {
+      final fam = await fx.createFamily('f08gate');
+      await plan(fam, 'free');
+      await fam.member.rpc<dynamic>('request_premium_from_admin',
+          params: {'p_gate': 'calendar-export'});
+      final n = await asks(fam.adminProfile.id);
+      expect(n.single['params']['gate'], 'calendar-export');
+      expect(n.single['message'],
+          endsWith('quer o Premium para exportar para outro calendário.'));
+    });
+
+    test('the calendar_export.premium_only key is public and on by default',
+        () async {
+      final row = await fx.service
+          .from('app_settings')
+          .select('value, value_type, is_public')
+          .eq('key', 'calendar_export.premium_only')
+          .single();
+      expect(row, {'value': 'true', 'value_type': 'bool', 'is_public': true});
+    });
+
     test('an admin, a Premium family and a stranger are refused', () async {
       final fam = await fx.createFamily('f102ref');
       await plan(fam, 'free');
