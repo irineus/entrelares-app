@@ -992,8 +992,34 @@ class _EntrelaresAppState extends State<EntrelaresApp>
       userId: () => _client.auth.currentUser?.id,
       enabled: !kIsWeb);
 
-  String? _redirect(BuildContext context, GoRouterState state) =>
-      _routeGate.redirect(state.matchedLocation);
+  String? _redirect(BuildContext context, GoRouterState state) {
+    _noteAppLinkInvite(state.uri);
+    return _routeGate.redirect(state.matchedLocation);
+  }
+
+  /// F-108: an App Link to `/register?invite=` opened on an Android app that
+  /// is already signed in. The gate below sends the session home, so the
+  /// token is kept here and offered after the frame — the same question the
+  /// web asks from its boot address ("Entrar com outra conta?", or F-88's
+  /// "Entrar na família X?" for a solo founder of an empty family). A cold
+  /// start already has the authed phase's post-frame callback scheduled
+  /// (`_setPhase`); scheduling again is harmless, because the offer consumes
+  /// the token before its first await.
+  bool _appLinkInviteScheduled = false;
+
+  void _noteAppLinkInvite(Uri uri) {
+    final token = InviteFormRules.appLinkInviteToken(uri,
+        isWeb: kIsWeb, signedIn: _phase == _AuthPhase.authed);
+    if (token == null) return;
+    _bootInviteToken = token;
+    if (_appLinkInviteScheduled) return;
+    _appLinkInviteScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _appLinkInviteScheduled = false;
+      unawaited(_offerInviteForAnotherAccount());
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
 
   AuthPhase get _routePhase => switch (_phase) {
         _AuthPhase.gate => AuthPhase.gate,
@@ -1771,7 +1797,9 @@ class _EntrelaresAppState extends State<EntrelaresApp>
 
   /// F-88: `/register?invite=` opened on a device already signed in — the
   /// router sends a session home, and the invitation used to vanish without
-  /// a word. Read from the boot address (web), offered once.
+  /// a word. Read from the boot address (web), offered once. F-108: on
+  /// Android the App Link reaches the router instead, and
+  /// [_noteAppLinkInvite] keeps it here.
   String? _bootInviteToken;
 
   Future<void> _offerInviteForAnotherAccount() async {
