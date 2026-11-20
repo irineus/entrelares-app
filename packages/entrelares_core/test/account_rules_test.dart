@@ -446,6 +446,65 @@ void main() {
               Uri.parse('https://web.entrelares.app/register?invite=')),
           isNull);
     });
+
+    // F-108 — on Android an App Link reaches a SIGNED-IN app through the
+    // router, which sends a session home: the token has to be read there.
+    group('appLinkInviteToken', () {
+      const token = '11111111-2222-3333-4444-555555555555';
+      final link = Uri.parse('/register?invite=$token');
+
+      test('a signed-in Android app keeps the invitation it was opened with',
+          () {
+        expect(
+            InviteFormRules.appLinkInviteToken(link,
+                isWeb: false, signedIn: true),
+            token);
+        expect(
+            InviteFormRules.appLinkInviteToken(
+                Uri.parse('https://web.entrelares.app/register?invite=$token'),
+                isWeb: false,
+                signedIn: true),
+            token,
+            reason: 'the full App Link URL reads the same as the route');
+      });
+
+      test('the web reads it from the boot address instead', () {
+        expect(
+            InviteFormRules.appLinkInviteToken(link,
+                isWeb: true, signedIn: true),
+            isNull,
+            reason: 'a web link is a cold boot (_bootInviteToken); reading '
+                'it here too would ask twice');
+      });
+
+      test('signed out, the register screen takes the token itself', () {
+        expect(
+            InviteFormRules.appLinkInviteToken(link,
+                isWeb: false, signedIn: false),
+            isNull,
+            reason: 'and "Sair e continuar" lands on /register?invite= '
+                'signed out — reading it there would ask again in a loop');
+      });
+
+      test('only /register with a uuid-shaped token is an invitation', () {
+        expect(
+            InviteFormRules.appLinkInviteToken(
+                Uri.parse('/update-password?invite=$token'),
+                isWeb: false,
+                signedIn: true),
+            isNull);
+        expect(
+            InviteFormRules.appLinkInviteToken(Uri.parse('/register'),
+                isWeb: false, signedIn: true),
+            isNull);
+        expect(
+            InviteFormRules.appLinkInviteToken(
+                Uri.parse('/register?invite=abc-123'),
+                isWeb: false,
+                signedIn: true),
+            isNull);
+      });
+    });
   });
 
   // F-57 — the onboarding form of a deferred OAuth sign-up: the founder half
