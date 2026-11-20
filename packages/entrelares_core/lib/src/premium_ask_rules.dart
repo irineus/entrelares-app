@@ -27,6 +27,8 @@ abstract final class PremiumAskRules {
     'agenda',
     'expenses',
     'pdf',
+    // F-08: the export to another calendar (.ics).
+    'calendar-export',
   };
 
   /// The ask with no gate behind it — the plan page opened from the Família
@@ -46,6 +48,7 @@ abstract final class PremiumAskRules {
         'agenda' => K.notifRenderPremiumGateAgenda,
         'expenses' => K.notifRenderPremiumGateExpenses,
         'pdf' => K.notifRenderPremiumGatePdf,
+        'calendar-export' => K.notifRenderPremiumGateCalendarExport,
         _ => K.notifRenderPremiumGateFamily,
       };
 
