@@ -118,7 +118,7 @@ dependencies:
   # F-73: Google's In-App Review (Play Core review). Checked on 28/09/2026
   # against the pinned toolchain — Flutter 3.44.7, AGP 9.0.1, Kotlin 2.3.20,
   # minSdk 26 — by a clean `--flavor dev` APK build; re-checked the same way
-  # on 22/11/2026 (T-60) against Flutter 3.50.1, AGP 9.3.1, Kotlin 2.4.20,
+  # on 22/11/2026 (T-60) against Flutter 3.50.1, AGP 9.3.3, Kotlin 2.4.20,
   # Gradle 9.5.0. Only the Android
   # production store build calls it (ReviewPromptRules.isStoreBuild).
   in_app_review: 2.0.12
