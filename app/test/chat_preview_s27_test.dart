@@ -1,7 +1,7 @@
 // S-27 — the Conversa's push hides the text by default; the member turns the
 // preview on (and off) from the Conversa, and the switch is the server's.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'chat_f35_test.dart' show pumpChat, source, text;

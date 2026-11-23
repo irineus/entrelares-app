@@ -23,7 +23,7 @@
 /// one slot and one look ([AppSheetDangerAction]).
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../theme/tokens.dart';
 import 'signals.dart';

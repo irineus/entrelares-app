@@ -1,6 +1,6 @@
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../theme/tokens.dart';
 import 'package:go_router/go_router.dart';
 

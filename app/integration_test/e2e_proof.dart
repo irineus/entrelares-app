@@ -32,7 +32,7 @@
 // (start, end, elapsed) always goes into `reportData`, and when it throws the
 // exception and stack go with it, BEFORE the rethrow. The binding's own
 // `tearDownAll` still completes `allTestsPassed` and `_requestData` sends
-// `reportData` in every outcome (both read out of `integration_test` 3.44.7),
+// `reportData` in every outcome (both read out of `integration_test` 3.44.7, re-read in 3.50.1 — T-60),
 // so the error text rides the same channel as the proof.
 library;
 

@@ -9,7 +9,7 @@
 // sentence in plain words, the message, and Aprovar/Recusar on the row (the
 // S-25 RPCs), with "Detalhes" for the sheet. "Enviadas" stays as U-42 left it.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/app_notification.dart';

@@ -12,7 +12,7 @@
 // ceiling, and to say what was on screen when the ceiling hit.
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Pumps until [finder] matches at least one widget, or fails after [timeout]

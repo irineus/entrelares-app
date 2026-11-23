@@ -17,5 +17,6 @@ Future<void> deliverTextFile(
   final directory = await getTemporaryDirectory();
   final file = File('${directory.path}/$fileName');
   await file.writeAsString(contents, encoding: utf8);
-  await Share.shareXFiles([XFile(file.path, mimeType: mimeType)]);
+  await SharePlus.instance.share(
+      ShareParams(files: [XFile(file.path, mimeType: mimeType)]));
 }

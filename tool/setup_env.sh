@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # tool/setup_env.sh — bootstrap idempotente do ambiente de build do Entrelares (Flutter) (Linux).
 #
-# Instala/garante: JDK 17, FVM, Flutter 3.44.7 (via .fvmrc), Android SDK
+# Instala/garante: JDK 17, FVM, Flutter 3.50.1 (via .fvmrc), Android SDK
 # (cmdline-tools, platform-tools, platforms;android-36, build-tools;36.0.0,
-# NDK 28.2.13676358 — versões que o Flutter 3.44.7 declara em FlutterExtension.kt).
+# NDK 28.2.13676358 — versões que o Flutter 3.50.1 declara em FlutterExtension.kt).
 # Escreve tool/env (source-ável) com ANDROID_HOME/JAVA_HOME/PATH e termina com
 # `fvm flutter doctor`, falhando com mensagem clara se algo essencial faltar.
 #
@@ -19,11 +19,11 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------- constantes
-FLUTTER_VERSION="3.44.7"   # fonte da verdade é o .fvmrc; aqui só para o fallback/checagem
-FLUTTER_SHA256="a0edd646c159c0e816788c0e46a4f071199c1320495898f5a679599b583a05a4"
-ANDROID_PLATFORM="android-36"      # compileSdk padrão do Flutter 3.44.7
+FLUTTER_VERSION="3.50.1"   # fonte da verdade é o .fvmrc; aqui só para o fallback/checagem
+FLUTTER_SHA256="4ad17fc8462fbcef2ba19ff4a78c0a16b7147fde1add8578e267ea62cdb92678"
+ANDROID_PLATFORM="android-36"      # compileSdk padrão do Flutter 3.50.1
 BUILD_TOOLS="36.0.0"
-NDK_VERSION="28.2.13676358"        # ndkVersion padrão do Flutter 3.44.7
+NDK_VERSION="28.2.13676358"        # ndkVersion padrão do Flutter 3.50.1
 CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -87,7 +87,7 @@ if ! command -v fvm >/dev/null; then
 fi
 command -v fvm >/dev/null || fail "fvm não ficou disponível no PATH ($PUB_BIN)."
 
-# ------------------------------------------------- Flutter 3.44.7 (via FVM)
+# ------------------------------------------------- Flutter 3.50.1 (via FVM)
 log "Flutter $FLUTTER_VERSION"
 if [ ! -x "$FVM_CACHE_PATH/versions/$FLUTTER_VERSION/bin/flutter" ]; then
   # caminho normal: clone git do FVM; fallback: tarball oficial (rede restrita)

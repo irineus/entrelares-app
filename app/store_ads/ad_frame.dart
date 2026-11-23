@@ -7,7 +7,7 @@
 // the phone sit on a canvas of the format's proportion, every colour a
 // `tokens.dart` token.
 import 'package:entrelares_app/theme/tokens.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../store_screenshots/store_frame.dart' show phone;
 

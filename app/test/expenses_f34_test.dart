@@ -8,7 +8,7 @@
 // the reader owes (capped by the debt) and Lembrar only where the reader is
 // owed, the activity list with each row's effect, and the live screen.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/expense.dart';

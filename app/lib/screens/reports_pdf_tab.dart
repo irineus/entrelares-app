@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/semantics.dart';
 import '../widgets/ui/ui.dart';
 import '../theme/tokens.dart';

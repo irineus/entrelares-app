@@ -13,7 +13,7 @@
 // question each one asks is the one the reader asks — did the URL I opened stay
 // the URL I am on?
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 

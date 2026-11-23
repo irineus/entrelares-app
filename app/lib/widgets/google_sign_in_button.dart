@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:google_sign_in/google_sign_in.dart'
     show GoogleSignInException;
 

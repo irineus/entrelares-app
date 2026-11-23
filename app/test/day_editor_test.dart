@@ -3,7 +3,7 @@
 // lock and admin confirmation, the admin-only clear day, the F-14 admin-mode
 // toggle/bypass and the F-40 proactive retro-reach gate.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/family.dart';

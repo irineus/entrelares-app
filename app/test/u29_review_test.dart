@@ -3,7 +3,7 @@
 // reader), the login eye toggle U-19 had shipped and the port dropped, and
 // the bulk sheet's U-28 alignment (bordered form fields, not underlines).
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

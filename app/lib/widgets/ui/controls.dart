@@ -2,7 +2,7 @@
 /// pair of buttons that ends a form, and the avatar that says whose row this is.
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../theme/tokens.dart';
 import 'fit.dart';
