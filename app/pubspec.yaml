@@ -58,7 +58,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   # Lote 1 shell: URL-based routing so Android App Links land on the right
   # screen (recovery is the first consumer; invitations follow in lote 4).
-  go_router: ^16.2.0
+  go_router: ^18.1.4
   # U-13 port: the persisted language override (the web's localStorage
   # equivalent) — read at boot, before any session exists.
   shared_preferences: ^2.5.3
