@@ -1127,6 +1127,42 @@ class ComponentContainer {
         return Array.from(this.providers.values());
     }
 }
+/**
+ * @license
+ * Copyright 2019 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+var InstantiationMode;
+(function (InstantiationMode) {
+    InstantiationMode["LAZY"] = "LAZY";
+    InstantiationMode["EAGER"] = "EAGER";
+    InstantiationMode["EXPLICIT"] = "EXPLICIT"; // component needs to be initialized explicitly by calling Provider.initialize()
+})(InstantiationMode || (InstantiationMode = {}));
+/**
+ * PUBLIC: A public component provides a set of public APIs to customers. A service namespace will be patched
+ * onto `firebase` namespace. Assume the component name is `test`, customers will be able
+ * to get the service by calling `firebase.test()` or `app.test()` where `app` is a `FirebaseApp` instance.
+ *
+ * PRIVATE: A private component provides a set of private APIs that are used internally by other
+ * Firebase SDKs. No service namespace is created in `firebase` namespace and customers have no way to get them.
+ */
+var ComponentType;
+(function (ComponentType) {
+    ComponentType["PUBLIC"] = "PUBLIC";
+    ComponentType["PRIVATE"] = "PRIVATE";
+    ComponentType["VERSION"] = "VERSION";
+})(ComponentType || (ComponentType = {}));
 
 /**
  * @license
@@ -1656,8 +1692,8 @@ function isVersionServiceProvider(provider) {
     const component = provider.getComponent();
     return component?.type === "VERSION" /* ComponentType.VERSION */;
 }
-const name$q = "./firebase-app.js";
-const version$1 = "0.16.1";
+const name$r = "./firebase-app.js";
+const version$1 = "0.16.6";
 /**
  * @license
  * Copyright 2019 Google LLC
@@ -1675,13 +1711,14 @@ const version$1 = "0.16.1";
  * limitations under the License.
  */
 const logger = new Logger('./firebase-app.js');
-const name$p = "@firebase/app-compat";
-const name$o = "@firebase/analytics-compat";
-const name$n = "@firebase/analytics";
-const name$m = "@firebase/app-check-compat";
-const name$l = "@firebase/app-check";
-const name$k = "@firebase/auth";
-const name$j = "@firebase/auth-compat";
+const name$q = "@firebase/app-compat";
+const name$p = "@firebase/analytics-compat";
+const name$o = "@firebase/analytics";
+const name$n = "@firebase/app-check-compat";
+const name$m = "@firebase/app-check";
+const name$l = "@firebase/auth";
+const name$k = "@firebase/auth-compat";
+const name$j = "@firebase/crashlytics";
 const name$i = "@firebase/database";
 const name$h = "@firebase/data-connect";
 const name$g = "@firebase/database-compat";
@@ -1700,8 +1737,8 @@ const name$4 = "@firebase/storage-compat";
 const name$3 = "@firebase/firestore";
 const name$2 = "@firebase/ai";
 const name$1 = "@firebase/firestore-compat";
-const name$r = "firebase";
-const version$2 = "12.18.0";
+const name$s = "firebase";
+const version$2 = "13.3.0";
 /**
  * @license
  * Copyright 2019 Google LLC
@@ -1725,14 +1762,15 @@ const version$2 = "12.18.0";
  */
 const DEFAULT_ENTRY_NAME = '[DEFAULT]';
 const PLATFORM_LOG_STRING = {
-    [name$q]: 'fire-core',
-    [name$p]: 'fire-core-compat',
-    [name$n]: 'fire-analytics',
-    [name$o]: 'fire-analytics-compat',
-    [name$l]: 'fire-app-check',
-    [name$m]: 'fire-app-check-compat',
-    [name$k]: 'fire-auth',
-    [name$j]: 'fire-auth-compat',
+    [name$r]: 'fire-core',
+    [name$q]: 'fire-core-compat',
+    [name$o]: 'fire-analytics',
+    [name$p]: 'fire-analytics-compat',
+    [name$m]: 'fire-app-check',
+    [name$n]: 'fire-app-check-compat',
+    [name$l]: 'fire-auth',
+    [name$k]: 'fire-auth-compat',
+    [name$j]: 'fire-cls',
     [name$i]: 'fire-rtdb',
     [name$h]: 'fire-data-connect',
     [name$g]: 'fire-rtdb-compat',
@@ -1752,7 +1790,7 @@ const PLATFORM_LOG_STRING = {
     [name$1]: 'fire-fst-compat',
     [name$2]: 'fire-vertex',
     'fire-js': 'fire-js', // Platform identifier for JS SDK.
-    [name$r]: 'fire-js-all'
+    [name$s]: 'fire-js-all'
 };
 /**
  * @license
@@ -2090,7 +2128,7 @@ class FirebaseServerAppImpl extends FirebaseAppImpl {
         // will never trigger.
         this._serverConfig.releaseOnDeref = undefined;
         serverConfig.releaseOnDeref = undefined;
-        registerVersion(name$q, version$1, 'serverapp');
+        registerVersion(name$r, version$1, 'serverapp');
     }
     toJSON() {
         return undefined;
@@ -2120,6 +2158,9 @@ class FirebaseServerAppImpl extends FirebaseAppImpl {
     // reference counts and delete itself if no reference count remain. The coordinating logic that
     // handles this is in deleteApp(...).
     automaticCleanup() {
+        if (this.isDeleted) {
+            return;
+        }
         void deleteApp(this);
     }
     get settings() {
@@ -2794,9 +2835,9 @@ function registerCoreComponents(variant) {
     _registerComponent(new Component('platform-logger', container => new PlatformLoggerServiceImpl(container), "PRIVATE" /* ComponentType.PRIVATE */));
     _registerComponent(new Component('heartbeat', container => new HeartbeatServiceImpl(container), "PRIVATE" /* ComponentType.PRIVATE */));
     // Register `app` package.
-    registerVersion(name$q, version$1, variant);
+    registerVersion(name$r, version$1, variant);
     // BUILD_TARGET will be replaced by values like esm, cjs, etc during the compilation
-    registerVersion(name$q, version$1, 'esm2020');
+    registerVersion(name$r, version$1, 'esm2020');
     // Register platform SDK identifier (no version).
     registerVersion('fire-js', '');
 }
@@ -2825,7 +2866,7 @@ function registerCoreComponents(variant) {
 registerCoreComponents('');
 
 var name = "firebase";
-var version = "12.18.0";
+var version = "13.3.0";
 
 /**
  * @license

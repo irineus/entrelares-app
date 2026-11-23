@@ -90,8 +90,8 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-importScripts('/firebasejs/12.18.0/firebase-app-compat.js');
-importScripts('/firebasejs/12.18.0/firebase-messaging-compat.js');
+importScripts('/firebasejs/13.3.0/firebase-app-compat.js');
+importScripts('/firebasejs/13.3.0/firebase-messaging-compat.js');
 
 // The PUBLIC Firebase Web config — the mirror of `Env.prod.webPush` (minus the
 // VAPID key, which only the page needs). Armed 08/09/2026 together with

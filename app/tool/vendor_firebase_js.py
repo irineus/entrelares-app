@@ -45,7 +45,7 @@ import urllib.request
 # runtime when the loaded SDK differs from the version it was tested against,
 # and a browser console warning nobody reads is not a gate — so the pin is a
 # test instead.
-VERSION = "12.18.0"
+VERSION = "13.3.0"
 
 BASE = f"https://www.gstatic.com/firebasejs/{VERSION}"
 OUT = os.path.join("web", "firebasejs", VERSION)

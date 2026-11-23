@@ -43,7 +43,7 @@ PushMessaging create() => WebPushMessaging();
 class WebPushMessaging implements PushMessaging {
   /// The vendored SDK, at the version `web_channel_test` pins to the plugin's
   /// own `supportedFirebaseJsSdkVersion`.
-  static const _sdkBase = '/firebasejs/12.18.0';
+  static const _sdkBase = '/firebasejs/13.3.0';
 
   FirebaseApp? _app;
   Future<bool>? _loading;
@@ -103,6 +103,10 @@ class WebPushMessaging implements PushMessaging {
   Future<String?> token() async {
     if (_current != PushPermission.granted) return null;
     if (!await _ensureFirebase()) return null;
+    // T-60: deprecated for register()/onRegistered, which return a Firebase
+    // Installation ID the server's FCM v1 `message.token` cannot use — see
+    // push_messaging_io.dart. Kept until server and client move together.
+    // ignore: deprecated_member_use
     return FirebaseMessaging.instance.getToken(
       vapidKey: Env.current.webPush.vapidKey,
       // NOT passed on purpose — see the class doc. Null leaves the JS SDK to
@@ -118,6 +122,7 @@ class WebPushMessaging implements PushMessaging {
     // Only reachable after [token] brought the SDK up; asking otherwise would
     // download the whole SDK in order to delete a token that cannot exist.
     if (_app == null) return;
+    // ignore: deprecated_member_use
     await FirebaseMessaging.instance.deleteToken();
   }
 
