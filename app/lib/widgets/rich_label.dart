@@ -1,5 +1,5 @@
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// U-13 — renders the catalog entries that carry inline emphasis (the web's
 /// `L.Rich`). The parsing is the pure mirror ([parseRichText]); this only

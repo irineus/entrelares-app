@@ -2,7 +2,7 @@
 // Hoje card, the "Horário das trocas" sheet that fills every future
 // transition day in one call, and the per-device dismissal.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_app/screens/calendar_screen.dart';

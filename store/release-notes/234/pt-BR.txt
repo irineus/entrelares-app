@@ -1,0 +1,1 @@
+Atualização interna: o app passa a ser construído com uma versão mais nova das ferramentas do Android e do Flutter. Nada muda no uso; o compartilhamento de convites e arquivos segue pelo menu do sistema.

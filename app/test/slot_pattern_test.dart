@@ -7,7 +7,7 @@
 // top of the whole cell, that made the day untappable.
 import 'package:entrelares_app/theme/slot_pattern.dart';
 import 'package:entrelares_app/theme/tokens.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

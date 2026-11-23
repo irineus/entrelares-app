@@ -4,12 +4,11 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, kReleaseMode, TargetPlatform;
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 // T-53 stage 4: real paths instead of `/#/…` on the web. The library resolves
 // to a non-web STUB off the web, so the call below is safe on every platform.
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';

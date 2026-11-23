@@ -6,7 +6,7 @@
 // past is read-only, a refusal keeps the editor open with the server's words,
 // and a delete asks first.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/app_notification.dart';

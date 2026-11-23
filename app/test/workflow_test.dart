@@ -5,7 +5,7 @@
 // question when the texts differ), the per-day F-28 gate skips instead of
 // failing, and the resolve sheet batches the three subsets.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';

@@ -7,7 +7,7 @@
 /// the argument — one implementation cannot drift from itself.
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../theme/tokens.dart';
 import 'surfaces.dart';

@@ -3,7 +3,7 @@
 import 'package:entrelares_app/theme/app_theme.dart';
 import 'package:entrelares_app/theme/tokens.dart';
 import 'package:entrelares_app/widgets/ui/ui.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Widget _host(Widget child, {ThemeData? theme}) => MaterialApp(

@@ -4,7 +4,7 @@ version: 0.1.0
 publish_to: none
 
 environment:
-  sdk: ^3.12.2
+  sdk: ^3.14.0
 
 dependencies:
   # The PURE-DART Supabase SDK, never `supabase_flutter`. The gate needs SEVERAL

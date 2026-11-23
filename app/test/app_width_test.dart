@@ -2,7 +2,7 @@
 // requirement is about ARRANGEMENT, so the test measures geometry — a cap that
 // silently stopped binding would look identical to a suite that only asserts
 // what is present.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_app/theme/tokens.dart';

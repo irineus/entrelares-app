@@ -7,7 +7,7 @@
 // account gives — the gate is not weakened; and afterwards the page asks the
 // server again, so the password door and the Senha card appear at once.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/family.dart';

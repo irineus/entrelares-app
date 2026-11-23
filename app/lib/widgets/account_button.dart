@@ -1,5 +1,5 @@
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../services/account_identity.dart';
 import '../theme/tokens.dart';

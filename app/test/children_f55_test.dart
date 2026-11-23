@@ -5,7 +5,7 @@
 // name(s), the page is read at rest and edited in a sheet, only an admin gets
 // the doors, and a refusal keeps the sheet open with the server's sentence.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/child.dart';

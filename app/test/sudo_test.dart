@@ -13,7 +13,7 @@
 // optimistic check can be wrong (window expired mid-flight, or a drifted
 // device clock) and the server is the only authority.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_app/services/custody_data_source.dart';

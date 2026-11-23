@@ -12,7 +12,7 @@
 /// hand-built `Row` in the day sheet.
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../theme/tokens.dart';
 

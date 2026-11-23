@@ -5,4 +5,4 @@ export ANDROID_SDK_ROOT="/root/android-sdk"
 export FVM_CACHE_PATH="/root/.fvm-cache"
 # o SDK pinado no PATH: o shim do fvm (pub global) invoca 'dart', e 'flutter'/'dart'
 # diretos apontam para a MESMA versão que o fvm resolve pelo .fvmrc
-export PATH="/root/.pub-cache/bin:/root/.fvm-cache/versions/3.44.7/bin:$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
+export PATH="/root/.pub-cache/bin:/root/.fvm-cache/versions/3.50.1/bin:$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"

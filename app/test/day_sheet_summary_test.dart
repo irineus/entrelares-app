@@ -10,7 +10,7 @@
 // nothing can be saved on, and for a past day (the relato's, F-67), where the
 // admin mode reaches the editor through the pencil. A ✕ closes in every mode.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';

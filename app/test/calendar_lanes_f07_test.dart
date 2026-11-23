@@ -5,7 +5,7 @@
 // that says who has whom, the "which child?" question before any write, and a
 // single-plan family seeing none of it.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';

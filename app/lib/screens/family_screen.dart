@@ -1,6 +1,6 @@
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../widgets/ui/ui.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -631,7 +631,7 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
       if (share != null) {
         await share(message);
       } else {
-        await Share.share(message);
+        await SharePlus.instance.share(_textShare(message));
       }
     } catch (_) {
       // F-108: a browser without Web Share (desktop) throws here, and the
@@ -655,9 +655,16 @@ class _FamilyScreenState extends State<FamilyScreen> with RouteAware {
     if (share != null) {
       await share(message);
     } else {
-      await Share.share(message);
+      await SharePlus.instance.share(_textShare(message));
     }
   }
+
+  /// T-60 (share_plus 10 → 13): the new API falls back to a `mailto:` link on
+  /// a browser without Web Share unless told not to. Off, so it throws as
+  /// share_plus 10 did — the invite's catch above copies the link instead,
+  /// which is what that reader can use (F-108).
+  static ShareParams _textShare(String message) =>
+      ShareParams(text: message, mailToFallbackEnabled: false);
 
   /// U-67: the referral link to the clipboard — the link alone, like the
   /// invitation's "Copiar link".

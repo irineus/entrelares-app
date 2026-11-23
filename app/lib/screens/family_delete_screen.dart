@@ -1,5 +1,5 @@
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:entrelares_db_contracts/models/member.dart';
 import '../services/custody_data_source.dart';

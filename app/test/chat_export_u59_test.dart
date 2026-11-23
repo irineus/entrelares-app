@@ -5,7 +5,7 @@
 // the gate with its way in (`/family/plan`), a viewer exports too, and the
 // QR is promised only where the PDF can carry one (F-64: never a viewer's).
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_app/screens/reports_pdf_tab.dart';

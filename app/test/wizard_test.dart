@@ -2,7 +2,7 @@
 // preset expansion, existing days preserved (insert-only write), the T-27
 // transition-only handoff, the F-39 free-tier clamp and the block validation.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/care_schedule.dart';

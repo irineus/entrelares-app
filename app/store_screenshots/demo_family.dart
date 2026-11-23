@@ -34,9 +34,8 @@ import 'package:entrelares_db_contracts/models/member.dart';
 import 'package:entrelares_db_contracts/models/report_attestation.dart';
 import 'package:entrelares_db_contracts/models/role.dart';
 import 'package:entrelares_db_contracts/models/swap_request.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../test/calendar_slice_test.dart' show FakeCustodyDataSource;
 

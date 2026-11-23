@@ -7,7 +7,7 @@
 // already had, a failed origin lookup costs the origin line and NOT the
 // timeline, and the synthetic trial-end entry lands in chronological order.
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_db_contracts/models/account_log.dart';

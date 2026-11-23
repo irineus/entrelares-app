@@ -26,10 +26,10 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 #   +N    — rises on EVERY merge to main, strictly monotonic: Play burns a
 #           versionCode by UPLOAD and never accepts it again (store/README §6).
 # Env.appVersion mirrors this line — env_version_test pins the two together.
-version: 3.5.0+233
+version: 3.5.1+234
 
 environment:
-  sdk: ^3.12.2
+  sdk: ^3.14.0
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -40,21 +40,25 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # U-13 port: Material's own strings (dialogs, a11y labels) follow the
-  # session language; the app catalog stays in entrelares_core.
-  flutter_localizations:
-    sdk: flutter
   # T-53 stage 4: `usePathUrlStrategy()` — real paths on the web channel. Ships
   # with the SDK and stubs out off the web.
   flutter_web_plugins:
     sdk: flutter
+  # T-60: Material left the SDK in Flutter 3.47 — `package:flutter/material.dart`
+  # is deprecated in favour of this package (the one the 3.50 app template
+  # depends on), and `flutter analyze` treats the deprecation as an issue.
+  # It also carries `GlobalMaterialLocalizations.delegates` (U-13 port:
+  # Material's own strings — dialogs, a11y labels — follow the session
+  # language; the app catalog stays in entrelares_core), so the direct
+  # `flutter_localizations` dependency left with the SDK import.
+  material_ui: ^1.1.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   # Lote 1 shell: URL-based routing so Android App Links land on the right
   # screen (recovery is the first consumer; invitations follow in lote 4).
-  go_router: ^16.2.0
+  go_router: ^18.1.4
   # U-13 port: the persisted language override (the web's localStorage
   # equivalent) — read at boot, before any session exists.
   shared_preferences: ^2.5.3
@@ -67,7 +71,7 @@ dependencies:
   # Lote 4 — the native improvement the parity map asks for twice: the system
   # share sheet replaces the web's "copy the link and send it on WhatsApp" hint
   # (invitations) and the browser download (LGPD export, PR 4).
-  share_plus: ^10.1.4
+  share_plus: ^13.3.1
   # F-17 export: the share sheet hands over a FILE, so the JSON is written to
   # the app's own cache directory first (never external storage — no extra
   # permission, and the OS reclaims it). Native half only — the web half is an
@@ -113,7 +117,9 @@ dependencies:
   google_sign_in_web: ^1.1.3
   # F-73: Google's In-App Review (Play Core review). Checked on 28/09/2026
   # against the pinned toolchain — Flutter 3.44.7, AGP 9.0.1, Kotlin 2.3.20,
-  # minSdk 26 — by a clean `--flavor dev` APK build. Only the Android
+  # minSdk 26 — by a clean `--flavor dev` APK build; re-checked the same way
+  # on 22/11/2026 (T-60) against Flutter 3.50.1, AGP 9.3.3, Kotlin 2.4.20,
+  # Gradle 9.5.0. Only the Android
   # production store build calls it (ReviewPromptRules.isStoreBuild).
   in_app_review: 2.0.12
 

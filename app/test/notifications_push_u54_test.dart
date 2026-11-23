@@ -17,7 +17,7 @@ import 'package:entrelares_app/services/push_messaging.dart';
 import 'package:entrelares_app/services/push_service.dart';
 import 'package:entrelares_app/widgets/app_l10n.dart';
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

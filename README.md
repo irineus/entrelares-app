@@ -31,7 +31,7 @@ carrega o nome do dia.
 ## Estrutura (molde `irineus/desmalha`)
 
 ```
-.fvmrc                        # pin do Flutter (3.44.7) — só o .fvmrc é versionado, .fvm/ não
+.fvmrc                        # pin do Flutter (3.50.1) — só o .fvmrc é versionado, .fvm/ não
 tool/setup_env.sh             # bootstrap idempotente de ambiente Linux (JDK 17, FVM, Android SDK)
 app/                          # o app Flutter (só orquestra e apresenta)
 app/lib/theme/                # U-27: tokens.dart (a única fonte de cor) + app_theme.dart
@@ -51,7 +51,7 @@ store/                        # T-56 PR 4c: listagens da Play, masters de marca 
 ## Comandos
 
 ```
-fvm flutter --version                                  # 3.44.7 (pinado)
+fvm flutter --version                                  # 3.50.1 (pinado)
 cd packages/entrelares_core && fvm dart test           # regras puras, sem emulador
 cd app && fvm flutter analyze && fvm flutter test
 cd app && fvm flutter build apk --debug --flavor dev --split-per-abi
@@ -536,7 +536,7 @@ Regra herdada do produto: bump em toda mudança funcional entregue ao owner.
 
 ## Decisões herdadas (não reabrir aqui)
 
-- Flutter **3.44.7** via FVM; JDK **17**; `minSdk` **26**.
+- Flutter **3.50.1** via FVM; JDK **17**; `minSdk` **26**.
 - `applicationId` por flavor (estágio 3): **dev = `com.entrelares.flutter`** — DIFERENTE
   do pacote da Play de propósito, para o APK dev coexistir com o app instalado da loja no
   aparelho do owner — e **prod = `com.entrelares.app`** (mesma assinatura de upload —

@@ -1,7 +1,7 @@
 // The SnackBar face of the web's ToastService (T-53 lote 1): one at a time,
 // tappable to dismiss, duration scaling with length (the formula itself is
 // mirrored and tested in core — feedback_rules_test).
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:entrelares_app/widgets/app_snack.dart';
