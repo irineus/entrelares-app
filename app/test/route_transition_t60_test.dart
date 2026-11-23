@@ -23,11 +23,11 @@ void main() {
         routes: [
           GoRoute(
             path: '/',
-            builder: (_, __) => const Scaffold(body: Text('first')),
+            builder: (_, _) => const Scaffold(body: Text('first')),
             routes: [
               GoRoute(
                 path: 'second',
-                builder: (_, __) => const Scaffold(body: Text('second')),
+                builder: (_, _) => const Scaffold(body: Text('second')),
               ),
             ],
           ),
