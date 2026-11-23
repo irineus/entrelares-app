@@ -1,0 +1,1 @@
+Internal update: notifications now use a newer version of Firebase, on the phone and in the browser. Nothing changes in how you use the app.

@@ -56,7 +56,7 @@ List<String> _sources(String csp, String directive) =>
 /// T-62 — the Firebase JS SDK version this repo vendors. Named once here and
 /// checked against the four places that spell it out, plus the plugin constant
 /// below, which is the authority.
-const _firebaseSdkVersion = '12.18.0';
+const _firebaseSdkVersion = '13.3.0';
 
 /// The Firebase JS SDK version `firebase_core_web` was tested against, read out
 /// of the resolved package rather than repeated here.

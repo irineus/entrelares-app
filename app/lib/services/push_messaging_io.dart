@@ -55,14 +55,24 @@ class FcmMessaging implements PushMessaging {
         _ => PushPermission.notAsked,
       };
 
+  // T-60 (firebase_messaging 17): getToken/deleteToken/onTokenRefresh are
+  // deprecated for register()/onRegistered, which hand back a Firebase
+  // Installation ID — a DIFFERENT identifier. The server sends FCM v1 with
+  // `message.token` (supabase/functions/_shared/fcm.ts), so swapping here alone
+  // would store FIDs where registration tokens belong and silence every push.
+  // The move to FID direct-send is server + client together, its own item.
   @override
+  // ignore: deprecated_member_use
   Future<String?> token() => FirebaseMessaging.instance.getToken();
 
   @override
+  // ignore: deprecated_member_use
   Future<void> deleteToken() => FirebaseMessaging.instance.deleteToken();
 
   @override
-  Stream<String> get tokenRefreshes => FirebaseMessaging.instance.onTokenRefresh;
+  Stream<String> get tokenRefreshes =>
+      // ignore: deprecated_member_use
+      FirebaseMessaging.instance.onTokenRefresh;
 
   @override
   Stream<Map<String, String>> get opened =>

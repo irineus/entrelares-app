@@ -1,0 +1,1 @@
+Atualização interna: as notificações passam a usar uma versão mais nova do Firebase, no celular e no navegador. Nada muda no uso.
