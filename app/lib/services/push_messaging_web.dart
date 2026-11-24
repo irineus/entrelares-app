@@ -4,6 +4,7 @@ import 'dart:js_interop';
 // construction — the whole question is whether the property is there.
 import 'dart:js_interop_unsafe';
 
+import 'package:entrelares_core/entrelares_core.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -26,7 +27,7 @@ import 'push_messaging.dart';
 ///     Flutter's own bootstrap.
 ///   * `firebase-messaging-sw.js` is registered by the Firebase JS SDK at its
 ///     own scope, `/firebase-cloud-messaging-push-scope`, which is exactly why
-///     [token] does NOT pass `serviceWorkerScriptPath`: the FlutterFire layer
+///     [target] does NOT pass `serviceWorkerScriptPath`: the FlutterFire layer
 ///     would then call `register(path)` with no `{scope}`, taking scope `/` and
 ///     REPLACING the app shell's registration. Letting the SDK register its own
 ///     worker is the whole answer to "which worker at which scope".
@@ -87,52 +88,91 @@ class WebPushMessaging implements PushMessaging {
     }
   }
 
-  /// This browser's registration token, or null.
+  /// This browser's Firebase Installation ID (T-109), or null.
   ///
   /// **The permission is read BEFORE the SDK is asked, and that guard is the
-  /// point of this method.** The Firebase JS SDK's `getToken` opens the
-  /// browser's permission prompt on its own when the permission is still
-  /// `default` — and `PushService.start` calls this on EVERY authenticated
-  /// session, whose documented contract is that it never prompts. Ported
-  /// without this line, the web channel would ask every returning visitor for
-  /// notification permission at boot, with no gesture and no context, and
-  /// would spend on page load the one prompt the product means to spend on a
-  /// press. The prompt lives in [requestPermission], reachable only from the
-  /// control.
+  /// point of this method.** The Firebase JS SDK's `register()` — like the
+  /// `getToken` it replaces — opens the browser's permission prompt on its own
+  /// when the permission is still `default`, and `PushService.start` calls this
+  /// on EVERY authenticated session, whose documented contract is that it never
+  /// prompts. Without this line the web channel would ask every returning
+  /// visitor for notification permission at boot, with no gesture and no
+  /// context, and would spend on page load the one prompt the product means to
+  /// spend on a press. The prompt lives in [requestPermission], reachable only
+  /// from the control.
+  ///
+  /// **The listener is armed before `register()`.** The JS SDK REFUSES a
+  /// `register()` with no `onRegistered` handler in place, and the FID arrives
+  /// only on that stream (every `register()` re-emits it). Reading the getter
+  /// installs the handler; `.first` subscribes on the spot.
   @override
-  Future<String?> token() async {
+  Future<String?> target() async {
     if (_current != PushPermission.granted) return null;
     if (!await _ensureFirebase()) return null;
-    // T-60: deprecated for register()/onRegistered, which return a Firebase
-    // Installation ID the server's FCM v1 `message.token` cannot use — see
-    // push_messaging_io.dart. Kept until server and client move together.
+    final messaging = FirebaseMessaging.instance;
+    final registered = messaging.onRegistered.first.timeout(_registerTimeout);
+    try {
+      await messaging.register(
+        vapidKey: Env.current.webPush.vapidKey,
+        // NOT passed on purpose — see the class doc. Null leaves the JS SDK to
+        // register its own worker at its own scope, instead of the FlutterFire
+        // layer registering it at `/` over the app shell.
+        // ignore: avoid_redundant_argument_values
+        serviceWorkerScriptPath: null,
+      );
+    } catch (_) {
+      // The listener is already armed; left alone, its timeout fires 30 s
+      // later as an UNHANDLED error — measured on Android (T-109).
+      registered.ignore();
+      rethrow;
+    }
+    return await registered;
+  }
+
+  static const _registerTimeout = Duration(seconds: 30);
+
+  @override
+  PushTargetKind get targetKind => PushTargetKind.fid;
+
+  @override
+  Future<void> unregister() async {
+    // Only reachable after [target] brought the SDK up; asking otherwise would
+    // download the whole SDK in order to drop a registration that cannot exist.
+    if (_app == null) return;
+    await FirebaseMessaging.instance.unregister();
+  }
+
+  /// The JS SDK feeds `onRegistered` on every `register()` and on the
+  /// browser's `pushsubscriptionchange` — the rotation the old `onTokenRefresh`
+  /// never reported on the web (its stream was never fed). Empty until the SDK
+  /// is up, so a person who never enabled push never downloads it for this.
+  @override
+  Stream<String> get targetChanges => _app == null
+      ? const Stream.empty()
+      : FirebaseMessaging.instance.onRegistered;
+
+  // T-109 MIGRATION ONLY — the token API firebase_messaging 17 deprecated.
+  // Read once per browser, before the first `register()`, so the row an older
+  // build wrote can be deleted; removed with the token path (cleanup card).
+  // The same guard as [target]: `getToken` prompts on `default` too.
+  @override
+  Future<String?> legacyToken() async {
+    if (_current != PushPermission.granted) return null;
+    if (!await _ensureFirebase()) return null;
     // ignore: deprecated_member_use
     return FirebaseMessaging.instance.getToken(
       vapidKey: Env.current.webPush.vapidKey,
-      // NOT passed on purpose — see the class doc. Null leaves the JS SDK to
-      // register its own worker at its own scope, instead of the FlutterFire
-      // layer registering it at `/` over the app shell.
       // ignore: avoid_redundant_argument_values
       serviceWorkerScriptPath: null,
     );
   }
 
   @override
-  Future<void> deleteToken() async {
-    // Only reachable after [token] brought the SDK up; asking otherwise would
-    // download the whole SDK in order to delete a token that cannot exist.
+  Future<void> dropLegacyToken() async {
     if (_app == null) return;
     // ignore: deprecated_member_use
     await FirebaseMessaging.instance.deleteToken();
   }
-
-  /// Empty, and honestly so. The web SDK dropped `onTokenRefresh` — FlutterFire
-  /// returns a stream that is never fed, which looks like a working listener
-  /// and is not. A web token rotates when the browser's push subscription
-  /// changes, and the repair for that is [PushService.start] reading the token
-  /// again on the next session, which it already does unconditionally.
-  @override
-  Stream<String> get tokenRefreshes => const Stream.empty();
 
   /// Empty because on this channel the tap never reaches Dart: a notification
   /// shown by a service worker is clicked against the WORKER, and

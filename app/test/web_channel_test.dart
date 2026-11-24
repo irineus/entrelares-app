@@ -470,27 +470,77 @@ void main() {
           reason: 'the messaging worker must not claim scope `/`');
     });
 
-    test('reading the token never opens the permission prompt', () {
-      // THE assertion of this group. The Firebase JS SDK's `getToken` calls
-      // `Notification.requestPermission()` on its own when the permission is
-      // still `default` — and `PushService.start` reads the token on EVERY
+    test('reading the target never opens the permission prompt', () {
+      // THE assertion of this group. The Firebase JS SDK's `register()` (since
+      // T-109) and the `getToken` it replaced both call
+      // `Notification.requestPermission()` on their own when the permission is
+      // still `default` — and `PushService.start` reads the target on EVERY
       // authenticated session, whose documented contract is that it never
       // prompts. Without the guard, the web channel would ask every returning
       // visitor for notification permission at boot, with no gesture and no
       // context, spending on page load the one prompt the product means to
-      // spend on a press.
-      final token = transport.substring(
-        transport.indexOf('Future<String?> token()'),
-        transport.indexOf('Future<void> deleteToken()'),
-      );
-      final guard = token.indexOf('_current != PushPermission.granted');
-      final getToken = token.indexOf('getToken(');
-      expect(guard, greaterThan(-1),
-          reason: 'token() must read the permission itself before asking the '
-              'SDK for anything');
-      expect(guard, lessThan(getToken),
-          reason: 'the guard has to come BEFORE getToken, which is what '
-              'raises the prompt');
+      // spend on a press. Two methods reach the SDK on that path: [target]
+      // (`register`) and, once per browser, the T-109 migration's
+      // [legacyToken] (`getToken`). Both carry the guard, before the call.
+      String body(String from, String to) => transport.substring(
+          transport.indexOf(from), transport.indexOf(to));
+      final paths = {
+        'register(': body('Future<String?> target()', 'PushTargetKind get targetKind'),
+        'getToken(': body('Future<String?> legacyToken()', 'Future<void> dropLegacyToken()'),
+      };
+      for (final MapEntry(key: call, value: method) in paths.entries) {
+        final guard = method.indexOf('_current != PushPermission.granted');
+        final sdk = method.indexOf(call);
+        expect(guard, greaterThan(-1),
+            reason: 'the method calling $call must read the permission itself '
+                'before asking the SDK for anything');
+        expect(sdk, greaterThan(-1), reason: '$call not found where expected');
+        expect(guard, lessThan(sdk),
+            reason: 'the guard has to come BEFORE $call, which is what raises '
+                'the prompt');
+      }
+    });
+
+    test('the Android manifest opts in to installation-ID registration', () {
+      // T-109, measured on the owner's device: without this meta-data the
+      // native SDK refuses `register()` with "IllegalStateException: API
+      // disabled", the enable button fails, and no unit test can see it — the
+      // transport is a platform channel. Removing the line is how push stops
+      // turning on for every updated Android install.
+      final manifest =
+          File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+      expect(
+          RegExp(r'android:name="firebase_messaging_installation_id_enabled"\s*'
+                  r'android:value="true"')
+              .hasMatch(manifest),
+          isTrue,
+          reason: 'firebase_messaging_installation_id_enabled must be "true"');
+    });
+
+    test('a failed register() never leaves its listener to time out', () {
+      // T-109, measured too: `register()` threw, and the armed
+      // `onRegistered.first.timeout(...)` surfaced 30 s later as an UNHANDLED
+      // TimeoutException — an error report for a failure already handled.
+      for (final path in [
+        'lib/services/push_messaging_io.dart',
+        'lib/services/push_messaging_web.dart',
+      ]) {
+        final source = File(path).readAsStringSync();
+        expect(source, contains('registered.ignore();'),
+            reason: '$path must drop the armed listener when register() throws');
+      }
+    });
+
+    test('the FID listener is armed before register()', () {
+      // T-109: the JS SDK refuses a `register()` with no `onRegistered`
+      // handler in place ("invalid-on-registered-handler"), and the FID only
+      // ever arrives on that stream. Reading the getter installs the handler.
+      final target = transport.substring(
+          transport.indexOf('Future<String?> target()'),
+          transport.indexOf('PushTargetKind get targetKind'));
+      expect(target.indexOf('onRegistered'), greaterThan(-1));
+      expect(target.indexOf('onRegistered'), lessThan(target.indexOf('register(')),
+          reason: 'register() before the onRegistered handler throws on web');
     });
 
     test('the worker and env.dart are armed together or not at all', () {

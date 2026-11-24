@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:entrelares_app/services/push_messaging.dart';
+import 'package:entrelares_app/services/push_migration_prefs.dart';
 import 'package:entrelares_app/services/push_service.dart';
 import 'package:entrelares_core/entrelares_core.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,16 +52,34 @@ class FakeMessaging implements PushMessaging {
   }
 
   @override
-  Future<String?> token() async {
+  Future<String?> target() async {
     if (tokenThrows) throw StateError('SERVICE_NOT_AVAILABLE');
     return nextToken;
   }
 
   @override
-  Future<void> deleteToken() async => deletedTokens++;
+  PushTargetKind get targetKind => PushTargetKind.fid;
 
   @override
-  Stream<String> get tokenRefreshes => _refresh.stream;
+  Future<void> unregister() async => deletedTokens++;
+
+  @override
+  Stream<String> get targetChanges => _refresh.stream;
+
+  /// T-109: the registration token an older build left on the server, and
+  /// how many times the migration read and dropped it.
+  String? oldToken;
+  int legacyReads = 0;
+  int legacyDrops = 0;
+
+  @override
+  Future<String?> legacyToken() async {
+    legacyReads++;
+    return oldToken;
+  }
+
+  @override
+  Future<void> dropLegacyToken() async => legacyDrops++;
 
   @override
   Stream<Map<String, String>> get opened => _opened.stream;
@@ -70,6 +89,16 @@ class FakeMessaging implements PushMessaging {
 
   void rotateToken(String token) => _refresh.add(token);
   void tapNotification(Map<String, String> data) => _opened.add(data);
+}
+
+/// T-109: the install's memory of the retired registration token.
+class FakeMigrationPrefs implements PushMigrationPrefs {
+  @override
+  bool legacyTokenRetired;
+  FakeMigrationPrefs({this.legacyTokenRetired = false});
+
+  @override
+  Future<void> markLegacyTokenRetired() async => legacyTokenRetired = true;
 }
 
 void main() {
@@ -149,6 +178,116 @@ void main() {
       // No `await push.initialize()` here on purpose — start must be enough.
       await push.start(7);
 
+      expect(push.state, PushState.on);
+    });
+  });
+
+  group('T-109 — the installation ID', () {
+    test('registers the target as an installation ID', () async {
+      final messaging = FakeMessaging(current: PushPermission.granted);
+      await serviceWith(messaging).start(7);
+
+      // The server picks `message.fid` by this kind; a target stored as a
+      // token would go out through the deprecated field.
+      expect(data.pushWrites, [('tok-1', PushTargetKind.fid)]);
+    });
+
+    test('a session with the row in place touches it', () async {
+      // The daily prune reads `last_seen_at`; written only at registration it
+      // would say "registered N days ago" and drop a live phone.
+      final messaging = FakeMessaging(current: PushPermission.granted);
+      await serviceWith(messaging).start(7);
+      await serviceWith(messaging).start(7);
+
+      expect(data.pushWrites,
+          [('tok-1', PushTargetKind.fid), ('tok-1', PushTargetKind.fid)]);
+      expect(data.registeredPushTokens, ['tok-1']);
+    });
+
+    test('a revoked permission does not keep the row alive', () async {
+      final messaging = FakeMessaging(current: PushPermission.granted);
+      await serviceWith(messaging).start(7);
+
+      messaging.current = PushPermission.denied;
+      await serviceWith(messaging).start(7);
+
+      expect(data.pushWrites, hasLength(1),
+          reason: 'touched a row whose phone can no longer show a push — '
+              'the prune would never get to drop it');
+    });
+
+    test('a rotation re-points the row and drops the old one', () async {
+      final messaging = FakeMessaging(current: PushPermission.granted);
+      final push = serviceWith(messaging);
+      await push.start(7);
+
+      messaging.rotateToken('tok-2');
+      await pumpEventQueue();
+
+      expect(data.registeredPushTokens, ['tok-2']);
+      expect(data.pushWrites.last, ('tok-2', PushTargetKind.fid));
+    });
+  });
+
+  group('T-109 — retiring the old registration token, once', () {
+    PushService withMigration(
+            FakeMessaging messaging, FakeMigrationPrefs prefs) =>
+        PushService(data, messaging: messaging, migration: prefs);
+
+    test('deletes the row an older build wrote, then registers the ID',
+        () async {
+      data.registeredPushTokens.add('old-registration-token');
+      final messaging = FakeMessaging(current: PushPermission.granted)
+        ..oldToken = 'old-registration-token';
+      final prefs = FakeMigrationPrefs();
+
+      await withMigration(messaging, prefs).start(7);
+
+      // One row per phone: without this the updated device would receive
+      // every push twice, through the token and through the ID.
+      expect(data.registeredPushTokens, ['tok-1']);
+      expect(messaging.legacyDrops, 1);
+      expect(prefs.legacyTokenRetired, isTrue);
+    });
+
+    test('runs once per install', () async {
+      final messaging = FakeMessaging(current: PushPermission.granted)
+        ..oldToken = 'old-registration-token';
+      final prefs = FakeMigrationPrefs();
+
+      await withMigration(messaging, prefs).start(7);
+      await withMigration(messaging, prefs).start(7);
+
+      // Firebase warns against running the token API beside the installation
+      // API; the second session must not touch it at all.
+      expect(messaging.legacyReads, 1);
+    });
+
+    test('without the permission nothing is read, and the step is done',
+        () async {
+      // An older build registered only with the permission granted, so there
+      // is nothing to retire — and asking would make a fresh install mint a
+      // registration token just to throw it away.
+      final messaging = FakeMessaging(current: PushPermission.notAsked)
+        ..oldToken = 'would-be-minted';
+      final prefs = FakeMigrationPrefs();
+
+      await withMigration(messaging, prefs).start(7);
+
+      expect(messaging.legacyReads, 0);
+      expect(messaging.legacyDrops, 0);
+      expect(prefs.legacyTokenRetired, isTrue);
+    });
+
+    test('a failure leaves the step for the next session', () async {
+      final messaging = _ThrowingLegacy(current: PushPermission.granted);
+      final prefs = FakeMigrationPrefs();
+
+      final push = withMigration(messaging, prefs);
+      await push.start(7);
+
+      expect(prefs.legacyTokenRetired, isFalse);
+      // …and the session itself is not the casualty.
       expect(push.state, PushState.on);
     });
   });
@@ -316,4 +455,12 @@ void main() {
       expect(calls, 1);
     });
   });
+}
+
+/// T-109: a transport whose old-token read fails (offline, no Play Services).
+class _ThrowingLegacy extends FakeMessaging {
+  _ThrowingLegacy({super.current});
+
+  @override
+  Future<String?> legacyToken() async => throw StateError('SERVICE_NOT_AVAILABLE');
 }

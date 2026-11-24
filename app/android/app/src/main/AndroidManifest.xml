@@ -125,6 +125,15 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="entrelares_swaps" />
+        <!-- T-109: the OPT-IN to Firebase Installation ID registration. Without
+             it the native SDK refuses `FirebaseMessaging.register()` with
+             "IllegalStateException: API disabled" and push never turns on — the
+             Android twin of the Info.plist flag Firebase documents for iOS,
+             measured on the owner's device (dev 3.5.5+238, 24/11/2026).
+             `web_channel_test` keeps it here. -->
+        <meta-data
+            android:name="firebase_messaging_installation_id_enabled"
+            android:value="true" />
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

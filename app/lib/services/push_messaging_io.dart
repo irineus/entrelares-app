@@ -1,3 +1,4 @@
+import 'package:entrelares_core/entrelares_core.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -55,24 +56,55 @@ class FcmMessaging implements PushMessaging {
         _ => PushPermission.notAsked,
       };
 
-  // T-60 (firebase_messaging 17): getToken/deleteToken/onTokenRefresh are
-  // deprecated for register()/onRegistered, which hand back a Firebase
-  // Installation ID — a DIFFERENT identifier. The server sends FCM v1 with
-  // `message.token` (supabase/functions/_shared/fcm.ts), so swapping here alone
-  // would store FIDs where registration tokens belong and silence every push.
-  // The move to FID direct-send is server + client together, its own item.
+  /// T-109: the Firebase Installation ID, from `register()`/`onRegistered`.
+  ///
+  /// The listener is armed BEFORE `register()` — `.first` subscribes on the
+  /// spot — because the FID arrives only on the stream: every `register()`
+  /// re-emits it, even for an installation already registered. A transport that
+  /// never answers (no Play Services, an offline first run) times out into an
+  /// error, which [PushService] already reads as "no target right now".
   @override
-  // ignore: deprecated_member_use
-  Future<String?> token() => FirebaseMessaging.instance.getToken();
+  Future<String?> target() async {
+    final messaging = FirebaseMessaging.instance;
+    final registered = messaging.onRegistered.first.timeout(_registerTimeout);
+    try {
+      await messaging.register();
+    } catch (_) {
+      // The listener is already armed; left alone, its timeout fires 30 s
+      // later as an UNHANDLED error — measured on a device (T-109).
+      registered.ignore();
+      rethrow;
+    }
+    return await registered;
+  }
+
+  static const _registerTimeout = Duration(seconds: 30);
 
   @override
-  // ignore: deprecated_member_use
-  Future<void> deleteToken() => FirebaseMessaging.instance.deleteToken();
+  PushTargetKind get targetKind => PushTargetKind.fid;
 
   @override
-  Stream<String> get tokenRefreshes =>
-      // ignore: deprecated_member_use
-      FirebaseMessaging.instance.onTokenRefresh;
+  Future<void> unregister() => FirebaseMessaging.instance.unregister();
+
+  /// Emits on every app start with auto-init on (a routine sync), on every
+  /// `register()`, and when the FID changes. [PushService] upserts each one, so
+  /// a repeat is a `last_seen_at` touch and a change re-points the row.
+  @override
+  Stream<String> get targetChanges => FirebaseMessaging.instance.onRegistered;
+
+  /// T-109: nothing to retire from the APP on Android, by measurement. The
+  /// manifest opt-in (`firebase_messaging_installation_id_enabled`) switches
+  /// the native SDK to installation IDs and DISABLES the token API — `getToken`
+  /// throws "API disabled" — and FCM itself stops accepting this device's old
+  /// registration token: on the owner's device (24/11/2026) the first send
+  /// after the update answered `retired: 3` and the server's own retire rule
+  /// (`isDeadTarget`) deleted the old row, with each push reaching the app
+  /// once. So the step [PushService] runs once per install is a no-op here.
+  @override
+  Future<String?> legacyToken() async => null;
+
+  @override
+  Future<void> dropLegacyToken() async {}
 
   @override
   Stream<Map<String, String>> get opened =>

@@ -6,6 +6,7 @@ import 'package:entrelares_core/entrelares_core.dart'
         HandoffRangeResult,
         HandoffTime,
         PreEditNotes,
+        PushTargetKind,
         ScheduleRangeResult,
         SignInIdentity,
         SplitPart,
@@ -389,10 +390,16 @@ abstract class CustodyDataSource {
   /// schedule and hands the same one to whoever signs in next on that device.
   /// Re-pointing the existing row is what stops the previous account's notices
   /// from continuing to arrive on a phone that changed hands.
+  ///
+  /// T-109: [kind] says what [token] holds — an installation ID since that
+  /// item, a registration token before it — and the server picks the FCM v1
+  /// field by it. Each call also refreshes `last_seen_at`, which the daily
+  /// prune reads.
   Future<void> registerPushToken({
     required int myProfileId,
     required String token,
     required String platform,
+    PushTargetKind kind = PushTargetKind.token,
     String? deviceLabel,
   });
 
