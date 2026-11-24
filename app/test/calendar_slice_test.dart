@@ -2119,13 +2119,19 @@ class FakeCustodyDataSource implements CustodyDataSource {
   /// first phone and differently on the second.
   final List<String> deviceChecks = [];
 
+  /// T-109: every (token, kind) written, in order — a repeat of a token is a
+  /// `last_seen_at` touch on the real table.
+  final List<(String, PushTargetKind)> pushWrites = [];
+
   @override
   Future<void> registerPushToken({
     required int myProfileId,
     required String token,
     required String platform,
+    PushTargetKind kind = PushTargetKind.token,
     String? deviceLabel,
   }) async {
+    pushWrites.add((token, kind));
     if (!registeredPushTokens.contains(token)) registeredPushTokens.add(token);
   }
 

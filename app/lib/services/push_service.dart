@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'custody_data_source.dart';
 import 'push_messaging.dart';
+import 'push_migration_prefs.dart';
 
 /// F-09 — the device's side of push: the permission, the token's lifetime, and
 /// where a tap lands.
@@ -34,7 +35,11 @@ class PushService extends ChangeNotifier {
   /// (ids and an ISO date), never text to render.
   void Function(Map<String, String> data)? onOpen;
 
-  PushService(this._dataSource, {PushMessaging? messaging})
+  /// T-109: where this install remembers that its old registration token was
+  /// retired. Null skips the step (suites that are not about it).
+  final PushMigrationPrefs? _migration;
+
+  PushService(this._dataSource, {PushMessaging? messaging, this._migration})
       : _messaging = messaging ?? createPushMessaging();
 
   /// True once the transport has come up. False on the web, and on a build or
@@ -86,6 +91,11 @@ class PushService extends ChangeNotifier {
     try {
       final permission = await _messaging.permission();
 
+      // T-109: BEFORE the first installation registration, and once per
+      // install — see [_retireLegacyToken].
+      await _retireLegacyToken(
+          permissionGranted: permission == PushPermission.granted);
+
       // The token is read FIRST, and unconditionally, because it is what
       // identifies this DEVICE — and every question below is about this
       // device, never about the profile.
@@ -111,6 +121,13 @@ class PushService extends ChangeNotifier {
         hasSubscription: hasRow,
       )) {
         hasRow = await _register(profileId, token: token);
+      } else if (hasRow && permission == PushPermission.granted) {
+        // T-109: the row's `last_seen_at` is what the daily prune reads
+        // (`push.stale_after_days`). Written only at registration, it would
+        // say "registered N days ago" and a live phone would be pruned; so
+        // every session with the row in place touches it. Upsert on our own
+        // row — the DO UPDATE branch RLS allows.
+        await _touch(profileId, token);
       }
 
       _set(_resolve(permission, hasRow));
@@ -182,7 +199,7 @@ class PushService extends ChangeNotifier {
     final token = _token;
     try {
       if (token != null) await _dataSource.deletePushToken(token);
-      await _messaging.deleteToken();
+      await _messaging.unregister();
     } catch (error) {
       debugPrint('[push] disable failed: $error');
     }
@@ -206,12 +223,55 @@ class PushService extends ChangeNotifier {
       myProfileId: profileId,
       token: resolved,
       platform: _messaging.platformName,
+      kind: _messaging.targetKind,
     );
     return true;
   }
 
-  /// This device's registration token, or null when the transport cannot
-  /// produce one right now.
+  /// Refreshes `last_seen_at` on this device's own row. A failure is a
+  /// `last_seen_at` a day older, never a session that failed to start.
+  Future<void> _touch(int profileId, String token) async {
+    try {
+      await _dataSource.registerPushToken(
+        myProfileId: profileId,
+        token: token,
+        platform: _messaging.platformName,
+        kind: _messaging.targetKind,
+      );
+    } catch (error) {
+      debugPrint('[push] last_seen_at not touched: $error');
+    }
+  }
+
+  /// T-109 — retires, ONCE per install, the FCM registration token an older
+  /// build stored for this device, so the updated device does not receive
+  /// every push twice (its new row is an installation ID; nothing on the server
+  /// ties the two rows of one phone together).
+  ///
+  /// Only where an older build could have registered: those builds registered
+  /// only with the permission GRANTED, so without it the step is marked done
+  /// without asking the transport — which keeps a fresh install from minting a
+  /// registration token just to throw it away. A failure leaves the step for
+  /// the next session; deleting a row that is already gone is harmless.
+  Future<void> _retireLegacyToken({required bool permissionGranted}) async {
+    final migration = _migration;
+    if (migration == null || migration.legacyTokenRetired) return;
+    try {
+      if (permissionGranted) {
+        final legacy = await _messaging.legacyToken();
+        if (legacy != null) {
+          await _dataSource.deletePushToken(legacy);
+          await _messaging.dropLegacyToken();
+        }
+      }
+      await migration.markLegacyTokenRetired();
+    } catch (error) {
+      debugPrint('[push] the old registration token was not retired: $error');
+    }
+  }
+
+  /// This device's push target (an installation ID since T-109), or null when
+  /// the transport cannot produce one right now.
   ///
   /// Never throws, and never prompts. Asking for a token is not asking for the
   /// permission — the transport hands one out before, and independently of, any
@@ -221,7 +281,7 @@ class PushService extends ChangeNotifier {
   /// and only the first of those is true.
   Future<String?> _deviceToken() async {
     try {
-      return await _messaging.token();
+      return await _messaging.target();
     } catch (error) {
       debugPrint('[push] the transport gave no token: $error');
       return null;
@@ -233,7 +293,7 @@ class PushService extends ChangeNotifier {
     // device, a reinstall, its own housekeeping). Missing the rotation is the
     // classic silent break: every layer keeps reporting success while the
     // server holds an address nobody answers.
-    _tokenRefresh ??= _messaging.tokenRefreshes.listen(_onTokenRotated);
+    _tokenRefresh ??= _messaging.targetChanges.listen(_onTokenRotated);
     _opened ??= _messaging.opened.listen((data) => onOpen?.call(data));
 
     // The app opened FROM a notification while it was dead — that message waits
@@ -252,6 +312,7 @@ class PushService extends ChangeNotifier {
         myProfileId: profileId,
         token: token,
         platform: _messaging.platformName,
+        kind: _messaging.targetKind,
       );
       if (previous != null && previous != token) {
         await _dataSource.deletePushToken(previous);

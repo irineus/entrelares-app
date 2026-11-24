@@ -19,6 +19,8 @@
 /// Same idiom, and the same reasoning, as `file_delivery.dart`.
 library;
 
+import 'package:entrelares_core/entrelares_core.dart';
+
 import 'push_messaging_io.dart'
     if (dart.library.js_interop) 'push_messaging_web.dart' as impl;
 
@@ -45,16 +47,37 @@ abstract class PushMessaging {
   /// only a gesture may call it.
   Future<PushPermission> requestPermission();
 
-  /// This device's registration token, or null when there is none to give.
-  Future<String?> token();
+  /// This device's push TARGET — the value the server addresses it by — or
+  /// null when there is none to give. Since T-109 a Firebase Installation ID
+  /// from `register()`/`onRegistered`, never the deprecated registration token
+  /// (see [targetKind]). Never prompts: a transport whose registration would
+  /// raise the permission dialog answers null while the permission is unasked.
+  Future<String?> target();
 
-  /// Drops the token at the transport, so the next [token] mints a fresh one.
-  Future<void> deleteToken();
+  /// What [target] returns, as stored in `push_subscriptions.kind` — the
+  /// server picks the FCM v1 field (`fid` / `token`) by it.
+  PushTargetKind get targetKind;
 
-  /// Fires when the transport rotates the token on its own. Missing this is
-  /// the classic silent break: every layer keeps reporting success while the
-  /// server holds an address nobody answers.
-  Stream<String> get tokenRefreshes;
+  /// Unregisters this installation at the transport, so the next [target]
+  /// registers anew.
+  Future<void> unregister();
+
+  /// Fires when the transport re-registers this installation on its own (an
+  /// ID change, a routine sync, a browser `pushsubscriptionchange`). Missing
+  /// this is the classic silent break: every layer keeps reporting success
+  /// while the server holds an address nobody answers.
+  Stream<String> get targetChanges;
+
+  /// T-109 MIGRATION ONLY: the registration token an older build of this app
+  /// stored on the server for this device, or null when there is none to give.
+  /// Read ONCE per install by [PushService] — Firebase warns against using the
+  /// token API and the installation API together — so the old row can be
+  /// deleted and the device does not receive every push twice. Goes away with
+  /// the token path (the T-109 cleanup card).
+  Future<String?> legacyToken();
+
+  /// T-109 MIGRATION ONLY: invalidates that token at the transport.
+  Future<void> dropLegacyToken();
 
   /// Fires when a notification is TAPPED, carrying its data payload.
   Stream<Map<String, String>> get opened;

@@ -1,3 +1,4 @@
+import 'package:entrelares_core/entrelares_core.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -55,24 +56,45 @@ class FcmMessaging implements PushMessaging {
         _ => PushPermission.notAsked,
       };
 
-  // T-60 (firebase_messaging 17): getToken/deleteToken/onTokenRefresh are
-  // deprecated for register()/onRegistered, which hand back a Firebase
-  // Installation ID — a DIFFERENT identifier. The server sends FCM v1 with
-  // `message.token` (supabase/functions/_shared/fcm.ts), so swapping here alone
-  // would store FIDs where registration tokens belong and silence every push.
-  // The move to FID direct-send is server + client together, its own item.
+  /// T-109: the Firebase Installation ID, from `register()`/`onRegistered`.
+  ///
+  /// The listener is armed BEFORE `register()` — `.first` subscribes on the
+  /// spot — because the FID arrives only on the stream: every `register()`
+  /// re-emits it, even for an installation already registered. A transport that
+  /// never answers (no Play Services, an offline first run) times out into an
+  /// error, which [PushService] already reads as "no target right now".
+  @override
+  Future<String?> target() async {
+    final messaging = FirebaseMessaging.instance;
+    final registered = messaging.onRegistered.first.timeout(_registerTimeout);
+    await messaging.register();
+    return await registered;
+  }
+
+  static const _registerTimeout = Duration(seconds: 30);
+
+  @override
+  PushTargetKind get targetKind => PushTargetKind.fid;
+
+  @override
+  Future<void> unregister() => FirebaseMessaging.instance.unregister();
+
+  /// Emits on every app start with auto-init on (a routine sync), on every
+  /// `register()`, and when the FID changes. [PushService] upserts each one, so
+  /// a repeat is a `last_seen_at` touch and a change re-points the row.
+  @override
+  Stream<String> get targetChanges => FirebaseMessaging.instance.onRegistered;
+
+  // T-109 MIGRATION ONLY — the token API firebase_messaging 17 deprecated.
+  // Read once per install, before the first `register()`, to delete the row
+  // an older build wrote; removed with the token path (T-109 cleanup card).
   @override
   // ignore: deprecated_member_use
-  Future<String?> token() => FirebaseMessaging.instance.getToken();
+  Future<String?> legacyToken() => FirebaseMessaging.instance.getToken();
 
   @override
   // ignore: deprecated_member_use
-  Future<void> deleteToken() => FirebaseMessaging.instance.deleteToken();
-
-  @override
-  Stream<String> get tokenRefreshes =>
-      // ignore: deprecated_member_use
-      FirebaseMessaging.instance.onTokenRefresh;
+  Future<void> dropLegacyToken() => FirebaseMessaging.instance.deleteToken();
 
   @override
   Stream<Map<String, String>> get opened =>

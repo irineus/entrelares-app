@@ -1140,6 +1140,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
     required int myProfileId,
     required String token,
     required String platform,
+    PushTargetKind kind = PushTargetKind.token,
     String? deviceLabel,
   }) async {
     // `onConflict: 'token'` and not the primary key: the UNIQUE constraint is
@@ -1158,6 +1159,7 @@ class SupabaseCustodyDataSource implements CustodyDataSource {
       'profile_id': myProfileId,
       'token': token,
       'platform': platform,
+      'kind': kind.wire,
       'device_label': ?deviceLabel,
       'last_seen_at': DateTime.now().toUtc().toIso8601String(),
     }, onConflict: 'token');

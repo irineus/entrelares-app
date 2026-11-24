@@ -66,6 +66,7 @@ import 'services/offline_cache.dart';
 import 'services/offline_cache_store.dart';
 import 'services/onboarding_service.dart';
 import 'services/review_prompt_service.dart';
+import 'services/push_migration_prefs.dart';
 import 'services/push_service.dart';
 import 'services/refresh_guard_client.dart';
 import 'services/session_gate.dart';
@@ -1059,7 +1060,8 @@ class _EntrelaresAppState extends State<EntrelaresApp>
             environmentTitlePrefix(isProduction: Env.current.isProduction),
         analytics: _analytics);
     _badge = NotificationBadge(_dataSource);
-    _push = PushService(_dataSource);
+    _push = PushService(_dataSource,
+        migration: SharedPushMigrationPrefs(widget.prefs));
     // F-09: brings the transport up, and never fatally. A build whose flavor
     // carries no Firebase config — or a device without the services it needs —
     // simply has no push; the product's whole job works without it, so this
