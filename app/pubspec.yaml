@@ -26,7 +26,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 #   +N    — rises on EVERY merge to main, strictly monotonic: Play burns a
 #           versionCode by UPLOAD and never accepts it again (store/README §6).
 # Env.appVersion mirrors this line — env_version_test pins the two together.
-version: 3.5.3+236
+version: 3.5.4+237
 
 environment:
   sdk: ^3.14.0
@@ -53,9 +53,6 @@ dependencies:
   # `flutter_localizations` dependency left with the SDK import.
   material_ui: ^1.1.0
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
   # Lote 1 shell: URL-based routing so Android App Links land on the right
   # screen (recovery is the first consumer; invitations follow in lote 4).
   go_router: ^18.1.4

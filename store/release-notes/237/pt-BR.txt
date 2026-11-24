@@ -1,0 +1,1 @@
+Atualização interna: o app fica um pouco menor ao deixar de incluir um conjunto de ícones que não usava. Nada muda no uso.
