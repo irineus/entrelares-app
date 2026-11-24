@@ -70,6 +70,7 @@ export 'src/push_enrollment.dart';
 export 'src/push_nudge_rules.dart';
 export 'src/premium_ask_rules.dart';
 export 'src/push_routing.dart';
+export 'src/push_target.dart';
 export 'src/push_today_rules.dart';
 export 'src/quick_swap_rules.dart';
 export 'src/refresh_guard_rules.dart';

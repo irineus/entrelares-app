@@ -15,14 +15,48 @@
 // here fails CLOSED: no credential means no push, never a thrown request that
 // takes a notification INSERT down with it.
 
-/// A send's outcome, per token. `retire` marks the tokens FCM says are dead —
-/// the caller deletes those rows, which is the only garbage collection
-/// `push_subscriptions` gets.
+/// What a `push_subscriptions` row holds (T-109): an FCM registration token,
+/// which every build before T-109 PR 2 stores, or a Firebase Installation ID,
+/// which `register()`/`onRegistered` hand out since firebase_messaging 17. The
+/// two values are the migration's CHECK (`push_subscriptions_kind_check`), and
+/// `push_target_mirror_test` (core) holds the two lists equal.
+export type PushTargetKind = "token" | "fid";
+
+/// One device to reach: the stored value and what it is.
+export interface PushTarget {
+	token: string;
+	kind: PushTargetKind;
+}
+
+/// A send's outcome, per target. `retire` marks the targets FCM says are dead —
+/// the caller deletes those rows, which (beside the daily
+/// `prune_push_subscriptions`) is the garbage collection `push_subscriptions`
+/// gets. `token` is the stored value, whichever kind it is.
 export interface SendResult {
 	token: string;
 	ok: boolean;
 	retire: boolean;
 	error?: string;
+}
+
+/// The message's TARGET field for one row (T-109). FCM HTTP v1 has one field
+/// per kind: `fid` for an installation, `token` for a registration token
+/// (deprecated, and it accepts an FID only "during the transition period",
+/// undated — so an FID is never sent through it). A row with any other kind
+/// cannot exist (the CHECK), and falls back to the field every row had before.
+export function fcmTarget(target: PushTarget): { fid: string } | { token: string } {
+	return target.kind === "fid" ? { fid: target.token } : { token: target.token };
+}
+
+/// Whether FCM's answer means this target will never be valid again. Judged on
+/// the STATUS alone, for both kinds: the documented answers for a dead
+/// registration are the same for an FID and a token — UNREGISTERED (404) and
+/// INVALID_ARGUMENT (400) — so a kind-specific rule could only delete one kind
+/// for the other's error. NOT_FOUND is kept from F-09 (undocumented, harmless).
+/// Every other failure (quota, 5xx, auth) is transient and the row stays.
+export function isDeadTarget(status: string): boolean {
+	return status === "UNREGISTERED" || status === "NOT_FOUND" ||
+		status === "INVALID_ARGUMENT";
 }
 
 interface ServiceAccount {
@@ -131,23 +165,24 @@ async function accessToken(account: ServiceAccount): Promise<string> {
 	return cached.token;
 }
 
-/// One FCM message per token. FCM v1 has no multicast endpoint — the batch API
-/// the old server key offered went with it — so N tokens is N requests, sent
+/// One FCM message per target. FCM v1 has no multicast endpoint — the batch API
+/// the old server key offered went with it — so N targets is N requests, sent
 /// concurrently. A family holds a handful of devices, so the fan-out is small
 /// by construction.
-export async function sendToTokens(
-	tokens: string[],
+export async function sendToTargets(
+	targets: PushTarget[],
 	copy: { title: string; body: string },
 	data: Record<string, string>,
 ): Promise<SendResult[]> {
 	const account = serviceAccount();
-	if (account === null || tokens.length === 0) return [];
+	if (account === null || targets.length === 0) return [];
 
 	const bearer = await accessToken(account);
 	const url =
 		`https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`;
 
-	return await Promise.all(tokens.map(async (token): Promise<SendResult> => {
+	return await Promise.all(targets.map(async (target): Promise<SendResult> => {
+		const token = target.token;
 		try {
 			const response = await fetch(url, {
 				method: "POST",
@@ -157,7 +192,7 @@ export async function sendToTokens(
 				},
 				body: JSON.stringify({
 					message: {
-						token,
+						...fcmTarget(target),
 						// A `notification` block (not data-only): it is the only
 						// payload the OS displays on its own with the app killed,
 						// and on iOS a silent data message is throttled and may
@@ -205,12 +240,10 @@ export async function sendToTokens(
 
 			const payload = await response.json().catch(() => ({}));
 			const status = payload?.error?.status ?? String(response.status);
-			// UNREGISTERED = the app was uninstalled or the token rotated.
-			// INVALID_ARGUMENT on a send = a malformed token. Both are permanent,
-			// and both are what keeps the table from filling with dead rows. Every
-			// other failure (quota, 5xx) is transient and the row stays.
-			const retire = status === "UNREGISTERED" || status === "NOT_FOUND" ||
-				status === "INVALID_ARGUMENT";
+			// UNREGISTERED = the app was uninstalled or the target rotated.
+			// INVALID_ARGUMENT on a send = a malformed target. Both are permanent,
+			// and both are what keeps the table from filling with dead rows.
+			const retire = isDeadTarget(status);
 			return { token, ok: false, retire, error: status };
 		} catch (error) {
 			return { token, ok: false, retire: false, error: String(error) };

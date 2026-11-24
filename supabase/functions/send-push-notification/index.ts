@@ -4,7 +4,7 @@ import { secretKey } from "../_shared/keys.ts";
 import { isSecretKeyCaller } from "../_shared/auth.ts";
 import { resolveLang } from "../_shared/i18n.ts";
 import { PUSH_TYPES, type PushParams, renderPush } from "../_shared/push.ts";
-import { fcmConfigured, sendToTokens } from "../_shared/fcm.ts";
+import { fcmConfigured, type PushTarget, sendToTargets } from "../_shared/fcm.ts";
 
 // F-09 — the push dispatcher.
 //
@@ -105,15 +105,22 @@ serve(async (req: Request) => {
       return json({ skipped: "payload could not be rendered" });
     }
 
+    // T-109: `kind` says which FCM v1 field addresses the row (`fid` or
+    // `token`). Every row written before that item is a token, by DEFAULT.
     const { data: subs } = await supabase
       .from("push_subscriptions")
-      .select("token")
+      .select("token, kind")
       .eq("profile_id", row.recipient_profile_id);
 
-    const tokens = (subs ?? []).map((s: { token: string }) => s.token);
-    if (tokens.length === 0) return json({ skipped: "no registered device" });
+    const targets: PushTarget[] = (subs ?? []).map(
+      (s: { token: string; kind: string | null }) => ({
+        token: s.token,
+        kind: s.kind === "fid" ? "fid" : "token",
+      }),
+    );
+    if (targets.length === 0) return json({ skipped: "no registered device" });
 
-    const results = await sendToTokens(tokens, copy, {
+    const results = await sendToTargets(targets, copy, {
       // What the tap needs to land somewhere useful. Values only — the client
       // routes from these, it never renders them.
       notificationId: String(row.id),
