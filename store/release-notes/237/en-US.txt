@@ -1,0 +1,1 @@
+Internal update: the app gets slightly smaller by no longer bundling an icon set it never used. Nothing changes in how you use it.
