@@ -152,4 +152,10 @@ dependencies {
     // on Google's Maven (checked 02/10/2026). Its manifest merges one
     // permission, BIND_GET_INSTALL_REFERRER_SERVICE — not a runtime one.
     implementation("com.android.installreferrer:installreferrer:2.2")
+    // T-60 — Play's In-App Review library, called by the app's own channel
+    // (InAppReviewChannel.kt) in place of the `in_app_review` plugin, which
+    // applied the Kotlin Gradle Plugin. 2.0.2 is the latest on Google's Maven
+    // (checked 24/11/2026) and the one the plugin carried. Not `review-ktx`:
+    // the channel uses no Kotlin extension from it.
+    implementation("com.google.android.play:review:2.0.2")
 }

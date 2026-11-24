@@ -1,0 +1,1 @@
+Internal update: the app now asks for a Play review on its own, without a third-party library. Nothing changes in how you use it.

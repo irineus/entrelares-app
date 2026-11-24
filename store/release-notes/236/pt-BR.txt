@@ -1,0 +1,1 @@
+Atualização interna: o pedido de avaliação do app na Play passa a ser feito pelo próprio app, sem biblioteca de terceiros. Nada muda no uso.
