@@ -13,10 +13,15 @@ class MainActivity : FlutterActivity() {
      * purpose: the pub.dev plugins for this apply `kotlin-android` and break
      * on the pinned AGP 9. Registering it reads nothing; the Dart side asks
      * only while `feature.referral` is on.
+     *
+     * T-60 — In-App Review by the same route (InAppReviewChannel.kt): the
+     * plugin applied `kotlin-android` too. Registering it asks Play nothing.
      */
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        InstallReferrerChannel(this).register(flutterEngine.dartExecutor.binaryMessenger)
+        val messenger = flutterEngine.dartExecutor.binaryMessenger
+        InstallReferrerChannel(this).register(messenger)
+        InAppReviewChannel(this).register(messenger)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

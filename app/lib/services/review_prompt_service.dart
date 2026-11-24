@@ -1,5 +1,5 @@
 import 'package:entrelares_core/entrelares_core.dart';
-import 'package:in_app_review/in_app_review.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'connectivity_status.dart';
@@ -11,12 +11,38 @@ abstract class InAppReviewer {
   Future<void> requestReview();
 }
 
+/// T-60 — Play's review flow through the app's OWN Android channel
+/// (`InAppReviewChannel.kt`, registered by `MainActivity`), in place of the
+/// `in_app_review` plugin, which applied the Kotlin Gradle Plugin that future
+/// Flutter versions refuse. Only the Android production store build ever gets
+/// here (`ReviewPromptRules.isStoreBuild`).
 class PlayInAppReviewer implements InAppReviewer {
-  @override
-  Future<bool> isAvailable() => InAppReview.instance.isAvailable();
+  PlayInAppReviewer({MethodChannel? channel})
+    : _channel = channel ?? const MethodChannel(channelName);
 
+  /// The channel `MainActivity` answers on. Spelled once on each side.
+  static const String channelName = 'app.entrelares/in_app_review';
+  static const String isAvailableMethod = 'isAvailable';
+  static const String requestReviewMethod = 'requestReview';
+
+  final MethodChannel _channel;
+
+  /// False for anything but a clear yes: no channel (a platform without it),
+  /// a missing Play Store, or any error.
   @override
-  Future<void> requestReview() => InAppReview.instance.requestReview();
+  Future<bool> isAvailable() async {
+    try {
+      return await _channel.invokeMethod<bool>(isAvailableMethod) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Throws when Play refused a flow — [ReviewPromptService] treats that as
+  /// "no review this time" and never shows it to the reader.
+  @override
+  Future<void> requestReview() =>
+      _channel.invokeMethod<void>(requestReviewMethod);
 }
 
 /// The last request on THIS device — the interval is per device, like
