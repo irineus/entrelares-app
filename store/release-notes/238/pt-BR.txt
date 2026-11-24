@@ -1,0 +1,1 @@
+Notificações: o app passa a se registrar para receber avisos pelo identificador de instalação do Google, o formato novo do serviço de notificações. Se você já recebe as notificações, nada muda; ao abrir esta versão, o registro é atualizado sozinho.
