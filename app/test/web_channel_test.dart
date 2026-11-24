@@ -501,6 +501,36 @@ void main() {
       }
     });
 
+    test('the Android manifest opts in to installation-ID registration', () {
+      // T-109, measured on the owner's device: without this meta-data the
+      // native SDK refuses `register()` with "IllegalStateException: API
+      // disabled", the enable button fails, and no unit test can see it — the
+      // transport is a platform channel. Removing the line is how push stops
+      // turning on for every updated Android install.
+      final manifest =
+          File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+      expect(
+          RegExp(r'android:name="firebase_messaging_installation_id_enabled"\s*'
+                  r'android:value="true"')
+              .hasMatch(manifest),
+          isTrue,
+          reason: 'firebase_messaging_installation_id_enabled must be "true"');
+    });
+
+    test('a failed register() never leaves its listener to time out', () {
+      // T-109, measured too: `register()` threw, and the armed
+      // `onRegistered.first.timeout(...)` surfaced 30 s later as an UNHANDLED
+      // TimeoutException — an error report for a failure already handled.
+      for (final path in [
+        'lib/services/push_messaging_io.dart',
+        'lib/services/push_messaging_web.dart',
+      ]) {
+        final source = File(path).readAsStringSync();
+        expect(source, contains('registered.ignore();'),
+            reason: '$path must drop the armed listener when register() throws');
+      }
+    });
+
     test('the FID listener is armed before register()', () {
       // T-109: the JS SDK refuses a `register()` with no `onRegistered`
       // handler in place ("invalid-on-registered-handler"), and the FID only

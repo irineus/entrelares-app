@@ -111,14 +111,21 @@ class WebPushMessaging implements PushMessaging {
     if (!await _ensureFirebase()) return null;
     final messaging = FirebaseMessaging.instance;
     final registered = messaging.onRegistered.first.timeout(_registerTimeout);
-    await messaging.register(
-      vapidKey: Env.current.webPush.vapidKey,
-      // NOT passed on purpose — see the class doc. Null leaves the JS SDK to
-      // register its own worker at its own scope, instead of the FlutterFire
-      // layer registering it at `/` over the app shell.
-      // ignore: avoid_redundant_argument_values
-      serviceWorkerScriptPath: null,
-    );
+    try {
+      await messaging.register(
+        vapidKey: Env.current.webPush.vapidKey,
+        // NOT passed on purpose — see the class doc. Null leaves the JS SDK to
+        // register its own worker at its own scope, instead of the FlutterFire
+        // layer registering it at `/` over the app shell.
+        // ignore: avoid_redundant_argument_values
+        serviceWorkerScriptPath: null,
+      );
+    } catch (_) {
+      // The listener is already armed; left alone, its timeout fires 30 s
+      // later as an UNHANDLED error — measured on Android (T-109).
+      registered.ignore();
+      rethrow;
+    }
     return await registered;
   }
 

@@ -67,7 +67,14 @@ class FcmMessaging implements PushMessaging {
   Future<String?> target() async {
     final messaging = FirebaseMessaging.instance;
     final registered = messaging.onRegistered.first.timeout(_registerTimeout);
-    await messaging.register();
+    try {
+      await messaging.register();
+    } catch (_) {
+      // The listener is already armed; left alone, its timeout fires 30 s
+      // later as an UNHANDLED error — measured on a device (T-109).
+      registered.ignore();
+      rethrow;
+    }
     return await registered;
   }
 
