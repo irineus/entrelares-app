@@ -1,0 +1,1 @@
+Notifications: the app now registers for notices with Google's installation identifier, the notification service's new format. If you already receive notifications, nothing changes; opening this version updates the registration by itself.
