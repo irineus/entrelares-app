@@ -92,16 +92,19 @@ class FcmMessaging implements PushMessaging {
   @override
   Stream<String> get targetChanges => FirebaseMessaging.instance.onRegistered;
 
-  // T-109 MIGRATION ONLY — the token API firebase_messaging 17 deprecated.
-  // Read once per install, before the first `register()`, to delete the row
-  // an older build wrote; removed with the token path (T-109 cleanup card).
+  /// T-109: nothing to retire from the APP on Android, by measurement. The
+  /// manifest opt-in (`firebase_messaging_installation_id_enabled`) switches
+  /// the native SDK to installation IDs and DISABLES the token API — `getToken`
+  /// throws "API disabled" — and FCM itself stops accepting this device's old
+  /// registration token: on the owner's device (24/11/2026) the first send
+  /// after the update answered `retired: 3` and the server's own retire rule
+  /// (`isDeadTarget`) deleted the old row, with each push reaching the app
+  /// once. So the step [PushService] runs once per install is a no-op here.
   @override
-  // ignore: deprecated_member_use
-  Future<String?> legacyToken() => FirebaseMessaging.instance.getToken();
+  Future<String?> legacyToken() async => null;
 
   @override
-  // ignore: deprecated_member_use
-  Future<void> dropLegacyToken() => FirebaseMessaging.instance.deleteToken();
+  Future<void> dropLegacyToken() async {}
 
   @override
   Stream<Map<String, String>> get opened =>

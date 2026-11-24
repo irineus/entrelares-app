@@ -72,8 +72,10 @@ abstract class PushMessaging {
   /// stored on the server for this device, or null when there is none to give.
   /// Read ONCE per install by [PushService] — Firebase warns against using the
   /// token API and the installation API together — so the old row can be
-  /// deleted and the device does not receive every push twice. Goes away with
-  /// the token path (the T-109 cleanup card).
+  /// deleted and the device does not receive every push twice. Always null on
+  /// Android, where the installation-ID opt-in disables the token API and FCM
+  /// retires the old token by itself (measured; see push_messaging_io.dart).
+  /// Goes away with the token path (the T-109 cleanup card).
   Future<String?> legacyToken();
 
   /// T-109 MIGRATION ONLY: invalidates that token at the transport.

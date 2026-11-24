@@ -230,7 +230,18 @@ export async function sendToTargets(
 							// the rule it mirrors, in `firebase-messaging-sw.js`.
 							// Naming a link here would ALSO hand the tap to the
 							// SDK's own click handler, which stops propagation.
-							notification: { icon: "/icons/Icon-192.png" },
+							//
+							// `tag` (T-109): the browser REPLACES a notification
+							// with the same tag instead of stacking a second one —
+							// the twin of `android.notification.tag` above. The id
+							// is unique per notice, so only a duplicate collapses:
+							// a browser still holding its pre-T-109 registration
+							// token beside its new installation ID would otherwise
+							// show every notice twice.
+							notification: {
+								icon: "/icons/Icon-192.png",
+								tag: data.notificationId,
+							},
 						},
 					},
 				}),

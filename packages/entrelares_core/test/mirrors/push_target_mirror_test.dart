@@ -96,6 +96,17 @@ void main() {
     expect(fcm, contains('const retire = isDeadTarget(status);'));
   });
 
+  test('a duplicate delivery collapses on both channels', () {
+    // During the move a device can still hold its pre-T-109 token beside its
+    // new installation ID; the tag makes the second copy REPLACE the first
+    // instead of stacking (Android since F-09, the web since T-109).
+    final compact = fcm.replaceAll(RegExp(r'\s+'), ' ');
+    expect(compact, contains('tag: data.notificationId, }, }, apns:'),
+        reason: '`android.notification.tag` is gone');
+    expect(compact, contains('icon: "/icons/Icon-192.png", tag: data.notificationId,'),
+        reason: '`webpush.notification.tag` is gone');
+  });
+
   group('PushTargetRules.looksLikeFid', () {
     test('accepts the shape the Firebase SDK generates', () {
       expect(PushTargetRules.looksLikeFid('cAbCdEfGhIjKlMnOpQrS_-'), isTrue);
