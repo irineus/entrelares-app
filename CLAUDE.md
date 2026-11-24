@@ -119,7 +119,7 @@ chores that are not backlog items.
 ## Build & test
 ```
 cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
-# Nesse lane moram os doze ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21 + F-60 + F-68 + T-78 + F-76 + F-08): rótulos
+# Nesse lane moram os treze ESPELHOS (test/mirrors/, T-56 + F-09 + T-62 + S-21 + F-60 + F-68 + T-78 + F-76 + F-08 + T-109): rótulos
 # de papel em inglês, formato de data dos e-mails, a chave `lang` do redirect de reset,
 # a cobertura de `params` de todo writer de notificação, o catálogo de push
 # (F-09: o texto do push é montado no servidor, então `_shared/push.ts` duplica de
@@ -154,11 +154,15 @@ cd packages/entrelares_core && fvm dart analyze --fatal-infos && fvm dart test
 # Premium ao administrador (F-08, 20/11/2026: o IN de `request_premium_from_admin` — o corpo
 # MAIS NOVO entre as migrações —, o CASE que grava a frase em PT e o `push.ts` têm de nomear
 # os mesmos gates que `PremiumAskRules.gates`; um motivo novo esquecido num dos lados é recusado
-# pela RPC depois do toque, com o app compilando). Cinco leem
+# pela RPC depois do toque, com o app compilando), e os dois tipos de alvo de push (T-109,
+# 24/11/2026: `push_subscriptions.kind` e o formato do FID nos CHECKs da migração, e o
+# `fcm.ts`, que escolhe `message.fid` ou `message.token` pelo tipo e aposenta pelos mesmos
+# códigos para os dois — um FID mandado pelo campo errado é recusado pelo FCM e o servidor
+# apaga um aparelho vivo com tudo respondendo 200). Cinco leem
 # supabase/functions/_shared/i18n.ts e supabase/migrations — as duplicações que
 # existem de propósito porque Deno não chama Dart; o sexto lê um service worker, o
 # sétimo uma Edge Function, o oitavo um catálogo de e-mail ao lado de uma migração e o
-# nono uma Edge Function ao lado de uma migração, o décimo e o décimo primeiro uma migração só e o décimo segundo uma migração ao lado de uma Edge Function,
+# nono uma Edge Function ao lado de uma migração, o décimo e o décimo primeiro uma migração só e o décimo segundo e o décimo terceiro uma migração ao lado de uma Edge Function,
 # pela mesma razão em outras linguagens. Um espelho que
 # ninguém confere apodrece calado, e é o lane mais barato do run.
 # Também no lane core, desde o T-78 (23/09/2026), analytics_catalog_test: todo evento que o

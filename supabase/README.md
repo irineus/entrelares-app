@@ -2191,8 +2191,8 @@ push should arrive within a couple of seconds. When it does not, read in this or
 select id, status_code, error_msg, created
 from net._http_response order by created desc limit 5;
 
--- 2. Is there a device at all?
-select profile_id, platform, created_at from public.push_subscriptions;
+-- 2. Is there a device at all? (`kind`: 'token' or, since T-109, 'fid')
+select profile_id, platform, kind, created_at, last_seen_at from public.push_subscriptions;
 ```
 
 Then the function's own logs (Dashboard → Edge Functions → `send-push-notification`), which
@@ -2204,6 +2204,18 @@ name every refusal explicitly: `FCM_SERVICE_ACCOUNT not set`, `no registered dev
 > and the app registers a fresh token on its next start. An empty `push_subscriptions` for a
 > profile means that person has not granted the permission on any device — the notification
 > and its e-mail still reached them.
+
+> **Two kinds of target (T-109, 24/11/2026).** A row is an FCM registration token
+> (`kind = 'token'`, the DEFAULT, every build before T-109 PR 2) or a Firebase Installation ID
+> (`kind = 'fid'`, 22 symbols, a CHECK holds the shape). `_shared/fcm.ts` sends the first
+> through `message.token` and the second through `message.fid` — FCM v1's `token` field is
+> deprecated and accepts an FID only "during the transition period", so an FID never goes
+> through it. The retire rule (`isDeadTarget`: `UNREGISTERED`, `INVALID_ARGUMENT`,
+> `NOT_FOUND`) is the same for both. **Daily prune:** `prune_push_subscriptions()`
+> (pg_cron `push-subscriptions-prune-daily`, 03:30 BRT) deletes rows not seen for
+> `push.stale_after_days` (default 270, FCM's own Android expiry) and every row of a member
+> who left. Until the app touches `last_seen_at` on every start (T-109 PR 2, in Production),
+> that column is the REGISTRATION date — do not lower the key below 270 before then.
 
 ---
 

@@ -238,6 +238,133 @@ void pushSubscriptionsTests(GateFixture fx) {
           }));
     });
 
+    // ── T-109: two kinds of target, and a registry that forgets ──────────
+
+    test('a row written the old way is a registration token', () async {
+      // Every Android build in the stores before T-109 PR 2 upserts
+      // (profile_id, token, platform, last_seen_at) and knows nothing of
+      // `kind`. The DEFAULT is what keeps those pushes going through the
+      // `token` field after the server learned to read the column.
+      final token = await registerFor(fx.member, fx.memberProfile.id);
+      final row = (await fx.service
+              .from('push_subscriptions')
+              .select('kind')
+              .eq('token', token))
+          .single;
+      expect(row['kind'], 'token');
+    });
+
+    test('an installation ID is stored as one', () async {
+      // The 22-symbol shape the Firebase SDK generates: c–f, then 21 more.
+      final stamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+      final fid = 'c${stamp.padLeft(21, 'x')}'.substring(0, 22);
+      await fx.member.from('push_subscriptions').insert({
+        'profile_id': fx.memberProfile.id,
+        'token': fid,
+        'kind': 'fid',
+        'platform': 'web',
+      });
+      final row = (await fx.service
+              .from('push_subscriptions')
+              .select('kind, platform')
+              .eq('token', fid))
+          .single;
+      expect(row['kind'], 'fid');
+      await fx.service.from('push_subscriptions').delete().eq('token', fid);
+    });
+
+    test('a row that says fid but holds a token is refused', () async {
+      // The client bug this CHECK exists for: a registration token stored as
+      // an FID would go out through `message.fid`, FCM would refuse it, and the
+      // server would retire a live device as dead — with no error anywhere.
+      await expectRejected(
+        () => fx.member.from('push_subscriptions').insert({
+          'profile_id': fx.memberProfile.id,
+          'token': 'e2e-${uniqueMarker()}:APA91b-a-registration-token',
+          'kind': 'fid',
+          'platform': 'android',
+        }),
+        contains: 'push_subscriptions_fid_shape',
+      );
+    });
+
+    test('an unknown kind is refused', () async {
+      await expectRejected(
+        () => fx.member.from('push_subscriptions').insert({
+          'profile_id': fx.memberProfile.id,
+          'token': 'e2e-${uniqueMarker()}',
+          'kind': 'apns',
+          'platform': 'ios',
+        }),
+        contains: 'push_subscriptions_kind_check',
+      );
+    });
+
+    test('the prune drops targets past the window and keeps the rest',
+        () async {
+      // Read the window from the row, not from the seed: the console may have
+      // moved it, and the rule is "older than the key", whatever it holds.
+      final days = int.parse(await readFlag(fx, 'push.stale_after_days'));
+      String ago(int d) => DateTime.now()
+          .toUtc()
+          .subtract(Duration(days: d))
+          .toIso8601String();
+
+      final fam = await fx.createFamily('push-prune');
+      final stale = 'e2e-stale-${uniqueMarker()}';
+      final fresh = 'e2e-fresh-${uniqueMarker()}';
+      await fx.service.from('push_subscriptions').insert([
+        {
+          'profile_id': fam.adminProfile.id,
+          'token': stale,
+          'platform': 'android',
+          'last_seen_at': ago(days + 5),
+        },
+        {
+          'profile_id': fam.adminProfile.id,
+          'token': fresh,
+          'platform': 'android',
+          'last_seen_at': ago(days - 5),
+        },
+      ]);
+
+      final pruned = await fx.service.rpc('prune_push_subscriptions');
+      expect(pruned, greaterThanOrEqualTo(1));
+
+      final left = (await tokensOf(fam.adminProfile.id))
+          .map((r) => r['token'])
+          .toSet();
+      expect(left, contains(fresh));
+      expect(left, isNot(contains(stale)));
+    });
+
+    test("the prune drops a departed member's devices at once", () async {
+      // S-11: a member who left is frozen and is never a recipient again, so
+      // their registration can only ever deliver to nobody — or, on a phone
+      // handed on, to the wrong person.
+      final fam = await fx.createFamily('push-gone');
+      final mine = 'e2e-gone-${uniqueMarker()}';
+      final kept = 'e2e-kept-${uniqueMarker()}';
+      await fx.service.from('push_subscriptions').insert([
+        {'profile_id': fam.memberProfile.id, 'token': mine, 'platform': 'web'},
+        {'profile_id': fam.adminProfile.id, 'token': kept, 'platform': 'web'},
+      ]);
+      await fx.service.from('profiles').update({
+        'left_at': DateTime.now().toUtc().toIso8601String()
+      }).eq('id', fam.memberProfile.id);
+
+      await fx.service.rpc('prune_push_subscriptions');
+
+      expect(await tokensOf(fam.memberProfile.id), isEmpty);
+      expect((await tokensOf(fam.adminProfile.id)).map((r) => r['token']),
+          contains(kept));
+    });
+
+    test('a client cannot run the prune', () async {
+      await expectRejected(
+          () => fx.member.rpc('prune_push_subscriptions'));
+    });
+
     test('the dispatcher never fails the notification it rides on', () async {
       // The whole point of the AFTER trigger being async and swallowing its own
       // errors: on this project there are no Vault secrets, so the dispatcher
