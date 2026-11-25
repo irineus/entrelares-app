@@ -35,6 +35,15 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretKey } from "../_shared/keys.ts";
 import { fetchStorePurchase, priceCents, purchaseExpiry } from "../_shared/play.ts";
+import {
+	isPaidPurchase,
+	isTestPurchase,
+	notifySale,
+	playAmountCents,
+	playCurrency,
+	playCycle,
+	playOrderKind,
+} from "../_shared/sale_alert.ts";
 
 const ACTIVATING = new Set([1, 2, 4, 7]);
 const ENDING_NOW = new Set([12, 13]);
@@ -129,13 +138,30 @@ serve(async (req) => {
 		if (!subscription) return jsonResponse({ ok: true, ignored: true });
 
 		const nowUtc = new Date().toISOString();
+		const packageName = notification.packageName ??
+			Deno.env.get("PLAY_PACKAGE_NAME") ?? "com.entrelares.app";
+
+		// T-111: a cancellation or a refund tells the operator once, keyed by
+		// this message (the ledger above already made it run once). Google is
+		// asked only for the test flag and the amount — best effort.
+		const alertFromRtdn = async (kind: "canceled" | "refund") => {
+			const purchase = await fetchStorePurchase(packageName, productId, purchaseToken)
+				.catch(() => null);
+			await notifySale(admin, {
+				saleKey: `play:rtdn:${messageId}`,
+				rail: "play",
+				kind,
+				cycle: playCycle(productId),
+				amountCents: kind === "refund" ? playAmountCents(purchase) : null,
+				currency: kind === "refund" ? playCurrency(purchase) : null,
+				isTest: isTestPurchase(purchase),
+			});
+		};
 
 		if (ACTIVATING.has(type)) {
 			// Ask Google what the truth is rather than trusting the message —
 			// the notification says WHICH purchase changed, not until when it
 			// now pays.
-			const packageName = notification.packageName ??
-				Deno.env.get("PLAY_PACKAGE_NAME") ?? "com.entrelares.app";
 			const purchase = await fetchStorePurchase(packageName, productId, purchaseToken);
 			if (!purchase) return jsonResponse({ ok: true, ignored: true });
 
@@ -168,6 +194,22 @@ serve(async (req) => {
 				p_plan: "premium",
 			});
 			if (planError) throw planError;
+
+			// T-111: a paid charge is a sale. The Google order id is the key the
+			// verification of the same period shares, so the app's verify and
+			// this RTDN tell the operator once between them; a RESTARTED (7)
+			// re-uses the running order and claims nothing new.
+			if (isPaidPurchase(purchase)) {
+				await notifySale(admin, {
+					saleKey: purchase.orderId ? `play:order:${purchase.orderId}` : `play:rtdn:${messageId}`,
+					rail: "play",
+					kind: playOrderKind(purchase.orderId),
+					cycle: playCycle(productId),
+					amountCents: playAmountCents(purchase),
+					currency: playCurrency(purchase),
+					isTest: isTestPurchase(purchase),
+				});
+			}
 			return jsonResponse({ ok: true, applied: "active" });
 		}
 
@@ -180,6 +222,7 @@ serve(async (req) => {
 				.update({ status: "canceled", canceled_at: nowUtc, updated_at: nowUtc })
 				.eq("id", subscription.id);
 			if (error) throw error;
+			await alertFromRtdn("canceled");
 			return jsonResponse({ ok: true, applied: "canceled" });
 		}
 
@@ -203,6 +246,9 @@ serve(async (req) => {
 				p_plan: "free",
 			});
 			if (planError) throw planError;
+			// T-111: REVOKED (12) is money returned; EXPIRED (13) is paid time
+			// running out, which the operator already heard of as a cancellation.
+			if (type === 12) await alertFromRtdn("refund");
 			return jsonResponse({ ok: true, applied: "free" });
 		}
 

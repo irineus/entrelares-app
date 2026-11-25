@@ -40,6 +40,9 @@ const _senders = [
   'supabase/functions/send-support-request/index.ts',
   // T-99: the weekly bulletin to the operator.
   'supabase/functions/weekly-bulletin/index.ts',
+  // T-111: the sale alert to the operator — a shared module the three billing
+  // functions call, so it imports the layer from its own directory.
+  'supabase/functions/_shared/sale_alert.ts',
 ];
 
 /// WCAG AA for body text. Every pair in the layer clears it, headings included,
@@ -218,7 +221,10 @@ void main() {
     for (final path in _senders) {
       test(path, () {
         final code = _code(repoFile(path));
-        expect(code, contains('from "../_shared/email_layout.ts"'),
+        expect(
+            code,
+            anyOf(contains('from "../_shared/email_layout.ts"'),
+                contains('from "./email_layout.ts"')),
             reason: '$path no longer imports the shared e-mail layer.');
         expect(code, isNot(contains('style=')),
             reason: '$path writes its own style again — the fix would have '

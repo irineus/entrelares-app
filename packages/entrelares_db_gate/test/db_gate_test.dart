@@ -68,6 +68,7 @@ import 'suites/plan_end_reminders.dart';
 import 'suites/trial_end_reminders.dart';
 import 'suites/unplanned_nudges.dart';
 import 'suites/weekly_bulletin.dart';
+import 'suites/sale_alert.dart';
 import 'suites/planning_horizon_gate.dart';
 import 'suites/platform_operator.dart';
 import 'suites/premium_entitlement.dart';
@@ -256,4 +257,7 @@ void main() {
   billingAvulsoTests(fx);
   billingStoreTests(fx);
   billingWebhookTests(fx);
+  // T-111: one e-mail to the operator per sale event — once per key, dark by
+  // the switch, no family data in the ledger.
+  saleAlertTests(fx);
 }

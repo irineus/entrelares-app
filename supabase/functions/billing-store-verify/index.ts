@@ -37,6 +37,15 @@ import {
 	priceCents,
 	purchaseExpiry,
 } from "../_shared/play.ts";
+import {
+	isPaidPurchase,
+	isTestPurchase,
+	notifySale,
+	playAmountCents,
+	playCurrency,
+	playCycle,
+	playOrderKind,
+} from "../_shared/sale_alert.ts";
 
 /** The Play products this app sells, and the cycle each one means. */
 const PRODUCT_CYCLES: Record<string, string> = {
@@ -198,6 +207,21 @@ serve(async (req) => {
 			p_plan: "premium",
 		});
 		if (planError) throw planError;
+
+		// T-111: the app usually reaches us before the RTDN does, so a first
+		// purchase is most often told from HERE. Same key as the RTDN (the
+		// Google order id), so whichever path comes second sends nothing.
+		if (isPaidPurchase(purchase)) {
+			await notifySale(admin, {
+				saleKey: purchase.orderId ? `play:order:${purchase.orderId}` : eventId,
+				rail: "play",
+				kind: playOrderKind(purchase.orderId),
+				cycle: playCycle(productId),
+				amountCents: playAmountCents(purchase),
+				currency: playCurrency(purchase),
+				isTest: isTestPurchase(purchase),
+			});
+		}
 
 		return jsonResponse({
 			ok: true,

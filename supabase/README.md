@@ -203,6 +203,7 @@ npx supabase functions deploy billing-checkout     --project-ref <project-ref>
 | `send-push-notification` | F-09: the push dispatcher. Fired by an AFTER INSERT trigger on `notifications` (pg_net, hence `--no-verify-jwt` and the secret key on `apikey`), so push and in-app are two renderings of ONE event (e-mail is a third only where F-59 kept it). Pushes the types in `PUSH_TYPES` only — since F-59 also the membership notices, by `kind` — and the rule is "push only what the recipient did not just do" — renders the copy per recipient from `_shared/push.ts` in that reader's language, and deletes the tokens FCM retires. **Fails closed and quiet on every branch**: no `FCM_SERVICE_ACCOUNT`, no device, or an unrenderable payload each answer 200 with a reason (arming: section 11) |
 | `send-account-email` | S-11 account-lifecycle e-mails. Since F-59 (02/10/2026): the leaver's OWN confirmation, the family-deletion request (requester + every other member) and its D-3 reminder, and the post-purge farewell. Someone joining, coming back or leaving (to the others), a deletion refused or withdrawn, and F-70's plan end are push + in-app; their types answer 200 `{skipped: "push_only"}` for the builds that still ask. S-15/B-3 added `premium_grace_ending` — the only type that e-mails ONLY the subject (a family admin), since billing is admin-only. S-21 added `elevation_code`, the odd one out: keyed by `userId` (the subject may have no profile yet), secret-key callers only (`elevate`), and the destination address is read from `auth.users` instead of trusted from the payload |
 | `weekly-bulletin` | T-99 cron worker (Mondays 12:00 UTC): e-mails the operator (`contato@`) the weekly sales bulletin from `admin_weekly_sales_bulletin()` — counts only. Secret key on `apikey` (hence `--no-verify-jwt`); `{"dry_run": true}` returns the subject and HTML without sending (the DB gate uses it); kill switch `ops.weekly_bulletin.enabled` |
+| `_shared/sale_alert.ts` | T-111 (not a function): the e-mail to the operator per sale event, called by `billing-webhook`, `billing-store-webhook` and `billing-store-verify` after the event is applied — once per key (`claim_sale_alert`), never throws; kill switch `ops.sale_alert.enabled` (section 4.6-quater-bis) |
 
 | `billing-webhook` | T-39: receives Asaas events (auth = the `ASAAS_WEBHOOK_TOKEN` shared secret in `asaas-access-token`, hence `--no-verify-jwt`). **Idempotent by the provider's event id** — a redelivery is recorded and ignored — and applies every effect through `set_family_plan`, adopting the subscription created by the payment link (`externalReference family:<id>`, link-id fallback) |
 | `billing-checkout` | T-39: called with the **user's** JWT and admin-only (guard chain 401→403→409→503); creates the Asaas Payment Link (`RECURRENT`, `dueDateLimitDays` — the API rejects it without one) so payer data is typed only on the provider's PCI page, and handles `cancel` honouring the period already paid. Refuses everything while `billing.enabled` is false; gateway failures are audited as `CHECKOUT_ERROR` in the ledger |
@@ -401,6 +402,30 @@ select public.admin_weekly_sales_bulletin(current_date); -- the week in progress
 select acquisition_source, acquisition_campaign, count(*) from public.families
  where created_at >= (public.acquisition_real_cohort_start()::timestamp at time zone 'America/Sao_Paulo')
  group by 1, 2 order by 3 desc;
+```
+
+### 4.6-quater-bis The sale alert (T-111) — nothing to do by hand
+
+`20261125120000_t111_sale_alerts.sql`. Google Play sends no per-sale
+notification, so the three billing functions tell the operator themselves, right
+after they applied the event (`_shared/sale_alert.ts`): **one e-mail to
+`contato@entrelares.app`** (`OPERATOR_INBOX` overrides) per first purchase,
+renewal, cancellation and refund, on both rails — `billing-webhook` (Asaas),
+`billing-store-webhook` (Play RTDN 1/2/4/7 paid, 3, 12) and `billing-store-verify`
+(the app's purchase, which usually beats the RTDN). Subject `Nova assinatura:
+Premium mensal · Google Play · R$ 5,99` (`[teste] ` for a license-tester purchase,
+`purchaseType` 0; `[Dev] ` outside production). Rail, kind, cycle, amount and
+time only — no family, member, e-mail or order id. **Once per event**:
+`claim_sale_alert` (service role) inserts the key into `sale_alerts` first — the
+Google order id (`play:order:GPA…`, shared by the verify and the RTDN of one
+period; `..N` = renewal), the Asaas payment (`CONFIRMED` + `RECEIVED` of one card
+charge) or the gateway subscription (`DELETED` + `INACTIVATED` of one
+cancellation). `sent_at` NULL = Resend refused (logged; never retried, and never a
+non-2xx to the gateway). Kill switch `ops.sale_alert.enabled` (operator console).
+A trial start is not a sale; EXPIRED (13) is not a refund.
+```sql
+select sale_key, rail, kind, cycle, amount_cents, is_test, created_at, sent_at
+  from public.sale_alerts order by created_at desc limit 20;
 ```
 
 ### 4.6-quinquies The referral reward crons (F-80 PR 3) — two owner/operator steps
