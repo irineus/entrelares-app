@@ -35,6 +35,9 @@ export interface StorePurchase {
 	priceCurrencyCode?: string;
 	acknowledgementState?: number;
 	orderId?: string;
+	/** Absent for a real purchase; 0 = a license-tester (test card) purchase,
+	 * 1 = promo code (T-111 tags the operator's alert "[teste]" on 0). */
+	purchaseType?: number;
 }
 
 function serviceAccount(): ServiceAccount {

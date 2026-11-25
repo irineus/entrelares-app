@@ -15,7 +15,7 @@
 # — so the gate judges the schema and the functions the branch proposes, with no
 # deploy and no shared state between runs.
 #
-# The functions get three values and nothing real (`supabase/functions/.env`,
+# The functions get four values and nothing real (`supabase/functions/.env`,
 # git-ignored, written here):
 #   · RESEND_API_KEY — a dummy. Every gate recipient is on `@resend.dev`, which
 #     `_shared/mail.ts` suppresses before the outbound call; the key only has to
@@ -24,6 +24,9 @@
 #     positive billing-webhook cases are always armed (on dev they depended on an
 #     optional secret).
 #   · APP_ENVIRONMENT=Development — the "[Dev] " subject tag, as on dev.
+#   · OPERATOR_INBOX — on `@resend.dev` (T-111): every billing case the suite
+#     drives tells the operator of a sale, and the operator mail must stop at
+#     `_shared/mail.ts` like every other gate recipient, not try Resend.
 #
 # Usage (repository root):  bash tool/db_gate_local.sh
 #   DART=<cmd>        how to call dart (default: `dart`; locally `fvm dart`)
@@ -45,6 +48,7 @@ cat > supabase/functions/.env <<EOF
 RESEND_API_KEY=re_db_gate_local_never_sent
 ASAAS_WEBHOOK_TOKEN=$webhook_token
 APP_ENVIRONMENT=Development
+OPERATOR_INBOX=delivered+operator@resend.dev
 EOF
 
 # Only what the gate talks to: Postgres, GoTrue, PostgREST, Kong, the edge

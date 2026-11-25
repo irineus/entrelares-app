@@ -49,6 +49,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretKey } from "../_shared/keys.ts";
+import { notifySale, type SaleCycle } from "../_shared/sale_alert.ts";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -203,6 +204,15 @@ serve(async (req: Request) => {
 
     const nowUtc = new Date().toISOString();
 
+    // T-111: what the operator's alert says about this row. Never a family id.
+    const paymentId = event.payment?.id ?? null;
+    const amountCents = typeof event.payment?.value === "number"
+      ? Math.round(event.payment.value * 100) : null;
+    const cycleOf = (single: boolean): SaleCycle =>
+      single ? "single"
+      : subscription!.cycle === "monthly" || subscription!.cycle === "annual"
+      ? subscription!.cycle : "unknown";
+
     if (ACTIVATING.has(eventType)) {
       // The paid invoice covers one cycle counted from whichever is LATEST:
       // its due date, the end of the already-paid period, or the end of a
@@ -290,6 +300,32 @@ serve(async (req: Request) => {
           .eq("id", subscription.family_id);
         if (trialError) throw trialError;
       }
+
+      // T-111: a renewal is a paid invoice of a gateway subscription that
+      // already had an EARLIER paid invoice; the first one (and an avulso Pix)
+      // is a purchase. Keyed by the payment, so the CONFIRMED and the RECEIVED
+      // of one card charge tell the operator once.
+      let kind: "purchase" | "renewal" = "purchase";
+      if (externalSubscriptionId && paymentId) {
+        const { data: earlier } = await supabase
+          .from("billing_events")
+          .select("id")
+          .eq("subscription_id", subscription.id)
+          .in("event_type", [...ACTIVATING])
+          .eq("payload->payment->>subscription", externalSubscriptionId)
+          .neq("payload->payment->>id", paymentId)
+          .limit(1);
+        if (earlier && earlier.length > 0) kind = "renewal";
+      }
+      await notifySale(supabase, {
+        saleKey: `asaas:pay:${paymentId ?? eventId}`,
+        rail: "asaas",
+        kind,
+        cycle: cycleOf(isSingle),
+        amountCents,
+        currency: "BRL",
+        isTest: false,
+      });
     } else if (eventType === "PAYMENT_OVERDUE") {
       // F-48: never for an avulso row — an unpaid single Pix charge is simply
       // an abandoned checkout, and an expired paid one is a lapse the grace
@@ -314,6 +350,16 @@ serve(async (req: Request) => {
         p_plan: "free",
       });
       if (planError) throw planError;
+
+      await notifySale(supabase, {
+        saleKey: `asaas:refund:${paymentId ?? eventId}`,
+        rail: "asaas",
+        kind: "refund",
+        cycle: cycleOf(subscription.single_charge),
+        amountCents,
+        currency: "BRL",
+        isTest: false,
+      });
     } else if (CANCELING.has(eventType)) {
       const { error } = await supabase
         .from("subscriptions")
@@ -321,6 +367,18 @@ serve(async (req: Request) => {
         .eq("id", subscription.id);
       if (error) throw error;
       // Premium runs until current_period_end; the PR3 cron flips it on lapse.
+
+      // T-111: DELETED and INACTIVATED both arrive for one cancellation —
+      // keyed by the gateway subscription, the operator hears it once.
+      await notifySale(supabase, {
+        saleKey: `asaas:cancel:${externalSubscriptionId ?? eventId}`,
+        rail: "asaas",
+        kind: "canceled",
+        cycle: cycleOf(false),
+        amountCents: null,
+        currency: null,
+        isTest: false,
+      });
     }
     // Unknown event types: ledger row already written above — acknowledged.
 
